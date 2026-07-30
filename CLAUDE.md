@@ -5,11 +5,11 @@
 
 ## 1. 项目概览
 
-- **项目**：multilingual-course-assistant — 大学课程材料多语言问答（RAG，开源权重 LLM，Qwen 系）+ Django/Celery 网站（PPM 部分）。**Triennale 毕业论文**，UniFi，relatore Prof. Marco Bertini；单人开发（Junliang Zheng）。
+- **项目**：multilingual-course-assistant — 大学课程材料多语言问答（RAG，开源权重 LLM，Qwen 系；语料含往年 scritto 真题，仅 QA，⛔ 出题/判卷）+ 网站（PPM 部分）：Django/DRF + Celery 后端、React SPA 前端。**Triennale 毕业论文**，UniFi，relatore Prof. Marco Bertini；单人开发（Junliang Zheng）。
 - **当前阶段 🔶 scaffold**：只有文档；无应用代码、无测试、无 CI。
-- **范围**：定义在 `ROADMAP.md`（里程碑 M0–M6、阻塞项、给 relatore 的问题清单）；relatore 的约束在 `docs/architettura.md`。**禁用专有 LLM API**（OpenAI/Claude）：只用开源权重模型。
-- **技术栈 🔶 部分确定**：已定 Python 3.12 via uv · Django 5 · Celery+Redis · Qwen3（LLM/embedding/reranker）· Docling。未定 🔒（解锁条件：M1 + 与 relatore 的 Meet）：RAG 路线、向量库、DB、推理服务、评估方法 — 唯一决策表在 `docs/architettura.md`。**禁止引入 🔒 项的依赖或配置文件**；M2 之前不引入任何依赖。
-- **目录结构 🔜 M2**：随 RAG 路线一起确定。未定前不建"顺手"目录。
+- **范围**：定义在 `ROADMAP.md`（里程碑 M0–M7、阻塞项、给 relatore 的问题清单）；relatore 的约束在 `docs/architettura.md`。**禁用专有 LLM API**（OpenAI/Claude）：只用开源权重模型。MCP/外部知识源 🔜 M7（可选，论文范围外）。
+- **技术栈 🔶 大部分已定**：已定 Python 3.12 via uv · Django 5 + DRF · Celery+Redis · Qwen3（LLM/embedding/reranker）· Docling · React+TS SPA（Vite）。🔶 倾向（待 M1 实验 + Meet 确认）：自建 RAG pipeline、Qdrant hybrid、vLLM、RAGAS、Langfuse、PostgreSQL、工程化链 — 唯一决策表在 `docs/architettura.md`。依赖规则：**🔒 项禁止引入依赖或配置文件**；🔶 项自 M2 起可引入（Meet 后如变更，原地替换）；M2 之前不引入任何依赖。
+- **目录结构 🔜 M2**：项目初始化时确定。未定前不建"顺手"目录。
 - **语言域**：业务领域是多语言的；所有数据模型和面向用户的文本从一开始就带 `locale` 字段/参数，禁止硬编码语言字符串。
 - **深入文档**：具体主题放 `docs/`，本文件只放指针。
 

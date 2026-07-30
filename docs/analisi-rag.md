@@ -57,7 +57,7 @@ Qwen3-Embedding 与 Qwen3-Reranker 系列：两者都有 **0.6B / 4B / 8B** 三�
 | 论文中的可解释性     | 高（每步都是自己的代码） | 中                  | 中低                |
 | 起步速度             | 中                       | 高                  | 高                  |
 
-带去 Meet 的提案（决策仍 🔒 归 relatore/用户）：**轻量自建 pipeline**（docling → chunk → Qwen3-Embedding → rerank → Qwen3）为主系统，**Qwen-Agent/BM25 做实验基线**；LlamaIndex 仅当需要现成组件时考虑（LlamaIndex 有 Docling reader）。
+带去 Meet 的提案：**轻量自建 pipeline**（docling → chunk → Qwen3-Embedding → rerank → Qwen3）为主系统，**Qwen-Agent/BM25 做实验基线**；LlamaIndex 仅当需要现成组件时考虑（LlamaIndex 有 Docling reader）。拍板结果与当前状态见 [architettura.md](architettura.md) 决策表（本文件是 M1 分析记录，不是决策属主）。
 
 ## 最小实验提案（M1）
 
