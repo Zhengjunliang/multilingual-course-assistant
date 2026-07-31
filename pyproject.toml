@@ -5,6 +5,7 @@ description = "Multilingual QA over university course materials (RAG, open-weigh
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "django>=5.2,<6",
+    "docling>=2.117.0",
     "pydantic-settings>=2",
 ]
 
@@ -24,6 +25,8 @@ package = false
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+# Snippets in docs/ are illustrative prose, aligned for reading, not compiled code.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]

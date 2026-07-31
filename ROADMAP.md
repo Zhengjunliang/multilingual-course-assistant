@@ -33,11 +33,15 @@
 
 ### M2 — 单语言 RAG 原型
 
-意大利语材料 + 意大利语提问（IT→IT，已定），CLI 级别，不做 web。语料：课程 slides/讲义 PDF（已有）。
+英语材料 + 英语提问（EN→EN），CLI 级别，不做 web。
+
+语料 2026-07-31 实测（31 份 PPM slides，约 1200 页）：**英语为主，~23 份英语、~8 份意大利语或英意混排**，全部有文字层（无扫描件）。原计划的 IT→IT 因此不成立 —— 单语基线改用占语料 3/4 的英语，relatore 要求的「先同语言再跨语言」递进保持不变。语料事实与决策见 [docs/architettura.md](docs/architettura.md)。
 
 - [x] 项目初始化：uv + Python 3.12、目录结构、工程化链、Django 骨架 — [pyproject.toml](pyproject.toml) · [.pre-commit-config.yaml](.pre-commit-config.yaml) · [.github/workflows/ci.yml](.github/workflows/ci.yml) · `config/` · `rag/` · `tests/`
 - [ ] 服务器侧：`~/.bashrc` 设 `HF_HOME=/oblivion/users/jzheng/hf_cache`（Qwen3 推理前）
-- [ ] Ingest：Docling → chunking（课程 PDF）；同时验证解析质量 — 重音字符、公式、表格、多栏阅读顺序，经典 pipeline vs VlmPipeline
+- [x] Ingest 步骤 1 — Docling 解析（`rag/parse.py`）：经典 pipeline，OCR 默认关。解析质量已验收（词间空格、重音、表格、标题层级），结果表在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)
+- [ ] Ingest 步骤 1b — 全语料解析一遍（31 份约 1200 页，约 20 分钟），确认连字与多栏阅读顺序；`3.5-HTML5-Part-2` 单独试 VlmPipeline
+- [ ] Ingest 步骤 2 — chunking：HybridChunker + 与 Qwen3-Embedding 对齐的 tokenizer，chunk 带 `locale` · `course` · `source_file` · `page` · `heading_path`
 - [ ] Hybrid 检索：Qdrant 本地模式（dense Qwen3-Embedding + sparse BM25）+ Qwen3-Reranker
 - [ ] Qwen3 生成回答
 - [ ] 用真实课程材料端到端跑通
@@ -55,7 +59,7 @@
 
 relatore 表示是可选项（«poi si passa (eventualmente) alla parte di traduzione»）：M3 之后经他同意才启动。
 
-- [ ] 英文（± 中文）提问意大利语材料
+- [ ] 意大利语（± 中文）提问混合语料 — IT→EN、ZH→EN。这是真实场景：学生用意大利语问，材料主体是英语
 - [ ] 用 M3 的指标对比跨语言 vs 单语言质量
 
 ### M5 — 网站（PPM 部分）
@@ -96,7 +100,7 @@ relatore 表示是可选项（«poi si passa (eventualmente) alla parte di tradu
 
 Meet 🔜 未安排，不阻塞任何里程碑。
 
-自主拍板项（2026-07-30）报备即可，不等答复：Django + DRF + React SPA · Qdrant hybrid · vLLM · RAGAS + 检索指标 · 语料只用课程 PDF · gold set 自建 · IT→IT 起步 · 网站与 RAG 同仓库交付。
+自主拍板项（2026-07-30）报备即可，不等答复：Django + DRF + React SPA · Qdrant hybrid · vLLM · RAGAS + 检索指标 · 语料只用课程 PDF · gold set 自建 · EN→EN 起步（语料实测英语为主）· 网站与 RAG 同仓库交付。
 
 待 relatore 答复：
 

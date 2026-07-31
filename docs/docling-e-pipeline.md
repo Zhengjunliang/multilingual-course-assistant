@@ -27,7 +27,7 @@ flowchart LR
 
 三条心法：
 
-- **Ingest 的错误会被永久固化。** PDF 解析把 `perché` 读成 `perche`、把两栏读成一栏，之后再强的 LLM 也救不回来 —— 索引里就是错的。所以 M1 最小实验先验证解析质量，顺序不能反。
+- **Ingest 的错误会被永久固化。** PDF 解析把 `perché` 读成 `perche`、把两栏读成一栏，之后再强的 LLM 也救不回来 —— 索引里就是错的。所以 ingest 的第一步就是验证解析质量，顺序不能反。
 - **在线部分是线性流水线。** 没有循环、没有条件跳转、没有「模型自己决定下一步」。这一点直接决定了第 5 节的框架取舍。
 - **LLM 是最后一步，也是最不重要的一步。** 检索没召回正确片段，生成阶段只能编。论文里 M3 的 RAGAS 指标之所以要分开测 *context precision/recall*（检索）和 *faithfulness*（生成），就是为了把锅分清楚。
 
@@ -65,7 +65,7 @@ flowchart TD
 | DoclingDocument | **统一文档模型**，下游一切的唯一源 | `.document` |
 | Chunker / Serializer | 切块喂给 embedding；或导出 Markdown/JSON | `HybridChunker` |
 
-关键点：**`DoclingDocument` 是中间表示**。不管前面走哪条 pipeline、输入是 PDF 还是 PPTX，下游代码只面对同一个对象 → ingest 代码写一次，换 pipeline 只改配置。这正是要在 M1 做 A/B 对比却不用写两套代码的原因。
+关键点：**`DoclingDocument` 是中间表示**。不管前面走哪条 pipeline、输入是 PDF 还是 PPTX，下游代码只面对同一个对象 → ingest 代码写一次，换 pipeline 只改配置。这正是能对两条 pipeline 做 A/B 对比却不用写两套 ingest 代码的原因。
 
 ### 2.3 两条 pipeline
 
@@ -86,7 +86,7 @@ flowchart LR
 | 维度 | 经典 pipeline | VlmPipeline（granite-docling） |
 | --- | --- | --- |
 | 原理 | 多个专用小模型串联，每步职责单一 | 一个视觉语言模型端到端「看图写标记」 |
-| 算力 | CPU 可跑，本地笔记本够用 | 实际要 GPU；老卡有 bfloat16 限制（含 Colab T4） |
+| 算力 | CPU 可跑，本地笔记本够用 | 实际要 GPU；MICC 的 Turing 卡无 bfloat16，须用 fp16 |
 | 数字版 PDF | 已经很稳，是默认选择 | 未必更好，且慢 |
 | 扫描件 / 复杂版面 | 依赖 OCR 质量，易错 | 强项 |
 | 可调试性 | 每步中间产物可看，出错能定位到具体模型 | 黑盒；错了只能换提示或换模型 |
@@ -132,17 +132,33 @@ for chunk in chunker.chunk(doc):
     meta = chunk.meta                     # page / headings / provenance -> payload
 ```
 
-命令行快速试：`docling slides.pdf`（经典）· `docling --pipeline vlm --vlm-model granite_docling slides.pdf`（VLM）。M1 最小实验就是这两条命令跑同一份课程 PDF 然后对比。
+命令行快速试：`docling slides.pdf`（经典）· `docling --pipeline vlm --vlm-model granite_docling slides.pdf`（VLM）。
 
 ### 2.7 要盯的验证点
 
-意大利语课程 slide 的具体风险，按优先级：
+按 2026-07-31 的语料实测（事实见 [architettura.md](architettura.md) 语料一节）排的优先级：
 
-1. **重音字符**：`à è é ì ò ù` 会不会变成乱码或被拆开 —— 一旦坏掉，BM25 精确匹配全废。
-2. **多栏阅读顺序**：slide 常见两栏，顺序错了会把不相干的两句粘成一个 chunk。
-3. **公式与符号**：课程材料的核心内容。
-4. **表格**：单元格边界、合并单元格。
-5. **页眉页脚重复文本**：每页都有的课程名会污染每个 chunk。
+1. **词间空格**：pypdf 抽出来是 `"Video isa sequenceof framesconsecutivelytransmitted"`，词全粘在一起。Docling 修不修得好决定 BM25 还能不能用 —— 这是本语料最严重的问题。
+2. **连字（ligature）**：`micc.uniﬁ.it` 里的 `ﬁ` 是单字符 U+FB01。不归一化成 `fi`，字面检索必漏。`ﬂ` 同理。
+3. **重音字符**：`à è é ì ò ù`，意大利语那 8 份里必然出现 —— 坏掉则 BM25 精确匹配全废。
+4. **多栏阅读顺序**：slide 常见两栏，顺序错了会把不相干的两句粘成一个 chunk。
+5. **图片型页面**：`3.5-HTML5-Part-2` 文字都在图里，经典 pipeline 大概率交白卷 → VlmPipeline 的对照样本。
+6. **表格与公式**：单元格边界、合并单元格；视频编码那几份公式密集。
+7. **页眉页脚重复文本**：每页都有的课程名会污染每个 chunk。
+
+实测结果 ✅（2026-07-31，经典 pipeline，`rag/parse.py`，4 份样本）：
+
+| 验证点 | 结果 |
+| --- | --- |
+| 词间空格 | **修好**。pypdf 的 `"Video isa sequenceof frames"` → Docling 的 `"Video is a sequence of frames"` |
+| 重音字符 | 正常：`più` · `è` · `ambiguità` · `può` |
+| 表格 | 结构还原成真 markdown 表格，边界正确 |
+| 标题层级 | 识别出 `##` 层级 → `contextualize()` 有标题链可用 |
+| 连字 | 已解析样本中 U+FB01 残留 0；但样本本身不含 `uniﬁ`，语料级验证待 `3.1-web-intro-html` 与 `3.9-javascript` |
+| 图片型页面 | `3.5-HTML5-Part-2` 即使开 OCR 仍主要是 `<!-- image -->` 占位 → 交给 VlmPipeline |
+| HTML 标签转义 | **不一致**：正文 `&lt;div&gt;`，表格内裸 `<header>`。web 课程语料里搜 `<nav>` 可能受影响，待 chunking 后评估 |
+
+OCR 的取舍（实测，同一份 28 页意大利语 slides）：开 43.8s / 关 27.0s，**产出字符完全相同（11040）**。语料 31 份全有文字层 → `rag/parse.py` 把 `do_ocr` 默认设为 `False`，与 Docling 自身默认相反。唯一例外是图片型的 `3.5`：开 OCR 花 527s，但抽取量从 pypdf 的 10001 涨到 20032，值这个钱。
 
 ## 3. Ingest pipeline 逐步
 
@@ -281,4 +297,4 @@ flowchart TD
 
 模块划分只是职责示意，实际目录结构在 M2 实现时确定（规则见 CLAUDE.md：未定前不建「顺手」目录）。
 
-最短路径：一份真实课程 PDF → `docling` 两条 pipeline 各跑一遍 → 人眼比对意大利语 Markdown（重音、公式、栏序、表格）→ 选定 pipeline 后再往下接 chunking。**先验证解析，再谈检索。**
+最短路径：真实课程 PDF → 两条 pipeline 各跑一遍 → 按 2.7 的清单比对输出（词间空格、连字、重音、栏序、图片型页面）→ 选定 pipeline 后再往下接 chunking。**先验证解析，再谈检索。**
