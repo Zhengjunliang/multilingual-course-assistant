@@ -39,3 +39,7 @@ Thumbs.db
 # Data / modelli
 *.sqlite3
 *.db
+
+# Esperimenti: script e conclusioni sotto git, materiali e output no
+experiments/**/data/
+experiments/**/out/

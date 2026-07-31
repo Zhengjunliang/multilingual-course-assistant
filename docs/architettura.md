@@ -29,27 +29,29 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 | Embedding/Rerank | Qwen3-Embedding / Qwen3-Reranker  | 与 LLM 同源的一体化方案，relatore 链接指向的路线                          |
 | 文档解析       | Docling（Granite-Docling）          | relatore 建议；开源最强 PDF→结构化，经典 pipeline 与 VlmPipeline 对比    |
 
-选 Django 不选 Flask 的理由：对单人开发 Django **减少**代码量（admin、auth、ORM、i18n 内置）；Flask 需手动拼装。待 Meet 时向 relatore 确认。前端选 React SPA 弃 HTMX 的理由：PPM 展示性与流式交互；待 Meet 确认满足 PPM 评分要求（问题清单 8）。
+选 Django 不选 Flask 的理由：对单人开发 Django **减少**代码量（admin、auth、ORM、i18n 内置）；Flask 需手动拼装。前端选 React SPA 弃 HTMX 的理由：PPM 展示性与流式交互。两项 2026-07-30 拍板确认（PPM 无 UI 评分要求，前端自主）。
 
 ## 决策状态
 
-原则（2026-07-29 拍板）：技术决策不等 Meet 死锁 — 有依据即定 🔶 倾向，实验验证 + Meet 确认后关闭；🔒 只留 relatore 属主项。依赖规则：🔒 项**禁止**引入依赖或配置文件；🔶 项自 M2 起可引入（Meet 后如变更，原地替换 — 规则在 CLAUDE.md）。
+原则（2026-07-29 拍板，2026-07-30 收敛）：技术决策自主，**不挂 relatore 确认** — 有依据即定，实验验证后关闭；🔒 只留 relatore 真正属主的项（跨语言启动、截止日期）。依赖规则：🔒 项**禁止**引入依赖或配置文件；🔶 项自 M2 起可引入（实验推翻则原地替换 — 规则在 CLAUDE.md）。
 
-| 决策       | 选择 / 倾向                                                                                                   | 状态 | 验证条件                  |
+| 决策       | 选择                                                                                                          | 状态 | 验证条件                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | ---- | ------------------------- |
-| RAG 路线   | 自建 pipeline：Docling → chunk → hybrid 检索 → rerank → Qwen3；Qwen-Agent/纯 BM25 做对照基线（分析见 [analisi-rag.md](analisi-rag.md)）；不用 LlamaIndex/LangGraph 全家桶（可解释性优先） | 🔶   | M1 最小实验 + Meet 问题 9 |
+| RAG 路线   | 自建 pipeline：Docling → chunk → hybrid 检索 → rerank → Qwen3；Qwen-Agent/纯 BM25 做对照基线（分析见 [analisi-rag.md](analisi-rag.md)）；不用 LlamaIndex/LangGraph 全家桶（可解释性优先） | 🔶   | M1 最小实验               |
 | 向量库     | Qdrant：原生 hybrid（dense Qwen3-Embedding + sparse BM25）、locale/课程 payload 过滤、量化；M2 用 qdrant-client 本地模式（无服务器进程），M5 起 Docker；降级备选 pgvector | 🔶   | M2 实测                   |
 | 数据库     | M2 原型无 DB（文件 + Qdrant 本地）；M5 起 PostgreSQL（Docker）                                                 | 🔶   | M5                        |
 | 推理服务   | vLLM（MICC 服务器端，OpenAI 兼容端点 + 流式）；Colab 备用时直接 transformers                                   | 🔶   | M1 ultron 尺寸实验        |
 | 可观测性   | Langfuse 自托管（Docker），LLM tracing                                                                         | 🔶   | M3 接入                   |
-| 评估方法   | 提案：RAGAS（faithfulness · answer relevancy · context precision/recall，judge = 开源权重 Qwen3 大尺寸）+ 检索指标（hit@k、MRR）+ 真题 gold set | 🔒   | relatore（Meet 问题 2/6） |
-| 目标语言   | 倾向：IT→IT（M2）→ EN→IT（M4）→ 中文可选                                                                       | 🔒   | relatore（Meet 问题 3）   |
+| 评估方法   | RAGAS（faithfulness · answer relevancy · context precision/recall，judge = 开源权重 Qwen3 大尺寸）+ 检索指标（hit@k、MRR）；gold set 自建（无现成数据集） | 🔶   | M3 跑通                   |
+| 目标语言   | IT→IT（M2）；EN→IT 🔒 M4（relatore 属主）；中文可选                                                            | 🔶   | M2 端到端                 |
+
+评估方法自主拍板（2026-07-30）：relatore 只要求"能评估回答质量"，未指定指标。gold set 无现成数据集，M3 从课程材料自建（LLM 辅助生成 + 人工校验）。
 
 ## 语料与交付范围
 
-- **语料**：课程 slides/讲义 + **往年 scritto 真题 PDF**，同一 ingest 管线进知识库；真题同时是 M3 gold set 的种子。
+- **语料**：课程 slides/讲义 PDF（已有），Docling 统一进 ingest 管线。往年 scritto 真题暂缓 🔜（见 [ROADMAP.md](../ROADMAP.md) 暂缓项）。
 - **能力边界**：检索问答（QA）。出题 / 自动判卷 ⛔ 超出范围。
-- **交付**：React SPA + DRF API（SSE 流式问答）+ Django admin 材料后台。
+- **交付**：React SPA + DRF API（SSE 流式问答）+ Django admin 材料后台，与 RAG 部分**同一仓库**。
 - **外部知识源**（MCP、Google Drive 等）🔜 M7（可选，post-M6，见 [ROADMAP.md](../ROADMAP.md)）。
 
 ## 工程化 🔜 M2

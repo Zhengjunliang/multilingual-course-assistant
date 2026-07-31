@@ -1,17 +1,17 @@
 # ROADMAP
 
-**范围**：Triennale 毕业论文（信息工程，UniFi — relatore Prof. Marco Bertini）：大学课程材料的多语言问答（语料含往年 scritto 真题，仅 QA，⛔ 出题/判卷），RAG + 开源权重 LLM（Qwen 系），另含网站（PPM 部分）：Django/DRF + Celery/Redis 后端 + React SPA 前端。relatore 约束、技术栈与决策状态见 [docs/architettura.md](docs/architettura.md)。
+**范围**：Triennale 毕业论文（信息工程，UniFi — relatore Prof. Marco Bertini）：大学课程材料的多语言问答（仅 QA，⛔ 出题/判卷），RAG + 开源权重 LLM（Qwen 系），另含网站（PPM 部分）：Django/DRF + Celery/Redis 后端 + React SPA 前端。relatore 约束、技术栈与决策状态见 [docs/architettura.md](docs/architettura.md)。
 
 ## 里程碑
 
-### M0 — 脚手架与基础决策 🔶
+### M0 — 脚手架与基础决策 ✅
 
-已有：仓库、`.gitignore`、`CLAUDE.md`、`README.md`、本 roadmap、`docs/architettura.md`、初始 commit（`f5d7285`）。缺：Meet 确认项（Django、前端与技术栈升级 — 问题 7/8/9）。
+已有：仓库、`.gitignore`、`CLAUDE.md`、`README.md`、本 roadmap、`docs/architettura.md`、`docs/analisi-rag.md`。技术栈与评估方法自主拍板（2026-07-30），不再挂 relatore 确认；relatore 属主项只剩跨语言启动（M4）。
 
 - [x] 仓库初始化（`.gitignore`、`CLAUDE.md`）
 - [x] 技术栈基础决策（表在 `docs/architettura.md`）
 - [x] 文档初始 commit（`f5d7285`）
-- [ ] Meet 时向 relatore 确认 Django
+- [x] Django 确认（自主拍板，2026-07-30）
 
 ### M1 — RAG 学习与分析
 
@@ -28,22 +28,24 @@
 - [ ] MICC 接入：NAS 个人 home 🔒（sysadmin 补建 — 已确认 `/oblivion/users/` 与 `/equilibrium/` 下均缺）、设 `HF_HOME`
 - [ ] 最小实验（MICC 服务器，或 Colab T4 备用）：Docling 解析一个课程 PDF + Qwen3 推理
 - [x] 路线对比 → 自建 pipeline + 各领域最佳组件（分析在 `docs/analisi-rag.md`，决策表在 `docs/architettura.md`）
-- [ ] 与 relatore Meet（问题清单在文末）并确认已定/🔶 倾向栈
-- [ ] 用 Meet 结论更新 `docs/architettura.md` 与 `CLAUDE.md`
+- [x] 决策收敛落文档（2026-07-30 自主拍板：Django、评估方法、目标语言、语料范围）
+- [ ] 与 relatore Meet：同步进度，报备自主决策（不阻塞任何里程碑）
 
 ### M2 — 单语言 RAG 原型
 
-意大利语材料 + 意大利语提问，CLI 级别，不做 web。可基于 🔶 倾向栈在 Meet 前启动（依赖规则见 `docs/architettura.md`）；语料含往年 scritto 真题 PDF。
+意大利语材料 + 意大利语提问（IT→IT，已定），CLI 级别，不做 web。语料：课程 slides/讲义 PDF（已有）。
 
 - [ ] 项目初始化：uv、Python 3.12、目录结构、工程化链（ruff · pyright · pytest · pre-commit · CI）
-- [ ] Ingest：Docling → chunking（slides + 真题 PDF）
+- [ ] Ingest：Docling → chunking（课程 PDF）
 - [ ] Hybrid 检索：Qdrant 本地模式（dense Qwen3-Embedding + sparse BM25）+ Qwen3-Reranker
 - [ ] Qwen3 生成回答
 - [ ] 用真实课程材料端到端跑通
 
 ### M3 — 评估
 
-- [ ] 基于所选材料构建 gold 问答集（往年 scritto 真题做种子）
+无现成 gold set，需自建（决策见 `docs/architettura.md`）。
+
+- [ ] 基于课程材料构建 gold 问答集（人工 + LLM 辅助生成，人工校验）
 - [ ] RAGAS 指标（忠实度、相关性、context precision/recall）+ 检索指标（hit@k、MRR），可复现评估脚本
 - [ ] Langfuse 接入（tracing，自托管）
 - [ ] 模型尺寸对比（0.6B / 4B / 8B）：质量与运行成本
@@ -80,19 +82,22 @@ relatore 表示是可选项（«poi si passa (eventualmente) alla parte di tradu
 
 | 阻塞                                                | 谁解锁              |
 | --------------------------------------------------- | ------------------- |
-| 期望的评估标准                                      | relatore（Meet）    |
-| 目标语言组合                                        | relatore（Meet）    |
+| 跨语言部分是否启动（M4）                            | relatore            |
 | 毕业 session / 截止日期                             | 用户 + relatore     |
 | MICC NAS 个人 home（只阻塞 M1 实验）                | MICC sysadmin       |
 
-## Meet 问题清单（给 relatore）
+## 暂缓项
 
-1. 从哪门课、哪些材料开始？什么格式（slide PDF、讲义、其他）？往年 scritto 真题可否提供（语料 + gold set 种子）？
-2. 期望用什么标准评估回答质量？
-3. 语言组合：从英文提问意大利语材料开始？中文是否纳入？
-4. 确认：论文实验跑在 MICC 服务器上（技术细节找 sysadmin）？
-5. PPM 部分（网站）是否在同一个仓库交付？
-6. 是否已有可用作 gold set 的问答数据集？
-7. 确认 Django 选择（理由在 `docs/architettura.md`）。
-8. PPM 网站的 UI 有什么要求/评分标准？前端采用 React SPA + DRF（理由在 `docs/architettura.md`）是否满足 PPM 要求？
-9. 确认技术栈升级：Qdrant hybrid 检索、vLLM、RAGAS、Langfuse（决策表在 `docs/architettura.md`）。
+| 项                                          | 状态 | 说明                                                        |
+| ------------------------------------------- | ---- | ----------------------------------------------------------- |
+| 往年 scritto 真题（语料 + gold set 种子）   | 🔜 M4 后 | 2026-07-30 决定暂不纳入；M2/M3 只用课程 slides/讲义 PDF。加入时走同一 ingest 管线，不为其做特殊设计 |
+
+## Meet 议题（给 relatore）
+
+自主拍板项（2026-07-30）报备即可，不等答复：Django + DRF + React SPA · Qdrant hybrid · vLLM · RAGAS + 检索指标 · 语料只用课程 PDF · gold set 自建 · IT→IT 起步 · 网站与 RAG 同仓库交付。
+
+待 relatore 答复：
+
+1. 跨语言部分（M4）何时/是否启动 — 论文标题的核心能力，relatore 邮件称 «eventualmente»。
+2. 毕业 session 与截止日期。
+3. 论文实验跑在 MICC 服务器上是否需要额外报备（技术细节找 sysadmin）。

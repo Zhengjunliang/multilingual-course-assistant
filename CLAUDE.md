@@ -5,11 +5,11 @@
 
 ## 1. 项目概览
 
-- **项目**：multilingual-course-assistant — 大学课程材料多语言问答（RAG，开源权重 LLM，Qwen 系；语料含往年 scritto 真题，仅 QA，⛔ 出题/判卷）+ 网站（PPM 部分）：Django/DRF + Celery 后端、React SPA 前端。**Triennale 毕业论文**，UniFi，relatore Prof. Marco Bertini；单人开发（Junliang Zheng）。
+- **项目**：multilingual-course-assistant — 大学课程材料多语言问答（RAG，开源权重 LLM，Qwen 系；仅 QA，⛔ 出题/判卷）+ 网站（PPM 部分）：Django/DRF + Celery 后端、React SPA 前端，同一仓库。**Triennale 毕业论文**，UniFi，relatore Prof. Marco Bertini；单人开发（Junliang Zheng）。
 - **当前阶段 🔶 scaffold**：只有文档；无应用代码、无测试、无 CI。
-- **范围**：定义在 `ROADMAP.md`（里程碑 M0–M7、阻塞项、给 relatore 的问题清单）；relatore 的约束在 `docs/architettura.md`。**禁用专有 LLM API**（OpenAI/Claude）：只用开源权重模型。MCP/外部知识源 🔜 M7（可选，论文范围外）。
-- **技术栈 🔶 大部分已定**：已定 Python 3.12 via uv · Django 5 + DRF · Celery+Redis · Qwen3（LLM/embedding/reranker）· Docling · React+TS SPA（Vite）。🔶 倾向（待 M1 实验 + Meet 确认）：自建 RAG pipeline、Qdrant hybrid、vLLM、RAGAS、Langfuse、PostgreSQL、工程化链 — 唯一决策表在 `docs/architettura.md`。依赖规则：**🔒 项禁止引入依赖或配置文件**；🔶 项自 M2 起可引入（Meet 后如变更，原地替换）；M2 之前不引入任何依赖。
-- **目录结构 🔜 M2**：项目初始化时确定。未定前不建"顺手"目录。
+- **范围**：定义在 `ROADMAP.md`（里程碑 M0–M7、阻塞项、暂缓项、Meet 议题）；relatore 的约束在 `docs/architettura.md`。**禁用专有 LLM API**（OpenAI/Claude）：只用开源权重模型。语料只用课程 slides/讲义 PDF（scritto 真题暂缓 🔜）。MCP/外部知识源 🔜 M7（可选，论文范围外）。
+- **技术栈 🔶 全部自主已定**：Python 3.12 via uv · Django 5 + DRF · Celery+Redis · Qwen3（LLM/embedding/reranker）· Docling · React+TS SPA（Vite）· 自建 RAG pipeline · Qdrant hybrid · vLLM · RAGAS · Langfuse · PostgreSQL · 工程化链 — 唯一决策表在 `docs/architettura.md`，🔶 项待实验验证（推翻则原地替换）。依赖规则：**🔒 项禁止引入依赖或配置文件**；🔶 项自 M2 起可引入；M2 之前主项目不引入任何依赖（`experiments/` 例外，见下）。
+- **目录结构 🔜 M2**：项目初始化时确定。未定前不建"顺手"目录。唯一例外 `experiments/<里程碑>-<主题>/`：里程碑实验的脚本与结论进 git（论文可复现证据），各自用**独立 venv**、不写进主项目依赖；`.venv/`、`data/`（版权材料）、`out/` 由 `.gitignore` 排除。
 - **语言域**：业务领域是多语言的；所有数据模型和面向用户的文本从一开始就带 `locale` 字段/参数，禁止硬编码语言字符串。
 - **深入文档**：具体主题放 `docs/`，本文件只放指针。
 
@@ -31,7 +31,7 @@
 
 ## 3. Git
 
-1. **Commit**：AI 可以改文件、`git add`、`git diff`、`git status`；`git commit` **仅在用户要求时**执行。一个逻辑单元一个 commit，消息用英文，Conventional Commits 格式（`feat:` · `fix:` · `docs:` · `chore:` · `refactor:` · `test:`）。
+1. **Commit 归用户**：AI 可以改文件、`git add`、`git diff`、`git status`；**永不执行 `git commit`** — 把完整命令打印出来，用户在自己终端执行。一个逻辑单元一个 commit，消息用英文，Conventional Commits 格式（`feat:` · `fix:` · `docs:` · `chore:` · `refactor:` · `test:`）。
 2. **禁止生成签名**：commit 消息和 PR 正文**不含** `Co-Authored-By: Claude …`、`🤖 Generated with …` 等任何 AI 工具签名。消息以最后一行内容结束。
 3. **远程与账号归用户**：AI **永不执行** `git push`，也不做远程/账号级操作（建删仓库、改 `git remote`、任何 `gh` 写操作、`git config --global`、`gh auth`）。其余场景**打印命令，用户在自己终端执行**。
 4. **永不重写共享历史**：无明确要求不 `push --force`、不对未提交工作 `reset --hard`、不 rebase 已发布的 commit。
