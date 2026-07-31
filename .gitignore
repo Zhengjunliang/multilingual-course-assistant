@@ -40,6 +40,5 @@ Thumbs.db
 *.sqlite3
 *.db
 
-# Esperimenti: script e conclusioni sotto git, materiali e output no
-experiments/**/data/
-experiments/**/out/
+# Materiale di corso (copyright), indici Qdrant locali, output di parsing
+/data/

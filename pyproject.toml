@@ -1,0 +1,41 @@
+[project]
+name = "multilingual-course-assistant"
+version = "0.1.0"
+description = "Multilingual QA over university course materials (RAG, open-weight Qwen)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "django>=5.2,<6",
+    "pydantic-settings>=2",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit",
+    "pyright",
+    "pytest",
+    "pytest-django",
+    "ruff",
+]
+
+[tool.uv]
+# Application, not a distributable library: nothing to build or install.
+package = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+include = ["config", "rag", "tests"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["."]
+testpaths = ["tests"]

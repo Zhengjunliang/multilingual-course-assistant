@@ -6,16 +6,40 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 
 ## 状态
 
-🔶 scaffold：只有文档 — 无应用代码、无测试、无 CI。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+🔶 M2 进行中：项目骨架与工程化链已就位，尚无 RAG 与 web 业务逻辑。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
-```bash
+```powershell
 git clone git@github.com:Zhengjunliang/multilingual-course-assistant.git
 cd multilingual-course-assistant
+uv sync                       # uv 自带 Python 3.12，不动系统的 3.10
+Copy-Item .env.example .env   # 填 DJANGO_SECRET_KEY，命令见文件内注释
+uv run pre-commit install
 ```
 
-无需安装依赖；环境搭建（uv、Python 3.12）🔜 M2，见 ROADMAP.md。
+## 开发
+
+```powershell
+uv run ruff check .                # lint
+uv run ruff format .               # format
+uv run pyright                     # 类型检查
+uv run pytest                      # 测试
+uv run python manage.py check      # Django system checks
+```
+
+CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 push 与 PR 上跑同一条链，用 `uv sync --locked`，所以 `uv.lock` 必须跟着 commit。
+
+## 代码布局
+
+| 路径              | 内容                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| `config/`         | Django project：settings · urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入）        |
+| `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估                        |
+| `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性                                |
+| `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
+
+`apps/qa/`（DRF）与 `frontend/`（React SPA）🔜 M5，届时再建。
 
 ## MICC 服务器日常使用
 
@@ -29,10 +53,11 @@ cd multilingual-course-assistant
 
 ### 存储
 
-- **模型缓存与数据集放 NAS home，不放服务器本地 `/home`**（本地盘小且全员共享 — targaryen 首测即 100%）。
-- NAS 卷 `/andromeda` `/equilibrium` `/oblivion` 挂在每台服务器上，首登自动建个人 home（`/<卷>/<user>` 或 `/<卷>/users/<user>`；没建成 = 已知 glitch，找 sysadmin）。挑监控面板里不满的卷。
-- HF 缓存重定向：服务器 `~/.bashrc` 加 `export HF_HOME=/<卷>/<user>/hf_cache`。
-- 共享数据集在 `/oblivion/Datasets`（注意大写 D）；数据集放个人目录会被清理（NAS 规则）。
+- **模型缓存与数据集放 NAS home，不放服务器本地 `/home`**（本地盘小且全员共享 — targaryen 首测 94.9%）。
+- NAS 卷 `/andromeda` `/equilibrium` `/fishtank` `/oblivion` 挂在每台服务器上。个人目录路径**各卷不统一**：`/oblivion/users/<user>` 带 `users/`，`/equilibrium/<user>` 不带；andromeda 与 fishtank 下没有，需要时找 sysadmin。
+- 挑卷看剩余容量（2026-07-30 实测：oblivion 已用 60%、剩 2.87 TB 最空；equilibrium 94%；andromeda 满）。本项目用 `/oblivion/users/jzheng`。
+- HF 缓存重定向：服务器 `~/.bashrc` 加 `export HF_HOME=/oblivion/users/jzheng/hf_cache`。
+- 共享数据集在 `/<卷>/DATASETS`、`/<卷>/datasets` 或 `/home/DATASETS`（各机命名不统一，`ls` 确认）；数据集放个人目录会被清理（NAS 规则）。
 
 ### 收工
 

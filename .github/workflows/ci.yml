@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Not a secret: this key only ever signs throwaway CI sessions.
+      DJANGO_SECRET_KEY: ci-only-key-never-used-outside-this-runner
+      DJANGO_DEBUG: "false"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Types
+        run: uv run pyright
+
+      - name: Django system checks
+        run: uv run python manage.py check
+
+      - name: Tests
+        run: uv run pytest

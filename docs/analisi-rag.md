@@ -41,6 +41,8 @@ Qwen3-Embedding 与 Qwen3-Reranker 系列：两者都有 **0.6B / 4B / 8B** 三�
 - `docling` 库还有经典非 VLM pipeline，对数字版 PDF 已经很稳；VLM 主要针对扫描件和复杂版面。
 - 对论文：材料多为 slide PDF → 解析质量决定下游一切。最小实验里要在同一份课程 PDF 上**两条 pipeline 都跑**。
 
+Docling 架构、DocTags、chunking 与两条 pipeline 的原理讲解见 [docling-e-pipeline.md](docling-e-pipeline.md)（本文件只做路线分析，不重复原理）。
+
 ## 架构启示
 
 1. **Embedding-first**：跨语言靠多语言 embedding，不靠翻译（翻译是 relatore 说的可选第二阶段）。

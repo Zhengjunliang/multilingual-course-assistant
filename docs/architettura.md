@@ -15,13 +15,13 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 
 ## 已定技术栈
 
-决策已做；仓库中尚无任何依赖（引入时间：RAG 部分 🔜 M2，网站前后端 🔜 M5）。选型原则（2026-07-29 拍板）：**市面最好的开源方案**；硬约束只有两条 — 后端 Django + Celery/Redis（relatore 指定）、模型层开源权重 Qwen 全家桶（论文硬约束，且 Qwen3-Embedding 8B 是 MTEB multilingual 榜首，非妥协项）。
+决策已做；依赖只在真正要用的里程碑引入（已装：Django、pydantic-settings + 工具链；RAG 组件随 M2 各步加入，前端与 Celery 🔜 M5）。选型原则（2026-07-29 拍板）：**市面最好的开源方案**；硬约束只有两条 — 后端 Django + Celery/Redis（relatore 指定）、模型层开源权重 Qwen 全家桶（论文硬约束，且 Qwen3-Embedding 8B 是 MTEB multilingual 榜首，非妥协项）。
 
 | 组件           | 选择                                | 动机                                                                     |
 | -------------- | ----------------------------------- | ------------------------------------------------------------------------ |
 | 语言           | Python 3.12（uv 管理）              | ML 生态；Flask/Django 是 relatore 指定范围                               |
 | 包管理         | uv                                  | lockfile、内置 Python 版本管理（系统 3.10 不动）                         |
-| Web            | Django 5.x                          | admin 免费当材料后台，auth/ORM/i18n 内置（多语言域加分），Celery 集成成熟 |
+| Web            | Django 5.2 LTS                      | admin 免费当材料后台，auth/ORM/i18n 内置（多语言域加分），Celery 集成成熟。选 LTS 不选 6.0：支持到 2028-04，且 DRF 等生态对 LTS 支持最稳 |
 | API            | DRF（Django REST Framework）+ SSE 流式 | 问答 API 与页面并行交付（2026-07-29 拍板）；为 M7 外部集成留口          |
 | 前端           | React + TypeScript SPA（Vite）      | 市面主流组合；流式回答、引用高亮等交互展示性最强（2026-07-29 拍板）      |
 | 异步任务       | Celery + Redis                      | relatore 指定                                                            |
@@ -54,13 +54,13 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 - **交付**：React SPA + DRF API（SSE 流式问答）+ Django admin 材料后台，与 RAG 部分**同一仓库**。
 - **外部知识源**（MCP、Google Drive 等）🔜 M7（可选，post-M6，见 [ROADMAP.md](../ROADMAP.md)）。
 
-## 工程化 🔜 M2
+## 工程化 ✅
 
-ruff（lint + format）· pyright · pytest · pre-commit · GitHub Actions CI · pydantic-settings（配置/密钥经 `.env`）· docker-compose 🔜 M5（PostgreSQL · Redis · Qdrant · Langfuse）。
+ruff（lint + format）· pyright · pytest + pytest-django · pre-commit · GitHub Actions CI。工具配置集中在 [pyproject.toml](../pyproject.toml)，hook 在 [.pre-commit-config.yaml](../.pre-commit-config.yaml)，流水线在 [.github/workflows/ci.yml](../.github/workflows/ci.yml)（`uv sync --locked` → lint → format → 类型 → Django check → 测试）；日常命令见 [README.md](../README.md)。配置与密钥经 `.env` 由 pydantic-settings 读入（`config/env.py`，不 import Django，将来与 `rag/` 共用同一来源），`.env` 永不进 git。docker-compose 🔜 M5（PostgreSQL · Redis · Qdrant · Langfuse）。
 
 ## 算力策略：remote-first
 
-所有 GPU 工作跑在 MICC 服务器上；笔记本只用于写代码、git 和 SSH — **本地不装推理栈**（不装 CUDA/Ollama）。Colab 是服务器满载时的零配置备用。relatore 邮件说的 "2080Ti 机器" 即 Dream Machines 本身（每台 2× 2080 Ti）。
+所有 **GPU** 工作跑在 MICC 服务器上；笔记本**不装 CUDA、不装推理服务**（vLLM/Ollama）。纯 CPU 的解析与预处理（Docling 经典 pipeline）先在本地验证，结果满意再上服务器跑全量 — 迭代快、不占共享 GPU。Colab 是服务器满载时的零配置备用。relatore 邮件说的 "2080Ti 机器" 即 Dream Machines 本身（每台 2× 2080 Ti）。
 
 日常开发循环（**代码不需要同步到服务器**）：vLLM 在服务器 tmux 常驻，暴露 OpenAI 兼容端点（LLM + embedding + rerank）；本地经 SSH 隧道（`ssh -L 8000:localhost:8000 <server>`）调用，代码里只配 base_url。单测/CI mock 掉 LLM client，零网络零 GPU。只有正式实验（M3 评估、尺寸对比）才在服务器上 `git pull` 执行。
 
@@ -74,7 +74,7 @@ ruff（lint + format）· pyright · pytest · pre-commit · GitHub Actions CI �
 | Google Colab         | T4 16 GB（免费）          | 零配置备用                                  |
 | Runpod / Lightning   | 可变                      | 按量付费选项，仅当 MICC 不够用              |
 
-MICC 接入 🔶：账号与公钥登记 ✅（sysadmin 确认）；首次登录 ✅（targaryen：2× 2080 Ti 11 GB、CUDA 12.4；ultron：2× Titan RTX 24 GB、CUDA 12.2，用户 `jzheng`）；缺 NAS 个人 home 🔒（sysadmin 补建）。服务器侧工作暂停只影响 M1 实验与大模型推理，不阻塞 M2 本地开发。校外接入 ✅：Dream Machines 公网直连 `ssh <user>@<server>.micc.unifi.it`，无需 VPN（OpenVPN 已弃用，sysadmin 确认；另有可选 MICC VPN，本项目不用）。服务器规格与 IP 见 doc portal：`https://doc.portal.micc.unifi.it`（仓库外，需登录）。存储：共享 NAS `andromeda` · `equilibrium` · `oblivion`，home 配额 100 GB。GPU 监控：专用 Discord 频道 / Grafana（micc-authentik 登录）。**凭据永不进仓库。**
+MICC 接入 ✅：账号与公钥登记（sysadmin 确认）；首次登录（targaryen：2× 2080 Ti 11 GB、CUDA 12.4；ultron：2× Titan RTX 24 GB、CUDA 12.2，用户 `jzheng`）；NAS 个人 home 存在（`/oblivion/users/jzheng`、`/equilibrium/jzheng`）。校外接入 ✅：Dream Machines 公网直连 `ssh <user>@<server>.micc.unifi.it`，无需 VPN（OpenVPN 已弃用，sysadmin 确认；另有可选 MICC VPN，本项目不用）。服务器规格与 IP 见 doc portal：`https://doc.portal.micc.unifi.it`（仓库外，需登录）。存储：共享 NAS `andromeda` · `equilibrium` · `fishtank` · `oblivion`，home 配额 100 GB；卷选择、个人目录路径与 `HF_HOME` 见 [README.md](../README.md)。GPU 监控：专用 Discord 频道 / Grafana（micc-authentik 登录）。**凭据永不进仓库。**
 
 ## 开发环境注意（Windows）
 
