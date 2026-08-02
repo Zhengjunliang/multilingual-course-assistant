@@ -8,8 +8,8 @@ left `<!-- formula-not-decoded -->` in the parsed corpus.
 
 So parsing is routed per document, from signals this module reads straight out of the
 PDF structure — no model is loaded and no page is rendered. Over the 31-deck PPM
-corpus (~1200 pages) the whole probe takes seconds and selects the formula model for
-4 files and the VLM pipeline for 1, leaving 26 on the plain classic pipeline.
+corpus (~1200 pages) the whole probe takes seconds and turns on formula decoding for
+4 files and OCR for 1, leaving 26 on the plain classic pipeline.
 
     uv run python -m rag.probe data/corpus/PPM
 """
@@ -33,9 +33,9 @@ Pipeline = Literal["classic", "vlm"]
 # averages 230-1000 chars/page, and the pages this catches hold a title at most.
 EMPTY_PAGE_CHARS = 50
 
-# Above this share of empty pages the text layer is not worth trusting and the whole
-# document goes to the VLM pipeline. Measured on the PPM corpus: every deck sits at
-# <= 0.24 except `3.5-HTML5-Part-2` at 0.50, whose content genuinely is images.
+# Above this share of empty pages the text layer is not worth trusting and the text has
+# to be recovered from the rendered page instead. Measured on the PPM corpus: every deck
+# sits at <= 0.24 except `3.5-HTML5-Part-2` at 0.50, whose content genuinely is images.
 NEEDS_VISION_RATIO = 0.3
 
 # Substrings of PostScript font names that indicate mathematical typesetting: the
@@ -163,36 +163,31 @@ def probe(pdf: Path) -> DocumentProfile:
 def plan_for(profile: DocumentProfile) -> ParsePlan:
     """Map a profile onto a parse configuration.
 
-    OCR is never switched on automatically. Every deck in the corpus carries a text
-    layer, and on such a PDF OCR was measured to return byte-identical output for 62%
-    more time. A document whose text layer really is missing is better served by the
-    VLM pipeline, which reads layout as well; `--ocr` stays available as a manual
-    override for the in-between cases.
-    """
-    if profile.empty_page_ratio > NEEDS_VISION_RATIO:
-        return ParsePlan(
-            pipeline="vlm",
-            ocr=False,
-            formula=False,
-            reason=(
-                f"{profile.empty_page_ratio:.0%} of pages carry no text layer"
-                " -> content is inside the images"
-            ),
-        )
+    Routing never selects the VLM pipeline. It was the obvious choice for a document
+    whose text layer is missing, until the two were compared on the one file in the
+    corpus that qualifies: granite-docling took 1059 s against OCR's 527 s and, with
+    the repeated page header discounted, produced *fewer* distinct words (671 vs 729).
+    Its exclusive vocabulary was prose — `allows`, `becomes`, `comes` — while OCR's
+    was the literal kind retrieval depends on: `avc1.42e01e`, `ajax.googleapis.com`,
+    `autoplay`. A VLM paraphrases where OCR transcribes, and paraphrase is the wrong
+    trade for a lexical index. `--profile manual --pipeline vlm` keeps it reachable
+    for comparison.
 
+    OCR stays off for everything else: on a PDF that does have a text layer it was
+    measured to return byte-identical output for 62% more time.
+    """
+    needs_ocr = profile.empty_page_ratio > NEEDS_VISION_RATIO
+    reasons = []
+    if needs_ocr:
+        reasons.append(f"{profile.empty_page_ratio:.0%} of pages carry no text layer")
     if profile.has_math_fonts:
-        return ParsePlan(
-            pipeline="classic",
-            ocr=False,
-            formula=True,
-            reason=f"math fonts present ({', '.join(profile.math_fonts)})",
-        )
+        reasons.append(f"math fonts present ({', '.join(profile.math_fonts)})")
 
     return ParsePlan(
         pipeline="classic",
-        ocr=False,
-        formula=False,
-        reason="text layer intact, no math fonts",
+        ocr=needs_ocr,
+        formula=profile.has_math_fonts,
+        reason=" + ".join(reasons) or "text layer intact, no math fonts",
     )
 
 
@@ -208,10 +203,13 @@ def main() -> None:
     for pdf in collect_pdfs(args.target):
         profile = probe(pdf)
         plan = plan_for(profile)
+        flags = "".join(
+            f" +{name}" for name, on in (("ocr", plan.ocr), ("formula", plan.formula)) if on
+        )
         print(
             f"{pdf.name}: {profile.pages}p, {profile.chars_per_page} chars/p, "
             f"{profile.empty_page_ratio:.0%} empty, {profile.images} images "
-            f"-> {plan.pipeline}{' +formula' if plan.formula else ''} ({plan.reason})"
+            f"-> {plan.pipeline}{flags} ({plan.reason})"
         )
 
 

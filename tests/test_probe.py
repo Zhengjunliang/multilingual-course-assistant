@@ -99,15 +99,34 @@ def make_profile(*, empty_page_ratio: float, math_fonts: tuple[str, ...] = ()) -
     )
 
 
-def test_a_missing_text_layer_routes_to_the_vlm_pipeline() -> None:
+def test_a_missing_text_layer_routes_to_ocr() -> None:
+    """Measured against granite-docling on the one qualifying deck: OCR cost half the
+    time and kept more distinct words, including literals like `avc1.42e01e`."""
     plan = plan_for(make_profile(empty_page_ratio=0.5))
-    assert plan.pipeline == "vlm"
-    assert not plan.formula
+    assert plan.pipeline == "classic"
+    assert plan.ocr
+
+
+def test_routing_never_selects_the_vlm_pipeline() -> None:
+    """It stays reachable through --profile manual, but a paraphrasing model is the
+    wrong trade for a lexical index."""
+    for ratio in (0.0, 0.31, 0.5, 1.0):
+        for fonts in ((), ("/SymbolMT",)):
+            assert plan_for(make_profile(empty_page_ratio=ratio, math_fonts=fonts)).pipeline == (
+                "classic"
+            )
 
 
 def test_math_fonts_route_to_formula_enrichment() -> None:
     plan = plan_for(make_profile(empty_page_ratio=0.1, math_fonts=("/SymbolMT",)))
     assert plan.pipeline == "classic"
+    assert plan.formula
+
+
+def test_a_scanned_deck_with_formulas_gets_both() -> None:
+    """The two signals are independent; an earlier rule let the vision branch mask math."""
+    plan = plan_for(make_profile(empty_page_ratio=0.5, math_fonts=("/SymbolMT",)))
+    assert plan.ocr
     assert plan.formula
 
 
@@ -121,10 +140,10 @@ def test_an_intact_text_layer_needs_no_enrichment() -> None:
 
 def test_the_vision_threshold_is_exclusive() -> None:
     """Decks sit at up to 0.24 empty pages; only a genuine outlier may cross over."""
-    assert plan_for(make_profile(empty_page_ratio=0.3)).pipeline == "classic"
+    assert not plan_for(make_profile(empty_page_ratio=0.3)).ocr
 
 
-def test_ocr_is_never_enabled_automatically() -> None:
+def test_ocr_stays_off_while_a_text_layer_is_present() -> None:
     """Measured: on a PDF that has a text layer, OCR returns identical bytes for 62% more time."""
-    for ratio in (0.0, 0.29, 0.5, 1.0):
+    for ratio in (0.0, 0.1, 0.24):
         assert not plan_for(make_profile(empty_page_ratio=ratio)).ocr

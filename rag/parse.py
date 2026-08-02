@@ -79,6 +79,14 @@ def build_converter(
     )
 
 
+def cuda_available() -> bool:
+    """Docling picks the device itself (`AcceleratorOptions.device` defaults to AUTO);
+    this only decides whether to warn that a run is about to be unbearably slow."""
+    import torch
+
+    return torch.cuda.is_available()
+
+
 def variant_of(plan: ParsePlan) -> str:
     """Name the configuration, so two runs over the same deck stay comparable on disk."""
     parts = [plan.pipeline]
@@ -147,6 +155,12 @@ def main() -> None:
             plan = plan_for(probe(pdf))
 
         variant = variant_of(plan)
+        if plan.pipeline == "vlm" and not cuda_available():
+            # granite-docling generates DocTags autoregressively, thousands of tokens a
+            # page, each one a full forward pass. Measured without CUDA: over 56 s/page
+            # against 0.9 s/page for the classic pipeline. Warn rather than refuse — the
+            # run is valid, just far too slow to iterate on.
+            print(f"{pdf.name}: no CUDA device, vlm will take minutes per page")
         if variant not in converters:
             converters[variant] = build_converter(plan.pipeline, ocr=plan.ocr, formula=plan.formula)
 

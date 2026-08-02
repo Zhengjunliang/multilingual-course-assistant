@@ -156,7 +156,7 @@ for chunk in chunker.chunk(doc):
 | 表格 | 结构还原成真 markdown 表格，边界正确 |
 | 标题层级 | 识别出 `##` 层级 → `contextualize()` 有标题链可用 |
 | 连字 | **验证通过**。31 份原始 PDF 中 17 份的文字层带连字（`1-intro_django` 74 处 · `2-orm_django` 97 处 · `3.1-web-intro-html` 88 处，含 `micc.uniﬁ.it`）；解析后这三份的 U+FB00–FB04 残留全为 **0**，且 `non-proﬁt` → `non-profit` · `conﬁgured` → `configured` · `deﬁning` → `defining` 逐词还原 —— `normalize_text()` 的 NFKC 在真实数据上有效 |
-| 图片型页面 | `3.5-HTML5-Part-2` 即使开 OCR 仍主要是 `<!-- image -->` 占位 → 交给 VlmPipeline |
+| 图片型页面 | `3.5-HTML5-Part-2` 即使开 OCR 仍有 19 个死 section；VlmPipeline 也没救回（20 个），且丢失技术字面量 → 路由判为 `classic + ocr`，对照实测见下 |
 | HTML 标签转义 | **不一致**：正文 `&lt;div&gt;`，表格内裸 `<header>`。web 课程语料里搜 `<nav>` 可能受影响，待 chunking 后评估 |
 | 公式 | 富化关：**全丢**（见下）。富化开：`2.1` 产出 4 个 `$$` LaTeX 块，CIE RGB→XYZ 矩阵的数值正确还原 |
 | 图片 | 一律 `<!-- image -->` 空占位，**死 chunk 是本语料最大的检索缺口**（见下表） |
@@ -212,7 +212,7 @@ OCR 的取舍（实测，同一份 28 页意大利语 slides）：开 43.8s / �
 - **全开** —— 纯文字讲义要为它永远用不到的模型付几十倍算力。
 - **全关** —— 就是上面那个结果。
 
-生产级文档管线（unstructured.io 的 `strategy="auto"`、Azure Document Intelligence 的分层、AWS Textract 的 tiering）走的是同一个三层结构，**没有一层是"让用户选"**：
+生产级文档管线（unstructured.io 的 `strategy="auto"`、Azure Document Intelligence 的分层、AWS Textract 的 tiering）走的是同一个三层结构，**没有一层是"让用户选"**。下图中探测与解析 ✅，虚线的升级重跑 🔜 M3：
 
 ```mermaid
 flowchart LR
@@ -224,7 +224,7 @@ flowchart LR
     C --> Q[③ 对产出打质量分]
     CF --> Q
     V --> Q
-    Q -.升级重跑 🔜.-> R
+    Q -.升级重跑.-> R
 ```
 
 **① 探测先于解析。** 从 PDF 结构里直接读四个信号 —— 每页文字量、空页比例、图片对象数、字体表里有无数学字体。不加载任何模型、不渲染任何页面。属主是 [rag/probe.py](../rag/probe.py)。
@@ -237,24 +237,83 @@ flowchart LR
 
 | 路由结果 | 份数 | 命中的文件 |
 | --- | --- | --- |
-| `vlm`（空页比 > 0.3） | **1** | `3.5-HTML5-Part-2`：32 页里 16 页近乎空、91 张图 |
+| `classic + ocr`（空页比 > 0.3） | **1** | `3.5-HTML5-Part-2`：32 页里 16 页近乎空、91 张图 |
 | `classic + formula`（字体表含数学字体） | **4** | `2.1 IMAGES GENERAL` · `2.3 IMAGES LOSSY` · `3.2b VIDEO H261-H262` · `3.3b VIDEO H264-H265` |
 | `classic`（裸跑） | **26** | Django · JavaScript · web 全系列 |
 
-零误报：唯一被判去 VLM 的正是独立已知的那份图片型 slides，四份公式富化正是图像/视频压缩理论那几份（`2.1` 就是产出 `formula-not-decoded` 的那份）。路由省掉 27/31 的公式模型加载与 30/31 的 VLM。
+零误报：唯一被判需要 OCR 的正是独立已知的那份图片型 slides，四份公式富化正是图像/视频压缩理论那几份（`2.1` 就是产出 `formula-not-decoded` 的那份）。路由省掉 27/31 的公式模型加载与 30/31 的 OCR。
 
 #### 规则 v0 与阈值来源
 
 | 条件 | 决策 | 依据 |
 | --- | --- | --- |
-| `empty_page_ratio > 0.3` | `pipeline = vlm` | 文字层大面积缺失 → 内容在图里。语料实测：除 `3.5` 的 0.50 外全部 ≤ 0.24 |
+| `empty_page_ratio > 0.3` | `ocr = True` | 文字层大面积缺失 → 只能从渲染页面里恢复文字。语料实测：除 `3.5` 的 0.50 外全部 ≤ 0.24。**不选 VLM，理由见下节的对照实测** |
 | 字体表含 `Symbol` · `CM*` · `MT*` · `STIX` 等 | `formula = True` | 数学字体提供文本字体没有的积分号、大括号、希腊字母 |
 | 其余 | 经典 pipeline，全关 | 26/31 属于此类 |
-| **任何情况** | `ocr` **不自动开** | 实测：有文字层的 PDF 开 OCR 产出字节完全相同却多耗 62% 时间。文字层真缺失的该走 VLM（它同时读版面），OCR 只留作手动覆盖 |
+| **有文字层时** | `ocr` 保持关 | 实测：开 OCR 产出字节完全相同却多耗 62% 时间 |
+
+两个信号**互相独立**：一份既缺文字层又含数学字体的文档同时拿到 `ocr` 和 `formula`。路由**从不选 VLM**，它只经 `--profile manual --pipeline vlm` 手动可达。
 
 阈值（`EMPTY_PAGE_CHARS = 50`、`NEEDS_VISION_RATIO = 0.3`）是**本语料实测值，不是通用真理**，换语料要重标。
 
 数学字体判定会**故意误报**：PowerPoint 也用 `SymbolMT` 画项目符号。这个方向是有意选的 —— 富化逐 item 自门控，误报的代价是一次模型加载，漏报的代价是公式永久从索引里消失。**不对称的代价，就该配不对称的门槛。**
+
+#### 对照实测：VLM 输给了 OCR —— 而且输在 RAG 最在意的地方
+
+`3.5-HTML5-Part-2` 是语料里唯一文字层大面积缺失的一份，本来是 VlmPipeline 的天然对象。两条路各跑一遍（2026-08-02）：
+
+| | `classic-ocr` | `vlm`（granite-docling 258M，GPU） |
+| --- | --- | --- |
+| 耗时（32 页） | **527s** | 1059s |
+| 原始字符数 | 20032 | 22621 |
+| 去掉重复页眉与图占位后字符数 | 19435 | **21840** |
+| **唯一词汇数** | **729** | 671 |
+| 独有词 | 144 | 86 |
+
+VLM 字数更多，**唯一词汇却更少**。看独有词就明白为什么：
+
+- 只在 OCR 里：`avc1.42e01e` · `ajax.googleapis.com` · `autoplay` · `codecs` · `attr` · `absolutepositioning` —— **技术字面量**
+- 只在 VLM 里：`add` · `allows` · `anything` · `becomes` · `comes` · `content` · `around` —— **叙述性虚词**
+
+**VLM 在转述，OCR 在转录。** 对生成式回答来说转述也许无妨，但对**词法检索**是净损失：`avc1.42e01e` 正是学生会在 `<video>` 例子里搜的字符串，VLM 把它换成了流畅的句子。而 hybrid 检索的 BM25 那一路，命脉就是这些字面 token。
+
+死 section 也没被救回（OCR 19 个 / VLM 20 个），页眉污染反而更重（`HTML &amp; CSS` 重复 21 次 → 32 次）。
+
+**规则据此修正：空页比超阈值 → `classic + ocr`，不是 `vlm`。** 代价减半、词汇更全、字面量保留。这不违背"OCR 不自动开"那条 —— 那条针对的是**有文字层**的 PDF（开了纯浪费）；这里文字层本就缺失，正是 OCR 的用武之地。
+
+VLM 保留在 `--profile manual --pipeline vlm`，作为对照组与将来扫描件的兜底。**一个模型"更聪明"不等于对检索更有用** —— 这是本项目从实测里换来的教训，值得写进论文。
+
+#### 算力实测：两条 pipeline 的计算性质不同
+
+开发笔记本（RTX 4070 Laptop 8 GB），Docling 走 CPU 时：
+
+| 配置 | 实测 | 每页 |
+| --- | --- | --- |
+| `classic` | `2.1` 35 页 32.0s；`3.1-web` 110 页 83.7s | **约 0.8-0.9s** |
+| `classic-formula` | `2.1` 35 页 299.8s（含 CodeFormulaV2 首次下载） | 模型加载后增量小，公式逐 item 触发 |
+| `classic-ocr` | `3.5` 32 页 527s | 约 16s |
+| `vlm`（CPU） | `3.5` 32 页跑满 30 分钟未完成，中止 | > 56s |
+| `vlm`（RTX 4070 Laptop） | `3.5` 32 页 1059s | **33s，仅比 CPU 快约 1.7 倍** |
+
+差距的来源是**两种计算根本不同**：经典 pipeline 是几个小专用模型各做一次前向，CPU 友好；granite-docling 是 258M 参数的**自回归生成**，每页逐 token 吐出几千个 DocTags，每个 token 一次完整前向。
+
+**GPU 只快 1.7 倍，是因为瓶颈不是算力。** 跑的时候 `nvidia-smi` 显示 94% 利用率却只吃 72 W（4070 Laptop 可到 100-140 W）—— 这是**延迟受限**的签名：batch size = 1，每个 token 算几毫秒就停下来等 Python 侧的下一步，SM 从没被喂饱。"利用率"只表示有 kernel 在跑，不表示 SM 忙。
+
+**唯一有效的杠杆是 batching，不是更快的卡。** 一页 258M 模型的单 token 前向用不掉 4070 的几千个 core；而一份文档的各页**互相独立**，本可同时解码 —— batch = 16 时同一次 kernel launch 干 16 倍的活，吞吐近似线性增长。Docling 提供的三条路：
+
+| 路径 | 能否 batch | Windows 本地 |
+| --- | --- | --- |
+| `InferenceFramework.VLLM`（`GRANITEDOCLING_VLLM`） | ✅ continuous batching + paged attention | ❌ vLLM 无 Windows 支持 |
+| `ApiVlmOptions.concurrency`（默认 1，`GRANITEDOCLING_VLLM_API`） | ✅ 多页并发请求 | ❌ 端点仍需 Linux 上的 vLLM |
+| `InferenceFramework.TRANSFORMERS`（当前使用） | ❌ 逐页调 `generate()`，batch = 1 | ✅ |
+
+本地唯一可调的是 `max_new_tokens`（默认 4096/页）—— 调低只是**截断内容**，不是加速，对 RAG 是净损失。
+
+对本项目：VLM 解析已被实测否决，这个瓶颈对 ingest 不重要。但它是 **M3 图片描述的决定性约束** —— Qwen2.5-VL-3B 要处理全语料上千张图，同样是自回归生成、规模大一个数量级。那正是 `PictureDescriptionApiOptions` + MICC 上 vLLM 的用武之地。**本地 GPU 用来跑单份对照实验够用，批量视觉工作必须上服务器。**
+
+**踩过的坑：这不是"电脑不行"，是 GPU 根本没被用到。** `uv add docling` 在 Windows 上从 PyPI 拉到的是 `torch 2.13.0+cpu`，`torch.cuda.is_available()` 返回 `False`，4070 全程闲置。修法是把 torch 指到 CUDA 构建（`pyproject.toml` 里的 `[[tool.uv.index]] pytorch-cu126` + `sys_platform == 'win32'` 标记），**代码零改动** —— Docling 的 `AcceleratorOptions.device` 默认是 `AUTO`，torch 一带 CUDA 就自动切过去。
+
+顺带纠正 [architettura.md](architettura.md) 算力策略里"笔记本不装 CUDA"那条：它针对的是 **Qwen3-8B 那种 LLM 推理**（8 GB 显存确实塞不下），不该套到一个 258M 的解析模型上 —— granite-docling fp16 约 0.5 GB。**约束要落到具体模型尺寸上，不能按"是不是推理"一刀切。**
 
 #### 一个必须记下来的不一致：同一个开关，两个默认值
 

@@ -27,7 +27,7 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 | 异步任务       | Celery + Redis                      | relatore 指定                                                            |
 | LLM            | Qwen3 系列（0.6B–8B 尺寸对比）      | relatore 指定；2080 Ti（11 GB）上 8B 需量化，ultron（24 GB）可 8B fp16   |
 | Embedding/Rerank | Qwen3-Embedding / Qwen3-Reranker  | 与 LLM 同源的一体化方案，relatore 链接指向的路线                          |
-| 文档解析       | Docling + **自适应路由**：逐份文件按画像选配置（经典 / 经典 + 公式富化 / VLM），OCR 不自动开 | 2026-07-31 实测：经典 pipeline 修复了词间空格粘连、还原表格与标题层级、重音正确；OCR 对有文字层的 PDF 零产出却多耗 62% 时间。2026-08-02：富化开关全用 Docling 默认（关）会让公式与图片永久丢失 —— `2.1` 有 5~6 张只剩标题的死 chunk → 改为解析前先探测。31 份语料上 4 份触发公式富化、1 份触发 VLM，零误报。规则、阈值与三层结构见 [docling-e-pipeline.md](docling-e-pipeline.md)，实现是 [rag/probe.py](../rag/probe.py) |
+| 文档解析       | Docling **经典 pipeline + 自适应路由**：逐份文件按画像决定是否开 OCR / 公式富化。**VLM 不进自动路由**，只留手动对照 | 2026-07-31 实测：经典 pipeline 修复词间空格粘连、还原表格与标题层级、重音正确；有文字层的 PDF 开 OCR 零产出却多耗 62% 时间。2026-08-02：富化开关全用 Docling 默认（关）会让公式与图片永久丢失 → 解析前先探测，31 份里 4 份开公式、1 份开 OCR，零误报。同日 VLM 对照实测**否决**了"缺文字层就上 VLM"的原设想：granite-docling 耗时翻倍（1059s vs 527s），唯一词汇反而更少（671 vs 729），丢掉 `avc1.42e01e` 这类检索命脉的字面量 —— 它在转述而非转录。规则、阈值与全部实测见 [docling-e-pipeline.md](docling-e-pipeline.md)，实现是 [rag/probe.py](../rag/probe.py) |
 
 选 Django 不选 Flask 的理由：对单人开发 Django **减少**代码量（admin、auth、ORM、i18n 内置）；Flask 需手动拼装。前端选 React SPA 弃 HTMX 的理由：PPM 展示性与流式交互。两项 2026-07-30 拍板确认（PPM 无 UI 评分要求，前端自主）。
 
@@ -52,7 +52,7 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 - **语料 ✅**：PPM 课程 slides，31 份 PDF、约 1200 页、约 65 万字符，在 `data/corpus/PPM/`（gitignore，版权材料永不进 git）。2026-07-31 用 pypdf 实测：
   - **语言**：英语为主（~23 份：Django 全系列、Docker、JavaScript、图像/视频压缩理论、REST、Flask），意大利语或英意混排 ~8 份（`3.1-web-intro-html`、`3.6`–`3.8`、`HTML5_tag_semantici`）。**单文件内也会混语言**，所以 `locale` 是 chunk 级属性，不是文件级。
   - **文字层**：31 份全部有，无扫描件 → OCR 非必需项。
-  - **例外**：`3.5-HTML5-Part-2` 32 页仅 10001 字符且前几页近乎为空，内容在图里 → VlmPipeline 的验证对象。
+  - **例外**：`3.5-HTML5-Part-2` 32 页里 16 页近乎为空，内容在图里 → 路由为其开 OCR（抽取量 10001 → 20032 字符）。仍余 19 个死 section，VLM 也救不回。
   - **两个已知坑，均已验收 ✅**：朴素抽取丢词间空格（`"Video isa sequenceof frames"`）→ Docling 还原成 `"Video is a sequence of frames"`；连字（U+FB01 等）出现在 17 份 PDF 的文字层里，单份多达 97 处（`non-proﬁt` · `conﬁgured` · `micc.uniﬁ.it`），不归一化 BM25 必漏召回 → `rag/parse.py` 的 NFKC 归一化后残留为 0。
   - **新发现的坑**：图片与公式在 Docling 默认配置下全部丢弃，抽样 9 份约 322 页里有 **63 个死 section**（只剩标题、正文全是图片占位）。这是本语料最大的检索缺口，也是自适应路由与 M3 图片描述消融实验的动机。明细见 [docling-e-pipeline.md](docling-e-pipeline.md)。
   - 往年 scritto 真题暂缓 🔜（见 [ROADMAP.md](../ROADMAP.md) 暂缓项）。
@@ -66,7 +66,7 @@ ruff（lint + format）· pyright · pytest + pytest-django · pre-commit · Git
 
 ## 算力策略：remote-first
 
-所有 **GPU** 工作跑在 MICC 服务器上；笔记本**不装 CUDA、不装推理服务**（vLLM/Ollama）。纯 CPU 的解析与预处理（Docling 经典 pipeline）先在本地验证，结果满意再上服务器跑全量 — 迭代快、不占共享 GPU。relatore 邮件说的 "2080Ti 机器" 即 Dream Machines 本身（每台 2× 2080 Ti）。
+**LLM 级**推理（Qwen3 0.6B–8B、vLLM/Ollama）一律在 MICC 服务器上；笔记本**不装推理服务**。分界线是**模型尺寸而非"是不是推理"**：4070 Laptop 的 8 GB 塞不下 Qwen3-8B，但装得下 ingest 阶段那几个小模型 —— 2026-08-02 修正，笔记本装 CUDA 版 torch（`pyproject.toml` 的 `pytorch-cu126` index，`sys_platform == 'win32'` 限定，Linux CI 不受影响），让 Docling 的 layout / TableFormer / CodeFormulaV2 / granite-docling-258M（fp16 约 0.5 GB）走本地 GPU。**收益有限但真实**：VLM 从 CPU 上 > 56s/页降到 33s/页（只快 1.7 倍 —— 逐 token 解码是延迟受限，不是算力受限），足以在本地跑完那次否决了 VLM 的对照实验，也为 M3 的 Qwen2.5-VL 图片描述留出本地试错空间。全量解析与需要吞吐的 VLM/图片描述仍上服务器（vLLM 后端）。实测见 [docling-e-pipeline.md](docling-e-pipeline.md)。relatore 邮件说的 "2080Ti 机器" 即 Dream Machines 本身（每台 2× 2080 Ti）。
 
 Colab ⛔ 不用：MICC 接入已完成，6 台 Dream Machines + ultron 可挑空闲机器，显存和常驻能力都优于免费 T4；Colab 的会话超时、每次重装依赖、模型权重反复下载只会拖慢迭代，且论文实验需要可复现的固定环境。Runpod / Lightning 仅作 MICC 长期不可用时的付费兜底，不进日常流程。
 
@@ -78,13 +78,14 @@ Colab ⛔ 不用：MICC 接入已完成，6 台 Dream Machines + ultron 可挑�
 | -------------------- | ------------------------- | ------------------------------------------ |
 | MICC Dream Machines  | 每台 2× RTX 2080 Ti（doc 标 12 GB，实际规格 11 GB）；6 台：targaryen · lannister · lechuck · theflash · harlock · nikita | 常规实验；通过监控挑空闲机器 |
 | MICC ultron          | 2× Titan RTX 24 GB        | 大实验、8B fp16、模型尺寸对比               |
-| 开发笔记本           | RTX 4070 Laptop, 8 GB     | 只写代码 + SSH，不做推理                    |
+| 开发笔记本           | RTX 4070 Laptop, 8 GB     | 写代码 + SSH + **ingest 小模型本地跑**（Docling 全套，含 granite-docling-258M）；LLM 级推理不做 |
 | Runpod / Lightning   | 可变                      | 付费兜底，仅当 MICC 长期不可用              |
 
 MICC 接入 ✅：账号与公钥登记（sysadmin 确认）；首次登录（targaryen：2× 2080 Ti 11 GB、CUDA 12.4；ultron：2× Titan RTX 24 GB、CUDA 12.2，用户 `jzheng`）；NAS 个人 home 存在（`/oblivion/users/jzheng`、`/equilibrium/jzheng`）。校外接入 ✅：Dream Machines 公网直连 `ssh <user>@<server>.micc.unifi.it`，无需 VPN（OpenVPN 已弃用，sysadmin 确认；另有可选 MICC VPN，本项目不用）。服务器规格与 IP 见 doc portal：`https://doc.portal.micc.unifi.it`（仓库外，需登录）。存储：共享 NAS `andromeda` · `equilibrium` · `fishtank` · `oblivion`，home 配额 100 GB；卷选择、个人目录路径与 `HF_HOME` 见 [README.md](../README.md)。GPU 监控：专用 Discord 频道 / Grafana（micc-authentik 登录）。**凭据永不进仓库。**
 
 ## 开发环境注意（Windows）
 
-- 系统 Python 3.10：不动；项目版本由 uv 管理（🔜 M2）。
+- 系统 Python 3.10：不动；项目版本由 uv 管理 ✅（`.python-version` 写 3.12）。
+- PyPI 在 Windows 上给的 torch 是 CPU 版；项目把它指向 CUDA 构建，理由与实测见上方算力策略。
 - Redis 无原生 Windows 版：本地经 Docker 或 WSL2。
 - Windows 上 Celery：dev 用 `solo` pool；部署在 Linux 上。

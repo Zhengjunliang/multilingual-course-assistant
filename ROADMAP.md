@@ -23,7 +23,7 @@
 ✅ 交付物：项目初始化（uv + Python 3.12 · 工程化链 · Django 骨架）—— [pyproject.toml](pyproject.toml) · [.pre-commit-config.yaml](.pre-commit-config.yaml) · [.github/workflows/ci.yml](.github/workflows/ci.yml) · `config/` · `rag/` · `tests/`。Ingest 步骤 0-1 —— 自适应路由 [rag/probe.py](rag/probe.py) + Docling 解析 [rag/parse.py](rag/parse.py)，解析质量验收与路由实测表在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)。
 
 - [ ] 服务器侧：`~/.bashrc` 设 `HF_HOME=/oblivion/users/jzheng/hf_cache`（Qwen3 推理前）
-- [ ] 服务器侧：全语料解析（31 份约 1200 页）。**本地只做抽样验证**（9 份约 322 页，结果见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)）—— 笔记本 CPU 上全量要近一小时，而 MICC 机器上顺带就跑完了
+- [ ] 服务器侧：全语料解析（31 份约 1200 页）。**本地只做抽样**（10 份约 432 页，结果见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)）—— 经典 pipeline 在笔记本上 0.8s/页够用，但全量一小时起，服务器上顺带跑完
 - [ ] Ingest 步骤 2 — chunking：HybridChunker + 与 Qwen3-Embedding 对齐的 tokenizer，chunk 带 `locale` · `course` · `source_file` · `page` · `heading_path`
 - [ ] Hybrid 检索：Qdrant 本地模式（dense Qwen3-Embedding + sparse BM25）+ Qwen3-Reranker
 - [ ] Qwen3 生成回答
@@ -38,7 +38,7 @@
 - [ ] Langfuse 接入（tracing，自托管）
 - [ ] 模型尺寸对比（0.6B / 4B / 8B）：质量与运行成本
 - [ ] 消融实验 — 图片描述（Docling `do_picture_description`，Qwen2.5-VL-3B 经 MICC 的 vLLM）：带 / 不带的 RAGAS 差值。动机是死 chunk（只剩标题、正文全是图的 slide），量化见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)
-- [ ] 消融实验 — 自适应路由 vs 全经典 vs 全 VLM：质量增益与算力代价
+- [ ] 消融实验 — 自适应路由 vs 全经典 vs 全 VLM：质量增益与算力代价。2026-08-02 已有单份对照否决了自动路由用 VLM（见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)），此项用 gold set 在语料级复核
 
 ### M4 — 跨语言 🔒
 
