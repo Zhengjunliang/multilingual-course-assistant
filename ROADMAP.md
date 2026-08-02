@@ -6,30 +6,13 @@
 
 ### M0 — 脚手架与基础决策 ✅
 
-已有：仓库、`.gitignore`、`CLAUDE.md`、`README.md`、本 roadmap、`docs/architettura.md`、`docs/analisi-rag.md`。技术栈与评估方法自主拍板（2026-07-30），不再挂 relatore 确认；relatore 属主项只剩跨语言启动（M4）。
-
-- [x] 仓库初始化（`.gitignore`、`CLAUDE.md`）
-- [x] 技术栈基础决策（表在 `docs/architettura.md`）
-- [x] 文档初始 commit（`f5d7285`）
-- [x] Django 确认（自主拍板，2026-07-30）
+✅ 交付物：仓库骨架（`.gitignore` · [CLAUDE.md](CLAUDE.md) · [README.md](README.md) · 本 roadmap）+ [docs/architettura.md](docs/architettura.md) 的技术栈决策表。技术栈与评估方法自主拍板（2026-07-30），不再挂 relatore 确认；relatore 属主项只剩跨语言启动（M4）。
 
 ### M1 — RAG 学习与分析 ✅
 
-目标：关闭 🔒 RAG 路线决策。交付物：[docs/analisi-rag.md](docs/analisi-rag.md)。
+✅ 交付物：[docs/analisi-rag.md](docs/analisi-rag.md) —— relatore 指定的四个起步链接（Qwen-Agent RAG 模块 · Qwen3 RAG pipeline · Qwen3 agentic RAG 模板 · Granite-Docling）精读并扩展，路线定为自建 pipeline + 各领域最佳组件。MICC 接入完成（密钥登记 · 首次登录 · Discord · NAS home），规格与路径见 [docs/architettura.md](docs/architettura.md) 与 [README.md](README.md)。
 
 2026-07-31 决定**不做一次性最小实验**：Docling 的解析质量（重音字符、公式、表格、多栏阅读顺序）与 Qwen3 推理直接在 M2 的真实 ingest 管线里验证 —— 同样的投入产出论文可引用的证据，而不是用完即弃的脚本。
-
-- [x] 精读并扩展 relatore 给的链接分析（relatore 明确要求）→ `docs/analisi-rag.md`：
-  - [x] Qwen-Agent RAG 模块 — `https://qwenlm.github.io/Qwen-Agent/en/guide/core_moduls/rag/`
-  - [x] Qwen3 RAG pipeline（LLM + embedding + reranking）— novita.ai Medium 文章
-  - [x] Qwen3 agentic RAG 模板 — Lightning AI
-  - [x] Granite-Docling 文档转换 — IBM 公告
-- [x] MICC 接入：生成专用 SSH 密钥并把公钥发给 sysadmin（已登记，sysadmin 确认）
-- [x] MICC 接入：首次登录成功（targaryen：2× 2080 Ti 11 GB、CUDA 12.4；ultron：2× Titan RTX 24 GB、CUDA 12.2）
-- [x] MICC 接入：加入 Discord（GPU 监控频道）
-- [x] MICC 接入：NAS 个人 home 存在（`/oblivion/users/jzheng`、`/equilibrium/jzheng`；路径格式各卷不统一，见 [README.md](README.md)）
-- [x] 路线对比 → 自建 pipeline + 各领域最佳组件（分析在 `docs/analisi-rag.md`，决策表在 `docs/architettura.md`）
-- [x] 决策收敛落文档（2026-07-30 自主拍板：Django、评估方法、目标语言、语料范围）
 
 ### M2 — 单语言 RAG 原型
 
@@ -37,10 +20,10 @@
 
 语料 2026-07-31 实测（31 份 PPM slides，约 1200 页）：**英语为主，~23 份英语、~8 份意大利语或英意混排**，全部有文字层（无扫描件）。原计划的 IT→IT 因此不成立 —— 单语基线改用占语料 3/4 的英语，relatore 要求的「先同语言再跨语言」递进保持不变。语料事实与决策见 [docs/architettura.md](docs/architettura.md)。
 
-- [x] 项目初始化：uv + Python 3.12、目录结构、工程化链、Django 骨架 — [pyproject.toml](pyproject.toml) · [.pre-commit-config.yaml](.pre-commit-config.yaml) · [.github/workflows/ci.yml](.github/workflows/ci.yml) · `config/` · `rag/` · `tests/`
+✅ 交付物：项目初始化（uv + Python 3.12 · 工程化链 · Django 骨架）—— [pyproject.toml](pyproject.toml) · [.pre-commit-config.yaml](.pre-commit-config.yaml) · [.github/workflows/ci.yml](.github/workflows/ci.yml) · `config/` · `rag/` · `tests/`。Ingest 步骤 0-1 —— 自适应路由 [rag/probe.py](rag/probe.py) + Docling 解析 [rag/parse.py](rag/parse.py)，解析质量验收与路由实测表在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)。
+
 - [ ] 服务器侧：`~/.bashrc` 设 `HF_HOME=/oblivion/users/jzheng/hf_cache`（Qwen3 推理前）
-- [x] Ingest 步骤 1 — Docling 解析（`rag/parse.py`）：经典 pipeline，OCR 默认关。解析质量已验收（词间空格、重音、表格、标题层级），结果表在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)
-- [ ] Ingest 步骤 1b — 全语料解析一遍（31 份约 1200 页，约 20 分钟），确认连字与多栏阅读顺序；`3.5-HTML5-Part-2` 单独试 VlmPipeline
+- [ ] 服务器侧：全语料解析（31 份约 1200 页）。**本地只做抽样验证**（9 份约 322 页，结果见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)）—— 笔记本 CPU 上全量要近一小时，而 MICC 机器上顺带就跑完了
 - [ ] Ingest 步骤 2 — chunking：HybridChunker + 与 Qwen3-Embedding 对齐的 tokenizer，chunk 带 `locale` · `course` · `source_file` · `page` · `heading_path`
 - [ ] Hybrid 检索：Qdrant 本地模式（dense Qwen3-Embedding + sparse BM25）+ Qwen3-Reranker
 - [ ] Qwen3 生成回答
@@ -54,6 +37,8 @@
 - [ ] RAGAS 指标（忠实度、相关性、context precision/recall）+ 检索指标（hit@k、MRR），可复现评估脚本
 - [ ] Langfuse 接入（tracing，自托管）
 - [ ] 模型尺寸对比（0.6B / 4B / 8B）：质量与运行成本
+- [ ] 消融实验 — 图片描述（Docling `do_picture_description`，Qwen2.5-VL-3B 经 MICC 的 vLLM）：带 / 不带的 RAGAS 差值。动机是死 chunk（只剩标题、正文全是图的 slide），量化见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)
+- [ ] 消融实验 — 自适应路由 vs 全经典 vs 全 VLM：质量增益与算力代价
 
 ### M4 — 跨语言 🔒
 

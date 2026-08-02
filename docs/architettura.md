@@ -27,7 +27,7 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 | 异步任务       | Celery + Redis                      | relatore 指定                                                            |
 | LLM            | Qwen3 系列（0.6B–8B 尺寸对比）      | relatore 指定；2080 Ti（11 GB）上 8B 需量化，ultron（24 GB）可 8B fp16   |
 | Embedding/Rerank | Qwen3-Embedding / Qwen3-Reranker  | 与 LLM 同源的一体化方案，relatore 链接指向的路线                          |
-| 文档解析       | Docling 经典 pipeline，OCR 关闭     | 2026-07-31 实测：修复了词间空格粘连、还原表格与标题层级、重音正确。OCR 对有文字层的 PDF 零产出却多耗 62% 时间 → 默认关（与 Docling 默认相反）。图片型 slides 才开 OCR 或走 VlmPipeline。验证结果见 [docling-e-pipeline.md](docling-e-pipeline.md) |
+| 文档解析       | Docling + **自适应路由**：逐份文件按画像选配置（经典 / 经典 + 公式富化 / VLM），OCR 不自动开 | 2026-07-31 实测：经典 pipeline 修复了词间空格粘连、还原表格与标题层级、重音正确；OCR 对有文字层的 PDF 零产出却多耗 62% 时间。2026-08-02：富化开关全用 Docling 默认（关）会让公式与图片永久丢失 —— `2.1` 有 5~6 张只剩标题的死 chunk → 改为解析前先探测。31 份语料上 4 份触发公式富化、1 份触发 VLM，零误报。规则、阈值与三层结构见 [docling-e-pipeline.md](docling-e-pipeline.md)，实现是 [rag/probe.py](../rag/probe.py) |
 
 选 Django 不选 Flask 的理由：对单人开发 Django **减少**代码量（admin、auth、ORM、i18n 内置）；Flask 需手动拼装。前端选 React SPA 弃 HTMX 的理由：PPM 展示性与流式交互。两项 2026-07-30 拍板确认（PPM 无 UI 评分要求，前端自主）。
 
@@ -53,7 +53,8 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
   - **语言**：英语为主（~23 份：Django 全系列、Docker、JavaScript、图像/视频压缩理论、REST、Flask），意大利语或英意混排 ~8 份（`3.1-web-intro-html`、`3.6`–`3.8`、`HTML5_tag_semantici`）。**单文件内也会混语言**，所以 `locale` 是 chunk 级属性，不是文件级。
   - **文字层**：31 份全部有，无扫描件 → OCR 非必需项。
   - **例外**：`3.5-HTML5-Part-2` 32 页仅 10001 字符且前几页近乎为空，内容在图里 → VlmPipeline 的验证对象。
-  - **已知坑**：朴素抽取丢词间空格（`"Video isa sequenceof frames"`）；连字 `ﬁ`（U+FB01）出现在 `micc.uniﬁ.it` 等处，不归一化会让 BM25 漏召回。两者都是 Docling 解析质量的验收点。
+  - **两个已知坑，均已验收 ✅**：朴素抽取丢词间空格（`"Video isa sequenceof frames"`）→ Docling 还原成 `"Video is a sequence of frames"`；连字（U+FB01 等）出现在 17 份 PDF 的文字层里，单份多达 97 处（`non-proﬁt` · `conﬁgured` · `micc.uniﬁ.it`），不归一化 BM25 必漏召回 → `rag/parse.py` 的 NFKC 归一化后残留为 0。
+  - **新发现的坑**：图片与公式在 Docling 默认配置下全部丢弃，抽样 9 份约 322 页里有 **63 个死 section**（只剩标题、正文全是图片占位）。这是本语料最大的检索缺口，也是自适应路由与 M3 图片描述消融实验的动机。明细见 [docling-e-pipeline.md](docling-e-pipeline.md)。
   - 往年 scritto 真题暂缓 🔜（见 [ROADMAP.md](../ROADMAP.md) 暂缓项）。
 - **能力边界**：检索问答（QA）。出题 / 自动判卷 ⛔ 超出范围。
 - **交付**：React SPA + DRF API（SSE 流式问答）+ Django admin 材料后台，与 RAG 部分**同一仓库**。

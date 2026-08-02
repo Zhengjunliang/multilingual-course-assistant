@@ -2,7 +2,7 @@
 .omc/
 !.omc/skills/
 .claude/settings.local.json
-
+.claude/
 # Python
 __pycache__/
 *.py[cod]

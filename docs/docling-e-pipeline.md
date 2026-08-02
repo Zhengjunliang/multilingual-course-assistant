@@ -9,7 +9,8 @@
 ```mermaid
 flowchart LR
     subgraph Offline["离线 · Ingest pipeline（材料进来时跑一次）"]
-        A[课程 PDF] --> B[Docling 解析]
+        A[课程 PDF] --> A0[探测 · 选解析配置]
+        A0 --> B[Docling 解析]
         B --> C[Chunking 切块]
         C --> D[Embedding 向量化]
         D --> E[(Qdrant 索引<br/>dense + sparse)]
@@ -154,16 +155,118 @@ for chunk in chunker.chunk(doc):
 | 重音字符 | 正常：`più` · `è` · `ambiguità` · `può` |
 | 表格 | 结构还原成真 markdown 表格，边界正确 |
 | 标题层级 | 识别出 `##` 层级 → `contextualize()` 有标题链可用 |
-| 连字 | 已解析样本中 U+FB01 残留 0；但样本本身不含 `uniﬁ`，语料级验证待 `3.1-web-intro-html` 与 `3.9-javascript` |
+| 连字 | **验证通过**。31 份原始 PDF 中 17 份的文字层带连字（`1-intro_django` 74 处 · `2-orm_django` 97 处 · `3.1-web-intro-html` 88 处，含 `micc.uniﬁ.it`）；解析后这三份的 U+FB00–FB04 残留全为 **0**，且 `non-proﬁt` → `non-profit` · `conﬁgured` → `configured` · `deﬁning` → `defining` 逐词还原 —— `normalize_text()` 的 NFKC 在真实数据上有效 |
 | 图片型页面 | `3.5-HTML5-Part-2` 即使开 OCR 仍主要是 `<!-- image -->` 占位 → 交给 VlmPipeline |
 | HTML 标签转义 | **不一致**：正文 `&lt;div&gt;`，表格内裸 `<header>`。web 课程语料里搜 `<nav>` 可能受影响，待 chunking 后评估 |
+| 公式 | 富化关：**全丢**（见下）。富化开：`2.1` 产出 4 个 `$$` LaTeX 块，CIE RGB→XYZ 矩阵的数值正确还原 |
+| 图片 | 一律 `<!-- image -->` 空占位，**死 chunk 是本语料最大的检索缺口**（见下表） |
+
+公式富化实测（2026-08-02，`2.1 IMAGES GENERAL CONCEPTS`，35 页）：
+
+| | `classic` | `classic-formula` |
+| --- | --- | --- |
+| `<!-- formula-not-decoded -->` | 1 | **0** |
+| `$$…$$` LaTeX 块 | **0** | **4** |
+| `<!-- image -->` | 53 | 53（无副作用） |
+
+**最值得记的一条：`formula-not-decoded` 的计数严重低估了损失。** 基线只留了 1 个占位符，但开启富化后出来 4 个公式 —— 也就是说另外 3 个公式在基线里**连占位符都没有，被静默丢弃**。靠数占位符来判断"公式丢了多少"是错的，只能靠开一次富化去比。
+
+两处**没有**被救回，与预期一致：`Y ê ê ú ú = X Z é ê ù ú` 这类矩阵（Symbol 字体的大括号字形）和整张变 `......` 的 `XYZ-RGB transformations` 表 —— 它们被 layout 判成 **table** 而非 formula，走的不是富化路径。这是经典 pipeline 的已知损失，VlmPipeline 是唯一可能的补救。
+
+LaTeX 质量诚实记录：矩阵数值（0.4887180 · 0.3106803 · …）与 CIE 标准矩阵一致，但模型在两侧多生成了 `\hat{e}_i \hat{e} =` 和 `\hat{e}_i \hat{e}^i` 这样原文没有的符号。**这是 VLM 的固有失败模式（幻觉），不是配置错误** —— 数值可信，符号外壳需要在引用时留心。
+
+#### 死 chunk 实测（9 份抽样，约 322 页，经典 pipeline）
+
+"死 chunk" = 一个标题下除了 `<!-- image -->` 占位之外没有任何正文的 section。它进索引后既召不回也答不出。
+
+| 抽样文件 | 图片占位 | 死 section |
+| --- | --- | --- |
+| `1-intro_django_2026`（65p） | 117 | 5 |
+| `1.1 Course intro 2025`（11p） | 9 | 6 |
+| `1.2 Where ICT goes 2025`（36p） | 53 | 8 |
+| `2-orm_django_2025`（46p） | 102 | 9 |
+| `2.1 IMAGES GENERAL CONCEPTS`（35p） | 53 | 6 |
+| `2.2 IMAGES LOSSLESS COMPRESSION`（38p） | 11 | 4 |
+| `3.1b VIDEO GENERAL CONCEPTS`（31p） | 22 | 4 |
+| `3.5-HTML5-Part-2`（32p，`classic-ocr`） | 19 | **19** |
+| `HTML5_tag_semantici`（28p） | 15 | 2 |
+| **合计** | **401** | **63** |
+
+死掉的不是边角内容，正是课程主干：`Django's ORM (Object-Relational Mapping)` · `CRUD examples` · `Create a basic View` · `Components of a Database` · `Overview Client-Server Interaction`。学生问"Django 的 ORM 怎么用"，索引里对应的块是空的。
+
+`3.5-HTML5-Part-2` 的 19/19 是极端情形 —— 每一个 section 都是死的，这正是路由把它判去 VLM 的原因。
+
+**这组数字是 M3 图片描述消融实验的基线**：带 / 不带 `do_picture_description` 的 RAGAS 差值，分母就在这里。
 
 OCR 的取舍（实测，同一份 28 页意大利语 slides）：开 43.8s / 关 27.0s，**产出字符完全相同（11040）**。语料 31 份全有文字层 → `rag/parse.py` 把 `do_ocr` 默认设为 `False`，与 Docling 自身默认相反。唯一例外是图片型的 `3.5`：开 OCR 花 527s，但抽取量从 pypdf 的 10001 涨到 20032，值这个钱。
+
+### 2.8 自适应路由：谁来决定每份文件用哪套配置
+
+上一节的验收暴露了一个比"某个字符没抽对"更根本的问题。`2.1 IMAGES GENERAL CONCEPTS`（35 页）解析出来有 **53 个 `<!-- image -->`、1 个 `<!-- formula-not-decoded -->`**，其中 5~6 张 slide 除了 `##` 标题外**零可检索文字**（`Camera pixel size`、三张 `HSL and HSV`、`XYZ-RGB transformations`）。这些块进了索引就是**死 chunk** —— 永远召不回、也答不出，而"HSL 和 HSV 有什么区别"恰恰是学生会问的。
+
+原因不是 Docling 能力到顶，是这些富化开关**默认就是关的**：`do_formula_enrichment = False`、`do_picture_description = False`。
+
+那么谁来开？系统最终接受学生上传任意 PDF，上传时没人知道那是纯文字讲义、公式密集的理论课、还是文字全在图里的扫描件。三个显而易见的答案都是错的：
+
+- **让用户选** —— 把一个他答不上来的问题推给他。
+- **全开** —— 纯文字讲义要为它永远用不到的模型付几十倍算力。
+- **全关** —— 就是上面那个结果。
+
+生产级文档管线（unstructured.io 的 `strategy="auto"`、Azure Document Intelligence 的分层、AWS Textract 的 tiering）走的是同一个三层结构，**没有一层是"让用户选"**：
+
+```mermaid
+flowchart LR
+    U[上传的 PDF] --> P[① 探测<br/>零模型信号]
+    P --> R{路由规则}
+    R -->|文字层完好| C[经典 pipeline]
+    R -->|有数学字体| CF[经典 + 公式富化]
+    R -->|文字层大面积缺失| V[VLM pipeline]
+    C --> Q[③ 对产出打质量分]
+    CF --> Q
+    V --> Q
+    Q -.升级重跑 🔜.-> R
+```
+
+**① 探测先于解析。** 从 PDF 结构里直接读四个信号 —— 每页文字量、空页比例、图片对象数、字体表里有无数学字体。不加载任何模型、不渲染任何页面。属主是 [rag/probe.py](../rag/probe.py)。
+
+**② 富化自门控。** 关键性质：Docling 的富化模型是**逐 item 触发**的（`standard_pdf_pipeline.py` 里 `CodeFormulaVlmModel` 挂在 `enrichment_pipe` 上）—— layout 没检出公式区域，模型压根不推理。图片描述侧则由 Docling 原生的 `picture_area_threshold`（默认 0.05，只描述占页 5% 以上的图）和 `classification_allow` 挡掉装饰性小图。
+
+**③ 级联升级。** 便宜配置先跑，再对**产出**打质量分（每页实际抽出多少字、多少页零文字、多少张图周围没有文字），只把不合格的部分用贵配置重跑。**本项目只做到"打分并报告"，不做自动重跑** 🔜 M3 —— 重跑阈值必须用 gold set 调，现在拍脑袋定就是给论文埋一个没有依据的常数。
+
+#### 信号在 PPM 语料上的实测分布（31 份，约 1200 页，探测耗时数秒）
+
+| 路由结果 | 份数 | 命中的文件 |
+| --- | --- | --- |
+| `vlm`（空页比 > 0.3） | **1** | `3.5-HTML5-Part-2`：32 页里 16 页近乎空、91 张图 |
+| `classic + formula`（字体表含数学字体） | **4** | `2.1 IMAGES GENERAL` · `2.3 IMAGES LOSSY` · `3.2b VIDEO H261-H262` · `3.3b VIDEO H264-H265` |
+| `classic`（裸跑） | **26** | Django · JavaScript · web 全系列 |
+
+零误报：唯一被判去 VLM 的正是独立已知的那份图片型 slides，四份公式富化正是图像/视频压缩理论那几份（`2.1` 就是产出 `formula-not-decoded` 的那份）。路由省掉 27/31 的公式模型加载与 30/31 的 VLM。
+
+#### 规则 v0 与阈值来源
+
+| 条件 | 决策 | 依据 |
+| --- | --- | --- |
+| `empty_page_ratio > 0.3` | `pipeline = vlm` | 文字层大面积缺失 → 内容在图里。语料实测：除 `3.5` 的 0.50 外全部 ≤ 0.24 |
+| 字体表含 `Symbol` · `CM*` · `MT*` · `STIX` 等 | `formula = True` | 数学字体提供文本字体没有的积分号、大括号、希腊字母 |
+| 其余 | 经典 pipeline，全关 | 26/31 属于此类 |
+| **任何情况** | `ocr` **不自动开** | 实测：有文字层的 PDF 开 OCR 产出字节完全相同却多耗 62% 时间。文字层真缺失的该走 VLM（它同时读版面），OCR 只留作手动覆盖 |
+
+阈值（`EMPTY_PAGE_CHARS = 50`、`NEEDS_VISION_RATIO = 0.3`）是**本语料实测值，不是通用真理**，换语料要重标。
+
+数学字体判定会**故意误报**：PowerPoint 也用 `SymbolMT` 画项目符号。这个方向是有意选的 —— 富化逐 item 自门控，误报的代价是一次模型加载，漏报的代价是公式永久从索引里消失。**不对称的代价，就该配不对称的门槛。**
+
+#### 一个必须记下来的不一致：同一个开关，两个默认值
+
+`rag/parse.py` 的 CLI 里公式富化默认**关**；M5 的 Celery worker 里应该默认**开**。理由是进程生命周期：CLI 每次运行都要重付一次模型下载与加载，而常驻 worker 只付一次，之后逐 item 自门控 ≈ 免费。
+
+不写下来，将来自己看到这个不一致只会以为是 bug。
 
 ## 3. Ingest pipeline 逐步
 
 | 步骤 | 干什么 | 关键选择 | 出错的表现 |
 | --- | --- | --- | --- |
+| 0. Probe | PDF → 文件画像 → 解析配置 | 信号与阈值（见 2.8） | 该开的富化没开 → 公式/图片永久丢失 |
 | 1. Parse | PDF → DoclingDocument | 经典 vs VLM pipeline | 乱码、栏序错、表格塌 |
 | 2. Chunk | 文档 → 带元数据的块 | HybridChunker + 对齐的 tokenizer | 块太大被截断 / 太小丢上下文 |
 | 3. Contextualize | 块 → 富化文本 | 标题链前缀 | 短块检索不到 |
@@ -288,7 +391,8 @@ flowchart TD
 
 | Pipeline 步骤 | 模块职责 | 实验变量（M3 要调的） |
 | --- | --- | --- |
-| Parse | PDF → DoclingDocument | 经典 vs VLM pipeline |
+| Probe | PDF → 画像 → 解析配置 | 路由阈值；路由 vs 全经典 vs 全 VLM 的质量/算力对比 |
+| Parse | PDF → DoclingDocument | 经典 vs VLM pipeline；是否开图片描述 |
 | Chunk | 切块 + contextualize | chunk 大小、是否富化 |
 | Embed | 文本 → 向量 | Qwen3-Embedding 0.6B / 4B / 8B |
 | Index | 写入 Qdrant | hybrid 融合、量化 |
