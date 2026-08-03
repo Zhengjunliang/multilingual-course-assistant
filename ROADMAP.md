@@ -22,41 +22,56 @@
 
 ✅ 交付物：项目初始化（uv + Python 3.12 · 工程化链 · Django 骨架）—— [pyproject.toml](pyproject.toml) · [.pre-commit-config.yaml](.pre-commit-config.yaml) · [.github/workflows/ci.yml](.github/workflows/ci.yml) · `config/` · `rag/` · `tests/`。Ingest 步骤 0-1 —— 自适应路由 [rag/probe.py](rag/probe.py) + Docling 解析 [rag/parse.py](rag/parse.py)，解析质量验收与路由实测表在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)。
 
+工作量粗估：剩余约 2–3 周。
+
 - [ ] 服务器侧：`~/.bashrc` 设 `HF_HOME=/oblivion/users/jzheng/hf_cache`（Qwen3 推理前）
 - [ ] 服务器侧：全语料解析（31 份约 1200 页）。**本地只做抽样**（10 份约 432 页，结果见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)）—— 经典 pipeline 在笔记本上 0.8s/页够用，但全量一小时起，服务器上顺带跑完
-- [ ] Ingest 步骤 2 — chunking：HybridChunker + 与 Qwen3-Embedding 对齐的 tokenizer，chunk 带 `locale` · `course` · `source_file` · `page` · `heading_path`
+- [ ] 冒烟 gold set：30–50 个 EN→EN 问答对，人工撰写，每题带 `source_file` + `page` 引用。问题与页码引用可进 git（本人撰写），含课件原文片段的参考答案放 `data/gold/`（gitignore）。用途：chunk 大小 / top-k / prompt 的调参依据 —— 没有它，M2 所有调参决定都是盲做，M3 才能事后评估。M3 扩为全量 gold set
+- [ ] Ingest 步骤 2 — chunking：HybridChunker + 与 Qwen3-Embedding 对齐的 tokenizer，chunk payload 字段（含溯源字段，索引写入后无法回填）定义在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)
 - [ ] Hybrid 检索：Qdrant 本地模式（dense Qwen3-Embedding + sparse BM25）+ Qwen3-Reranker
 - [ ] Qwen3 生成回答
-- [ ] 用真实课程材料端到端跑通
+- [ ] 用真实课程材料端到端跑通，冒烟 gold set 上报告检索命中率（验收标准，阈值不预设 —— 首轮数字就是基线）
 
 ### M3 — 评估
 
-无现成 gold set，需自建（决策见 `docs/architettura.md`）。
+无现成 gold set，M2 的冒烟版扩为全量（决策见 `docs/architettura.md`）。工作量粗估：约 3–4 周（模型尺寸对比的 3×3 网格是大头，逐配置重启 vLLM 的墙钟成本先估算再开跑）。
 
-- [ ] 基于课程材料构建 gold 问答集（人工 + LLM 辅助生成，人工校验）
-- [ ] RAGAS 指标（忠实度、相关性、context precision/recall）+ 检索指标（hit@k、MRR），可复现评估脚本
+- [ ] 基于课程材料构建 gold 问答集（M2 冒烟版扩量：人工 + LLM 辅助生成，人工校验；按文件/主题分层抽样，避免题目只覆盖解析得好的部分）
+- [ ] RAGAS 指标（忠实度、相关性、context precision/recall）+ 检索指标（hit@k、MRR），可复现评估脚本，遵循 [docs/architettura.md](docs/architettura.md) 的实验可复现性协议
+- [ ] LLM judge 校验：抽子样本人工打分，报告 judge 与人工的一致性 —— judge 与被评系统同为 Qwen 系，自偏好是已知效应，答辩必被问
+- [ ] 错误分类法：失败题逐个归因分桶（解析丢失 / 死 chunk / 切分不当 / 检索 miss / rerank 降位 / 上下文截断 / 生成幻觉 / 误拒答），聚合分数不构成实验章，逐桶分析才构成
+- [ ] 基线三件套：纯 BM25（Qwen-Agent 路线，见 [docs/analisi-rag.md](docs/analisi-rag.md)）· dense-only vs hybrid · 有/无 rerank —— 「rerank 是质量主要来源」这一断言要有测量支撑
 - [ ] Langfuse 接入（tracing，自托管）
 - [ ] 模型尺寸对比（0.6B / 4B / 8B）：质量与运行成本
 - [ ] 消融实验 — 图片描述（Docling `do_picture_description`，Qwen2.5-VL-3B 经 MICC 的 vLLM）：带 / 不带的 RAGAS 差值。动机是死 chunk（只剩标题、正文全是图的 slide），量化见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)
 - [ ] 消融实验 — 自适应路由 vs 全经典 vs 全 VLM：质量增益与算力代价。2026-08-02 已有单份对照否决了自动路由用 VLM（见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)），此项用 gold set 在语料级复核
 
+**M3 → M4 检查点（go/no-go）**：M3 指标齐 + relatore 同意（阻塞项表）则启动 M4；若毕业 session 时间紧，跳过 M4 直接 M5 —— relatore 邮件本就称跨语言 «eventualmente»。
+
 ### M4 — 跨语言 🔒
 
-relatore 表示是可选项（«poi si passa (eventualmente) alla parte di traduzione»）：M3 之后经他同意才启动。
+relatore 表示是可选项（«poi si passa (eventualmente) alla parte di traduzione»）：M3 之后经他同意才启动（见 M3 尾部检查点）。工作量粗估：约 1–2 周（管线不变，换提问语言重跑评估）。
 
 - [ ] 意大利语（± 中文）提问混合语料 — IT→EN、ZH→EN。这是真实场景：学生用意大利语问，材料主体是英语
 - [ ] 用 M3 的指标对比跨语言 vs 单语言质量
 
 ### M5 — 网站（PPM 部分）
 
+工作量粗估：约 4–6 周（后端 + docker-compose + SPA，是研究里程碑之外最大的工程块）。
+
+- [ ] **首个 `migrate` 前**建自定义 User（`AUTH_USER_MODEL`）—— Django 官方明确建议，事后改造要重写全部迁移
+- [ ] settings 拆 dev/prod + prod 安全响应头（HSTS · secure cookies 等），CI 加 `manage.py check --deploy` 与 `makemigrations --check` 漂移守卫
 - [ ] Django + DRF + Celery/Redis 后端项目
 - [ ] docker-compose：PostgreSQL · Redis · Qdrant · Langfuse
 - [ ] 上传材料 → Celery 异步 ingest
+- [ ] 上传滥用防护：文件大小/页数上限 · ingest 超时 · rate limit · 索引多租户隔离（谁的材料谁可检索）—— 单份 32 页图片密集 deck 实测吃掉 527s OCR，无上限等于开放算力
 - [ ] DRF 问答 API（`/api/ask`，SSE 流式，带 `locale` 参数）
 - [ ] React + TypeScript SPA（Vite）：问答界面、流式渲染、来源引用展示
 - [ ] admin 后台管理材料
 
 ### M6 — 部署与论文
+
+工作量粗估：约 4 周（论文写作为主）。
 
 - [ ] 部署到 MICC 服务器（或 Runpod）
 - [ ] 论文写作

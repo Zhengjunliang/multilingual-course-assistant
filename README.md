@@ -20,15 +20,22 @@ uv run pre-commit install
 
 ## 开发
 
+任务入口在 [justfile](justfile)（`scoop install just` 一次性安装）：
+
 ```powershell
-uv run ruff check .                # lint
-uv run ruff format .               # format
-uv run pyright                     # 类型检查
-uv run pytest                      # 测试
-uv run python manage.py check      # Django system checks
+just lint        # ruff check
+just format      # ruff format
+just typecheck   # pyright
+just test        # pytest（快跑，无覆盖率开销）
+just cov         # pytest --cov，带覆盖率门禁，与 CI 相同
+just check       # 完整 CI 链：lint + format + 类型 + Django check + 测试
+just probe data\corpus\PPM
+just parse data\corpus\PPM
 ```
 
-CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 push 与 PR 上跑同一条链，用 `uv sync --locked`，所以 `uv.lock` 必须跟着 commit。
+不装 just 也可以直接跑对应的 `uv run …` 命令（recipe 内容即命令本身）。
+
+CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 push 与 PR 上跑同一条链外加 pip-audit 依赖审计，用 `uv sync --locked`，所以 `uv.lock` 必须跟着 commit。依赖更新手动管理（`uv lock --upgrade` 后跑 `just check`）。
 
 ## Ingest（课程材料 → Markdown）
 

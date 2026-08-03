@@ -37,15 +37,23 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 
 | 决策       | 选择                                                                                                          | 状态 | 验证条件                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | ---- | ------------------------- |
-| RAG 路线   | 自建 pipeline：Docling → chunk → hybrid 检索 → rerank → Qwen3；Qwen-Agent/纯 BM25 做对照基线（分析见 [analisi-rag.md](analisi-rag.md)）；不用 LlamaIndex/LangGraph 全家桶（可解释性优先） | 🔶   | M1 最小实验               |
+| RAG 路线   | 自建 pipeline：Docling → chunk → hybrid 检索 → rerank → Qwen3；Qwen-Agent/纯 BM25 做对照基线（分析见 [analisi-rag.md](analisi-rag.md)）；不用 LlamaIndex/LangGraph 全家桶（可解释性优先） | 🔶   | M2 端到端跑通             |
 | 向量库     | Qdrant：原生 hybrid（dense Qwen3-Embedding + sparse BM25）、locale/课程 payload 过滤、量化；M2 用 qdrant-client 本地模式（无服务器进程），M5 起 Docker；降级备选 pgvector | 🔶   | M2 实测                   |
 | 数据库     | M2 原型无 DB（文件 + Qdrant 本地）；M5 起 PostgreSQL（Docker）                                                 | 🔶   | M5                        |
-| 推理服务   | vLLM（MICC 服务器端，OpenAI 兼容端点 + 流式）。MICC 显卡均为 Turing（2080 Ti / Titan RTX）：**无 bfloat16**，一律 fp16 | 🔶   | M1 ultron 尺寸实验        |
+| 推理服务   | vLLM（MICC 服务器端，OpenAI 兼容端点 + 流式）。MICC 显卡均为 Turing（2080 Ti / Titan RTX）：**无 bfloat16**，一律 fp16 | 🔶   | M3 模型尺寸对比           |
 | 可观测性   | Langfuse 自托管（Docker），LLM tracing                                                                         | 🔶   | M3 接入                   |
 | 评估方法   | RAGAS（faithfulness · answer relevancy · context precision/recall，judge = 开源权重 Qwen3 大尺寸）+ 检索指标（hit@k、MRR）；gold set 自建（无现成数据集） | 🔶   | M3 跑通                   |
 | 目标语言   | EN→EN（M2，语料实测英语为主）；IT→EN、ZH→EN 🔒 M4（relatore 属主）。语料不按语言拆库：Qwen3-Embedding 本身是多语言的，chunk 带 `locale` payload 供过滤 | 🔶   | M2 端到端                 |
 
-评估方法自主拍板（2026-07-30）：relatore 只要求"能评估回答质量"，未指定指标。gold set 无现成数据集，M3 从课程材料自建（LLM 辅助生成 + 人工校验）。
+评估方法自主拍板（2026-07-30）：relatore 只要求"能评估回答质量"，未指定指标。gold set 无现成数据集，M2 建冒烟版、M3 扩全量（见 [ROADMAP.md](../ROADMAP.md)）。
+
+## 实验可复现性 🔜 M3
+
+依赖层的可复现已就位（`uv.lock` + CI `--locked`）；模型层的对应物是下面这份每实验必录清单，M3 评估脚本落地时执行：
+
+- **模型身份**：HF 模型 revision（pin 到 commit，`Qwen3-8B` 这样的名字不是固定 artifact）+ 量化方案。量化 8B 与 fp16 8B 是**不同模型**：尺寸对比实验里两者不得跨机混比，否则尺寸轴与精度轴混杂。
+- **推理配置**：vLLM 版本、seed、采样参数（temperature / top_p / max_tokens）。
+- **数据身份**：语料快照哈希与解析配置随 chunk payload 携带（字段属主见 [docling-e-pipeline.md](docling-e-pipeline.md)）。
 
 ## 语料与交付范围
 
@@ -62,7 +70,7 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 
 ## 工程化 ✅
 
-ruff（lint + format）· pyright · pytest + pytest-django · pre-commit · GitHub Actions CI。工具配置集中在 [pyproject.toml](../pyproject.toml)，hook 在 [.pre-commit-config.yaml](../.pre-commit-config.yaml)，流水线在 [.github/workflows/ci.yml](../.github/workflows/ci.yml)（`uv sync --locked` → lint → format → 类型 → Django check → 测试）；日常命令见 [README.md](../README.md)。配置与密钥经 `.env` 由 pydantic-settings 读入（`config/env.py`，不 import Django，将来与 `rag/` 共用同一来源），`.env` 永不进 git。docker-compose 🔜 M5（PostgreSQL · Redis · Qdrant · Langfuse）。
+ruff（lint + format）· pyright（`rag/` strict）· pytest + pytest-django + 覆盖率门禁（pytest-cov）· pre-commit（含泄密与 lockfile 守卫、commit 消息格式）· GitHub Actions CI（check 链 + pip-audit 依赖审计）；依赖更新手动（pip-audit 兜底安全漏洞）。工具配置集中在 [pyproject.toml](../pyproject.toml)，hook 在 [.pre-commit-config.yaml](../.pre-commit-config.yaml)，流水线在 [.github/workflows/ci.yml](../.github/workflows/ci.yml)（`uv sync --locked` → lint → format → 类型 → Django check → 测试+覆盖率）；日常命令见 [README.md](../README.md)。配置与密钥经 `.env` 由 pydantic-settings 读入（`config/env.py`，不 import Django，将来与 `rag/` 共用同一来源），`.env` 永不进 git。docker-compose 🔜 M5（PostgreSQL · Redis · Qdrant · Langfuse）。
 
 ## 算力策略：remote-first
 

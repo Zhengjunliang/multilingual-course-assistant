@@ -332,7 +332,12 @@ VLM 保留在 `--profile manual --pipeline vlm`，作为对照组与将来扫描
 | 4. Embed | 文本 → 稠密向量 | Qwen3-Embedding 尺寸（0.6B/4B/8B） | 跨语言对不齐 |
 | 5. Index | 向量 + 原文 + payload 入库 | Qdrant，dense + sparse 双命名向量 | 过滤字段缺失 |
 
-payload 里从第一天就要带的字段：`locale`（多语言域的硬要求，见 CLAUDE.md）、`course`、`source_file`、`page`、`heading_path`。补数据比一开始就写进去贵得多。
+payload 里从第一天就要带的字段：
+
+- **业务字段**：`locale`（多语言域的硬要求，见 CLAUDE.md）、`course`、`source_file`、`page`、`heading_path`。
+- **溯源字段**：`parse_variant`（`classic` / `classic-ocr` / …，即 `rag/parse.py` 的 `variant_of`）、`docling_version`、`source_sha256`（原 PDF 内容哈希）。M3 的消融实验要能把每个 chunk 归因到它的解析配置与语料快照；索引一旦写入无法回填 —— 与 `locale` 同一论证。
+
+补数据比一开始就写进去贵得多。
 
 ## 4. Query pipeline 逐步
 
@@ -364,6 +369,17 @@ sequenceDiagram
 - **Rerank**：检索用的是 **bi-encoder**（问题和文档分别编码，可以预先算好 → 快，但两者从未「见过」对方）；reranker 是 **cross-encoder**（问题和文档拼在一起进模型 → 准，但每对都要现算 → 慢）。所以是两段式：检索粗筛几十个 → 重排精选几个。这不是可选优化，是质量的主要来源之一。
 
 **Top-k 的取舍**：k 太小召回不到；k 太大 → 上下文塞满噪音，LLM 反而被带偏（"lost in the middle"），且延迟和显存都涨。k 是 M3 要调的实验变量，不是拍脑袋的常量。
+
+### 4.1 生成侧设计要点 🔜 M2 实现、M3 实验
+
+实现前必须落定、目前只定方向的决策（属主在此，实现时原地补结论）：
+
+- **回答语言跟随提问 `locale`，不跟随材料语言** —— 跨语言场景最用户可见的行为：意大利语提问检索到英语 chunk，回答仍是意大利语，由 system prompt 显式约束并在评估中抽查。
+- **引用格式**：回答中引用 chunk 的 `source_file` + `page`，前端点击跳原 slide 页依赖 chunk 元数据（heading 链 / page / bbox）。
+- **拒答策略**：检索置信不足时回答「材料中没有」，宁可拒答不可编造 —— 拒答对错也是 M3 错误分类法的一个桶。
+- **RRF 参数与 dense/sparse 权重**：M3 实验变量，不预设。
+- **混合 IT/EN 语料的 sparse 侧**：BM25 编码器与分词/词干化方案（意英同索引是真实设计分叉），Qdrant sparse 向量需要显式编码器选型（FastEmbed BM25 / SPLADE / 自建 IDF），M2 chunking 落地时定。
+- **contextualize 标题链污染缓解**：语料实测有重复页头被识别为标题（`HTML &amp; CSS` ×32，见 2.7）；若每个 chunk 前缀同一标题链，dense 检索退化。候选方案：标题链只进 dense 侧文本、重复页头在 chunking 前去重。M2 chunking 落地时定。
 
 ## 5. LangChain / LangGraph / LlamaIndex：是什么，为什么本项目不用
 

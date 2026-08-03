@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     django_secret_key: str
     django_debug: bool = False
     django_allowed_hosts: str = "localhost,127.0.0.1"
+    django_log_level: str = "INFO"
 
     @property
     def allowed_hosts(self) -> list[str]:
