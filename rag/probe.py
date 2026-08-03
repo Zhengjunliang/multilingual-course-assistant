@@ -24,6 +24,8 @@ from typing import Literal
 from pypdf import PdfReader
 from pypdf.generic import DictionaryObject, IndirectObject
 
+logger = logging.getLogger(__name__)
+
 # Which parse configuration a profile maps to. Defined here rather than in `parse`
 # so that routing stays importable — and testable — without pulling in docling.
 Pipeline = Literal["classic", "vlm"]
@@ -118,7 +120,7 @@ def _font_names(page: DictionaryObject) -> set[str]:
     fonts = _resource(page, "/Font")
     if fonts is None:
         return set()
-    names = set()
+    names: set[str] = set()
     for name in fonts:
         entry = _resolve(fonts[name])
         if isinstance(entry, DictionaryObject) and (base := entry.get("/BaseFont")) is not None:
@@ -127,11 +129,6 @@ def _font_names(page: DictionaryObject) -> set[str]:
 
 
 def probe(pdf: Path) -> DocumentProfile:
-    # Several decks in the corpus carry a damaged cross-reference table; pypdf repairs
-    # it but logs a line per broken object, which would bury the profile output. The
-    # repair itself does not affect any signal read below.
-    logging.getLogger("pypdf").setLevel(logging.CRITICAL)
-
     reader = PdfReader(pdf)
     chars: list[int] = []
     images = 0
@@ -177,7 +174,7 @@ def plan_for(profile: DocumentProfile) -> ParsePlan:
     measured to return byte-identical output for 62% more time.
     """
     needs_ocr = profile.empty_page_ratio > NEEDS_VISION_RATIO
-    reasons = []
+    reasons: list[str] = []
     if needs_ocr:
         reasons.append(f"{profile.empty_page_ratio:.0%} of pages carry no text layer")
     if profile.has_math_fonts:
@@ -192,25 +189,53 @@ def plan_for(profile: DocumentProfile) -> ParsePlan:
 
 
 def collect_pdfs(target: Path) -> Iterator[Path]:
-    yield from ([target] if target.is_file() else sorted(target.glob("*.pdf")))
+    if target.is_file():
+        yield target
+        return
+    # rglob + suffix casefold: course folders nest by topic, and files arriving from
+    # Windows machines may carry `.PDF`, which a bare glob("*.pdf") skips on Linux.
+    yield from sorted(p for p in target.rglob("*") if p.is_file() and p.suffix.lower() == ".pdf")
 
 
-def main() -> None:
+def configure_cli_logging() -> None:
+    """Shared by the probe and parse CLIs; a batch over a corpus runs for minutes to
+    hours, so every diagnostic line carries a timestamp."""
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
+    # Several decks in the corpus carry a damaged cross-reference table; pypdf repairs
+    # it but logs a line per broken object, which would bury the report lines. The
+    # repair itself does not affect any signal probe() reads.
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
+
+
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", type=Path, help="a PDF, or a directory of PDFs")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    configure_cli_logging()
 
+    failed = 0
     for pdf in collect_pdfs(args.target):
-        profile = probe(pdf)
+        try:
+            profile = probe(pdf)
+        except Exception:
+            # One corrupt upload must not abort the rest of a corpus run.
+            logger.exception("%s: probe failed", pdf.name)
+            failed += 1
+            continue
         plan = plan_for(profile)
         flags = "".join(
             f" +{name}" for name, on in (("ocr", plan.ocr), ("formula", plan.formula)) if on
         )
+        # The report line is the command's product, not a diagnostic: plain stdout.
         print(
             f"{pdf.name}: {profile.pages}p, {profile.chars_per_page} chars/p, "
             f"{profile.empty_page_ratio:.0%} empty, {profile.images} images "
             f"-> {plan.pipeline}{flags} ({plan.reason})"
         )
+    if failed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

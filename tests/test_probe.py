@@ -7,8 +7,9 @@ copyrighted, never enters git, and does not exist on the CI runner.
 from pathlib import Path
 
 import pytest
+from pypdf.errors import PdfReadError
 
-from rag.probe import DocumentProfile, find_math_fonts, plan_for, probe
+from rag.probe import DocumentProfile, collect_pdfs, find_math_fonts, main, plan_for, probe
 
 # Comfortably longer than EMPTY_PAGE_CHARS, so this page reads as carrying a text layer.
 TEXT = (
@@ -147,3 +148,43 @@ def test_ocr_stays_off_while_a_text_layer_is_present() -> None:
     """Measured: on a PDF that has a text layer, OCR returns identical bytes for 62% more time."""
     for ratio in (0.0, 0.1, 0.24):
         assert not plan_for(make_profile(empty_page_ratio=ratio)).ocr
+
+
+def test_probe_raises_on_a_file_that_is_not_a_pdf(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.pdf"
+    bad.write_bytes(b"this is not a pdf")
+    with pytest.raises(PdfReadError):
+        probe(bad)
+
+
+def test_a_corrupt_file_does_not_abort_a_directory_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Students upload whatever they have; one broken deck must cost one deck, not the
+    whole corpus run. The run still exits non-zero so a batch script notices."""
+    (tmp_path / "aa-bad.pdf").write_bytes(b"this is not a pdf")
+    (tmp_path / "zz-good.pdf").write_bytes(build_pdf(OBJECTS))
+
+    with pytest.raises(SystemExit) as excinfo:
+        main([str(tmp_path)])
+
+    assert excinfo.value.code == 1
+    # The corrupt file sorts first, so this line proves processing continued past it.
+    assert "zz-good.pdf" in capsys.readouterr().out
+
+
+def test_collect_pdfs_finds_nested_and_uppercase_files(tmp_path: Path) -> None:
+    """Course folders nest by topic, and Windows-born files may carry `.PDF`, which a
+    bare glob("*.pdf") silently skips on Linux."""
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "a.pdf").write_bytes(b"")
+    (tmp_path / "sub" / "b.PDF").write_bytes(b"")
+    (tmp_path / "notes.txt").write_text("not a pdf")
+
+    assert list(collect_pdfs(tmp_path)) == sorted([tmp_path / "a.pdf", tmp_path / "sub" / "b.PDF"])
+
+
+def test_collect_pdfs_passes_a_single_file_through(tmp_path: Path) -> None:
+    pdf = tmp_path / "one.pdf"
+    pdf.write_bytes(b"")
+    assert list(collect_pdfs(pdf)) == [pdf]

@@ -10,17 +10,26 @@ first and parsed with the configuration that profile calls for (see `rag.probe`)
     uv run python -m rag.parse "data/corpus/PPM/<slides>.pdf" --profile manual --pipeline vlm
 """
 
+from __future__ import annotations
+
 import argparse
+import logging
 import time
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions
-from docling.document_converter import DocumentConverter, PdfFormatOption
+from rag.probe import ParsePlan, Pipeline, collect_pdfs, configure_cli_logging, plan_for, probe
 
-from rag.probe import ParsePlan, Pipeline, collect_pdfs, plan_for, probe
+if TYPE_CHECKING:
+    from docling.document_converter import DocumentConverter
+
+logger = logging.getLogger(__name__)
+
+# Default output anchored to the repo, not the cwd: an ingest launched from any
+# directory must land its markdown where the rest of the pipeline expects it.
+DEFAULT_OUT_DIR = Path(__file__).resolve().parent.parent / "data" / "parsed"
 
 
 @dataclass(frozen=True)
@@ -57,8 +66,17 @@ def build_converter(
     endpoint on MICC (the `qwen` preset is Qwen2.5-VL-3B, so it stays inside the
     open-weight constraint), with `picture_area_threshold` keeping decorative images
     out of the bill.
+
+    All docling imports live inside this function: importing them at module level
+    costs seconds and drags torch along, which anything that only wants
+    `normalize_text` or the CLI flag validation should never pay.
     """
+    from docling.datamodel.base_models import InputFormat
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+
     if pipeline == "classic":
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+
         options = PdfPipelineOptions()
         options.do_ocr = ocr
         options.do_formula_enrichment = formula
@@ -66,7 +84,6 @@ def build_converter(
             format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)}
         )
 
-    # Imported lazily: pulling in the VLM stack costs seconds we do not pay by default.
     from docling.datamodel import vlm_model_specs
     from docling.datamodel.pipeline_options import VlmPipelineOptions
     from docling.pipeline.vlm_pipeline import VlmPipeline
@@ -108,7 +125,7 @@ def parse(pdf: Path, converter: DocumentConverter) -> ParseResult:
     )
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", type=Path, help="a PDF, or a directory of PDFs")
     parser.add_argument(
@@ -128,8 +145,8 @@ def main() -> None:
         action="store_true",
         help="decode formulas to LaTeX (classic pipeline only)",
     )
-    parser.add_argument("--out-dir", type=Path, default=Path("data/parsed"))
-    args = parser.parse_args()
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    args = parser.parse_args(argv)
 
     manual = args.profile == "manual"
     if not manual and (args.pipeline or args.ocr or args.formula):
@@ -137,41 +154,63 @@ def main() -> None:
     if manual and (args.ocr or args.formula) and (args.pipeline or "classic") != "classic":
         parser.error("--ocr and --formula apply to the classic pipeline only")
 
+    configure_cli_logging()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     # One converter per distinct configuration, not per file: rebuilding it would
     # reload the layout and table models for every deck in the directory.
     converters: dict[str, DocumentConverter] = {}
 
-    for pdf in collect_pdfs(args.target):
-        if manual:
-            plan = ParsePlan(
-                pipeline=args.pipeline or "classic",
-                ocr=args.ocr,
-                formula=args.formula,
-                reason="manual",
-            )
-        else:
-            plan = plan_for(probe(pdf))
+    pdfs = list(collect_pdfs(args.target))
+    failed = 0
+    for pdf in pdfs:
+        try:
+            if manual:
+                plan = ParsePlan(
+                    pipeline=args.pipeline or "classic",
+                    ocr=args.ocr,
+                    formula=args.formula,
+                    reason="manual",
+                )
+            else:
+                plan = plan_for(probe(pdf))
 
-        variant = variant_of(plan)
-        if plan.pipeline == "vlm" and not cuda_available():
-            # granite-docling generates DocTags autoregressively, thousands of tokens a
-            # page, each one a full forward pass. Measured without CUDA: over 56 s/page
-            # against 0.9 s/page for the classic pipeline. Warn rather than refuse — the
-            # run is valid, just far too slow to iterate on.
-            print(f"{pdf.name}: no CUDA device, vlm will take minutes per page")
-        if variant not in converters:
-            converters[variant] = build_converter(plan.pipeline, ocr=plan.ocr, formula=plan.formula)
+            variant = variant_of(plan)
+            if plan.pipeline == "vlm" and not cuda_available():
+                # granite-docling generates DocTags autoregressively, thousands of
+                # tokens a page, each one a full forward pass. Measured without CUDA:
+                # over 56 s/page against 0.9 s/page for the classic pipeline. Warn
+                # rather than refuse — the run is valid, just far too slow to iterate on.
+                logger.warning("%s: no CUDA device, vlm will take minutes per page", pdf.name)
+            if variant not in converters:
+                converters[variant] = build_converter(
+                    plan.pipeline, ocr=plan.ocr, formula=plan.formula
+                )
 
-        result = parse(pdf, converters[variant])
+            result = parse(pdf, converters[variant])
+        except Exception:
+            # A parse crash on one deck must not lose the rest of an hour-long run.
+            logger.exception("%s: parse failed", pdf.name)
+            failed += 1
+            continue
+
         target = args.out_dir / f"{pdf.stem}.{variant}.md"
         target.write_text(result.markdown, encoding="utf-8")
-        print(
+        logger.info(
             # ASCII only: the Windows console codepage mangles anything else.
-            f"{pdf.name}: {variant} ({plan.reason}) - "
-            f"{result.seconds:.1f}s, {len(result.markdown)} chars -> {target}"
+            "%s: %s (%s) - %.1fs, %d chars -> %s",
+            pdf.name,
+            variant,
+            plan.reason,
+            result.seconds,
+            len(result.markdown),
+            target,
         )
+
+    # The summary is the command's product: how much of the corpus is now on disk.
+    print(f"parsed {len(pdfs) - failed}/{len(pdfs)}")
+    if failed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ repos:
       - id: check-merge-conflict
       # Course material and model weights must never be committed.
       - id: check-added-large-files
+      - id: detect-private-key
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.1
@@ -16,3 +17,18 @@ repos:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
+
+  # pyproject.toml and uv.lock must move together; CI's `uv sync --locked` would
+  # catch the drift anyway, but catching it before the commit exists is cheaper.
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.12.1
+    hooks:
+      - id: uv-lock
+
+  # Conventional Commits is the repo's commit format; commits are typed by hand,
+  # so the guard runs on the message, not on the tree.
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
