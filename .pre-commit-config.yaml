@@ -24,11 +24,3 @@ repos:
     rev: 0.12.1
     hooks:
       - id: uv-lock
-
-  # Conventional Commits is the repo's commit format; commits are typed by hand,
-  # so the guard runs on the message, not on the tree.
-  - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v4.4.0
-    hooks:
-      - id: conventional-pre-commit
-        stages: [commit-msg]

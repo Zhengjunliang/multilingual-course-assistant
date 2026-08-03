@@ -18,6 +18,7 @@ dev = [
     "pre-commit",
     "pyright",
     "pytest",
+    "pytest-cov>=7.1.0",
     "pytest-django",
     "ruff",
 ]
@@ -45,11 +46,39 @@ line-length = 100
 extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # import order
+    "UP",  # modern syntax upgrades
+    "B",   # bugbear
+    "SIM", # simplifications
+    "DJ",  # django pitfalls
+    "S",   # bandit security
+    "PT",  # pytest style
+    "RUF", # ruff-native correctness
+    "C4",  # comprehension idioms
+    "TC",  # type-checking-only imports
+    "N",   # pep8 naming
+    "PLC", "PLE", "PLW", # pylint convention/error/warning (PLR left out: opinionated)
+    "G",   # logging format strings
+    "LOG", # logging misuse
+]
+# Lazy imports are a deliberate pattern here: docling drags torch along and costs
+# seconds, so it is imported inside the functions that actually need it (see
+# rag/parse.py) — a rule that forces imports to the top would undo that.
+ignore = ["PLC0415"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is the tool in tests; the smoke tests exist to spawn subprocesses.
+"tests/**" = ["S101", "S603"]
 
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
+# The thesis core is plain Python with no Django metaprogramming, so it can afford
+# the strictest checking; config/ and tests/ stay on standard.
+strict = ["rag"]
 venvPath = "."
 venv = ".venv"
 include = ["config", "rag", "tests"]
@@ -58,3 +87,23 @@ include = ["config", "rag", "tests"]
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["."]
 testpaths = ["tests"]
+# --cov deliberately not in addopts: the everyday local run stays fast and debuggable;
+# CI passes it explicitly and enforces the gate below.
+addopts = "-ra --strict-markers --strict-config"
+xfail_strict = true
+# Warnings are failures: a deprecation seen today is a break at the next `uv sync`
+# upgrade. Third-party warnings get individually targeted ignores, never a blanket one.
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["rag", "config"]
+branch = true
+# Untouched startproject entry points; nothing to measure until deployment (M6).
+omit = ["config/asgi.py", "config/wsgi.py"]
+
+[tool.coverage.report]
+show_missing = true
+# Measured 75% after the M2 test additions (the gap is parse.py's converter loop,
+# which needs docling models), set ~5 points under. Ratchet up as coverage grows;
+# never lower it.
+fail_under = 70
