@@ -6,7 +6,7 @@
 ## 1. 项目概览
 
 - **项目**：multilingual-course-assistant — 大学课程材料多语言问答（RAG，开源权重 LLM，Qwen 系；仅 QA，⛔ 出题/判卷）+ 网站（PPM 部分）：Django/DRF + Celery 后端、React SPA 前端，同一仓库。**Triennale 毕业论文**，UniFi，relatore Prof. Marco Bertini；单人开发（Junliang Zheng）。
-- **当前阶段 🔶 M2**：骨架（`pyproject.toml` 集中 uv · ruff · pyright · pytest 配置、Django project `config/`、`.pre-commit-config.yaml`、`.github/workflows/ci.yml`）+ ingest 前两步 —— `rag/probe.py`（解析前探测，逐份文件决定是否开 OCR / 公式富化；VLM 不进自动路由）与 `rag/parse.py`（Docling 解析）。无 chunking、检索、生成与 web 业务逻辑。
+- **当前阶段 🔶 M2**：骨架（`pyproject.toml` 集中 uv · ruff · pyright · pytest 配置、Django project `config/`、`.pre-commit-config.yaml`、`.github/workflows/ci.yml`）+ ingest 前三步 —— `rag/probe.py`（解析前探测，逐份文件决定是否开 OCR / 公式富化；VLM 不进自动路由）、`rag/parse.py`（Docling 解析 → DoclingDocument JSON + 溯源 sidecar）与 `rag/chunk.py`（HybridChunker 切块 + payload）。无检索、生成与 web 业务逻辑。
 - **范围**：定义在 `ROADMAP.md`（里程碑 M0–M7、阻塞项、暂缓项、Meet 议题）；relatore 的约束在 `docs/architettura.md`。**禁用专有 LLM API**（OpenAI/Claude）：只用开源权重模型。语料只用课程 slides/讲义 PDF（scritto 真题暂缓 🔜）。MCP/外部知识源 🔜 M7（可选，论文范围外）。
 - **技术栈 🔶 全部自主已定**：Python 3.12 via uv · Django 5 + DRF · Celery+Redis · Qwen3（LLM/embedding/reranker）· Docling · React+TS SPA（Vite）· 自建 RAG pipeline · Qdrant hybrid · vLLM · RAGAS · Langfuse · PostgreSQL · 工程化链 — 唯一决策表在 `docs/architettura.md`，🔶 项待实验验证（推翻则原地替换）。依赖规则：**🔒 项禁止引入依赖或配置文件**；🔶 项用 `uv add` 引入，且**只在真正要用它的里程碑加** — 装了不用的依赖是噪音，也让 `uv.lock` 里出现无法解释的东西。
 - **目录结构 ✅**：`config/`（Django project：settings · urls · asgi/wsgi · env）· `rag/`（RAG pipeline 包）· `tests/` · `docs/` · `data/`（课程材料与派生产物，gitignore，永不进 git）· `.github/workflows/ci.yml`。**`rag/` 禁止 import Django** — 论文核心要能脱离 web 单独跑评估，`tests/test_smoke.py` 守着这条。后续目录到里程碑再建，未定前不建"顺手"目录：`apps/qa/`（DRF）与 `frontend/`（React SPA）🔜 M5。

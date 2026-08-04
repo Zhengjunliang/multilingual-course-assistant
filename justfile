@@ -39,6 +39,10 @@ check:
 probe target:
     uv run python -m rag.probe "{{ target }}"
 
-# Parse PDFs to markdown following the per-file routing.
+# Parse PDFs to DoclingDocument JSON (+ meta sidecar) following the per-file routing.
 parse target:
     uv run python -m rag.parse "{{ target }}"
+
+# Chunk parsed document JSON into payload-bearing JSONL.
+chunk target:
+    uv run python -m rag.chunk "{{ target }}"

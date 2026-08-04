@@ -6,7 +6,7 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 
 ## 状态
 
-🔶 M2 进行中：项目骨架与工程化链就位，ingest 走到解析这一步（探测 + Docling），尚无 chunking、检索与 web 业务逻辑。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+🔶 M2 进行中：项目骨架与工程化链就位，ingest 走到切块这一步（探测 + Docling 解析 + chunking），尚无检索、生成与 web 业务逻辑。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
@@ -31,13 +31,14 @@ just cov         # pytest --cov，带覆盖率门禁，与 CI 相同
 just check       # 完整 CI 链：lint + format + 类型 + Django check + 测试
 just probe data\corpus\PPM
 just parse data\corpus\PPM
+just chunk data\parsed
 ```
 
 不装 just 也可以直接跑对应的 `uv run …` 命令（recipe 内容即命令本身）。
 
 CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 push 与 PR 上跑同一条链外加 pip-audit 依赖审计，用 `uv sync --locked`，所以 `uv.lock` 必须跟着 commit。依赖更新手动管理（`uv lock --upgrade` 后跑 `just check`）。
 
-## Ingest（课程材料 → Markdown）
+## Ingest（课程材料 → 可检索的块）
 
 课程 PDF 放 `data/corpus/<课程>/`（gitignore）。解析前先探测、逐份文件选配置，不需要手动指定：
 
@@ -45,16 +46,17 @@ CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 push 与 PR 上�
 uv run python -m rag.probe data\corpus\PPM                       # 只看画像与路由结果，不解析
 uv run python -m rag.parse data\corpus\PPM                       # 按路由解析整个目录 -> data\parsed\
 uv run python -m rag.parse "data\corpus\PPM\<slides>.pdf" --profile manual --pipeline vlm
+uv run python -m rag.chunk data\parsed                           # 切块 -> data\chunks\*.jsonl
 ```
 
-输出文件名带配置（`<名>.classic.md` · `.classic-formula.md` · `.vlm.md`），同一份 PDF 的不同配置不互相覆盖，便于对比。路由规则与实测见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)。
+解析每份产出两个文件：`<名>.<配置>.json`（DoclingDocument，无损，chunking 的输入）与 `<名>.<配置>.meta.json`（溯源 sidecar）。配置名（`classic` · `classic-formula` · `vlm` …）进文件名，同一份 PDF 的不同配置不互相覆盖，便于对比。chunking 输出 `data/chunks/<名>.<配置>.jsonl`，每行一个带完整 payload 的 chunk。路由规则、实测与 payload 契约见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)。
 
 ## 代码布局
 
 | 路径              | 内容                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------ |
 | `config/`         | Django project：settings · urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入）        |
-| `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling |
+| `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`chunk.py` 切块并挂 payload |
 | `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性                                |
 | `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
 

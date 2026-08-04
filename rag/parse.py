@@ -1,8 +1,11 @@
-"""Step 1 of the ingest pipeline: course PDF -> DoclingDocument -> Markdown.
+"""Step 1 of the ingest pipeline: course PDF -> DoclingDocument -> lossless JSON.
 
 Parsing errors are frozen into the index forever, so this step is verified on its
-own output before anything downstream is built. By default each file is profiled
-first and parsed with the configuration that profile calls for (see `rag.probe`);
+own output before anything downstream is built. Each file lands as two artifacts:
+`<stem>.<variant>.json` (the DoclingDocument, the only input chunking needs) and
+`<stem>.<variant>.meta.json` (provenance sidecar), so later steps never touch the
+original PDF and never import docling. By default each file is profiled first and
+parsed with the configuration that profile calls for (see `rag.probe`);
 `--profile manual` forces one configuration, which is what experiments need:
 
     uv run python -m rag.parse data/corpus/PPM --out-dir data/parsed
@@ -13,29 +16,55 @@ first and parsed with the configuration that profile calls for (see `rag.probe`)
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 import time
 import unicodedata
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from pydantic import BaseModel, ConfigDict
 
 from rag.probe import ParsePlan, Pipeline, collect_pdfs, configure_cli_logging, plan_for, probe
 
 if TYPE_CHECKING:
     from docling.document_converter import DocumentConverter
+    from docling_core.types.doc.document import DoclingDocument
 
 logger = logging.getLogger(__name__)
 
 # Default output anchored to the repo, not the cwd: an ingest launched from any
-# directory must land its markdown where the rest of the pipeline expects it.
+# directory must land its artifacts where the rest of the pipeline expects them.
 DEFAULT_OUT_DIR = Path(__file__).resolve().parent.parent / "data" / "parsed"
+
+
+class ParsedMeta(BaseModel):
+    """Provenance sidecar written next to each document JSON.
+
+    Exists so the chunking step never opens the original PDF, never imports
+    docling, and never recomputes a hash: every field an index payload needs
+    to attribute a chunk to its parse configuration and corpus snapshot is
+    frozen here at parse time (M3's ablations depend on that attribution).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    source_file: str
+    source_path: str
+    source_sha256: str
+    parse_variant: str
+    docling_version: str
+    course: str
+    seconds: float
+    parsed_at: str
 
 
 @dataclass(frozen=True)
 class ParseResult:
     source: Path
-    markdown: str
+    document: DoclingDocument
     seconds: float
 
 
@@ -46,8 +75,18 @@ def normalize_text(text: str) -> str:
     query for `unifi` never matches. NFKC also folds full-width forms and
     non-breaking spaces, which is wanted here, but it rewrites superscripts and
     fractions too — acceptable for slides, revisit if formulas start suffering.
+
+    The DoclingDocument JSON keeps the original text; this is applied by the
+    chunking step to every chunk it emits, so the index only ever sees folded text.
     """
     return unicodedata.normalize("NFKC", text)
+
+
+def sha256_of(path: Path) -> str:
+    """Content hash of the original PDF: the corpus-snapshot identity of every
+    chunk derived from it."""
+    with path.open("rb") as handle:
+        return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def build_converter(
@@ -104,6 +143,13 @@ def cuda_available() -> bool:
     return torch.cuda.is_available()
 
 
+def docling_version() -> str:
+    """Read lazily: version metadata must not cost a docling import at module level."""
+    import docling
+
+    return docling.__version__
+
+
 def variant_of(plan: ParsePlan) -> str:
     """Name the configuration, so two runs over the same deck stay comparable on disk."""
     parts = [plan.pipeline]
@@ -118,11 +164,27 @@ def parse(pdf: Path, converter: DocumentConverter) -> ParseResult:
     started = time.perf_counter()
     document = converter.convert(pdf).document
     elapsed = time.perf_counter() - started
-    return ParseResult(
-        source=pdf,
-        markdown=normalize_text(document.export_to_markdown()),
-        seconds=elapsed,
-    )
+    return ParseResult(source=pdf, document=document, seconds=elapsed)
+
+
+def persist(document: DoclingDocument, meta: ParsedMeta, out_dir: Path) -> tuple[Path, Path]:
+    """Write the document JSON and its provenance sidecar as one unit.
+
+    The two files share the `<stem>.<variant>` key so the chunking step can pair
+    them back up with nothing but a directory listing.
+    """
+    stem = Path(meta.source_file).stem
+    doc_path = out_dir / f"{stem}.{meta.parse_variant}.json"
+    meta_path = out_dir / f"{stem}.{meta.parse_variant}.meta.json"
+    document.save_as_json(doc_path)
+    meta_path.write_text(meta.model_dump_json(indent=2), encoding="utf-8")
+    return doc_path, meta_path
+
+
+def course_of(target: Path) -> str:
+    """Default course name from the layout `data/corpus/<course>/...`."""
+    base = target if target.is_dir() else target.parent
+    return base.name
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -145,6 +207,11 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="decode formulas to LaTeX (classic pipeline only)",
     )
+    parser.add_argument(
+        "--course",
+        default=None,
+        help="course label carried into every chunk payload; defaults to the target directory name",
+    )
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     args = parser.parse_args(argv)
 
@@ -156,6 +223,7 @@ def main(argv: list[str] | None = None) -> None:
 
     configure_cli_logging()
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    course = args.course or course_of(args.target)
 
     # One converter per distinct configuration, not per file: rebuilding it would
     # reload the layout and table models for every deck in the directory.
@@ -188,23 +256,32 @@ def main(argv: list[str] | None = None) -> None:
                 )
 
             result = parse(pdf, converters[variant])
+            meta = ParsedMeta(
+                source_file=pdf.name,
+                source_path=str(pdf.resolve()),
+                source_sha256=sha256_of(pdf),
+                parse_variant=variant,
+                docling_version=docling_version(),
+                course=course,
+                seconds=round(result.seconds, 1),
+                parsed_at=datetime.now(UTC).isoformat(timespec="seconds"),
+            )
+            doc_path, _ = persist(result.document, meta, args.out_dir)
         except Exception:
             # A parse crash on one deck must not lose the rest of an hour-long run.
             logger.exception("%s: parse failed", pdf.name)
             failed += 1
             continue
 
-        target = args.out_dir / f"{pdf.stem}.{variant}.md"
-        target.write_text(result.markdown, encoding="utf-8")
         logger.info(
             # ASCII only: the Windows console codepage mangles anything else.
-            "%s: %s (%s) - %.1fs, %d chars -> %s",
+            "%s: %s (%s) - %.1fs, %d items -> %s",
             pdf.name,
             variant,
             plan.reason,
             result.seconds,
-            len(result.markdown),
-            target,
+            len(result.document.texts),
+            doc_path,
         )
 
     # The summary is the command's product: how much of the corpus is now on disk.

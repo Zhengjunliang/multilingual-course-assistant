@@ -1,0 +1,2 @@
+{"id": "q001", "locale": "en", "question": "What is an Object-Relational Mapping and what problem does it solve?", "source_file": "2-orm_django_2025.pdf", "page": 11, "answer_ref": "data/gold/answers/q001.md"}
+{"id": "q002", "locale": "en", "question": "What are Django migrations for, and which commands manage them?", "source_file": "2-orm_django_2025.pdf", "page": 24, "answer_ref": "data/gold/answers/q002.md"}
