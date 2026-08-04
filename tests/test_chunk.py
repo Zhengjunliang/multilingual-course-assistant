@@ -190,6 +190,22 @@ def test_meta_sidecars_are_paired_and_excluded_from_collection(tmp_path: Path) -
     assert list(collect_documents(doc)) == [doc]
 
 
+def test_stray_json_without_sidecar_is_skipped_in_directory_scans(tmp_path: Path) -> None:
+    """Other tools have dropped state files under the parsed dir; a lone .json is
+    not one of our artifacts and must not fail the corpus run. An explicitly
+    named file still goes through, so a missing sidecar surfaces as an error."""
+    doc = tmp_path / "deck.classic.json"
+    (tmp_path / "deck.classic.meta.json").touch()
+    doc.touch()
+    stray = tmp_path / ".omc" / "state"
+    stray.mkdir(parents=True)
+    (stray / "pre-tool-advisory-throttle.json").touch()
+    assert list(collect_documents(tmp_path)) == [doc]
+    assert list(collect_documents(stray / "pre-tool-advisory-throttle.json")) == [
+        stray / "pre-tool-advisory-throttle.json"
+    ]
+
+
 def test_importing_chunk_loads_neither_docling_nor_transformers() -> None:
     """The contract model and the heuristics must stay importable without paying
     for torch or a tokenizer download. Exact key membership, so `docling_core`

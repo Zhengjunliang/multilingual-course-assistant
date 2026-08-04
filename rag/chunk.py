@@ -249,12 +249,24 @@ def meta_path_of(doc_path: Path) -> Path:
 
 
 def collect_documents(target: Path) -> Iterator[Path]:
+    """A directory scan only yields JSONs whose sidecar sits next to them.
+
+    `persist()` always writes the pair together, so a lone `.json` under the
+    parsed dir is not our artifact (state files from other tools have shown up
+    there) — skip it with a warning instead of failing the corpus run. An
+    explicitly named file bypasses the filter so a genuinely missing sidecar
+    still surfaces as a hard error.
+    """
     if target.is_file():
         yield target
         return
-    yield from sorted(
-        p for p in target.rglob("*.json") if p.is_file() and not p.name.endswith(".meta.json")
-    )
+    for path in sorted(target.rglob("*.json")):
+        if not path.is_file() or path.name.endswith(".meta.json"):
+            continue
+        if not meta_path_of(path).exists():
+            logger.warning("%s: no meta sidecar, skipping", path.name)
+            continue
+        yield path
 
 
 def main(argv: list[str] | None = None) -> None:
