@@ -6,7 +6,7 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 
 ## 状态
 
-🔶 M2 进行中：项目骨架与工程化链就位，ingest 走到切块这一步（探测 + Docling 解析 + chunking），尚无检索、生成与 web 业务逻辑。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+🔶 M2 进行中：项目骨架与工程化链就位；ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在样本语料上跑通，gold 冒烟 hit@5 2/2；生成侧代码与测试就绪，实测待服务器 vLLM 端点。尚无 web 业务逻辑。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
@@ -32,6 +32,10 @@ just check       # 完整 CI 链：lint + format + 类型 + Django check + 测�
 just probe data\corpus\PPM
 just parse data\corpus\PPM
 just chunk data\parsed
+just index data\chunks
+just search "What is an ORM?"
+just answer "What is an ORM?"    # 需要 vLLM 隧道在线
+just gold                        # gold 冒烟 hit@5
 ```
 
 不装 just 也可以直接跑对应的 `uv run …` 命令（recipe 内容即命令本身）。
@@ -51,12 +55,23 @@ uv run python -m rag.chunk data\parsed                           # 切块 -> dat
 
 解析每份产出两个文件：`<名>.<配置>.json`（DoclingDocument，无损，chunking 的输入）与 `<名>.<配置>.meta.json`（溯源 sidecar）。配置名（`classic` · `classic-formula` · `vlm` …）进文件名，同一份 PDF 的不同配置不互相覆盖，便于对比。chunking 输出 `data/chunks/<名>.<配置>.jsonl`，每行一个带完整 payload 的 chunk。路由规则、实测与 payload 契约见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)。
 
+## 检索与问答
+
+```powershell
+uv run python -m rag.index data\chunks              # 索引 -> data\qdrant\（本地嵌入式，无服务进程）
+uv run python -m rag.search "What is an ORM?"       # hybrid（dense+BM25+RRF）+ Qwen3-Reranker
+uv run python -m rag.answer "What is an ORM?"       # 检索 + Qwen3 生成带引用的回答
+uv run python -m rag.gold gold\smoke.jsonl          # gold 冒烟：检索 hit@k
+```
+
+embedding 与 reranker（各 0.6B）在本机 GPU 跑，索引与检索完全离线；只有 `rag.answer` 的生成一步调服务器 vLLM 的 OpenAI 兼容端点 —— 本地先开隧道 `ssh -L 8000:localhost:8000 <server>`，端点与模型名在 `.env`（`VLLM_BASE_URL` · `VLLM_MODEL`）。分工依据见 [docs/architettura.md](docs/architettura.md) 算力策略一节。
+
 ## 代码布局
 
 | 路径              | 内容                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------ |
 | `config/`         | Django project：settings · urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入）        |
-| `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`chunk.py` 切块并挂 payload |
+| `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`answer.py` 生成带引用回答，`gold.py` 检索冒烟跑分 |
 | `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性                                |
 | `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
 

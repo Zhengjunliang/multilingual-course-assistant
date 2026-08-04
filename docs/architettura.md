@@ -38,7 +38,7 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 | 决策       | 选择                                                                                                          | 状态 | 验证条件                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | ---- | ------------------------- |
 | RAG 路线   | 自建 pipeline：Docling → chunk → hybrid 检索 → rerank → Qwen3；Qwen-Agent/纯 BM25 做对照基线（分析见 [analisi-rag.md](analisi-rag.md)）；不用 LlamaIndex/LangGraph 全家桶（可解释性优先） | 🔶   | M2 端到端跑通             |
-| 向量库     | Qdrant：原生 hybrid（dense Qwen3-Embedding + sparse BM25）、locale/课程 payload 过滤、量化；M2 用 qdrant-client 本地模式（无服务器进程），M5 起 Docker；降级备选 pgvector | 🔶   | M2 实测                   |
+| 向量库     | Qdrant：原生 hybrid（dense Qwen3-Embedding + sparse fastembed BM25 + RRF）、locale/课程 payload 过滤（fusion 下必须放 prefetch 分支内，实测顶层 filter 被静默忽略）；M2 用 qdrant-client 本地模式（无服务器进程，[rag/index.py](../rag/index.py)、[rag/search.py](../rag/search.py)），M5 起 Docker；降级备选 pgvector | ✅   | 4 deck 样本实测，gold 冒烟 hit@5 2/2 |
 | 数据库     | M2 原型无 DB（文件 + Qdrant 本地）；M5 起 PostgreSQL（Docker）                                                 | 🔶   | M5                        |
 | 推理服务   | vLLM（MICC 服务器端，OpenAI 兼容端点 + 流式）。MICC 显卡均为 Turing（2080 Ti / Titan RTX）：**无 bfloat16**，一律 fp16 | 🔶   | M3 模型尺寸对比           |
 | 可观测性   | Langfuse 自托管（Docker），LLM tracing                                                                         | 🔶   | M3 接入                   |
@@ -78,7 +78,7 @@ ruff（lint + format）· pyright（`rag/` strict）· pytest + pytest-django + 
 
 Colab ⛔ 不用：MICC 接入已完成，6 台 Dream Machines + ultron 可挑空闲机器，显存和常驻能力都优于免费 T4；Colab 的会话超时、每次重装依赖、模型权重反复下载只会拖慢迭代，且论文实验需要可复现的固定环境。Runpod / Lightning 仅作 MICC 长期不可用时的付费兜底，不进日常流程。
 
-日常开发循环（**代码不需要同步到服务器**）：vLLM 在服务器 tmux 常驻，暴露 OpenAI 兼容端点（LLM + embedding + rerank）；本地经 SSH 隧道（`ssh -L 8000:localhost:8000 <server>`）调用，代码里只配 base_url。单测/CI mock 掉 LLM client，零网络零 GPU。只有正式实验（M3 评估、尺寸对比）才在服务器上 `git pull` 执行。
+日常开发循环（**代码与数据都不需要同步到服务器**，2026-08-04 按尺寸分界线落实）：embedding（Qwen3-Embedding-0.6B）与 reranker（Qwen3-Reranker-0.6B）在笔记本 GPU 本地跑（fp16 各约 1.2 GB），Qdrant 用本地嵌入式模式（`data/qdrant/`，无服务进程）—— 索引与检索**完全离线**；vLLM 在服务器 tmux 常驻，暴露 OpenAI 兼容端点（**只有生成 LLM**），本地经 SSH 隧道（`ssh -L 8000:localhost:8000 <server>`）调用，代码里只配 base_url（`config/env.py` 的 `VLLM_BASE_URL`），发过去的是 prompt（问题 + 检索出的 chunk 文本），不是文件。单测/CI mock 掉 LLM client，零网络零 GPU。只有正式实验（M3 评估、尺寸对比）才在服务器上 `git pull` 执行。
 
 ## 硬件拓扑
 

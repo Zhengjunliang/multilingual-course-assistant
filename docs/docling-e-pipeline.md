@@ -2,7 +2,7 @@
 
 面向开发的概念梳理 + ingest 进度。决策结论不在这里（属主是 [architettura.md](architettura.md)），路线对比不在这里（属主是 [analisi-rag.md](analisi-rag.md)）。本文回答：**每个环节在干什么、为什么需要它、本项目怎么落、进度在哪。**
 
-进度一览：步骤 0 探测 ✅（[rag/probe.py](../rag/probe.py)）· 步骤 1 解析 ✅（[rag/parse.py](../rag/parse.py)）· 步骤 2 chunking ✅（[rag/chunk.py](../rag/chunk.py)）· 检索/生成 🔜 M2。
+进度一览：步骤 0 探测 ✅（[rag/probe.py](../rag/probe.py)）· 步骤 1 解析 ✅（[rag/parse.py](../rag/parse.py)）· 步骤 2 chunking ✅（[rag/chunk.py](../rag/chunk.py)）· 索引 ✅（[rag/index.py](../rag/index.py)）· hybrid 检索 + rerank ✅（[rag/search.py](../rag/search.py)）· 生成 🔶（[rag/answer.py](../rag/answer.py) 代码与测试就绪，实测待服务器 vLLM 端点）。
 
 ## 1. 全景：RAG 是两条 pipeline，不是一条
 
@@ -188,8 +188,8 @@ for chunk in chunker.chunk(doc):
 | 1. Parse | ✅ | PDF → DoclingDocument JSON | 经典 vs VLM | 乱码、栏序错、表格塌 |
 | 2. Chunk | ✅ | 文档 → 带 payload 的块 | HybridChunker + 对齐 tokenizer | 块太大被截断 / 太小丢上下文 |
 | 3. Contextualize | ✅（并入步骤 2） | 块 → 富化文本 | 标题链前缀（家具剔除，见 3.7） | 短块检索不到 |
-| 4. Embed | 🔜 M2 | 文本 → 稠密向量 | Qwen3-Embedding 尺寸 | 跨语言对不齐 |
-| 5. Index | 🔜 M2 | 向量 + 原文 + payload 入库 | Qdrant，dense + sparse 双命名向量 | 过滤字段缺失 |
+| 4. Embed | ✅（并入步骤 5，[rag/index.py](../rag/index.py)） | 文本 → 稠密向量 | Qwen3-Embedding-0.6B 本地跑；`embed_text` 进 dense、`text` 进 sparse | 跨语言对不齐 |
+| 5. Index | ✅（[rag/index.py](../rag/index.py)） | 向量 + 原文 + payload 入库 | Qdrant 本地模式，dense + sparse（fastembed BM25，IDF modifier）双命名向量；uuid5(chunk_id) 幂等 upsert | 过滤字段缺失 |
 
 ## 4. Query pipeline 逐步
 
@@ -222,15 +222,17 @@ sequenceDiagram
 
 **Top-k 取舍**：太小召回不到；太大 → 上下文塞满噪音（"lost in the middle"），延迟显存都涨。k 是 M3 实验变量，不是拍脑袋常量。
 
-### 4.1 生成侧设计要点 🔜 M2 实现、M3 实验
+### 4.1 检索与生成的已定决策
 
-实现前必须落定、当前只定方向的决策（属主在此，实现时原地补结论）：
+实现落地在 [rag/index.py](../rag/index.py) · [rag/search.py](../rag/search.py) · [rag/answer.py](../rag/answer.py)：
 
-- **回答语言跟随提问 `locale`，不跟随材料语言** —— 意大利语提问检索到英语 chunk，回答仍是意大利语；system prompt 显式约束并在评估中抽查。
-- **引用格式**：回答中引用 chunk 的 `source_file` + `page`，前端点击跳原 slide 页依赖 chunk 元数据。
-- **拒答策略**：检索置信不足时回答「材料中没有」，宁可拒答不可编造 —— 拒答对错也是 M3 错误分类法的一个桶。
-- **RRF 参数与 dense/sparse 权重**：M3 实验变量，不预设。
-- **混合 IT/EN 语料的 sparse 侧**：BM25 编码器与分词/词干化方案（FastEmbed BM25 / SPLADE / 自建 IDF），检索步落地时定 —— chunk 侧已按 `text`/`embed_text` 分存备好两路输入（见 3.6）。
+- **Sparse 侧 ✅**：fastembed 的 `Qdrant/bm25`（文档侧 TF、collection 上 `modifier=IDF` 补权重），词干化用其默认英语方案 —— chunk 侧 `text`/`embed_text` 分存（见 3.6）保证两路输入互不污染。SPLADE/自建 IDF 不再考虑。
+- **Fusion 陷阱 ✅**：Qdrant 本地模式下 fusion 查询会**静默忽略顶层 `query_filter`**（实测），locale/course 过滤必须放进每个 `Prefetch` 分支 —— [rag/search.py](../rag/search.py) 如此实现。
+- **Reranker 加载 ✅**：`Qwen/Qwen3-Reranker-0.6B` 是 causal LM，官方 recipe 是对每个 (query, doc) 取 yes/no 两 token 的 P("yes")；用 CrossEncoder 之类的分类头包装会**静默接一个随机初始化的头**输出垃圾分数。
+- **回答语言跟随提问 `locale` ✅** —— 默认从问题文本检测（`detect_locale`），`--locale` 覆写；system prompt 显式约束，评估抽查归 M3。
+- **引用格式 ✅**：`[source_file p.N]`，prompt 中每段摘录带同格式标记，模型被要求复用；前端点击跳原 slide 页依赖同一元数据。
+- **拒答策略 ✅**：检索零候选时不调 LLM，直接按 locale 回「材料中没有」；prompt 同时要求摘录不支撑时明说。拒答对错也是 M3 错误分类法的一个桶。
+- **RRF 参数与 dense/sparse 权重**：M3 实验变量，不预设（当前 Qdrant RRF 默认，prefetch 每路 20）。
 - **标题链污染缓解**：已定，见 3.7。
 
 ## 5. LangChain / LangGraph / LlamaIndex：为什么不用

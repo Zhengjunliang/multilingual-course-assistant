@@ -27,10 +27,10 @@
 - [ ] 服务器侧：`~/.bashrc` 设 `HF_HOME=/oblivion/users/jzheng/hf_cache`（Qwen3 推理前）
 - [ ] 服务器侧：全语料解析（31 份约 1200 页）。**本地只做抽样**（10 份约 432 页，结果见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)）—— 经典 pipeline 在笔记本上 0.8s/页够用，但全量一小时起，服务器上顺带跑完
 - [ ] 冒烟 gold set：30–50 个 EN→EN 问答对，人工撰写，每题带 `source_file` + `page` 引用。问题与页码引用可进 git（本人撰写），含课件原文片段的参考答案放 `data/gold/`（gitignore）。用途：chunk 大小 / top-k / prompt 的调参依据 —— 没有它，M2 所有调参决定都是盲做，M3 才能事后评估。M3 扩为全量 gold set
-- [ ] Ingest 步骤 2 — chunking：HybridChunker + 与 Qwen3-Embedding 对齐的 tokenizer，chunk payload 字段（含溯源字段，索引写入后无法回填）定义在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)
-- [ ] Hybrid 检索：Qdrant 本地模式（dense Qwen3-Embedding + sparse BM25）+ Qwen3-Reranker
-- [ ] Qwen3 生成回答
-- [ ] 用真实课程材料端到端跑通，冒烟 gold set 上报告检索命中率（验收标准，阈值不预设 —— 首轮数字就是基线）
+- [x] Ingest 步骤 2 — chunking：HybridChunker + 与 Qwen3-Embedding 对齐的 tokenizer（[rag/chunk.py](rag/chunk.py)），chunk payload 字段定义在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)
+- [x] Hybrid 检索：Qdrant 本地模式（dense Qwen3-Embedding-0.6B + sparse fastembed BM25 + RRF）+ Qwen3-Reranker-0.6B，小模型全部本地跑 —— [rag/index.py](rag/index.py) · [rag/search.py](rag/search.py)
+- [~] Qwen3 生成回答：[rag/answer.py](rag/answer.py) 代码与测试就绪（检索 → 带引用 prompt → 服务器 vLLM OpenAI 端点，流式）；缺服务器侧 vLLM 起服务后的实测
+- [~] 用真实课程材料端到端跑通，冒烟 gold set 上报告检索命中率：检索侧已通 —— 4 deck 样本索引后 gold 冒烟 hit@5 = 2/2（[rag/gold.py](rag/gold.py)，题量待用户补到 30-50）；生成侧待 vLLM
 
 ### M3 — 评估
 

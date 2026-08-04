@@ -46,3 +46,19 @@ parse target:
 # Chunk parsed document JSON into payload-bearing JSONL.
 chunk target:
     uv run python -m rag.chunk "{{ target }}"
+
+# Index chunk JSONL into the local Qdrant hybrid collection.
+index target:
+    uv run python -m rag.index "{{ target }}"
+
+# Hybrid search (+ rerank) against the local index.
+search query *args:
+    uv run python -m rag.search "{{ query }}" {{ args }}
+
+# Retrieve + generate a cited answer (needs the vLLM tunnel up).
+answer question *args:
+    uv run python -m rag.answer "{{ question }}" {{ args }}
+
+# Retrieval hit@k over the gold smoke set.
+gold *args:
+    uv run python -m rag.gold gold/smoke.jsonl {{ args }}
