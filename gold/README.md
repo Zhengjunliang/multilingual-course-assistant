@@ -18,11 +18,12 @@
 | 字段 | 说明 |
 | --- | --- |
 | `id` | `q` + 三位序号，唯一 |
-| `locale` | 提问语言；冒烟版全部 `en`，M4 起出现 `it`/`zh` |
+| `locale` | 提问语言；冒烟版全部 `en`，跨语言题（`it`/`zh`）🔜 M2.5/M3 |
 | `question` | 学生视角的自然提问，不抄课件原句 |
 | `source_file` | 答案所在 PDF 文件名（`data/corpus/PPM/` 下的原名） |
 | `page` | 答案主要出处页（1-based，与 chunk payload 的 `page` 同义） |
 | `answer_ref` | 参考答案文件相对仓库根的路径 |
+| `target` | 路由标签（agent 应查哪个库）；可省，默认 `slides`。campus 题 🔜 M2.5（`gold/campus.jsonl`，届时另配 `urls` 字段） |
 
 ## 撰写规则
 

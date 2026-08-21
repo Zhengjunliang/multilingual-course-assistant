@@ -8,7 +8,7 @@ import pytest
 from test_index import StubDense, StubSparse, make_chunk
 from test_search import ORM_TEXT
 
-from rag.gold import GoldQuestion, is_hit, load_gold, main
+from rag.gold import GoldQuestion, is_hit, load_gold, main, missing_answer_refs
 from rag.index import ensure_collection, index_chunks, open_client
 from rag.search import Hit
 
@@ -29,6 +29,19 @@ def test_hit_requires_both_file_and_page_span() -> None:
     assert is_hit(make_question(page=1), hits)
     assert not is_hit(make_question(page=7), hits)
     assert not is_hit(make_question(page=1), [])
+
+
+def test_target_defaults_to_slides() -> None:
+    assert make_question().target == "slides"
+
+
+def test_missing_answer_refs_lists_dangling_ids(tmp_path: Path) -> None:
+    present = tmp_path / "data" / "gold" / "answers" / "q001.md"
+    present.parent.mkdir(parents=True)
+    present.write_text("answer", encoding="utf-8")
+    q1 = make_question()
+    q2 = q1.model_copy(update={"id": "q002", "answer_ref": "data/gold/answers/q002.md"})
+    assert missing_answer_refs([q1, q2], tmp_path) == ["q002"]
 
 
 def test_gold_file_round_trips(tmp_path: Path) -> None:

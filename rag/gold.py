@@ -40,6 +40,9 @@ class GoldQuestion(BaseModel):
     source_file: str
     page: int
     answer_ref: str
+    # Routing label for the M2.5 agent: which collection should answer this.
+    # Default keeps every existing slides line valid without rewriting the file.
+    target: str = "slides"
 
 
 def load_gold(path: Path) -> list[GoldQuestion]:
@@ -48,6 +51,12 @@ def load_gold(path: Path) -> list[GoldQuestion]:
         for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+
+
+def missing_answer_refs(questions: Sequence[GoldQuestion], root: Path) -> list[str]:
+    """Reference answers live outside git (gold/README.md), so a dangling
+    `answer_ref` passes every retrieval check silently — surface it instead."""
+    return [q.id for q in questions if not (root / q.answer_ref).is_file()]
 
 
 def is_hit(question: GoldQuestion, hits: Sequence[Hit]) -> bool:
@@ -77,6 +86,9 @@ def main(argv: list[str] | None = None) -> None:
 
     configure_cli_logging()
     questions = load_gold(args.gold_file)
+    dangling = missing_answer_refs(questions, Path())
+    if dangling:
+        logger.warning("answer_ref not on disk for: %s", ", ".join(dangling))
 
     dense = build_dense_encoder(args.dense_model)
     sparse = build_sparse_encoder()
