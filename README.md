@@ -6,7 +6,7 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 
 ## 状态
 
-🔶 M2 进行中：项目骨架与工程化链就位；ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在样本语料上跑通，gold 冒烟 hit@5 2/2；生成侧代码与测试就绪，实测待服务器 vLLM 端点。尚无 web 业务逻辑。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+🔶 M2 进行中：项目骨架与工程化链就位；ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在样本语料上跑通，gold 冒烟 hit@5 2/2；生成侧代码与测试就绪，实测待本地 Ollama（服务器 vLLM 只在 M3 正式实验）。尚无 web 业务逻辑。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
@@ -34,7 +34,7 @@ just parse data\corpus\PPM
 just chunk data\parsed
 just index data\chunks
 just search "What is an ORM?"
-just answer "What is an ORM?"    # 需要 vLLM 隧道在线
+just answer "What is an ORM?"    # 需要本地 Ollama 在线
 just gold                        # gold 冒烟 hit@5
 ```
 
@@ -64,7 +64,14 @@ uv run python -m rag.answer "What is an ORM?"       # 检索 + Qwen3 生成带�
 uv run python -m rag.gold gold\smoke.jsonl          # gold 冒烟：检索 hit@k
 ```
 
-embedding 与 reranker（各 0.6B）在本机 GPU 跑，索引与检索完全离线；只有 `rag.answer` 的生成一步调服务器 vLLM 的 OpenAI 兼容端点 —— 本地先开隧道 `ssh -L 8000:localhost:8000 <server>`，端点与模型名在 `.env`（`VLLM_BASE_URL` · `VLLM_MODEL`）。分工依据见 [docs/architettura.md](docs/architettura.md) 算力策略一节。
+embedding 与 reranker（各 0.6B）在本机 GPU 跑，索引与检索完全离线；`rag.answer` 的生成一步调 OpenAI 兼容端点，默认**本地 Ollama**：
+
+```powershell
+winget install Ollama.Ollama                  # 或 https://ollama.com/download/windows
+ollama pull qwen3:4b-instruct-2507-q4_K_M
+```
+
+M3 正式实验改 `.env` 指向服务器 vLLM 隧道（`ssh -L 8000:localhost:8000 <server>`）。端点与模型名在 `.env`（`LLM_BASE_URL` · `LLM_MODEL`）。分工依据见 [docs/architettura.md](docs/architettura.md) 算力策略一节。
 
 ## 代码布局
 

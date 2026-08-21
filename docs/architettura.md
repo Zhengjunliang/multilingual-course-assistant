@@ -10,6 +10,7 @@
 - **文档解析**：考虑用 Granite-Docling 做材料转换。
 - **PPM 部分**：完整网站，Flask/Django + Celery/Redis 异步任务。
 - **算力**：先用 Google Colab（免费 T4）试验；后接入 relatore 提供的 GPU 机器；备选 Runpod / Lightning。**偏离（2026-07-31 自主拍板）**：跳过 Colab，直接用 MICC 机器 — 接入已完成且 ultron 有 24 GB，Colab 的 16 GB + 会话超时 + 每次重装环境不构成优势。理由见下方算力策略。
+- **新方向（2026-08-21 口头）**：agentic RAG（relatore 转的 Lightning «agentic RAG powered by Qwen3» 模板思路，分析见 [analisi-rag.md](analisi-rag.md)）+ UniFi 网站第二知识源 —— Erasmus/外国学生用自己的语言问校园信息（ingegneria、报名、学费、日历等）。落地清单在 [ROADMAP.md](../ROADMAP.md) M2.5。
 
 relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/analisi-rag.md`，M1 交付物）。
 
@@ -40,10 +41,12 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 | RAG 路线   | 自建 pipeline：Docling → chunk → hybrid 检索 → rerank → Qwen3；Qwen-Agent/纯 BM25 做对照基线（分析见 [analisi-rag.md](analisi-rag.md)）；不用 LlamaIndex/LangGraph 全家桶（可解释性优先） | 🔶   | M2 端到端跑通             |
 | 向量库     | Qdrant：原生 hybrid（dense Qwen3-Embedding + sparse fastembed BM25 + RRF）、locale/课程 payload 过滤（fusion 下必须放 prefetch 分支内，实测顶层 filter 被静默忽略）；M2 用 qdrant-client 本地模式（无服务器进程，[rag/index.py](../rag/index.py)、[rag/search.py](../rag/search.py)），M5 起 Docker；降级备选 pgvector | ✅   | 4 deck 样本实测，gold 冒烟 hit@5 2/2 |
 | 数据库     | M2 原型无 DB（文件 + Qdrant 本地）；M5 起 PostgreSQL（Docker）                                                 | 🔶   | M5                        |
-| 推理服务   | vLLM（MICC 服务器端，OpenAI 兼容端点 + 流式）。MICC 显卡均为 Turing（2080 Ti / Titan RTX）：**无 bfloat16**，一律 fp16 | 🔶   | M3 模型尺寸对比           |
+| 推理服务   | OpenAI 兼容端点是唯一契约：开发期本地 Ollama（Qwen3-4B q4），M3 正式实验 vLLM（MICC 服务器，流式；Turing 卡**无 bfloat16**，一律 fp16）—— 切换只改 `.env` 的 `LLM_BASE_URL`/`LLM_MODEL` | 🔶   | M3 模型尺寸对比           |
+| 校园信息源 | UniFi 网站第二知识源：爬取+索引为骨架（复用 ingest 管线，Qdrant `unifi_web` collection），实时抓取为增量层；发现 = sitemap + 范围规则，种子板块 ≤500 页起步，查询缺口驱动扩张；HTML 解析走 Docling HTML backend | 🔶   | M2.5 campus gold 跑分     |
+| agent 编排 | 分期：路由器（选库 + query 改写 + 带理由拒答）→ 实时补抓 + 自评重试（硬上限 1）；显式控制流 + 每步受 pydantic 校验的 JSON 决策，⛔ 原生 tool-calling（4B 量化协议遵从性不可靠） | 🔶   | M2.5 路由准确率           |
 | 可观测性   | Langfuse 自托管（Docker），LLM tracing                                                                         | 🔶   | M3 接入                   |
 | 评估方法   | RAGAS（faithfulness · answer relevancy · context precision/recall，judge = 开源权重 Qwen3 大尺寸）+ 检索指标（hit@k、MRR）；gold set 自建（无现成数据集） | 🔶   | M3 跑通                   |
-| 目标语言   | EN→EN（M2，语料实测英语为主）；IT→EN、ZH→EN 🔒 M4（relatore 属主）。语料不按语言拆库：Qwen3-Embedding 本身是多语言的，chunk 带 `locale` payload 供过滤 | 🔶   | M2 端到端                 |
+| 目标语言   | EN→EN 基线（M2）；任意语言提问 → 同语言回答是双场景核心（2026-08-21 拍板，原 M4 并入，见 [ROADMAP.md](../ROADMAP.md)），评估语言 EN/IT/ZH。语料不按语言拆库：Qwen3-Embedding 本身是多语言的，chunk 带 `locale` payload 供过滤 | 🔶   | M3 双场景评估             |
 
 评估方法自主拍板（2026-07-30）：relatore 只要求"能评估回答质量"，未指定指标。gold set 无现成数据集，M2 建冒烟版、M3 扩全量（见 [ROADMAP.md](../ROADMAP.md)）。
 
@@ -72,13 +75,13 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 
 ruff（lint + format）· pyright（`rag/` strict）· pytest + pytest-django + 覆盖率门禁（pytest-cov）· pre-commit（含泄密与 lockfile 守卫、commit 消息格式）· GitHub Actions CI（check 链 + pip-audit 依赖审计）；依赖更新手动（pip-audit 兜底安全漏洞）。工具配置集中在 [pyproject.toml](../pyproject.toml)，hook 在 [.pre-commit-config.yaml](../.pre-commit-config.yaml)，流水线在 [.github/workflows/ci.yml](../.github/workflows/ci.yml)（`uv sync --locked` → lint → format → 类型 → Django check → 测试+覆盖率）；日常命令见 [README.md](../README.md)。配置与密钥经 `.env` 由 pydantic-settings 读入（`config/env.py`，不 import Django，将来与 `rag/` 共用同一来源），`.env` 永不进 git。docker-compose 🔜 M5（PostgreSQL · Redis · Qdrant · Langfuse）。
 
-## 算力策略：remote-first
+## 算力策略：分层（开发本地 · 实验服务器）
 
-**LLM 级**推理（Qwen3 0.6B–8B、vLLM/Ollama）一律在 MICC 服务器上；笔记本**不装推理服务**。分界线是**模型尺寸而非"是不是推理"**：4070 Laptop 的 8 GB 塞不下 Qwen3-8B，但装得下 ingest 阶段那几个小模型 —— 2026-08-02 修正，笔记本装 CUDA 版 torch（`pyproject.toml` 的 `pytorch-cu126` index，`sys_platform == 'win32'` 限定，Linux CI 不受影响），让 Docling 的 layout / TableFormer / CodeFormulaV2 / granite-docling-258M（fp16 约 0.5 GB）走本地 GPU。**收益有限但真实**：VLM 从 CPU 上 > 56s/页降到 33s/页（只快 1.7 倍 —— 逐 token 解码是延迟受限，不是算力受限），足以在本地跑完那次否决了 VLM 的对照实验，也为 M3 的 Qwen2.5-VL 图片描述留出本地试错空间。全量解析与需要吞吐的 VLM/图片描述仍上服务器（vLLM 后端）。实测见 [docling-e-pipeline.md](docling-e-pipeline.md)。relatore 邮件说的 "2080Ti 机器" 即 Dream Machines 本身（每台 2× 2080 Ti）。
+分界线按**用途**（2026-08-21 拍板本地优先）：**正式实验**（M3 尺寸网格、评估跑分）在 MICC 服务器 vLLM；**开发循环**全本地，含生成 —— Ollama + Qwen3-4B q4 约 2.6 GB，与 embedding/reranker（0.6B fp16 各约 1.2 GB）共存约 5 GB，8 GB 装得下；8B 级笔记本仍塞不下，只在服务器。ingest 阶段那几个小模型本就本地 —— 2026-08-02 修正，笔记本装 CUDA 版 torch（`pyproject.toml` 的 `pytorch-cu126` index，`sys_platform == 'win32'` 限定，Linux CI 不受影响），让 Docling 的 layout / TableFormer / CodeFormulaV2 / granite-docling-258M（fp16 约 0.5 GB）走本地 GPU。**收益有限但真实**：VLM 从 CPU 上 > 56s/页降到 33s/页（只快 1.7 倍 —— 逐 token 解码是延迟受限，不是算力受限），足以在本地跑完那次否决了 VLM 的对照实验，也为 M3 的 Qwen2.5-VL 图片描述留出本地试错空间。全量解析与需要吞吐的 VLM/图片描述仍上服务器（vLLM 后端）。实测见 [docling-e-pipeline.md](docling-e-pipeline.md)。relatore 邮件说的 "2080Ti 机器" 即 Dream Machines 本身（每台 2× 2080 Ti）。
 
 Colab ⛔ 不用：MICC 接入已完成，6 台 Dream Machines + ultron 可挑空闲机器，显存和常驻能力都优于免费 T4；Colab 的会话超时、每次重装依赖、模型权重反复下载只会拖慢迭代，且论文实验需要可复现的固定环境。Runpod / Lightning 仅作 MICC 长期不可用时的付费兜底，不进日常流程。
 
-日常开发循环（**代码与数据都不需要同步到服务器**，2026-08-04 按尺寸分界线落实）：embedding（Qwen3-Embedding-0.6B）与 reranker（Qwen3-Reranker-0.6B）在笔记本 GPU 本地跑（fp16 各约 1.2 GB），Qdrant 用本地嵌入式模式（`data/qdrant/`，无服务进程）—— 索引与检索**完全离线**；vLLM 在服务器 tmux 常驻，暴露 OpenAI 兼容端点（**只有生成 LLM**），本地经 SSH 隧道（`ssh -L 8000:localhost:8000 <server>`）调用，代码里只配 base_url（`config/env.py` 的 `VLLM_BASE_URL`），发过去的是 prompt（问题 + 检索出的 chunk 文本），不是文件。单测/CI mock 掉 LLM client，零网络零 GPU。只有正式实验（M3 评估、尺寸对比）才在服务器上 `git pull` 执行。
+日常开发循环（**代码与数据都不需要同步到服务器**，2026-08-04 落实，2026-08-21 生成也本地化）：embedding（Qwen3-Embedding-0.6B）与 reranker（Qwen3-Reranker-0.6B）在笔记本 GPU 本地跑（fp16 各约 1.2 GB），Qdrant 用本地嵌入式模式（`data/qdrant/`，无服务进程）—— 索引与检索**完全离线**；生成走本地 Ollama（Qwen3-4B q4，OpenAI 兼容端点），代码里只配 base_url（`config/env.py` 的 `LLM_BASE_URL`）；M3 正式实验把它指向服务器 vLLM 的 SSH 隧道（`ssh -L 8000:localhost:8000 <server>`，tmux 常驻，发过去的是 prompt —— 问题 + 检索出的 chunk 文本，不是文件）。单测/CI mock 掉 LLM client，零网络零 GPU。只有正式实验（M3 评估、尺寸对比）才在服务器上 `git pull` 执行。
 
 ## 硬件拓扑
 
@@ -86,7 +89,7 @@ Colab ⛔ 不用：MICC 接入已完成，6 台 Dream Machines + ultron 可挑�
 | -------------------- | ------------------------- | ------------------------------------------ |
 | MICC Dream Machines  | 每台 2× RTX 2080 Ti（doc 标 12 GB，实际规格 11 GB）；6 台：targaryen · lannister · lechuck · theflash · harlock · nikita | 常规实验；通过监控挑空闲机器 |
 | MICC ultron          | 2× Titan RTX 24 GB        | 大实验、8B fp16、模型尺寸对比               |
-| 开发笔记本           | RTX 4070 Laptop, 8 GB     | 写代码 + SSH + **ingest 小模型本地跑**（Docling 全套，含 granite-docling-258M）；LLM 级推理不做 |
+| 开发笔记本           | RTX 4070 Laptop, 8 GB     | 写代码 + SSH + **ingest 小模型与开发期生成本地跑**（Docling 全套，含 granite-docling-258M · Ollama Qwen3-4B q4）；8B 级实验不做 |
 | Runpod / Lightning   | 可变                      | 付费兜底，仅当 MICC 长期不可用              |
 
 MICC 接入 ✅：账号与公钥登记（sysadmin 确认）；首次登录（targaryen：2× 2080 Ti 11 GB、CUDA 12.4；ultron：2× Titan RTX 24 GB、CUDA 12.2，用户 `jzheng`）；NAS 个人 home 存在（`/oblivion/users/jzheng`、`/equilibrium/jzheng`）。校外接入 ✅：Dream Machines 公网直连 `ssh <user>@<server>.micc.unifi.it`，无需 VPN（OpenVPN 已弃用，sysadmin 确认；另有可选 MICC VPN，本项目不用）。服务器规格与 IP 见 doc portal：`https://doc.portal.micc.unifi.it`（仓库外，需登录）。存储：共享 NAS `andromeda` · `equilibrium` · `fishtank` · `oblivion`，home 配额 100 GB；卷选择、个人目录路径与 `HF_HOME` 见 [README.md](../README.md)。GPU 监控：专用 Discord 频道 / Grafana（micc-authentik 登录）。**凭据永不进仓库。**

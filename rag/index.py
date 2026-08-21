@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-COLLECTION = "chunks"
+COLLECTION = "slides"
 DENSE_VECTOR = "dense"
 SPARSE_VECTOR = "sparse"
 

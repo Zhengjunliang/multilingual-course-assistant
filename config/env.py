@@ -19,12 +19,13 @@ class Settings(BaseSettings):
     django_allowed_hosts: str = "localhost,127.0.0.1"
     django_log_level: str = "INFO"
 
-    # Generation endpoint: vLLM on the MICC server, reached through an SSH
-    # tunnel, so the default points at the local tunnel mouth. vLLM ignores the
-    # API key but the OpenAI client insists on one.
-    vllm_base_url: str = "http://localhost:8000/v1"
-    vllm_api_key: str = "unused"
-    vllm_model: str = "Qwen/Qwen3-4B-Instruct-2507"
+    # Generation endpoint: any OpenAI-compatible server. Dev default is local
+    # Ollama (fully offline loop); M3 experiments point this at the MICC vLLM
+    # tunnel by overriding `.env` — nothing else changes. Both servers ignore
+    # the API key but the OpenAI client insists on one.
+    llm_base_url: str = "http://localhost:11434/v1"
+    llm_api_key: str = "unused"
+    llm_model: str = "qwen3:4b-instruct-2507-q4_K_M"
 
     @property
     def allowed_hosts(self) -> list[str]:

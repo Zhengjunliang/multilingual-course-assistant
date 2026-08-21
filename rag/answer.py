@@ -1,9 +1,9 @@
 """Answer generation: retrieved chunks -> grounded, cited answer from Qwen3.
 
-The LLM never runs on this machine: generation goes to a vLLM instance on the
-MICC server through its OpenAI-compatible endpoint (an SSH tunnel makes it
-`localhost:8000`, see `config/env.py`). What travels is the prompt — question
-plus the retrieved chunk texts — never files or the index.
+Generation talks to any OpenAI-compatible endpoint (`config/env.py`): the dev
+default is a local Ollama instance (Qwen3-4B quant); M3 experiments switch the
+base URL to the MICC vLLM tunnel. What travels is the prompt — question plus
+the retrieved chunk texts — never files or the index.
 
     uv run python -m rag.answer "What is an ORM?"
     uv run python -m rag.answer "Cosa sono le migrazioni?" --locale it --no-rerank
@@ -146,7 +146,7 @@ def main(argv: list[str] | None = None) -> None:
     hits = search(client, args.question, dense, sparse, reranker, limit=args.top_k)
     client.close()
 
-    streamer = build_streamer(env.vllm_base_url, env.vllm_api_key, env.vllm_model)
+    streamer = build_streamer(env.llm_base_url, env.llm_api_key, env.llm_model)
     for token in answer(args.question, hits, streamer, locale):
         print(token, end="", flush=True)
     print()

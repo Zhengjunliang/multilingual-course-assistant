@@ -55,7 +55,7 @@ index target:
 search query *args:
     uv run python -m rag.search "{{ query }}" {{ args }}
 
-# Retrieve + generate a cited answer (needs the vLLM tunnel up).
+# Retrieve + generate a cited answer (needs Ollama running locally).
 answer question *args:
     uv run python -m rag.answer "{{ question }}" {{ args }}
 

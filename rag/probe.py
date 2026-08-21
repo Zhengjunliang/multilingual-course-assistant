@@ -207,6 +207,10 @@ def configure_cli_logging() -> None:
     # it but logs a line per broken object, which would bury the report lines. The
     # repair itself does not affect any signal probe() reads.
     logging.getLogger("pypdf").setLevel(logging.ERROR)
+    # Model loads fire dozens of INFO-level hub freshness checks (one HEAD request
+    # per config file) that would bury the actual results.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 
 
 def main(argv: list[str] | None = None) -> None:

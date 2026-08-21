@@ -2,7 +2,7 @@
 
 面向开发的概念梳理 + ingest 进度。决策结论不在这里（属主是 [architettura.md](architettura.md)），路线对比不在这里（属主是 [analisi-rag.md](analisi-rag.md)）。本文回答：**每个环节在干什么、为什么需要它、本项目怎么落、进度在哪。**
 
-进度一览：步骤 0 探测 ✅（[rag/probe.py](../rag/probe.py)）· 步骤 1 解析 ✅（[rag/parse.py](../rag/parse.py)）· 步骤 2 chunking ✅（[rag/chunk.py](../rag/chunk.py)）· 索引 ✅（[rag/index.py](../rag/index.py)）· hybrid 检索 + rerank ✅（[rag/search.py](../rag/search.py)）· 生成 🔶（[rag/answer.py](../rag/answer.py) 代码与测试就绪，实测待服务器 vLLM 端点）。
+进度一览：步骤 0 探测 ✅（[rag/probe.py](../rag/probe.py)）· 步骤 1 解析 ✅（[rag/parse.py](../rag/parse.py)）· 步骤 2 chunking ✅（[rag/chunk.py](../rag/chunk.py)）· 索引 ✅（[rag/index.py](../rag/index.py)）· hybrid 检索 + rerank ✅（[rag/search.py](../rag/search.py)）· 生成 🔶（[rag/answer.py](../rag/answer.py) 代码与测试就绪，实测待本地 Ollama；服务器 vLLM 只在 M3 正式实验）。
 
 ## 1. 全景：RAG 是两条 pipeline，不是一条
 
@@ -245,13 +245,13 @@ sequenceDiagram
 4. **代码量没省多少**：自建量级几百行，每行都懂；框架省的是「接 20 种向量库」的适配成本，本项目只接一种。
 5. **依赖风险**：LangChain API 迭代激进，论文周期内的 breaking change 是纯损耗。
 
-框架真正划算的场景：接十几种数据源随时切换、真 agentic 工作流（LLM 决定是否再检索一轮 —— 带循环的状态机）。对应本项目是 M7 可选方向；自建的线性 pipeline 到时可整体变成图里一个节点，不锁死。**不用 ≠ 不懂** —— 读教程、写相关工作章节、答辩都需要这张对照表：
+框架真正划算的场景：接十几种数据源随时切换、真 agentic 工作流（LLM 决定是否再检索一轮 —— 带循环的状态机）。对应本项目是 M2.5 的 agent 编排（路由器 → 循环，显式控制流自建，见 [ROADMAP.md](../ROADMAP.md)）；自建的线性 pipeline 整体变成其中一个节点，不锁死。**不用 ≠ 不懂** —— 读教程、写相关工作章节、答辩都需要这张对照表：
 
 | 框架术语 | 本项目对应 |
 | --- | --- |
 | `DocumentLoader` | `DocumentConverter().convert()` |
 | `TextSplitter` | `HybridChunker` |
-| `Embeddings` | Qwen3-Embedding，经 vLLM 的 OpenAI 兼容端点 |
+| `Embeddings` | Qwen3-Embedding，sentence-transformers 本地推理（[rag/index.py](../rag/index.py)） |
 | `VectorStore` / `Retriever` | `qdrant-client`（本地模式 → Docker） |
 | `Chain` / LCEL | 一个普通 Python 函数 |
 | `Graph` / `StateGraph` | 用不上（无循环无分支） |
