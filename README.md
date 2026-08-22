@@ -36,6 +36,8 @@ just index data\chunks
 just search "What is an ORM?"
 just answer "What is an ORM?"    # 需要本地 Ollama 在线
 just gold                        # gold 冒烟 hit@5
+just crawl                       # 校园 web 源爬取（用户执行；robots · 1 req/s · ≤500 页）
+just webparse data\webcorpus\<run_id>   # 快照解析 -> 可切块工件对
 ```
 
 不装 just 也可以直接跑对应的 `uv run …` 命令（recipe 内容即命令本身）。
@@ -78,7 +80,7 @@ M3 正式实验改 `.env` 指向服务器 vLLM 隧道（`ssh -L 8000:localhost:8
 | 路径              | 内容                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------ |
 | `config/`         | Django project：settings · urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入）        |
-| `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`answer.py` 生成带引用回答，`gold.py` 检索冒烟跑分 |
+| `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`llm.py` OpenAI 兼容客户端（Streamer/Completer + pydantic JSON 校验助手），`answer.py` 生成带引用回答，`gold.py` 检索冒烟跑分 |
 | `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性                                |
 | `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
 

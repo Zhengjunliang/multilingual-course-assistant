@@ -4,9 +4,11 @@ version = "0.1.0"
 description = "Multilingual QA over university course materials (RAG, open-weight Qwen)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "beautifulsoup4>=4.15.0",
     "django>=5.2,<6",
     "docling>=2.117.0",
     "fastembed>=0.8.0",
+    "httpx>=0.28.1",
     "openai>=2.53.0",
     "pydantic-settings>=2",
     "pypdf>=6.14.2",
@@ -102,8 +104,11 @@ filterwarnings = ["error"]
 [tool.coverage.run]
 source = ["rag", "config"]
 branch = true
-# Untouched startproject entry points; nothing to measure until deployment (M6).
-omit = ["config/asgi.py", "config/wsgi.py"]
+# asgi/wsgi: untouched startproject entry points; nothing to measure until
+# deployment (M6). golddraft: LLM-driven drafting tool whose output is
+# human-gated before entering gold/ — its pure helpers are tested, but the
+# drafting main() is not pipeline logic and would need a live endpoint.
+omit = ["config/asgi.py", "config/wsgi.py", "rag/golddraft.py"]
 
 [tool.coverage.report]
 show_missing = true

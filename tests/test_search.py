@@ -7,19 +7,46 @@ import subprocess
 import sys
 from collections.abc import Iterator, Sequence
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 from qdrant_client import QdrantClient
 from test_index import StubDense, StubSparse, make_chunk
 
-from rag.index import DenseEncoder, SparseEncoder, ensure_collection, index_chunks, open_client
-from rag.search import Hit, Reranker, hybrid_search, main, payload_filter, rerank_hits, search
+from rag.chunk import Chunk
+from rag.index import (
+    WEB_COLLECTION,
+    DenseEncoder,
+    SparseEncoder,
+    ensure_collection,
+    index_chunks,
+    open_client,
+)
+from rag.search import (
+    Hit,
+    Reranker,
+    hybrid_search,
+    main,
+    payload_filter,
+    rerank_hits,
+    round_robin,
+    search,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 ORM_TEXT = "The Django ORM maps models to database tables."
 SORT_TEXT = "Merge sort splits the array into halves."
 MIGRAZIONI_TEXT = "Le migrazioni aggiornano lo schema del database."
+TASSE_TEXT = "Le tasse universitarie si pagano tramite il portale online."
+TASSE_URL = "https://www.unifi.it/it/studia-con-noi/tasse"
+
+
+def make_web_chunk(index: int, text: str) -> Chunk:
+    return make_chunk(index, text).model_copy(
+        update={"kind": "web", "url": TASSE_URL, "ingest_source": "crawl"}
+    )
 
 
 @pytest.fixture
@@ -87,6 +114,100 @@ def test_search_without_reranker_keeps_fusion_order(client: QdrantClient) -> Non
 def test_search_with_reranker_promotes_its_ranking(client: QdrantClient) -> None:
     hits = search(client, "django orm", StubDense(), StubSparse(), KeywordReranker(), limit=1)
     assert [hit.chunk.text for hit in hits] == [ORM_TEXT]
+
+
+@pytest.fixture
+def two_collection_client(tmp_path: Path) -> Iterator[QdrantClient]:
+    qdrant = open_client(tmp_path / "qdrant")
+    ensure_collection(qdrant, StubDense().dimension())
+    index_chunks(qdrant, [make_chunk(0, ORM_TEXT)], StubDense(), StubSparse())
+    ensure_collection(qdrant, StubDense().dimension(), collection=WEB_COLLECTION)
+    index_chunks(qdrant, [make_web_chunk(1, TASSE_TEXT)], StubDense(), StubSparse(), WEB_COLLECTION)
+    yield qdrant
+    qdrant.close()
+
+
+def test_multi_collection_pool_reranks_across_both(two_collection_client: QdrantClient) -> None:
+    hits = search(
+        two_collection_client,
+        "tasse universitarie",
+        StubDense(),
+        StubSparse(),
+        KeywordReranker(),
+        limit=1,
+        collections=("slides", WEB_COLLECTION),
+    )
+    assert [hit.chunk.url for hit in hits] == [TASSE_URL]
+
+
+def test_no_rerank_multi_collection_interleaves_round_robin(
+    two_collection_client: QdrantClient,
+) -> None:
+    hits = search(
+        two_collection_client,
+        "database",
+        StubDense(),
+        StubSparse(),
+        None,
+        limit=2,
+        collections=("slides", WEB_COLLECTION),
+    )
+    assert {hit.chunk.kind for hit in hits} == {"slides", "web"}  # one from each pool
+
+
+def test_round_robin_interleaves_and_fills_the_remainder() -> None:
+    first = [Hit(chunk=make_chunk(i, f"a{i}"), score=1.0) for i in range(3)]
+    second = [Hit(chunk=make_chunk(9, "b0"), score=1.0)]
+    ordered = round_robin([first, second], 3)
+    assert [hit.chunk.text for hit in ordered] == ["a0", "b0", "a1"]
+    assert round_robin([], 5) == []
+
+
+class RecordingClient:
+    """Captures the prefetch branches per collection; returns no points."""
+
+    def __init__(self) -> None:
+        self.prefetch_by_collection: dict[str, Any] = {}
+
+    def query_points(self, collection: str, **kwargs: Any) -> Any:
+        self.prefetch_by_collection[collection] = kwargs["prefetch"]
+        return SimpleNamespace(points=[])
+
+
+def condition_keys(prefetch: Any) -> list[str]:
+    return [
+        condition.key
+        for branch in prefetch
+        if branch.filter is not None
+        for condition in branch.filter.must
+    ]
+
+
+def test_web_source_conditions_reach_only_the_unifi_web_branches() -> None:
+    """ADR-1: `ingest_source` must land inside BOTH unifi_web prefetch
+    branches (a top-level filter is ignored under fusion) and inside NONE of
+    the slides branches."""
+    recorder = RecordingClient()
+    search(
+        cast("QdrantClient", recorder),
+        "query",
+        StubDense(),
+        StubSparse(),
+        None,
+        collections=("slides", WEB_COLLECTION),
+        ingest_source="crawl",
+    )
+    web_keys = condition_keys(recorder.prefetch_by_collection[WEB_COLLECTION])
+    assert web_keys.count("ingest_source") == 2  # dense branch + sparse branch
+    assert "ingest_source" not in condition_keys(recorder.prefetch_by_collection["slides"])
+
+
+def test_slides_hits_are_unchanged_by_web_source_conditions(client: QdrantClient) -> None:
+    baseline = search(client, ORM_TEXT, StubDense(), StubSparse(), None, limit=3)
+    with_source = search(
+        client, ORM_TEXT, StubDense(), StubSparse(), None, limit=3, ingest_source="crawl"
+    )
+    assert with_source == baseline
 
 
 def test_cli_prints_ranked_citations(

@@ -6,53 +6,35 @@
 
 ### M0 — 脚手架与基础决策 ✅
 
-✅ 交付物：仓库骨架（`.gitignore` · [CLAUDE.md](CLAUDE.md) · [README.md](README.md) · 本 roadmap）+ [docs/architettura.md](docs/architettura.md) 的技术栈决策表。技术栈与评估方法自主拍板（2026-07-30），不再挂 relatore 确认；relatore 属主项只剩跨语言启动（M4）。
+仓库骨架与技术栈决策表落地；决策原则（自主拍板、不挂 relatore 确认）与决策状态在 [docs/architettura.md](docs/architettura.md)。
 
 ### M1 — RAG 学习与分析 ✅
 
-✅ 交付物：[docs/analisi-rag.md](docs/analisi-rag.md) —— relatore 指定的四个起步链接（Qwen-Agent RAG 模块 · Qwen3 RAG pipeline · Qwen3 agentic RAG 模板 · Granite-Docling）精读并扩展，路线定为自建 pipeline + 各领域最佳组件。MICC 接入完成（密钥登记 · 首次登录 · Discord · NAS home），规格与路径见 [docs/architettura.md](docs/architettura.md) 与 [README.md](README.md)。
-
-2026-07-31 决定**不做一次性最小实验**：Docling 的解析质量（重音字符、公式、表格、多栏阅读顺序）与 Qwen3 推理直接在 M2 的真实 ingest 管线里验证 —— 同样的投入产出论文可引用的证据，而不是用完即弃的脚本。
+relatore 四个起步链接精读、路线定为自建 pipeline（分析在 [docs/analisi-rag.md](docs/analisi-rag.md)，拍板在 [docs/architettura.md](docs/architettura.md)）；MICC 接入完成（规格在 [docs/architettura.md](docs/architettura.md)，日常使用在 [README.md](README.md)）；一次性最小实验的否决记录在 [docs/analisi-rag.md](docs/analisi-rag.md)。
 
 ### M2 — 单语言 RAG 原型 ✅
 
-英语材料 + 英语提问（EN→EN），CLI 级别，不做 web。全部清单项完成（勾选如下），实测汇总见 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。
-
-语料 2026-07-31 实测（31 份 PPM slides，约 1200 页）：**英语为主，~23 份英语、~8 份意大利语或英意混排**，全部有文字层（无扫描件）。原计划的 IT→IT 因此不成立 —— 单语基线改用占语料 3/4 的英语，relatore 要求的「先同语言再跨语言」递进保持不变。语料事实与决策见 [docs/architettura.md](docs/architettura.md)。
-
-✅ 交付物：项目初始化（uv + Python 3.12 · 工程化链 · Django 骨架）—— [pyproject.toml](pyproject.toml) · [.pre-commit-config.yaml](.pre-commit-config.yaml) · [.github/workflows/ci.yml](.github/workflows/ci.yml) · `config/` · `rag/` · `tests/`。Ingest 步骤 0-1 —— 自适应路由 [rag/probe.py](rag/probe.py) + Docling 解析 [rag/parse.py](rag/parse.py)，解析质量验收与路由实测表在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)。
-
-2026-08-21 拍板**本地优先**：生成端点默认本地 Ollama（Qwen3-4B 量化，OpenAI 兼容端点），MICC vLLM 只在 M3 正式实验使用 —— M2 收尾不再等服务器。实测数据的属主是 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。
-
-- [x] 本地装 Ollama + 拉 Qwen3-4B 量化模型（Ollama 0.32.15 · `qwen3:4b-instruct-2507-q4_K_M`，命令见 [README.md](README.md)）
-- [x] 全语料**本地** ingest：31 份约 1200 页 parse → chunk → index，collection 定名 `slides`（实测 ~15 分钟 · 1234 chunks，路由分布 classic 26 / formula 4 / OCR 1）
-- [x] 冒烟 gold set：40 题 EN→EN（LLM 起草 + 人工按来源核验，[gold/smoke.jsonl](gold/smoke.jsonl)）+ 5 题防泄漏对照组（[gold/control.jsonl](gold/control.jsonl)）；参考答案在 `data/gold/answers/`（gitignore）。M3 扩为全量 gold set
-- [x] Ingest 步骤 2 — chunking：HybridChunker + 与 Qwen3-Embedding 对齐的 tokenizer（[rag/chunk.py](rag/chunk.py)），chunk payload 字段定义在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)
-- [x] Hybrid 检索：Qdrant 本地模式（dense Qwen3-Embedding-0.6B + sparse fastembed BM25 + RRF）+ Qwen3-Reranker-0.6B，小模型全部本地跑 —— [rag/index.py](rag/index.py) · [rag/search.py](rag/search.py)
-- [x] Qwen3 生成回答：[rag/answer.py](rag/answer.py) 经本地 Ollama 实测 —— groundedness、IT 语言跟随、语料外拒答通过；4B 量化的引用 marker 忠实度问题与显存峰值 7761 MiB 记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)
-- [x] 用真实课程材料端到端跑通：全量索引上 `just gold` **hit@5 = 38/40（95%）**，对照组 5/5（无泄漏虚高迹象）
+EN→EN CLI 原型端到端跑通：ingest 全链（probe → Docling → chunk → Qdrant hybrid）+ rerank + 本地 Ollama 生成，全量 31 deck · 1234 chunk，gold 40 题 hit@5 95%（防泄漏对照组 5/5）。实测与方法论在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)，解析/切块契约在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)，语料事实与本地优先拍板在 [docs/architettura.md](docs/architettura.md)，命令在 [README.md](README.md)。
 
 ### M2.5 — 校园信息源 + agentic 编排 🔜
 
-relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3» 模板思路的落地，模板分析见 [docs/analisi-rag.md](docs/analisi-rag.md)）：UniFi 网站作第二知识源，Erasmus/外国学生任意语言问校园信息（ingegneria、报名、学费、日历等）。架构：**爬取+索引为骨架，实时抓取为增量层**；页面发现 = sitemap + 范围规则（实测：unifi.it 有 `sitemap.xml` 且带 IT/EN hreflang 平行页，ingegneria.unifi.it 有 `sitemap.php`），种子板块起步（ingegneria + international/Erasmus + 核心服务页，≤500 页硬顶），查询缺口驱动扩张。HTML 解析走 Docling HTML backend（furniture 层自动剔导航/页脚，不引入新抽取依赖）；agent 用显式控制流 + 每步受 pydantic 校验的 JSON 决策（⛔ 原生 tool-calling：4B 量化遵从性不可靠）。契约与设计细节 🔜 `docs/fonte-web-unifi.md`（M2.5a 首项建立）。工作量粗估：a 约 2 周、b 约 1 周。
+relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3» 模板思路的落地，模板分析见 [docs/analisi-rag.md](docs/analisi-rag.md)）：UniFi 网站作第二知识源，Erasmus/外国学生任意语言问校园信息（ingegneria、报名、学费、日历等）。架构：**爬取+索引为骨架，实时抓取为自增长层**——学生问到未收录的页面（贴链接，或从已收录页面的出链图找到候选）时实时抓取，经 **LLM 相关性门**判定与大学相关后**持久写入**共享库（registry 溯源，可按 run 整批回滚）；答案不在当前页时 agent **迭代深化**（信息在 PDF 附件就下载、在链接后就跟进，以「够回答」为停止条件，≤3 步硬上限）。页面发现 = sitemap + 范围规则（板块规则表，**不锁 unifi.it 域**——Santa Marta/DSU/CISIA 类学生刚需域走规则表显式条目；实测 unifi.it 有 `sitemap.xml` 带 IT/EN hreflang，ingegneria.unifi.it 有 `sitemap.php`），种子板块起步 ≤500 页硬顶。HTML 解析走 Docling HTML backend；agent 用显式控制流 + 每步受 pydantic 校验的 JSON 决策（⛔ 原生 tool-calling：4B 量化遵从性不可靠）。**评估可复现**：live 写入带 `ingest_source="live"`，eval 默认只取冻结快照（filter 隔离，设计在 [docs/architettura.md](docs/architettura.md) 决策表）。契约与设计细节 🔜 `docs/fonte-web-unifi.md`（M2.5a 首项建立）。实施计划（Stage 顺序、验证门、共识审查记录）在 `.omc/plans/piano-m25-autogrow.md`（gitignore 操作件）。工作量粗估：a 约 2 周、b 约 1 周。
 
-**M2.5a — 爬取 + 第二 collection + 路由器**
+**M2.5a — 契约 + 爬取 + 第二 collection + 多库检索**
 
-- [ ] 契约先行：`ParsedMeta`/`Chunk` 加可空 `url`/`fetch_date`/`section`（+`lang`）；`GoldQuestion` 加 `target`/`urls`；建 `docs/fonte-web-unifi.md`（scope 规则表、快照布局、字段属主）
-- [ ] `rag/crawl.py`：scope 规则 + robots + sitemap（xml/php 宽松解析、link-BFS 兜底）+ 限速 1 req/s + 快照与 manifest（`content_hash` 增量）；实爬命令由用户执行
-- [ ] `rag/webparse.py`：DOM 预剪（bs4）+ Docling HTML backend + sidecar；locale 优先 `<html lang>`
-- [ ] chunk/index 打通 web 路径（sidecar 带 `url` 透传），索引进 `unifi_web` collection
-- [ ] `rag/search.py` 多 collection 合并检索（合并池统一 rerank）；`rag/answer.py` 引用支持 URL
-- [ ] `rag/llm.py` 抽出（Streamer/Completer Protocol）+ `rag/agent.py` 路由器（target/query/fresh/reason，校验失败 fallback `both`）+ 带理由拒答 + `ask` CLI
-- [ ] 校园冒烟 gold set：`rag/golddraft.py` 分层抽样 LLM 起草 30–45 题（EN/IT/ZH），用户按 URL 核验晋级 `gold/campus.jsonl`
-- [ ] `rag/gold.py`：campus hit@5（URL 命中）+ `--routing` 路由准确率（另报 `both` 占比与 fallback 率）
+- [x] 契约终态一次到位：`Chunk`/`ParsedMeta` 加 web 溯源字段（`kind` · `url` · `referrer_url` · `fetch_date` · `section` · `ingest_run_id` · `ingest_source` · `trigger` · `content_hash`，全可空/带默认；`ParsedMeta` 另加 `lang`）；`GoldQuestion` 加 `urls`；`Locale` 放宽 BCP-47 + 中文检测接上；`rag/llm.py` 抽出（Completer Protocol + pydantic JSON 助手）；建 `docs/fonte-web-unifi.md`（scope 规则表、快照/registry 布局、深化循环状态机；chunk 字段表属主仍是 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)）
+- [x] `rag/crawl.py`：ScopeRule 规则表 + robots + sitemap（xml/php、link-BFS 兜底）+ 1 req/s + `--max-pages` 500 硬顶 + 页面直链 PDF 附件下载（≤20MB，记 `referrer_url`）；产物 = 不可变快照 manifest + 全局 registry（append-only：url · content_hash · fetch_date · ingest_run_id · ingest_source · trigger · outlinks——出链图/增量判定/回滚账本三合一）
+- [x] `rag/webparse.py`：DOM 预剪（bs4）+ Docling HTML backend + sidecar 透传；入库用 **(url, ingest_source) 限定删除后 upsert**（crawl 与 live 版本互不覆盖）进 `unifi_web`
+- [x] 真实爬取（用户执行）：≥3 种子板块 · ≥100 页 · count ≥ 页数
+- [x] `rag/search.py` 多 collection 合并检索（合并池统一 rerank；`ingest_source` filter 只进 `unifi_web` 的 prefetch 分支）；`rag/answer.py` web 引用 marker `[<url> · <fetch_date>]`；**slides 非回归门**：gold 恒单库 38/40 且 MISS 仍为 q018/q028
+- [x] 校园冒烟 gold set：`rag/golddraft.py` 分层起草 30–45 题（EN/IT/ZH），用户按 URL 核验晋级 `gold/campus.jsonl`；autogrow 组（≥5 题未收录，含 ≥1 题答案在 modulo PDF）单列 `gold/campus-autogrow.jsonl`；验收 campus hit@5 **EN/IT ≥ 0.80**（ZH 单独报告，阈值 M3 依数据定）
 
-**M2.5b — 实时补抓 + 自评重试**
+**M2.5b — 路由器 + 自增长实时层**
 
-- [ ] `LiveFetcher` 三态 on/cache/off（一切评估默认 off）
-- [ ] freshness 路径：路由判 fresh 且命中 campus → top 命中 ≤3 个 URL 重抓 → 内存内重建上下文，引用附抓取日期
-- [ ] self-assess：生成后单次 JSON 判定，不支撑则改写 query 扩 `both` 重检索一次（硬上限 1）
-- [ ] 可复现接线：快照以 run_id 冻结、每 run 落逐题决策日志（M3 错误分类法原料）
+- [ ] `rag/agent.py` 路由器：RouteDecision（target/query/fresh/reason，校验失败 fallback `both`）+ 带理由拒答 + 兜底拒答+指路（出链图无候选时提示「贴 URL 可教会系统」）+ `ask` CLI；`rag/gold.py` `--routing`（路由准确率 · both 占比 · fallback 率）
+- [ ] `rag/live.py`（唯一写模块）：实时抓取 → LLM 相关性门（JSON 二分，校验失败=不落库；20 条标注集真机验收 **≥18/20**，低于走规则表兜底并记 diario 为论文发现）→ 持久写入（`ingest_source="live"`）+ registry 溯源 + 按 `ingest_run_id` 回滚 CLI；**整轮显存预算**：解析与 encode 走 CPU · LLM 段间卸载 · 页数 ≤40 · 60s/步（真机峰值 < 8188 MiB 验收）
+- [ ] 深化循环：抓页 → 「够答？」判定（**原 self-assess 并入此停止条件**）→ 编号候选（出链 ≤10 + PDF 附件）选一 → ≤3 步硬上限；`--no-deepen` 降级开关；逐题决策日志（run_id，M3 错误分类法原料）
+- [ ] autogrow 验收：`rag/gold.py` 加 `--live {off,on}`（默认 off）；未收录题组前 0/N → 跑流程后 **≥⌈0.7N⌉**（降级触发则分数附注状态、不与正常态混比）；content_hash 变/不变 → 重索引/跳过日志；回滚后 campus 基线恒等（快照未被 live 打洞的证据）
 
 ### M3 — 评估（双场景）
 
@@ -89,13 +71,16 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 - [ ] admin 后台管理材料
 - [ ] `/api/ask` 暴露路由决策与 URL 引用（campus 场景进 SPA：来源既有 slides 页码也有 unifi.it 链接）
 - [ ] admin 爬取快照状态页（run_id、页数、content_hash 变更；可选）
+- [ ] 访问模型：campus QA **免登录**可问；slides 上传/问答需账号（多租户隔离见上）；触发自增长的写操作挂账号 + rate limit
+- [ ] Celery beat 定时刷新 web 快照（content_hash 增量：变了才重解析重索引，没变跳过）——「⛔ 调度器」non-goal 到此解除，论文期只有查询保鲜 + 手动重爬
+- [ ] UniFi SSO（IDEM GARR 联邦，SAML/Shibboleth）post-tesi 可选：论文期自建 Django 账号、auth 做成可插拔；可行性与阻塞（校方注册审批）见 [docs/architettura.md](docs/architettura.md)
 
 ### M6 — 部署与论文
 
 工作量粗估：约 4 周（论文写作为主）。
 
-- [ ] 部署到 MICC 服务器（或 Runpod）
-- [ ] 论文写作
+- [ ] 答辩演示级部署：干净机器 `docker compose up` 一条命令起全套（Django · PostgreSQL · Redis · Qdrant · 生成端点），浏览器完成双库问答演示——共享 web KB 的「服务器」即 compose 服务；MICC/公网常驻 = post-tesi 可选
+- [ ] 论文写作（实验章声明：表中数字均在冻结快照 run_id 上测得）
 - [ ] 最终交付文档译为意大利语
 
 ### M7 — 外部知识源集成 🔜（可选，post-M6）
@@ -128,6 +113,7 @@ Meet 🔜 未安排，不阻塞任何里程碑。
 2. 跨语言并入核心（M4 解散）：任意语言提问 → 同语言回答，评估 EN/IT/ZH。
 3. 开发期生成本地 Ollama（Qwen3-4B 量化），MICC vLLM 留 M3 正式实验。
 4. 爬取姿态：robots 遵守 · 限速 1 req/s · ≤500 页 · 只读 · UA 表明论文用途（ingegneria.unifi.it 封 GPTBot 类训练爬虫，但通配 UA 无限制；我们是检索索引非模型训练）。
+5. 自增长姿态（2026-08-22 定案）：学生触发的实时抓取经 LLM 相关性门判定后才持久入库，registry 溯源可整批回滚；范围不锁 unifi.it 域（Santa Marta/DSU/CISIA 类学生刚需域可进）；评估用冻结快照与 live 写入隔离，论文数字不受演示影响；论文期演示环境免登录。
 
 待 relatore 答复：
 

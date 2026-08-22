@@ -42,8 +42,11 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 | 向量库     | Qdrant：原生 hybrid（dense Qwen3-Embedding + sparse fastembed BM25 + RRF）、locale/课程 payload 过滤（fusion 下必须放 prefetch 分支内，实测顶层 filter 被静默忽略）；M2 用 qdrant-client 本地模式（无服务器进程，[rag/index.py](../rag/index.py)、[rag/search.py](../rag/search.py)），M5 起 Docker；降级备选 pgvector | ✅   | 31 deck 全量（1234 chunk），gold 40 题 hit@5 38/40 |
 | 数据库     | M2 原型无 DB（文件 + Qdrant 本地）；M5 起 PostgreSQL（Docker）                                                 | 🔶   | M5                        |
 | 推理服务   | OpenAI 兼容端点是唯一契约：开发期本地 Ollama（Qwen3-4B q4），M3 正式实验 vLLM（MICC 服务器，流式；Turing 卡**无 bfloat16**，一律 fp16）—— 切换只改 `.env` 的 `LLM_BASE_URL`/`LLM_MODEL` | 🔶   | M3 模型尺寸对比           |
-| 校园信息源 | UniFi 网站第二知识源：爬取+索引为骨架（复用 ingest 管线，Qdrant `unifi_web` collection），实时抓取为增量层；发现 = sitemap + 范围规则，种子板块 ≤500 页起步，查询缺口驱动扩张；HTML 解析走 Docling HTML backend | 🔶   | M2.5 campus gold 跑分     |
-| agent 编排 | 分期：路由器（选库 + query 改写 + 带理由拒答）→ 实时补抓 + 自评重试（硬上限 1）；显式控制流 + 每步受 pydantic 校验的 JSON 决策，⛔ 原生 tool-calling（4B 量化协议遵从性不可靠） | 🔶   | M2.5 路由准确率           |
+| 校园信息源 | UniFi 网站第二知识源：爬取+索引为骨架（复用 ingest 管线，Qdrant `unifi_web` collection），实时抓取为**自增长层**（过相关性门后持久写入，registry 溯源可回滚）；发现 = sitemap + 范围规则（板块规则表，**不锁 unifi.it 域**——Santa Marta/DSU/CISIA 类学生刚需域走显式条目），种子板块 ≤500 页起步；页面直链 PDF 附件（≤20MB）复用 parse 管线；HTML 解析走 Docling HTML backend | 🔶   | M2.5 campus gold 跑分     |
+| agent 编排 | 分期：路由器（选库 + query 改写 + 带理由拒答 + 兜底拒答指路「贴 URL 可教会系统」，校验失败 fallback `both`）→ **深化循环**（抓页 → 「够答？」判定即停止条件——原 self-assess 并入 → 出链/PDF 编号候选选一，≤3 步硬上限，`--no-deepen` 降级）；显式控制流 + 每步受 pydantic 校验的 JSON 决策，⛔ 原生 tool-calling（4B 量化协议遵从性不可靠） | 🔶   | M2.5 路由准确率 + autogrow ≥⌈0.7N⌉ |
+| 自增长写入门 | 实时抓到的页面经 LLM 相关性判定（JSON 二分，校验失败=不落库）后才持久写入共享库；registry（append-only）记 url · content_hash · fetch_date · ingest_run_id · ingest_source · trigger · outlinks，可按 run 整批回滚 | 🔶   | M2.5b 标注集 ≥18/20（真机） |
+| eval 隔离  | live 写入带 `ingest_source="live"`，eval 默认只取 `"crawl"`（+ 可选 `--snapshot <run_id>`）；filter 只进 `unifi_web` 的 prefetch 分支（顶层 filter 在 fusion 下被忽略，已实测）；**写路径对偶**：删除谓词限定 (url, ingest_source)，crawl 快照与 live 增量互不覆盖 | 🔶   | M2.5b 回滚后 campus 基线恒等 |
+| 部署形态   | 答辩演示级：干净机器 `docker compose up` 一键起全套、浏览器演示——共享 web KB 的「服务器」即 compose 服务；MICC/公网常驻与 UniFi SSO = post-tesi 可选 | 🔶   | M6 compose 演示           |
 | 可观测性   | Langfuse 自托管（Docker），LLM tracing                                                                         | 🔶   | M3 接入                   |
 | 评估方法   | RAGAS（faithfulness · answer relevancy · context precision/recall，judge = 开源权重 Qwen3 大尺寸）+ 检索指标（hit@k、MRR）；gold set 自建（无现成数据集） | 🔶   | M3 跑通                   |
 | 目标语言   | EN→EN 基线（M2）；任意语言提问 → 同语言回答是双场景核心（2026-08-21 拍板，原 M4 并入，见 [ROADMAP.md](../ROADMAP.md)），评估语言 EN/IT/ZH。语料不按语言拆库：Qwen3-Embedding 本身是多语言的，chunk 带 `locale` payload 供过滤 | 🔶   | M3 双场景评估             |
@@ -69,6 +72,7 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
   - 往年 scritto 真题暂缓 🔜（见 [ROADMAP.md](../ROADMAP.md) 暂缓项）。
 - **能力边界**：检索问答（QA）。出题 / 自动判卷 ⛔ 超出范围。
 - **交付**：React SPA + DRF API（SSE 流式问答）+ Django admin 材料后台，与 RAG 部分**同一仓库**。
+- **租户与认证（2026-08-22 定案）**：slides = 每账号私有上传互不可见（多租户隔离 🔜 M5）；campus web KB = 全局共享一份，**免登录**可问；触发自增长的写操作 M5 起收敛到账号 + rate limit。**UniFi SSO 可行性**：走意大利高校联邦身份 IDEM GARR（SAML/Shibboleth），Django 侧有现成 SP 库，技术上是标准协议——但把应用注册为学校认可的服务方需要 UniFi IT 审批，单人论文项目不等它：论文期免登录（演示环境非公网），M5 用自建 Django 账号，auth 做成可插拔，SSO 记为 post-tesi 可选（🔜 见 [ROADMAP.md](../ROADMAP.md) M5）。
 - **外部知识源**（MCP、Google Drive 等）🔜 M7（可选，post-M6，见 [ROADMAP.md](../ROADMAP.md)）。
 
 ## 工程化 ✅

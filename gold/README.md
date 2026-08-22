@@ -1,11 +1,16 @@
-# Gold set — 冒烟版（M2）
+# Gold set — 冒烟版（M2）+ campus（M2.5）
 
-30–50 个 EN→EN 问答对，人工撰写。用途：chunk 大小 / top-k / prompt 的调参依据 —— 没有它，M2 所有调参决定都是盲做。M3 扩为全量（决策与流程归 [ROADMAP.md](../ROADMAP.md)）。
+`smoke.jsonl`：30–50 个 EN→EN 问答对，人工撰写，chunk 大小 / top-k / prompt 的调参依据。M3 扩为全量（决策与流程归 [ROADMAP.md](../ROADMAP.md)）。
+
+campus 集（M2.5，LLM 起草 → Claude 逐题核对 → 人工按 URL 抽查定稿）：
+
+- `campus.jsonl` — 校园信息题（it/en/zh 混合），按 URL 判分；验收门 EN/IT hit@5 ≥ 0.80，ZH 单独报告
+- `campus-autogrow.jsonl` — 答案页**故意不在库里**的题（含 modulo PDF 题），M2.5b 自增长验收用（先 0/N，跑完流程 ≥⌈0.7N⌉），PR1 不跑分
 
 ## 存放
 
-- **问题 + 页码引用**：本目录 `smoke.jsonl`，进 git（本人撰写，无版权问题）。
-- **参考答案**（含课件原文摘录）：`data/gold/answers/<id>.md`，gitignore，**永不进 git**。
+- **问题 + 引用**：本目录 `*.jsonl`，进 git（问题为原创撰写，无版权问题）。
+- **参考答案**（含课件/网页原文摘录）：`data/gold/answers/<id>.md`，gitignore，**永不进 git**。
 
 ## 格式
 
@@ -20,10 +25,11 @@
 | `id` | `q` + 三位序号，唯一 |
 | `locale` | 提问语言；冒烟版全部 `en`，跨语言题（`it`/`zh`）🔜 M2.5/M3 |
 | `question` | 学生视角的自然提问，不抄课件原句 |
-| `source_file` | 答案所在 PDF 文件名（`data/corpus/PPM/` 下的原名） |
-| `page` | 答案主要出处页（1-based，与 chunk payload 的 `page` 同义） |
+| `source_file` | 答案所在 PDF 文件名（`data/corpus/PPM/` 下的原名）；campus 题省略（默认 `""`） |
+| `page` | 答案主要出处页（1-based，与 chunk payload 的 `page` 同义）；campus 题省略（默认 `0`） |
 | `answer_ref` | 参考答案文件相对仓库根的路径 |
-| `target` | 路由标签（agent 应查哪个库）；可省，默认 `slides`。campus 题 🔜 M2.5（`gold/campus.jsonl`，届时另配 `urls` 字段） |
+| `target` | 路由标签（agent 应查哪个库）；可省，默认 `slides`；campus 题写 `unifi_web` |
+| `urls` | campus 题的 ground truth：命中 = top-k 里任一 web chunk 的 `url` ∈ 此列表（尾斜杠不敏感）。带 `urls` 的题按 URL 判分，不看 `source_file`/`page`。同一答案存在于多个页面时列出所有**核实过的**等价页（多参考；只加验证过含答案的页，不加"检索碰巧返回的"页） |
 
 ## 撰写规则
 

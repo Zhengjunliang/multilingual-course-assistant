@@ -23,7 +23,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -59,6 +59,20 @@ class ParsedMeta(BaseModel):
     course: str
     seconds: float
     parsed_at: str
+    # Web-source provenance (M2.5), threaded through to the chunk payload.
+    # All optional with defaults so every sidecar already on disk stays valid;
+    # the PDF path never sets them (a legal terminal state, not missing data).
+    # Field semantics are owned by docs/docling-e-pipeline.md.
+    kind: Literal["slides", "web"] = "slides"
+    lang: str | None = None
+    url: str | None = None
+    referrer_url: str | None = None
+    fetch_date: str | None = None
+    section: str | None = None
+    ingest_run_id: str | None = None
+    ingest_source: Literal["crawl", "live"] | None = None
+    trigger: str | None = None
+    content_hash: str | None = None
 
 
 @dataclass(frozen=True)

@@ -61,7 +61,9 @@ Docling 架构、DocTags、chunking 与两条 pipeline 的原理讲解见 [docli
 
 带去 Meet 的提案：**轻量自建 pipeline**（docling → chunk → Qwen3-Embedding → rerank → Qwen3）为主系统，**Qwen-Agent/BM25 做实验基线**；LlamaIndex 仅当需要现成组件时考虑（LlamaIndex 有 Docling reader）。拍板结果与当前状态见 [architettura.md](architettura.md) 决策表（本文件是 M1 分析记录，不是决策属主）。
 
-## 最小实验提案（M1）
+## 最小实验提案（M1）⛔ 已否决
+
+⛔ 2026-07-31 决定**不做**本节的一次性最小实验：Docling 的解析质量（重音字符、公式、表格、多栏阅读顺序）与 Qwen3 推理直接在 M2 的真实 ingest 管线里验证——同样的投入产出论文可引用的证据，而不是用完即弃的 notebook。M2 实测（[diario-sperimentale.md](diario-sperimentale.md)）证实该验证路径成立。提案原文保留如下，仅作 M1 分析记录：
 
 在 MICC 服务器上，一个 notebook：
 

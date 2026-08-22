@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 from test_index import StubDense, StubSparse, make_chunk
-from test_search import ORM_TEXT
+from test_search import ORM_TEXT, TASSE_TEXT, TASSE_URL, make_web_chunk
 
 from rag.gold import GoldQuestion, is_hit, load_gold, main, missing_answer_refs
-from rag.index import ensure_collection, index_chunks, open_client
+from rag.index import WEB_COLLECTION, ensure_collection, index_chunks, open_client
 from rag.search import Hit
 
 
@@ -33,6 +33,31 @@ def test_hit_requires_both_file_and_page_span() -> None:
 
 def test_target_defaults_to_slides() -> None:
     assert make_question().target == "slides"
+    assert make_question().urls == []
+
+
+def make_campus_question() -> GoldQuestion:
+    return GoldQuestion(
+        id="c001",
+        locale="en",
+        question="How do I apply for graduation?",
+        answer_ref="data/gold/answers/c001.md",
+        target="unifi_web",
+        urls=["https://www.ingegneria.unifi.it/vp-185-per-laurearsi.html"],
+    )
+
+
+def test_campus_hit_scores_by_url_not_by_page() -> None:
+    """A question carrying `urls` dispatches to URL matching (trailing-slash
+    insensitive); slides chunks (url=None) can never satisfy it."""
+    web_chunk = make_chunk(0, ORM_TEXT).model_copy(
+        update={
+            "kind": "web",
+            "url": "https://www.ingegneria.unifi.it/vp-185-per-laurearsi.html/",
+        }
+    )
+    assert is_hit(make_campus_question(), [Hit(chunk=web_chunk, score=1.0)])
+    assert not is_hit(make_campus_question(), [Hit(chunk=make_chunk(0, ORM_TEXT), score=1.0)])
 
 
 def test_missing_answer_refs_lists_dangling_ids(tmp_path: Path) -> None:
@@ -82,3 +107,48 @@ def test_cli_reports_hits_and_rate(
     assert "q001 HIT " in out
     assert "q001 MISS" in out
     assert "hit@5: 1/2 (50%)" in out
+
+
+def test_cli_scores_each_question_against_its_target_collection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A campus question must be answered from unifi_web and a slides question
+    from slides — within one gold file, one run (the Stage 5 campus gate
+    shape). Cross-collection leakage would show as a MISS on either row."""
+    qdrant_path = tmp_path / "qdrant"
+    qdrant = open_client(qdrant_path)
+    ensure_collection(qdrant, StubDense().dimension())
+    index_chunks(qdrant, [make_chunk(0, ORM_TEXT)], StubDense(), StubSparse())
+    ensure_collection(qdrant, StubDense().dimension(), collection=WEB_COLLECTION)
+    index_chunks(qdrant, [make_web_chunk(1, TASSE_TEXT)], StubDense(), StubSparse(), WEB_COLLECTION)
+    qdrant.close()
+
+    campus = GoldQuestion(
+        id="c001",
+        locale="it",
+        question=TASSE_TEXT,
+        answer_ref="data/gold/answers/c001.md",
+        target="unifi_web",
+        urls=[TASSE_URL],
+    )
+    gold_file = tmp_path / "campus.jsonl"
+    gold_file.write_text(
+        make_question(page=1).model_dump_json() + "\n" + campus.model_dump_json() + "\n",
+        encoding="utf-8",
+    )
+
+    def stub_dense(model_name: str) -> StubDense:
+        return StubDense()
+
+    def stub_sparse() -> StubSparse:
+        return StubSparse()
+
+    monkeypatch.setattr("rag.index.build_dense_encoder", stub_dense)
+    monkeypatch.setattr("rag.index.build_sparse_encoder", stub_sparse)
+
+    main([str(gold_file), "--qdrant-path", str(qdrant_path), "--no-rerank"])
+    out = capsys.readouterr().out
+    assert "q001 HIT " in out
+    assert "c001 HIT " in out
+    assert TASSE_URL in out  # campus rows report the wanted url, not file/page
+    assert "hit@5: 2/2 (100%)" in out
