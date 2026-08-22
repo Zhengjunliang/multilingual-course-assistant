@@ -17,9 +17,9 @@ import logging
 import re
 from math import ceil
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from rag.parse import ParsedMeta, normalize_text
 from rag.probe import configure_cli_logging
@@ -33,7 +33,23 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-Locale = Literal["en", "it"]
+# BCP-47 primary subtag, normalized lowercase (2-3 letters): the corpus is
+# en/it today, campus questions add zh, and the web source can surface anything
+# — a closed Literal would turn every new language into a ValidationError that
+# fails a whole file's ingest.
+_LOCALE_PATTERN = r"^[a-z]{2,3}$"
+Locale = Annotated[str, StringConstraints(pattern=_LOCALE_PATTERN)]
+
+
+def locale_arg(value: str) -> str:
+    """argparse type for --locale flags: normalize a BCP-47 tag to its primary
+    subtag (`it-IT` -> `it`) and reject junk loudly instead of letting a typo
+    like `itt` silently filter every result to nothing."""
+    subtag = value.strip().lower().replace("_", "-").split("-")[0]
+    if not re.fullmatch(_LOCALE_PATTERN, subtag):
+        raise argparse.ArgumentTypeError(f"not a BCP-47 primary subtag: {value!r}")
+    return subtag
+
 
 DEFAULT_OUT_DIR = Path(__file__).resolve().parent.parent / "data" / "chunks"
 
@@ -114,11 +130,17 @@ _IT_STOPWORDS = frozenset(
 )
 
 _WORD = re.compile(r"[a-zàèéìòù]+")
+_CJK = re.compile(r"[㐀-䶿一-鿿]")
 
 
 def detect_locale(text: str) -> Locale:
-    """Majority vote between the two stopword sets; ties fall to `en`, the
-    majority language of the corpus."""
+    """CJK by character ratio first (stopword voting is structurally blind to
+    Chinese — both counts stay zero and the tie falls to `en`), then majority
+    vote between the two stopword sets; ties fall to `en`, the majority
+    language of the corpus."""
+    stripped = "".join(text.split())
+    if stripped and len(_CJK.findall(stripped)) / len(stripped) >= 0.2:
+        return "zh"
     words = _WORD.findall(text.lower())
     en = sum(1 for word in words if word in _EN_STOPWORDS)
     it = sum(1 for word in words if word in _IT_STOPWORDS)
@@ -150,6 +172,21 @@ class Chunk(BaseModel):
     parse_variant: str
     docling_version: str
     source_sha256: str
+    # Web-source provenance (M2.5). All optional with defaults so every payload
+    # already in the index and every slides chunk stays valid: for slides,
+    # `kind` is "slides" and the rest is None — a legal terminal state, not
+    # missing data. Replacement granularity for web chunks is the
+    # (url, ingest_source) pair: crawl snapshots and live increments never
+    # overwrite each other (chunk_id changes with content, deletion is scoped).
+    kind: Literal["slides", "web"] = "slides"
+    url: str | None = None
+    referrer_url: str | None = None
+    fetch_date: str | None = None
+    section: str | None = None
+    ingest_run_id: str | None = None
+    ingest_source: Literal["crawl", "live"] | None = None
+    trigger: str | None = None
+    content_hash: str | None = None
 
 
 def furniture_threshold(num_pages: int) -> int:
@@ -220,6 +257,15 @@ def chunk_document(
                 parse_variant=meta.parse_variant,
                 docling_version=meta.docling_version,
                 source_sha256=meta.source_sha256,
+                kind=meta.kind,
+                url=meta.url,
+                referrer_url=meta.referrer_url,
+                fetch_date=meta.fetch_date,
+                section=meta.section,
+                ingest_run_id=meta.ingest_run_id,
+                ingest_source=meta.ingest_source,
+                trigger=meta.trigger,
+                content_hash=meta.content_hash,
             )
         )
     return chunks
@@ -277,9 +323,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS)
     parser.add_argument(
         "--locale",
-        choices=["auto", "en", "it"],
+        type=lambda value: value if value == "auto" else locale_arg(value),
         default="auto",
-        help="auto: stopword-count heuristic per document; en/it: force for every file",
+        help="auto: sidecar lang, else stopword/CJK heuristic per document; "
+        "a BCP-47 primary subtag (en/it/zh/...) forces it for every file",
     )
     args = parser.parse_args(argv)
 
@@ -300,10 +347,14 @@ def main(argv: list[str] | None = None) -> None:
                 meta_path_of(doc_path).read_text(encoding="utf-8")
             )
             document = DoclingDocument.load_from_json(doc_path)
-            if args.locale == "auto":
-                locale = detect_locale("\n".join(item.text for item in document.texts))
-            else:
+            if args.locale != "auto":
                 locale = args.locale
+            elif meta.lang:
+                # The web parser records <html lang>; a declared language beats
+                # the stopword/CJK guess.
+                locale = meta.lang
+            else:
+                locale = detect_locale("\n".join(item.text for item in document.texts))
             chunks = chunk_document(document, chunker, meta, locale)
         except Exception:
             # One bad artifact must not lose the rest of the corpus run.

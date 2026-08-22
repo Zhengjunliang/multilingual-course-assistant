@@ -33,6 +33,31 @@ def test_hit_requires_both_file_and_page_span() -> None:
 
 def test_target_defaults_to_slides() -> None:
     assert make_question().target == "slides"
+    assert make_question().urls == []
+
+
+def make_campus_question() -> GoldQuestion:
+    return GoldQuestion(
+        id="c001",
+        locale="en",
+        question="How do I apply for graduation?",
+        answer_ref="data/gold/answers/c001.md",
+        target="unifi_web",
+        urls=["https://www.ingegneria.unifi.it/vp-185-per-laurearsi.html"],
+    )
+
+
+def test_campus_hit_scores_by_url_not_by_page() -> None:
+    """A question carrying `urls` dispatches to URL matching (trailing-slash
+    insensitive); slides chunks (url=None) can never satisfy it."""
+    web_chunk = make_chunk(0, ORM_TEXT).model_copy(
+        update={
+            "kind": "web",
+            "url": "https://www.ingegneria.unifi.it/vp-185-per-laurearsi.html/",
+        }
+    )
+    assert is_hit(make_campus_question(), [Hit(chunk=web_chunk, score=1.0)])
+    assert not is_hit(make_campus_question(), [Hit(chunk=make_chunk(0, ORM_TEXT), score=1.0)])
 
 
 def test_missing_answer_refs_lists_dangling_ids(tmp_path: Path) -> None:

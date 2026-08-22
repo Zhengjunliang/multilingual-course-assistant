@@ -14,9 +14,10 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING
 
-from rag.chunk import detect_locale
+from rag.chunk import detect_locale, locale_arg
+from rag.llm import ChatStreamer, Message, build_streamer
 from rag.probe import configure_cli_logging
 from rag.search import (
     DEFAULT_RERANK_MODEL,
@@ -30,9 +31,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-Message = dict[str, str]
-
-LOCALE_NAMES = {"en": "English", "it": "Italian"}
+LOCALE_NAMES = {"en": "English", "it": "Italian", "zh": "Chinese"}
 
 SYSTEM_PROMPT = """\
 You are a course assistant answering questions about university course material.
@@ -47,37 +46,13 @@ write "Excerpt N" — the marker is the [...] label shown next to the excerpt.
 - Be concise: a student wants the concept, not an essay."""
 
 
-class ChatStreamer(Protocol):
-    """The one slice of the OpenAI client surface this module needs; tests
-    substitute a stub, the CLI builds the real thing."""
-
-    def stream(self, messages: Sequence[Message]) -> Iterator[str]: ...
-
-
-class _OpenAIStreamer:
-    def __init__(self, base_url: str, api_key: str, model: str) -> None:
-        from openai import OpenAI
-
-        self._client = OpenAI(base_url=base_url, api_key=api_key)
-        self._model = model
-
-    def stream(self, messages: Sequence[Message]) -> Iterator[str]:
-        events = self._client.chat.completions.create(
-            model=self._model,
-            messages=cast("Any", list(messages)),  # our Message shape matches the typed dicts
-            stream=True,
-        )
-        for event in events:
-            delta = event.choices[0].delta.content
-            if delta:
-                yield delta
-
-
-def build_streamer(base_url: str, api_key: str, model: str) -> ChatStreamer:
-    return _OpenAIStreamer(base_url, api_key, model)
-
-
 def source_marker(hit: Hit) -> str:
+    """Web chunks cite by URL and fetch date (the page a student can open);
+    slides keep file + page. The Sources footer downstream renders the same
+    markers, so this is the single citation shape for both collections."""
+    if hit.chunk.kind == "web" and hit.chunk.url:
+        date = f" · {hit.chunk.fetch_date}" if hit.chunk.fetch_date else ""
+        return f"[{hit.chunk.url}{date}]"
     return f"[{hit.chunk.source_file} p.{hit.chunk.page}]"
 
 
@@ -127,9 +102,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("question")
     parser.add_argument(
         "--locale",
-        choices=["en", "it"],
+        type=locale_arg,
         default=None,
-        help="answer language; default: detected from the question",
+        help="answer language (BCP-47 primary subtag, e.g. en/it/zh); "
+        "default: detected from the question",
     )
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--no-rerank", action="store_true")

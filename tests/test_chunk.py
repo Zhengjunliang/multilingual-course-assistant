@@ -3,9 +3,13 @@ at chunking time because none of them can be backfilled once indexed. All tests
 run offline — a word-counting tokenizer stub and a programmatically built
 DoclingDocument stand in for transformers and a real parse."""
 
+import argparse
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
 
 from rag.chunk import (
     Chunk,
@@ -14,6 +18,7 @@ from rag.chunk import (
     detect_locale,
     furniture_headings,
     furniture_threshold,
+    locale_arg,
     meta_path_of,
 )
 from rag.parse import ParsedMeta
@@ -178,6 +183,52 @@ def test_locale_heuristic_separates_the_corpus_languages() -> None:
     assert detect_locale(italian) == "it"
     assert detect_locale(english) == "en"
     assert detect_locale("") == "en"
+
+
+def test_locale_heuristic_detects_chinese_by_cjk_ratio() -> None:
+    """Stopword voting is structurally blind to Chinese (both counts stay zero,
+    the tie falls to en) — the CJK-ratio branch must catch it first, without
+    tripping on Latin text that merely mentions a CJK term."""
+    assert detect_locale("如何申请学分转换? 需要哪些文件?") == "zh"
+    assert detect_locale("What is the deadline for the 报名 form of this course?") == "en"
+
+
+def test_locale_arg_normalizes_bcp47_and_rejects_junk() -> None:
+    assert locale_arg("it-IT") == "it"
+    assert locale_arg("ZH_CN") == "zh"
+    assert locale_arg("deu") == "deu"
+    with pytest.raises(argparse.ArgumentTypeError):
+        locale_arg("english")
+
+
+def test_chunk_validates_pre_web_payload() -> None:
+    """Payloads already sitting in the index predate the web fields: they must
+    validate unchanged, landing on kind=slides with every web field None (the
+    legal terminal state for slides, not missing data)."""
+    payload = {
+        "chunk_id": "ab" * 8 + ":classic:0000",
+        "chunk_index": 0,
+        "text": "body",
+        "embed_text": "heading\nbody",
+        "locale": "en",
+        "course": "PPM",
+        "source_file": "deck.pdf",
+        "page": 1,
+        "pages": [1],
+        "heading_path": [],
+        "parse_variant": "classic",
+        "docling_version": "0.0.0",
+        "source_sha256": "ab" * 32,
+    }
+    chunk = Chunk.model_validate(payload)
+    assert chunk.kind == "slides"
+    assert chunk.url is None
+    assert chunk.ingest_source is None
+    assert chunk.content_hash is None
+    # The widened Locale accepts any lowercase primary subtag and nothing else.
+    assert Chunk.model_validate({**payload, "locale": "zh"}).locale == "zh"
+    with pytest.raises(ValidationError):
+        Chunk.model_validate({**payload, "locale": "EN"})
 
 
 def test_meta_sidecars_are_paired_and_excluded_from_collection(tmp_path: Path) -> None:

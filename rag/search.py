@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from pydantic import BaseModel, ConfigDict
 
-from rag.chunk import Chunk
+from rag.chunk import Chunk, locale_arg
 from rag.index import (
     COLLECTION,
     DEFAULT_DENSE_MODEL,
@@ -224,7 +224,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
     parser.add_argument("--no-rerank", action="store_true", help="fusion order only (M3 baseline)")
     parser.add_argument("--top-k", type=int, default=5)
-    parser.add_argument("--locale", choices=["en", "it"], default=None)
+    parser.add_argument("--locale", type=locale_arg, default=None)
     parser.add_argument("--course", default=None)
     args = parser.parse_args(argv)
 

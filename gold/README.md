@@ -20,10 +20,11 @@
 | `id` | `q` + 三位序号，唯一 |
 | `locale` | 提问语言；冒烟版全部 `en`，跨语言题（`it`/`zh`）🔜 M2.5/M3 |
 | `question` | 学生视角的自然提问，不抄课件原句 |
-| `source_file` | 答案所在 PDF 文件名（`data/corpus/PPM/` 下的原名） |
-| `page` | 答案主要出处页（1-based，与 chunk payload 的 `page` 同义） |
+| `source_file` | 答案所在 PDF 文件名（`data/corpus/PPM/` 下的原名）；campus 题省略（默认 `""`） |
+| `page` | 答案主要出处页（1-based，与 chunk payload 的 `page` 同义）；campus 题省略（默认 `0`） |
 | `answer_ref` | 参考答案文件相对仓库根的路径 |
-| `target` | 路由标签（agent 应查哪个库）；可省，默认 `slides`。campus 题 🔜 M2.5（`gold/campus.jsonl`，届时另配 `urls` 字段） |
+| `target` | 路由标签（agent 应查哪个库）；可省，默认 `slides`；campus 题写 `unifi_web` |
+| `urls` | campus 题的 ground truth：命中 = top-k 里任一 web chunk 的 `url` ∈ 此列表（尾斜杠不敏感）。带 `urls` 的题按 URL 判分，不看 `source_file`/`page`。campus 题 🔜 M2.5（`gold/campus.jsonl` · `gold/campus-autogrow.jsonl`） |
 
 ## 撰写规则
 

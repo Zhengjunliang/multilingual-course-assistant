@@ -16,7 +16,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from rag.probe import configure_cli_logging
 from rag.search import DEFAULT_RERANK_MODEL, build_reranker, search
@@ -37,12 +37,18 @@ class GoldQuestion(BaseModel):
     id: str
     locale: str
     question: str
-    source_file: str
-    page: int
+    # Campus questions score by URL and leave these at their defaults; the
+    # defaults exist only for that row shape — a slides question without a real
+    # source_file/page is a broken line and human review is the gate.
+    source_file: str = ""
+    page: int = 0
     answer_ref: str
     # Routing label for the M2.5 agent: which collection should answer this.
     # Default keeps every existing slides line valid without rewriting the file.
     target: str = "slides"
+    # Ground-truth pages for campus questions: a hit is any retrieved web chunk
+    # whose url matches one of these (trailing-slash insensitive).
+    urls: list[str] = Field(default_factory=list)
 
 
 def load_gold(path: Path) -> list[GoldQuestion]:
@@ -60,6 +66,13 @@ def missing_answer_refs(questions: Sequence[GoldQuestion], root: Path) -> list[s
 
 
 def is_hit(question: GoldQuestion, hits: Sequence[Hit]) -> bool:
+    """Slides questions score by (source_file, page); campus questions carry
+    `urls` and score by URL match on web chunks."""
+    if question.urls:
+        wanted = {url.rstrip("/") for url in question.urls}
+        return any(
+            hit.chunk.url is not None and hit.chunk.url.rstrip("/") in wanted for hit in hits
+        )
     return any(
         hit.chunk.source_file == question.source_file and question.page in hit.chunk.pages
         for hit in hits

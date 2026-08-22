@@ -13,6 +13,28 @@ from rag.probe import ParsePlan
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def test_parsed_meta_validates_pre_web_sidecar() -> None:
+    """Sidecars already on disk predate the web fields and must load unchanged:
+    kind=slides, every web field at its None default."""
+    meta = ParsedMeta.model_validate(
+        {
+            "source_file": "deck.pdf",
+            "source_path": "/corpus/PPM/deck.pdf",
+            "source_sha256": "ab" * 32,
+            "parse_variant": "classic",
+            "docling_version": "0.0.0",
+            "course": "PPM",
+            "seconds": 1.5,
+            "parsed_at": "2026-08-03T00:00:00+00:00",
+        }
+    )
+    assert meta.kind == "slides"
+    assert meta.lang is None
+    assert meta.url is None
+    assert meta.ingest_source is None
+
+
 COMPOSED = "perché è più"
 
 
