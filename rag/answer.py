@@ -91,6 +91,7 @@ def answer(
 def main(argv: list[str] | None = None) -> None:
     from config.env import env
     from rag.index import (
+        COLLECTION,
         DEFAULT_DENSE_MODEL,
         DEFAULT_QDRANT_DIR,
         build_dense_encoder,
@@ -110,6 +111,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--no-rerank", action="store_true")
     parser.add_argument("--qdrant-path", type=Path, default=DEFAULT_QDRANT_DIR)
+    parser.add_argument(
+        "--collection",
+        action="append",
+        default=None,
+        help="collection to retrieve from; repeat for a merged pool (default: slides). "
+        "The M2.5b agent router will pick this automatically",
+    )
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
     args = parser.parse_args(argv)
@@ -121,7 +129,15 @@ def main(argv: list[str] | None = None) -> None:
     sparse = build_sparse_encoder()
     reranker = None if args.no_rerank else build_reranker(args.rerank_model)
     client = open_client(args.qdrant_path)
-    hits = search(client, args.question, dense, sparse, reranker, limit=args.top_k)
+    hits = search(
+        client,
+        args.question,
+        dense,
+        sparse,
+        reranker,
+        limit=args.top_k,
+        collections=tuple(args.collection) if args.collection else (COLLECTION,),
+    )
     client.close()
 
     streamer = build_streamer(env.llm_base_url, env.llm_api_key, env.llm_model)

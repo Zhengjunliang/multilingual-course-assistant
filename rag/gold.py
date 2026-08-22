@@ -110,15 +110,30 @@ def main(argv: list[str] | None = None) -> None:
 
     scored = 0
     for question in questions:
-        hits = search(client, question.question, dense, sparse, reranker, limit=args.top_k)
+        # `target` names the collection to score against (gold/README.md):
+        # slides questions stay single-collection slides, campus questions
+        # single-collection unifi_web — the non-regression gates keep constant
+        # semantics; merged pools exist only behind the M2.5b agent router.
+        hits = search(
+            client,
+            question.question,
+            dense,
+            sparse,
+            reranker,
+            limit=args.top_k,
+            collections=(question.target,),
+        )
         hit = is_hit(question, hits)
         scored += hit
         top = hits[0].chunk if hits else None
-        print(
-            f"{question.id} {'HIT ' if hit else 'MISS'} "
-            f"want {question.source_file} p.{question.page}"
-            + (f" | top: {top.source_file} p.{top.page}" if top else " | top: -")
-        )
+        want = ", ".join(question.urls) or f"{question.source_file} p.{question.page}"
+        if top is None:
+            shown = "-"
+        elif top.kind == "web" and top.url:
+            shown = top.url
+        else:
+            shown = f"{top.source_file} p.{top.page}"
+        print(f"{question.id} {'HIT ' if hit else 'MISS'} want {want} | top: {shown}")
     client.close()
 
     total = len(questions)

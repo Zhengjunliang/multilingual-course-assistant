@@ -26,6 +26,7 @@ from rag.index import (
     DEFAULT_QDRANT_DIR,
     DENSE_VECTOR,
     SPARSE_VECTOR,
+    WEB_COLLECTION,
     DenseEncoder,
     SparseEncoder,
     build_dense_encoder,
@@ -118,18 +119,28 @@ def build_reranker(model_name: str = DEFAULT_RERANK_MODEL) -> Reranker:
     return _QwenReranker(model_name)
 
 
-def payload_filter(locale: str | None, course: str | None) -> qmodels.Filter | None:
+def payload_filter(
+    locale: str | None,
+    course: str | None,
+    ingest_source: str | None = None,
+    ingest_run_id: str | None = None,
+) -> qmodels.Filter | None:
+    """Equality conditions for one prefetch branch. The web-source pair
+    (`ingest_source`, `ingest_run_id`) exists for eval isolation and rollback
+    on `unifi_web`; scoping them to that collection is `search()`'s job."""
     from qdrant_client import models
 
-    conditions: list[models.FieldCondition] = []
-    if locale:
-        conditions.append(
-            models.FieldCondition(key="locale", match=models.MatchValue(value=locale))
-        )
-    if course:
-        conditions.append(
-            models.FieldCondition(key="course", match=models.MatchValue(value=course))
-        )
+    fields = (
+        ("locale", locale),
+        ("course", course),
+        ("ingest_source", ingest_source),
+        ("ingest_run_id", ingest_run_id),
+    )
+    conditions = [
+        models.FieldCondition(key=key, match=models.MatchValue(value=value))
+        for key, value in fields
+        if value
+    ]
     return models.Filter(must=list(conditions)) if conditions else None
 
 
@@ -144,11 +155,13 @@ def hybrid_search(
     locale: str | None = None,
     course: str | None = None,
     collection: str = COLLECTION,
+    ingest_source: str | None = None,
+    ingest_run_id: str | None = None,
 ) -> list[Hit]:
     from qdrant_client import models
 
     indices, values = sparse.encode_query(query)
-    query_filter = payload_filter(locale, course)
+    query_filter = payload_filter(locale, course, ingest_source, ingest_run_id)
     response = client.query_points(
         collection,
         prefetch=[
@@ -185,6 +198,20 @@ def rerank_hits(query: str, hits: Sequence[Hit], reranker: Reranker, limit: int)
     return sorted(rescored, key=lambda hit: hit.score, reverse=True)[:limit]
 
 
+def round_robin(pools: Sequence[Sequence[Hit]], limit: int) -> list[Hit]:
+    """The `--no-rerank` multi-collection order (docs/fonte-web-unifi.md):
+    fusion scores are not comparable across collections, so pools interleave
+    rank by rank instead of merging by score; leftover ranks from longer pools
+    fill the remainder."""
+    interleaved = [
+        pool[rank]
+        for rank in range(max((len(pool) for pool in pools), default=0))
+        for pool in pools
+        if rank < len(pool)
+    ]
+    return interleaved[:limit]
+
+
 def search(
     client: QdrantClient,
     query: str,
@@ -195,31 +222,50 @@ def search(
     limit: int = 5,
     locale: str | None = None,
     course: str | None = None,
-    collection: str = COLLECTION,
+    collections: Sequence[str] = (COLLECTION,),
+    ingest_source: str | None = None,
+    ingest_run_id: str | None = None,
 ) -> list[Hit]:
-    """The full retrieval pipeline: with a reranker, fusion produces the wide
-    candidate pool and the reranker picks the final `limit`; without one, fusion
-    order is the final order (the M3 no-rerank baseline)."""
-    candidates = hybrid_search(
-        client,
-        query,
-        dense,
-        sparse,
-        limit=PREFETCH_LIMIT if reranker else limit,
-        locale=locale,
-        course=course,
-        collection=collection,
-    )
+    """The full retrieval pipeline: with a reranker, per-collection fusion
+    pools merge into one candidate pool and the reranker picks the final
+    `limit`; without one, fusion order interleaves round-robin (the M3
+    no-rerank baseline). The web-source conditions apply only to the
+    `unifi_web` branch (ADR-1, docs/architettura.md): slides prefetches never
+    carry them, so slides retrieval semantics cannot drift with web features."""
+    pools: list[list[Hit]] = []
+    for collection in collections:
+        is_web = collection == WEB_COLLECTION
+        pools.append(
+            hybrid_search(
+                client,
+                query,
+                dense,
+                sparse,
+                limit=PREFETCH_LIMIT if reranker else limit,
+                locale=locale,
+                course=course,
+                collection=collection,
+                ingest_source=ingest_source if is_web else None,
+                ingest_run_id=ingest_run_id if is_web else None,
+            )
+        )
     if reranker is None:
-        return candidates[:limit]
-    return rerank_hits(query, candidates, reranker, limit)
+        return round_robin(pools, limit)
+    merged = [hit for pool in pools for hit in pool]
+    return rerank_hits(query, merged, reranker, limit)
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("query")
     parser.add_argument("--qdrant-path", type=Path, default=DEFAULT_QDRANT_DIR)
-    parser.add_argument("--collection", default=COLLECTION)
+    parser.add_argument(
+        "--collection",
+        action="append",
+        default=None,
+        help=f"collection to search; repeat for a merged multi-collection pool "
+        f"(default: {COLLECTION})",
+    )
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
     parser.add_argument("--no-rerank", action="store_true", help="fusion order only (M3 baseline)")
@@ -244,14 +290,19 @@ def main(argv: list[str] | None = None) -> None:
         limit=args.top_k,
         locale=args.locale,
         course=args.course,
-        collection=args.collection,
+        collections=tuple(args.collection) if args.collection else (COLLECTION,),
     )
     client.close()
 
     for rank, hit in enumerate(hits, start=1):
         chunk = hit.chunk
         preview = chunk.text[:160].replace("\n", " ")
-        print(f"{rank}. [{hit.score:.4f}] {chunk.source_file} p.{chunk.page} ({chunk.locale})")
+        where = (
+            chunk.url
+            if chunk.kind == "web" and chunk.url
+            else f"{chunk.source_file} p.{chunk.page}"
+        )
+        print(f"{rank}. [{hit.score:.4f}] {where} ({chunk.locale})")
         print(f"   {' > '.join(chunk.heading_path) or '-'}")
         print(f"   {preview}")
 

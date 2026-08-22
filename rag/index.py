@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 COLLECTION = "slides"
+WEB_COLLECTION = "unifi_web"
 DENSE_VECTOR = "dense"
 SPARSE_VECTOR = "sparse"
 

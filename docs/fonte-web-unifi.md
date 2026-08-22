@@ -18,6 +18,15 @@
 
 硬底线（全部路径共用）：robots 遵守 · 1 req/s · `--max-pages` 500 硬顶 · UA 表明论文用途 · PDF 附件 ≤20MB · 只读。附件只收 PDF：Office 后缀（`.doc(x)` `.xls(x)` `.ppt(x)` `.rtf` …）不跟进——首爬实测 46 个全是空白申请表模板，无问答价值；出链图仍记录这些链接。`--sections` 取规则表子集，补爬时把页数配额留给新板块（首爬 ingegneria 一家即打满 500 页）。
 
+## 多 collection 检索
+
+✅ 实现于 `rag/search.py` `search()`（`collections` 参数），gold 按 `GoldQuestion.target` 选库：
+
+- **rerank 路径**：每库各出一个 fusion 候选池（每池 20）→ 合并成一个池 → 统一 rerank 取 top-k。跨库可比性由 reranker 保证（它只看 query×文本）。
+- **`--no-rerank` 路径**：RRF 分数**跨库不可比**，不合并——每库各取 top-k，按名次 round-robin 交错后截断到 k（是定义不是融合；长池的余名次补满剩余名额）。
+- **ADR-1 作用域**（决策属主 [architettura.md](architettura.md)）：`ingest_source`/`ingest_run_id` 过滤条件只进 `unifi_web` 的两个 prefetch 分支，slides 分支永不携带——slides 非回归门的语义因此不可能漂移。
+- 多库合并只发生在 agent 路由 `both`（🔜 M2.5b）；两个非回归门（slides · campus）恒单库。
+
 ## 快照与 registry 布局 🔜 M2.5a
 
 两个工件，生命周期相反：
