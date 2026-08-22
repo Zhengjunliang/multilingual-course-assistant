@@ -1,0 +1,2 @@
+# Windows dev machine, Linux CI: keep both byte-identical by normalising to LF.
+* text=auto eol=lf

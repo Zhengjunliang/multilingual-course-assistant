@@ -8,7 +8,7 @@ M1 交付物（relatore 明确要求，2026-07-28 邮件：«espanda l'analisi d
 
 对论文的批判性解读：
 
-- BM25 = **词汇**匹配：英文提问和意大利语材料词汇不重叠 → 论文核心场景（跨语言）**结构性失效**。
+- BM25 = **词汇**匹配：意大利语提问和英语材料词汇不重叠 → 论文核心场景（跨语言）**结构性失效**。
 - 关键词生成的双语是 zh/en，不是意大利语。
 - 优点：零基础设施，最快上手。缺点：无语义检索，embedding 尺寸研究无从谈起。
 - **对论文的真实价值：词汇基线** — 实验章节里被语义检索打败的对照组（BM25 vs 语义检索是经典对比）。
@@ -36,10 +36,12 @@ Qwen3-Embedding 与 Qwen3-Reranker 系列：两者都有 **0.6B / 4B / 8B** 三�
 
 ## 4. Granite-Docling（文档解析）
 
-`granite-docling-258M`：紧凑 VLM（约 0.3B，Idefics3 架构：siglip2 视觉编码器 + Granite 165M LM），Apache 2.0。输出 **DocTags** — 保留版面语义的标记语言，可导出 Markdown/HTML；表格（OTSL）、公式（LaTeX）、代码、阅读顺序。集成在 `docling` 库的 `VlmPipeline`（模型自动下载）。多语言**实验性**（日语、阿拉伯语、中文），英语为主 — **未提及意大利语**：必须用真实 slide 验证。注意：老 GPU（含 Colab T4）可能有 bfloat16 限制。
+`granite-docling-258M`：紧凑 VLM（约 0.3B，Idefics3 架构：siglip2 视觉编码器 + Granite 165M LM），Apache 2.0。输出 **DocTags** — 保留版面语义的标记语言，可导出 Markdown/HTML；表格（OTSL）、公式（LaTeX）、代码、阅读顺序。集成在 `docling` 库的 `VlmPipeline`（模型自动下载）。多语言**实验性**（日语、阿拉伯语、中文），英语为主 — **未提及意大利语**：必须用真实 slide 验证。注意：MICC 显卡（2080 Ti / Titan RTX）都是 Turing 架构，**无 bfloat16**，跑 VLM 要显式用 fp16。
 
 - `docling` 库还有经典非 VLM pipeline，对数字版 PDF 已经很稳；VLM 主要针对扫描件和复杂版面。
 - 对论文：材料多为 slide PDF → 解析质量决定下游一切。最小实验里要在同一份课程 PDF 上**两条 pipeline 都跑**。
+
+Docling 架构、DocTags、chunking 与两条 pipeline 的原理讲解见 [docling-e-pipeline.md](docling-e-pipeline.md)（本文件只做路线分析，不重复原理）。
 
 ## 架构启示
 
@@ -61,7 +63,7 @@ Qwen3-Embedding 与 Qwen3-Reranker 系列：两者都有 **0.6B / 4B / 8B** 三�
 
 ## 最小实验提案（M1）
 
-在 Colab T4 或 MICC 服务器上，一个 notebook：
+在 MICC 服务器上，一个 notebook：
 
 1. 一份真实课程 PDF → `docling` 经典 pipeline **和** `VlmPipeline`（granite-docling）；对比意大利语 Markdown 质量。
 2. 简单 chunking → Qwen3-Embedding-0.6B → 内存索引（FAISS 之类）。

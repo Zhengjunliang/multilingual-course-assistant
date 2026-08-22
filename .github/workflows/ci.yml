@@ -1,0 +1,65 @@
+# No Windows job on purpose: the pytorch-cu126 marker in pyproject.toml would make a
+# windows runner download a ~2.5 GB CUDA torch wheel on every run, and the full chain
+# already runs on Windows daily on the dev machine (pre-commit + local pytest).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Not a secret: this key only ever signs throwaway CI sessions.
+      DJANGO_SECRET_KEY: ci-only-key-never-used-outside-this-runner
+      DJANGO_DEBUG: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Types
+        run: uv run pyright
+
+      - name: Django system checks
+        run: uv run python manage.py check
+
+      - name: Tests
+        run: uv run pytest --cov
+
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Audit locked dependencies
+        # --no-deps --disable-pip: audit exactly what the lockfile pins, no resolving
+        # and no virtualenv — the input is already a complete pin set, and resolving
+        # would trip over the torch custom index.
+        run: |
+          uv export --locked --no-emit-project --no-hashes -o requirements.txt
+          uvx pip-audit --no-deps --disable-pip -r requirements.txt

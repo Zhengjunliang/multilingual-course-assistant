@@ -5,11 +5,11 @@
 
 ## 1. 项目概览
 
-- **项目**：multilingual-course-assistant — 大学课程材料多语言问答（RAG，开源权重 LLM，Qwen 系；仅 QA，⛔ 出题/判卷）+ 网站（PPM 部分）：Django/DRF + Celery 后端、React SPA 前端，同一仓库。**Triennale 毕业论文**，UniFi，relatore Prof. Marco Bertini；单人开发（Junliang Zheng）。
-- **当前阶段 🔶 scaffold**：只有文档；无应用代码、无测试、无 CI。
-- **范围**：定义在 `ROADMAP.md`（里程碑 M0–M7、阻塞项、暂缓项、Meet 议题）；relatore 的约束在 `docs/architettura.md`。**禁用专有 LLM API**（OpenAI/Claude）：只用开源权重模型。语料只用课程 slides/讲义 PDF（scritto 真题暂缓 🔜）。MCP/外部知识源 🔜 M7（可选，论文范围外）。
-- **技术栈 🔶 全部自主已定**：Python 3.12 via uv · Django 5 + DRF · Celery+Redis · Qwen3（LLM/embedding/reranker）· Docling · React+TS SPA（Vite）· 自建 RAG pipeline · Qdrant hybrid · vLLM · RAGAS · Langfuse · PostgreSQL · 工程化链 — 唯一决策表在 `docs/architettura.md`，🔶 项待实验验证（推翻则原地替换）。依赖规则：**🔒 项禁止引入依赖或配置文件**；🔶 项自 M2 起可引入；M2 之前主项目不引入任何依赖（`experiments/` 例外，见下）。
-- **目录结构 🔜 M2**：项目初始化时确定。未定前不建"顺手"目录。唯一例外 `experiments/<里程碑>-<主题>/`：里程碑实验的脚本与结论进 git（论文可复现证据），各自用**独立 venv**、不写进主项目依赖；`.venv/`、`data/`（版权材料）、`out/` 由 `.gitignore` 排除。
+- **项目**：multilingual-course-assistant — 大学课程材料多语言问答 + 校园信息问答（UniFi 网站第二知识源 + agentic 路由 🔜 M2.5）（RAG，开源权重 LLM，Qwen 系；仅 QA，⛔ 出题/判卷）+ 网站（PPM 部分）：Django/DRF + Celery 后端、React SPA 前端，同一仓库。**Triennale 毕业论文**，UniFi，relatore Prof. Marco Bertini；单人开发（Junliang Zheng）。
+- **当前阶段 ✅ M2 → 🔜 M2.5**：骨架（`pyproject.toml` 集中 uv · ruff · pyright · pytest 配置、Django project `config/`、`.pre-commit-config.yaml`、`.github/workflows/ci.yml`）+ RAG 管线 —— `rag/probe.py`（解析前探测路由）、`rag/parse.py`（Docling → JSON + sidecar）、`rag/chunk.py`（HybridChunker + payload）、`rag/index.py`（Qdrant 本地 hybrid 索引）、`rag/search.py`（dense+BM25+RRF+rerank）、`rag/answer.py`（OpenAI 兼容端点生成，默认本地 Ollama）、`rag/gold.py`（检索冒烟跑分）。无 web 业务逻辑。小模型（embedding/reranker 0.6B）与开发期生成（Ollama Qwen3-4B q4）本地跑，服务器 vLLM 只在 M3 正式实验。M2.5（校园信息源 + 分期 agent 编排）已定案 🔜，清单在 `ROADMAP.md`。
+- **范围**：定义在 `ROADMAP.md`（里程碑 M0–M7、阻塞项、暂缓项、Meet 议题）；relatore 的约束在 `docs/architettura.md`。**禁用专有 LLM API**（OpenAI/Claude）：只用开源权重模型。课程场景语料只用 slides/讲义 PDF（scritto 真题暂缓 🔜）；校园场景语料 = UniFi 网站爬取快照 🔜 M2.5。MCP/Drive 等其余外部源 🔜 M7（可选，论文范围外）。
+- **技术栈 🔶 全部自主已定**：Python 3.12 via uv · Django 5 + DRF · Celery+Redis · Qwen3（LLM/embedding/reranker）· Docling · React+TS SPA（Vite）· 自建 RAG pipeline · Qdrant hybrid · vLLM · RAGAS · Langfuse · PostgreSQL · 工程化链 — 唯一决策表在 `docs/architettura.md`，🔶 项待实验验证（推翻则原地替换）。依赖规则：**🔒 项禁止引入依赖或配置文件**；🔶 项用 `uv add` 引入，且**只在真正要用它的里程碑加** — 装了不用的依赖是噪音，也让 `uv.lock` 里出现无法解释的东西。
+- **目录结构 ✅**：`config/`（Django project：settings · urls · asgi/wsgi · env）· `rag/`（RAG pipeline 包）· `tests/` · `docs/` · `data/`（课程材料与派生产物，gitignore，永不进 git）· `.github/workflows/ci.yml`。**`rag/` 禁止 import Django** — 论文核心要能脱离 web 单独跑评估，`tests/test_smoke.py` 守着这条。后续目录到里程碑再建，未定前不建"顺手"目录：`apps/qa/`（DRF）与 `frontend/`（React SPA）🔜 M5。
 - **语言域**：业务领域是多语言的；所有数据模型和面向用户的文本从一开始就带 `locale` 字段/参数，禁止硬编码语言字符串。
 - **深入文档**：具体主题放 `docs/`，本文件只放指针。
 
@@ -52,7 +52,7 @@
 | `README.md`    | 入口：是什么、怎么跑、怎么开发、CI                                        | ✅   |
 | `CLAUDE.md`    | 代理规则、项目概览、文档约定                                              | ✅   |
 | `ROADMAP.md`   | 范围、里程碑、可勾选清单、阻塞项                                          | ✅   |
-| `docs/*.md`    | 一主题一文件，主题存在才建（`docs/architettura.md`、`docs/analisi-rag.md`）| ✅   |
+| `docs/*.md`    | 一主题一文件，主题存在才建（`docs/architettura.md`、`docs/analisi-rag.md`、`docs/docling-e-pipeline.md`）| ✅   |
 
 **一条信息一个属主。** 属主写全文，其他文件一行 + 链接，永不复制。不知道属主是谁时，定属主也是本次修改的一部分。
 

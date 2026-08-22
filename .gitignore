@@ -2,7 +2,7 @@
 .omc/
 !.omc/skills/
 .claude/settings.local.json
-
+.claude/
 # Python
 __pycache__/
 *.py[cod]
@@ -13,6 +13,8 @@ env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
 
 # Node
 node_modules/
@@ -40,6 +42,5 @@ Thumbs.db
 *.sqlite3
 *.db
 
-# Esperimenti: script e conclusioni sotto git, materiali e output no
-experiments/**/data/
-experiments/**/out/
+# Materiale di corso (copyright), indici Qdrant locali, output di parsing
+/data/
