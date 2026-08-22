@@ -99,6 +99,49 @@ def test_payload_round_trips_the_full_chunk_contract(client: QdrantClient) -> No
     assert Chunk.model_validate(point.payload) == chunk
 
 
+def make_web_chunk(
+    content_hash: str, source: str, url: str = "https://ingegneria.unifi.it/vp-185.html"
+) -> Chunk:
+    """A web chunk whose id changes with its content, as the real pipeline
+    derives it — replacement must therefore come from the scoped delete, not
+    from upsert overwriting."""
+    return make_chunk().model_copy(
+        update={
+            "chunk_id": f"{content_hash[:16]}:html:0000",
+            "kind": "web",
+            "url": url,
+            "ingest_source": source,
+            "content_hash": content_hash,
+            "parse_variant": "html",
+        }
+    )
+
+
+def hashes_by_source(client: QdrantClient) -> dict[str, set[str]]:
+    points, _ = client.scroll(COLLECTION, limit=100, with_payload=True)
+    result: dict[str, set[str]] = {}
+    for point in points:
+        payload = point.payload or {}
+        result.setdefault(str(payload["ingest_source"]), set()).add(str(payload["content_hash"]))
+    return result
+
+
+def test_web_reingest_leaves_no_stale_version_of_the_same_source(client: QdrantClient) -> None:
+    """Same URL, same source, new content: the old version's hash must be gone
+    (a count-based check would pass even while stale chunks survive)."""
+    index_chunks(client, [make_web_chunk("aa" * 32, "crawl")], StubDense(), StubSparse())
+    index_chunks(client, [make_web_chunk("bb" * 32, "crawl")], StubDense(), StubSparse())
+    assert hashes_by_source(client) == {"crawl": {"bb" * 32}}
+
+
+def test_live_ingest_never_touches_the_crawl_snapshot_version(client: QdrantClient) -> None:
+    """Same URL ingested as crawl then as live: both versions coexist and the
+    crawl hash is unchanged — the eval-isolation contract on the write path."""
+    index_chunks(client, [make_web_chunk("aa" * 32, "crawl")], StubDense(), StubSparse())
+    index_chunks(client, [make_web_chunk("cc" * 32, "live")], StubDense(), StubSparse())
+    assert hashes_by_source(client) == {"crawl": {"aa" * 32}, "live": {"cc" * 32}}
+
+
 def test_collect_chunk_files_scans_directories_and_passes_files_through(tmp_path: Path) -> None:
     first = tmp_path / "a.classic.jsonl"
     second = tmp_path / "b.classic.jsonl"

@@ -155,6 +155,33 @@ def collect_chunk_files(target: Path) -> Iterator[Path]:
     yield from sorted(path for path in target.rglob("*.jsonl") if path.is_file())
 
 
+def delete_web_versions(
+    client: QdrantClient, pairs: Sequence[tuple[str, str]], collection: str = COLLECTION
+) -> None:
+    """Scoped replacement for web chunks: delete exactly the (url,
+    ingest_source) pair being re-ingested. A web chunk_id changes with the
+    page's content, so upsert alone would leave the previous version alive;
+    and an unscoped delete-by-url would let a live fetch destroy the crawl
+    snapshot version — crawl and live never overwrite each other
+    (docs/docling-e-pipeline.md 3.6)."""
+    from qdrant_client import models
+
+    for url, source in pairs:
+        client.delete(
+            collection,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(
+                    must=[
+                        models.FieldCondition(key="url", match=models.MatchValue(value=url)),
+                        models.FieldCondition(
+                            key="ingest_source", match=models.MatchValue(value=source)
+                        ),
+                    ]
+                )
+            ),
+        )
+
+
 def index_chunks(
     client: QdrantClient,
     chunks: Sequence[Chunk],
@@ -164,8 +191,19 @@ def index_chunks(
 ) -> int:
     """Encode and upsert one document's chunks; `dense` reads `embed_text`
     (heading-contextualized), `sparse` reads raw `text` — the two-sided contract
-    set at chunking time."""
+    set at chunking time. Web chunks replace their own (url, ingest_source)
+    predecessors first; slides chunks rely on deterministic ids alone."""
     from qdrant_client import models
+
+    web_pairs = sorted(
+        {
+            (chunk.url, chunk.ingest_source)
+            for chunk in chunks
+            if chunk.kind == "web" and chunk.url and chunk.ingest_source
+        }
+    )
+    if web_pairs:
+        delete_web_versions(client, web_pairs, collection)
 
     dense_vectors = dense.encode_documents([chunk.embed_text for chunk in chunks])
     sparse_vectors = sparse.encode_documents([chunk.text for chunk in chunks])

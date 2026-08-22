@@ -152,11 +152,11 @@ chunker 需要的是**带层级与页码的对象树**（标题链、provenance 
 | `text` | 原始块文本，NFKC —— sparse/BM25 侧 + 展示给用户 |
 | `embed_text` | `contextualize()` 输出（标题过滤后），NFKC —— **仅 dense 侧** |
 | `locale` | BCP-47 主子标签（小写 2-3 字母，pydantic pattern 校验）。优先级：CLI `--locale` 强制 > sidecar `lang`（web 侧 `<html lang>`）> 启发式（CJK 字符占比 ≥20% → `zh`，否则 it/en 停用词多数票、平局取 en） |
-| `course` · `source_file` | 来自 sidecar；web 侧取值：`course` = 站点板块 slug（如 `ingegneria`）、`source_file` = URL path |
+| `course` · `source_file` | 来自 sidecar；web 侧取值：`course` = 站点板块 slug（如 `ingegneria`）、`source_file` = 快照工件名（URL 哈希 + 扩展名——URL path 的 basename 全站互撞（`index.html`），哈希名不撞；URL 本体在 `url` 字段） |
 | `page` | 1-based，chunk 首个条目的首页 —— 引用「来源：第 12 页」与前端跳转的锚点；**web 侧 = 0 哨兵**（网页无页码，命中判定走 `urls`） |
 | `pages` | 跨页完整列表（合并跨了 slide 边界时 `page` 仍指起点，`pages` 保留真相）；web 侧 = `[]` 或 `[0]` |
 | `heading_path` | 过滤后的标题链，可空 |
-| `parse_variant` · `docling_version` · `source_sha256` | 溯源：M3 消融要能把每个 chunk 归因到解析配置与语料快照 —— 与 `locale` 同一论证。web 侧：`parse_variant` = `"html"`、`source_sha256` = 原始 HTML/PDF 字节哈希 |
+| `parse_variant` · `docling_version` · `source_sha256` | 溯源：M3 消融要能把每个 chunk 归因到解析配置与语料快照 —— 与 `locale` 同一论证。web 侧：`parse_variant` = `"html"`（PDF 附件保留真实配置名 `classic`）、`source_sha256` = 原始 HTML/PDF 字节哈希 |
 | `kind` | `"slides"` \| `"web"` 判别式，默认 `slides`——已入索引的旧 payload 与 slides 路径零改动 |
 | `url` · `referrer_url` | web 溯源（可空，slides 恒 None = 合法终态）：`url` = 页面或附件 PDF 自身地址（引用给学生看），`referrer_url` = 附件的承载页（溯源用） |
 | `fetch_date` · `section` | 抓取日期（引用 marker `[<url> · <fetch_date>]` 的第二半）与站点板块 |

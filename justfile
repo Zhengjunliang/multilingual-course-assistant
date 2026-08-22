@@ -66,3 +66,7 @@ gold *args:
 # Crawl the campus web source into a snapshot + registry (run by the user, 1 req/s, robots honored).
 crawl *args:
     uv run python -m rag.crawl --out data\webcorpus {{ args }}
+
+# Parse a crawl snapshot (HTML + PDF attachments) into chunkable artifact pairs.
+webparse snapshot *args:
+    uv run python -m rag.webparse "{{ snapshot }}" {{ args }}

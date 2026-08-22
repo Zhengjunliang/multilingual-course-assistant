@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Multilingual QA over university course materials (RAG, open-weight Qwen)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "beautifulsoup4>=4.15.0",
     "django>=5.2,<6",
     "docling>=2.117.0",
     "fastembed>=0.8.0",
