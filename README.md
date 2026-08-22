@@ -36,6 +36,7 @@ just index data\chunks
 just search "What is an ORM?"
 just answer "What is an ORM?"    # 需要本地 Ollama 在线
 just gold                        # gold 冒烟 hit@5
+just crawl                       # 校园 web 源爬取（用户执行；robots · 1 req/s · ≤500 页）
 ```
 
 不装 just 也可以直接跑对应的 `uv run …` 命令（recipe 内容即命令本身）。
