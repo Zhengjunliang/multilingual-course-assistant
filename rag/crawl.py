@@ -53,6 +53,10 @@ DEFAULT_MAX_PAGES = 500
 MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
 FETCH_TIMEOUT_SECONDS = 30.0
 
+# Attachments are PDF-only: office files on these sites are blank fill-in
+# templates (moduli), not content — links to them are never followed.
+SKIPPED_EXTENSIONS = (".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".rtf", ".odt", ".zip")
+
 
 class ScopeRule(BaseModel):
     """One row of the scope table (docs/fonte-web-unifi.md owns the table).
@@ -68,13 +72,27 @@ class ScopeRule(BaseModel):
     path_prefix: str = "/"
 
 
-# Seed sections for the first crawl; tuned against the real site at the
-# Stage 3.5 handover, kept in sync with the table in docs/fonte-web-unifi.md.
+# Seed sections, kept in sync with the table in docs/fonte-web-unifi.md.
+# Each path_prefix must be a real page: it doubles as the link-BFS seed URL
+# (calibrated against the live site at the Stage 3.5 handover).
 DEFAULT_SCOPE = (
     ScopeRule(section="ingegneria", host="ingegneria.unifi.it"),
-    ScopeRule(section="international", host="www.unifi.it", path_prefix="/international"),
-    ScopeRule(section="servizi", host="www.unifi.it", path_prefix="/vp-"),
+    ScopeRule(section="servizi", host="www.unifi.it", path_prefix="/it/studia-con-noi"),
+    ScopeRule(section="mobilita", host="www.unifi.it", path_prefix="/it/ateneo/nel-mondo"),
+    ScopeRule(section="international", host="www.unifi.it", path_prefix="/en/"),
 )
+
+
+def rules_for_sections(
+    names: Iterable[str], rules: Sequence[ScopeRule] = DEFAULT_SCOPE
+) -> tuple[ScopeRule, ...]:
+    """Subset of the scope table by section slug; unknown slugs are an error —
+    a typo silently crawling nothing would read as an empty site."""
+    wanted = set(names)
+    unknown = wanted - {rule.section for rule in rules}
+    if unknown:
+        raise ValueError(f"unknown sections: {sorted(unknown)}")
+    return tuple(rule for rule in rules if rule.section in wanted)
 
 
 class Outlink(BaseModel):
@@ -298,20 +316,27 @@ def crawl(
 
     queue: list[tuple[str, str | None]] = []  # (url, referrer)
     seen: set[str] = set()
+    sitemap_hosts: set[str] = set()
     for rule in rules:
-        for name in ("sitemap.xml", "sitemap.php"):
-            try:
-                throttle.wait()
-                reply = fetcher.get(f"https://{rule.host}/{name}")
-            except Exception:  # a host without this sitemap flavor, not an error
-                logger.info("https://%s/%s: not available", rule.host, name)
-                continue
-            if reply.status != 200:
-                continue
-            for url in sitemap_urls(reply.body.decode("utf-8", errors="replace")):
-                if rule_for(url, rules) and url not in seen:
-                    seen.add(url)
-                    queue.append((url, None))
+        if rule.host not in sitemap_hosts:
+            sitemap_hosts.add(rule.host)
+            for name in ("sitemap.xml", "sitemap.php"):
+                try:
+                    throttle.wait()
+                    reply = fetcher.get(f"https://{rule.host}/{name}")
+                except Exception:  # a host without this sitemap flavor, not an error
+                    logger.info("https://%s/%s: not available", rule.host, name)
+                    continue
+                if reply.status != 200:
+                    continue
+                for url in sitemap_urls(reply.body.decode("utf-8", errors="replace")):
+                    if (
+                        rule_for(url, rules)
+                        and url not in seen
+                        and not url.lower().endswith(SKIPPED_EXTENSIONS)
+                    ):
+                        seen.add(url)
+                        queue.append((url, None))
         root = f"https://{rule.host}{rule.path_prefix}"
         if root not in seen:  # link-BFS fallback seed when sitemaps are missing
             seen.add(root)
@@ -346,6 +371,15 @@ def crawl(
         if is_pdf and len(reply.body) > MAX_ATTACHMENT_BYTES:
             logger.warning("%s: attachment over %d bytes, skipped", url, MAX_ATTACHMENT_BYTES)
             continue
+        # Extensionless office/binary URLs slip past the link filter; the
+        # content type is the second net (application/xhtml+xml stays in).
+        if (
+            not is_pdf
+            and reply.content_type.startswith("application/")
+            and "html" not in reply.content_type
+        ):
+            logger.info("%s: unsupported content type %s, skipped", url, reply.content_type)
+            continue
         name = _artifact_name(url, ".pdf" if is_pdf else ".html")
         (snapshot / name).write_bytes(reply.body)
 
@@ -354,7 +388,10 @@ def crawl(
             html = reply.body.decode("utf-8", errors="replace")
             for link, text in extract_links(url, html):
                 outlinks.append(Outlink(url=link, text=text))
-                follow = link.lower().endswith(".pdf") or rule_for(link, rules) is not None
+                lowered = link.lower()
+                follow = not lowered.endswith(SKIPPED_EXTENSIONS) and (
+                    lowered.endswith(".pdf") or rule_for(link, rules) is not None
+                )
                 if follow and link not in seen:
                     seen.add(link)
                     queue.append((link, url))
@@ -395,10 +432,17 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True, help="webcorpus root directory")
     parser.add_argument("--max-pages", type=int, default=DEFAULT_MAX_PAGES)
+    parser.add_argument(
+        "--sections",
+        default=None,
+        help="comma-separated subset of the scope table (default: all sections); "
+        "lets a follow-up run spend the page cap on new sections only",
+    )
     args = parser.parse_args(argv)
 
     configure_cli_logging()
-    snapshot = crawl(HttpxFetcher(), args.out, max_pages=args.max_pages)
+    rules = rules_for_sections(args.sections.split(",")) if args.sections else DEFAULT_SCOPE
+    snapshot = crawl(HttpxFetcher(), args.out, rules=rules, max_pages=args.max_pages)
     print(f"snapshot: {snapshot}")
 
 

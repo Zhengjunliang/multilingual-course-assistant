@@ -4,18 +4,19 @@
 
 本文件大部分内容 🔜 M2.5a/b——描述已定案、待实现的设计；实现落地时逐节翻 ✅ 并补实测。
 
-## Scope 规则表 🔜 M2.5a
+## Scope 规则表
 
-种子爬取用**确定性规则表**（不锁 unifi.it 域——LLM 语义相关性判定只作用于自增长写入，分层理由：500 页逐页过 LLM 不经济）：
+种子爬取用**确定性规则表**（不锁 unifi.it 域——LLM 语义相关性判定只作用于自增长写入，分层理由：500 页逐页过 LLM 不经济）。✅ 实现于 `rag/crawl.py` 的 `DEFAULT_SCOPE`；每行的 path_prefix 必须是真实页面（兼作 link-BFS 种子）：
 
 | 板块（section slug） | 规则 | 状态 |
 | --- | --- | --- |
-| `ingegneria` | `ingegneria.unifi.it/*`（sitemap.php + link-BFS） | 🔜 M2.5a 首爬 |
-| `international` | `www.unifi.it` 下 international/Erasmus 路径 | 🔜 M2.5a 首爬 |
-| `servizi` | `www.unifi.it` 核心服务页（报名、学费、日历） | 🔜 M2.5a 首爬 |
+| `ingegneria` | `ingegneria.unifi.it/*`（sitemap.php + link-BFS） | ✅ 首爬 2026-08-22：497 页 + 127 PDF（`data/webcorpus/crawl-20260822-143647`），撞 500 页顶时队列剩 940 |
+| `servizi` | `www.unifi.it/it/studia-con-noi*`（报名、学费、segreterie） | 🔜 补爬（`--sections` 定向） |
+| `mobilita` | `www.unifi.it/it/ateneo/nel-mondo*`（Erasmus 与国际流动） | 🔜 补爬（`--sections` 定向） |
+| `international` | `www.unifi.it/en/*`（英文版，国际学生入口） | 🔜 补爬（`--sections` 定向） |
 | 校外学生刚需域（DSU Toscana、CISIA 等） | 显式条目按需加 | 🔜 查询缺口驱动 |
 
-硬底线（全部路径共用）：robots 遵守 · 1 req/s · `--max-pages` 500 硬顶 · UA 表明论文用途 · PDF 附件 ≤20MB · 只读。
+硬底线（全部路径共用）：robots 遵守 · 1 req/s · `--max-pages` 500 硬顶 · UA 表明论文用途 · PDF 附件 ≤20MB · 只读。附件只收 PDF：Office 后缀（`.doc(x)` `.xls(x)` `.ppt(x)` `.rtf` …）不跟进——首爬实测 46 个全是空白申请表模板，无问答价值；出链图仍记录这些链接。`--sections` 取规则表子集，补爬时把页数配额留给新板块（首爬 ingegneria 一家即打满 500 页）。
 
 ## 快照与 registry 布局 🔜 M2.5a
 

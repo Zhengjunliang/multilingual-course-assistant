@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from rag.crawl import (
+    DEFAULT_SCOPE,
     Outlink,
     RegistryEntry,
     Response,
@@ -19,6 +20,7 @@ from rag.crawl import (
     latest_by_url,
     read_registry,
     rule_for,
+    rules_for_sections,
     sitemap_urls,
 )
 
@@ -32,6 +34,8 @@ SITEMAP = """<?xml version="1.0"?>
 LAUREARSI = """<html><body>
 <a href="/vp-1-home.html">Home</a>
 <a href="modulo_tesi.pdf">Modulo richiesta tesi</a>
+<a href="/upload/Lista%20accordi.xlsx">Lista accordi</a>
+<a href="/upload/domanda_semp.rtf">Domanda SEMP</a>
 <a href="https://elsewhere.example.org/out.html">Fuori scope</a>
 <a href="#section">Anchor only</a>
 </body></html>"""
@@ -141,6 +145,42 @@ def test_oversized_attachment_is_skipped(tmp_path: Path) -> None:
     snapshot = crawl(fetcher, tmp_path, rules=RULES, throttle=instant())
     manifest = json.loads((snapshot / "manifest.json").read_text(encoding="utf-8"))
     assert all(entry["url"] != url for entry in manifest["pages"])
+
+
+def test_office_links_are_recorded_as_outlinks_but_never_fetched(tmp_path: Path) -> None:
+    fetcher = StubFetcher(site())
+    snapshot = crawl(fetcher, tmp_path, rules=RULES, throttle=instant())
+    assert all(not url.lower().endswith((".xlsx", ".rtf")) for url in fetcher.requested)
+    manifest = json.loads((snapshot / "manifest.json").read_text(encoding="utf-8"))
+    page_entry = latest_by_url(read_registry(tmp_path / "registry.jsonl"))[
+        "https://ingegneria.unifi.it/vp-185-per-laurearsi.html"
+    ]
+    outlink_urls = {outlink.url for outlink in page_entry.outlinks}
+    assert "https://ingegneria.unifi.it/upload/Lista%20accordi.xlsx" in outlink_urls
+    assert all(not entry["url"].endswith(".xlsx") for entry in manifest["pages"])
+
+
+def test_extensionless_binary_content_type_is_skipped(tmp_path: Path) -> None:
+    pages = site()
+    base = "https://ingegneria.unifi.it"
+    url = f"{base}/download?id=42"
+    pages[f"{base}/vp-1-home.html"] = page(
+        f"{base}/vp-1-home.html", b'<html><a href="/download?id=42">Modulo</a></html>'
+    )
+    pages[url] = page(url, b"PK\x03\x04 fake xlsx", "application/vnd.ms-excel")
+    fetcher = StubFetcher(pages)
+    snapshot = crawl(fetcher, tmp_path, rules=RULES, throttle=instant())
+    manifest = json.loads((snapshot / "manifest.json").read_text(encoding="utf-8"))
+    assert url in fetcher.requested  # no extension to filter on, so it was fetched...
+    assert all(entry["url"] != url for entry in manifest["pages"])  # ...but never stored
+
+
+def test_rules_for_sections_subsets_the_table_and_rejects_typos() -> None:
+    subset = rules_for_sections(["servizi", "international"])
+    assert {rule.section for rule in subset} == {"servizi", "international"}
+    assert rules_for_sections([rule.section for rule in DEFAULT_SCOPE]) == DEFAULT_SCOPE
+    with pytest.raises(ValueError, match="ingegneira"):
+        rules_for_sections(["ingegneira"])
 
 
 def test_registry_reader_skips_corrupt_lines(
