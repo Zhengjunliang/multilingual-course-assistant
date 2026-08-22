@@ -22,12 +22,12 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 
 **M2.5a — 契约 + 爬取 + 第二 collection + 多库检索**
 
-- [ ] 契约终态一次到位：`Chunk`/`ParsedMeta` 加 web 溯源字段（`kind` · `url` · `referrer_url` · `fetch_date` · `section` · `ingest_run_id` · `ingest_source` · `trigger` · `content_hash`，全可空/带默认；`ParsedMeta` 另加 `lang`）；`GoldQuestion` 加 `urls`；`Locale` 放宽 BCP-47 + 中文检测接上；`rag/llm.py` 抽出（Completer Protocol + pydantic JSON 助手）；建 `docs/fonte-web-unifi.md`（scope 规则表、快照/registry 布局、深化循环状态机；chunk 字段表属主仍是 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)）
-- [ ] `rag/crawl.py`：ScopeRule 规则表 + robots + sitemap（xml/php、link-BFS 兜底）+ 1 req/s + `--max-pages` 500 硬顶 + 页面直链 PDF 附件下载（≤20MB，记 `referrer_url`）；产物 = 不可变快照 manifest + 全局 registry（append-only：url · content_hash · fetch_date · ingest_run_id · ingest_source · trigger · outlinks——出链图/增量判定/回滚账本三合一）
-- [ ] `rag/webparse.py`：DOM 预剪（bs4）+ Docling HTML backend + sidecar 透传；入库用 **(url, ingest_source) 限定删除后 upsert**（crawl 与 live 版本互不覆盖）进 `unifi_web`
-- [ ] 真实爬取（用户执行）：≥3 种子板块 · ≥100 页 · count ≥ 页数
-- [ ] `rag/search.py` 多 collection 合并检索（合并池统一 rerank；`ingest_source` filter 只进 `unifi_web` 的 prefetch 分支）；`rag/answer.py` web 引用 marker `[<url> · <fetch_date>]`；**slides 非回归门**：gold 恒单库 38/40 且 MISS 仍为 q018/q028
-- [ ] 校园冒烟 gold set：`rag/golddraft.py` 分层起草 30–45 题（EN/IT/ZH），用户按 URL 核验晋级 `gold/campus.jsonl`；autogrow 组（≥5 题未收录，含 ≥1 题答案在 modulo PDF）单列 `gold/campus-autogrow.jsonl`；验收 campus hit@5 **EN/IT ≥ 0.80**（ZH 单独报告，阈值 M3 依数据定）
+- [x] 契约终态一次到位：`Chunk`/`ParsedMeta` 加 web 溯源字段（`kind` · `url` · `referrer_url` · `fetch_date` · `section` · `ingest_run_id` · `ingest_source` · `trigger` · `content_hash`，全可空/带默认；`ParsedMeta` 另加 `lang`）；`GoldQuestion` 加 `urls`；`Locale` 放宽 BCP-47 + 中文检测接上；`rag/llm.py` 抽出（Completer Protocol + pydantic JSON 助手）；建 `docs/fonte-web-unifi.md`（scope 规则表、快照/registry 布局、深化循环状态机；chunk 字段表属主仍是 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)）
+- [x] `rag/crawl.py`：ScopeRule 规则表 + robots + sitemap（xml/php、link-BFS 兜底）+ 1 req/s + `--max-pages` 500 硬顶 + 页面直链 PDF 附件下载（≤20MB，记 `referrer_url`）；产物 = 不可变快照 manifest + 全局 registry（append-only：url · content_hash · fetch_date · ingest_run_id · ingest_source · trigger · outlinks——出链图/增量判定/回滚账本三合一）
+- [x] `rag/webparse.py`：DOM 预剪（bs4）+ Docling HTML backend + sidecar 透传；入库用 **(url, ingest_source) 限定删除后 upsert**（crawl 与 live 版本互不覆盖）进 `unifi_web`
+- [x] 真实爬取（用户执行）：≥3 种子板块 · ≥100 页 · count ≥ 页数
+- [x] `rag/search.py` 多 collection 合并检索（合并池统一 rerank；`ingest_source` filter 只进 `unifi_web` 的 prefetch 分支）；`rag/answer.py` web 引用 marker `[<url> · <fetch_date>]`；**slides 非回归门**：gold 恒单库 38/40 且 MISS 仍为 q018/q028
+- [x] 校园冒烟 gold set：`rag/golddraft.py` 分层起草 30–45 题（EN/IT/ZH），用户按 URL 核验晋级 `gold/campus.jsonl`；autogrow 组（≥5 题未收录，含 ≥1 题答案在 modulo PDF）单列 `gold/campus-autogrow.jsonl`；验收 campus hit@5 **EN/IT ≥ 0.80**（ZH 单独报告，阈值 M3 依数据定）
 
 **M2.5b — 路由器 + 自增长实时层**
 

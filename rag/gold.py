@@ -109,6 +109,7 @@ def main(argv: list[str] | None = None) -> None:
     client = open_client(args.qdrant_path)
 
     scored = 0
+    per_locale: dict[str, list[bool]] = {}
     for question in questions:
         # `target` names the collection to score against (gold/README.md):
         # slides questions stay single-collection slides, campus questions
@@ -125,6 +126,7 @@ def main(argv: list[str] | None = None) -> None:
         )
         hit = is_hit(question, hits)
         scored += hit
+        per_locale.setdefault(question.locale, []).append(hit)
         top = hits[0].chunk if hits else None
         want = ", ".join(question.urls) or f"{question.source_file} p.{question.page}"
         if top is None:
@@ -139,6 +141,15 @@ def main(argv: list[str] | None = None) -> None:
     total = len(questions)
     rate = scored / total if total else 0.0
     print(f"hit@{args.top_k}: {scored}/{total} ({rate:.0%})")
+    # Per-locale rates carry the campus gate (EN/IT thresholded, ZH reported
+    # without one — docs/fonte-web-unifi.md); printed only when locales mix.
+    if len(per_locale) > 1:
+        for locale in sorted(per_locale):
+            outcomes = per_locale[locale]
+            print(
+                f"hit@{args.top_k} [{locale}]: {sum(outcomes)}/{len(outcomes)} "
+                f"({sum(outcomes) / len(outcomes):.0%})"
+            )
 
 
 if __name__ == "__main__":
