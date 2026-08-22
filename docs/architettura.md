@@ -38,8 +38,8 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 
 | 决策       | 选择                                                                                                          | 状态 | 验证条件                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | ---- | ------------------------- |
-| RAG 路线   | 自建 pipeline：Docling → chunk → hybrid 检索 → rerank → Qwen3；Qwen-Agent/纯 BM25 做对照基线（分析见 [analisi-rag.md](analisi-rag.md)）；不用 LlamaIndex/LangGraph 全家桶（可解释性优先） | 🔶   | M2 端到端跑通             |
-| 向量库     | Qdrant：原生 hybrid（dense Qwen3-Embedding + sparse fastembed BM25 + RRF）、locale/课程 payload 过滤（fusion 下必须放 prefetch 分支内，实测顶层 filter 被静默忽略）；M2 用 qdrant-client 本地模式（无服务器进程，[rag/index.py](../rag/index.py)、[rag/search.py](../rag/search.py)），M5 起 Docker；降级备选 pgvector | ✅   | 4 deck 样本实测，gold 冒烟 hit@5 2/2 |
+| RAG 路线   | 自建 pipeline：Docling → chunk → hybrid 检索 → rerank → Qwen3；Qwen-Agent/纯 BM25 做对照基线（分析见 [analisi-rag.md](analisi-rag.md)）；不用 LlamaIndex/LangGraph 全家桶（可解释性优先） | ✅   | M2 端到端跑通：gold 40 题 hit@5 95%（[diario-sperimentale.md](diario-sperimentale.md)） |
+| 向量库     | Qdrant：原生 hybrid（dense Qwen3-Embedding + sparse fastembed BM25 + RRF）、locale/课程 payload 过滤（fusion 下必须放 prefetch 分支内，实测顶层 filter 被静默忽略）；M2 用 qdrant-client 本地模式（无服务器进程，[rag/index.py](../rag/index.py)、[rag/search.py](../rag/search.py)），M5 起 Docker；降级备选 pgvector | ✅   | 31 deck 全量（1234 chunk），gold 40 题 hit@5 38/40 |
 | 数据库     | M2 原型无 DB（文件 + Qdrant 本地）；M5 起 PostgreSQL（Docker）                                                 | 🔶   | M5                        |
 | 推理服务   | OpenAI 兼容端点是唯一契约：开发期本地 Ollama（Qwen3-4B q4），M3 正式实验 vLLM（MICC 服务器，流式；Turing 卡**无 bfloat16**，一律 fp16）—— 切换只改 `.env` 的 `LLM_BASE_URL`/`LLM_MODEL` | 🔶   | M3 模型尺寸对比           |
 | 校园信息源 | UniFi 网站第二知识源：爬取+索引为骨架（复用 ingest 管线，Qdrant `unifi_web` collection），实时抓取为增量层；发现 = sitemap + 范围规则，种子板块 ≤500 页起步，查询缺口驱动扩张；HTML 解析走 Docling HTML backend | 🔶   | M2.5 campus gold 跑分     |
@@ -77,11 +77,11 @@ ruff（lint + format）· pyright（`rag/` strict）· pytest + pytest-django + 
 
 ## 算力策略：分层（开发本地 · 实验服务器）
 
-分界线按**用途**（2026-08-21 拍板本地优先）：**正式实验**（M3 尺寸网格、评估跑分）在 MICC 服务器 vLLM；**开发循环**全本地，含生成 —— Ollama + Qwen3-4B q4 约 2.6 GB，与 embedding/reranker（0.6B fp16 各约 1.2 GB）共存约 5 GB，8 GB 装得下；8B 级笔记本仍塞不下，只在服务器。ingest 阶段那几个小模型本就本地 —— 2026-08-02 修正，笔记本装 CUDA 版 torch（`pyproject.toml` 的 `pytorch-cu126` index，`sys_platform == 'win32'` 限定，Linux CI 不受影响），让 Docling 的 layout / TableFormer / CodeFormulaV2 / granite-docling-258M（fp16 约 0.5 GB）走本地 GPU。**收益有限但真实**：VLM 从 CPU 上 > 56s/页降到 33s/页（只快 1.7 倍 —— 逐 token 解码是延迟受限，不是算力受限），足以在本地跑完那次否决了 VLM 的对照实验，也为 M3 的 Qwen2.5-VL 图片描述留出本地试错空间。全量解析与需要吞吐的 VLM/图片描述仍上服务器（vLLM 后端）。实测见 [docling-e-pipeline.md](docling-e-pipeline.md)。relatore 邮件说的 "2080Ti 机器" 即 Dream Machines 本身（每台 2× 2080 Ti）。
+分界线按**用途**（2026-08-21 拍板本地优先）：**正式实验**（M3 尺寸网格、评估跑分）在 MICC 服务器 vLLM；**开发循环**全本地，含生成 —— Ollama + Qwen3-4B q4 约 2.6 GB，与 embedding/reranker（0.6B 各约 1.2 GB）共存 —— 实测生成时峰值 7761/8188 MiB（[diario-sperimentale.md](diario-sperimentale.md)），成立但贴限，题间须卸载 Ollama 模型（`ollama stop` 或服务端 `OLLAMA_KEEP_ALIVE=0`）；8B 级笔记本塞不下，只在服务器。ingest 阶段那几个小模型本就本地 —— 2026-08-02 修正，笔记本装 CUDA 版 torch（`pyproject.toml` 的 `pytorch-cu126` index，`sys_platform == 'win32'` 限定，Linux CI 不受影响），让 Docling 的 layout / TableFormer / CodeFormulaV2 / granite-docling-258M（fp16 约 0.5 GB）走本地 GPU。**收益有限但真实**：VLM 从 CPU 上 > 56s/页降到 33s/页（只快 1.7 倍 —— 逐 token 解码是延迟受限，不是算力受限），足以在本地跑完那次否决了 VLM 的对照实验，也为 M3 的 Qwen2.5-VL 图片描述留出本地试错空间。全量解析与需要吞吐的 VLM/图片描述仍上服务器（vLLM 后端）。实测见 [docling-e-pipeline.md](docling-e-pipeline.md)。relatore 邮件说的 "2080Ti 机器" 即 Dream Machines 本身（每台 2× 2080 Ti）。
 
 Colab ⛔ 不用：MICC 接入已完成，6 台 Dream Machines + ultron 可挑空闲机器，显存和常驻能力都优于免费 T4；Colab 的会话超时、每次重装依赖、模型权重反复下载只会拖慢迭代，且论文实验需要可复现的固定环境。Runpod / Lightning 仅作 MICC 长期不可用时的付费兜底，不进日常流程。
 
-日常开发循环（**代码与数据都不需要同步到服务器**，2026-08-04 落实，2026-08-21 生成也本地化）：embedding（Qwen3-Embedding-0.6B）与 reranker（Qwen3-Reranker-0.6B）在笔记本 GPU 本地跑（fp16 各约 1.2 GB），Qdrant 用本地嵌入式模式（`data/qdrant/`，无服务进程）—— 索引与检索**完全离线**；生成走本地 Ollama（Qwen3-4B q4，OpenAI 兼容端点），代码里只配 base_url（`config/env.py` 的 `LLM_BASE_URL`）；M3 正式实验把它指向服务器 vLLM 的 SSH 隧道（`ssh -L 8000:localhost:8000 <server>`，tmux 常驻，发过去的是 prompt —— 问题 + 检索出的 chunk 文本，不是文件）。单测/CI mock 掉 LLM client，零网络零 GPU。只有正式实验（M3 评估、尺寸对比）才在服务器上 `git pull` 执行。
+日常开发循环（**代码与数据都不需要同步到服务器**，2026-08-04 落实，2026-08-21 生成也本地化）：embedding（Qwen3-Embedding-0.6B）与 reranker（Qwen3-Reranker-0.6B）在笔记本 GPU 本地跑（dense bf16、reranker fp16，各约 1.2 GB），Qdrant 用本地嵌入式模式（`data/qdrant/`，无服务进程）—— 索引与检索**完全离线**；生成走本地 Ollama（Qwen3-4B q4，OpenAI 兼容端点），代码里只配 base_url（`config/env.py` 的 `LLM_BASE_URL`）；M3 正式实验把它指向服务器 vLLM 的 SSH 隧道（`ssh -L 8000:localhost:8000 <server>`，tmux 常驻，发过去的是 prompt —— 问题 + 检索出的 chunk 文本，不是文件）。单测/CI mock 掉 LLM client，零网络零 GPU。只有正式实验（M3 评估、尺寸对比）才在服务器上 `git pull` 执行。
 
 ## 硬件拓扑
 

@@ -14,25 +14,23 @@
 
 2026-07-31 决定**不做一次性最小实验**：Docling 的解析质量（重音字符、公式、表格、多栏阅读顺序）与 Qwen3 推理直接在 M2 的真实 ingest 管线里验证 —— 同样的投入产出论文可引用的证据，而不是用完即弃的脚本。
 
-### M2 — 单语言 RAG 原型
+### M2 — 单语言 RAG 原型 ✅
 
-英语材料 + 英语提问（EN→EN），CLI 级别，不做 web。
+英语材料 + 英语提问（EN→EN），CLI 级别，不做 web。全部清单项完成（勾选如下），实测汇总见 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。
 
 语料 2026-07-31 实测（31 份 PPM slides，约 1200 页）：**英语为主，~23 份英语、~8 份意大利语或英意混排**，全部有文字层（无扫描件）。原计划的 IT→IT 因此不成立 —— 单语基线改用占语料 3/4 的英语，relatore 要求的「先同语言再跨语言」递进保持不变。语料事实与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ✅ 交付物：项目初始化（uv + Python 3.12 · 工程化链 · Django 骨架）—— [pyproject.toml](pyproject.toml) · [.pre-commit-config.yaml](.pre-commit-config.yaml) · [.github/workflows/ci.yml](.github/workflows/ci.yml) · `config/` · `rag/` · `tests/`。Ingest 步骤 0-1 —— 自适应路由 [rag/probe.py](rag/probe.py) + Docling 解析 [rag/parse.py](rag/parse.py)，解析质量验收与路由实测表在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)。
 
-工作量粗估：剩余约 2–3 周。
+2026-08-21 拍板**本地优先**：生成端点默认本地 Ollama（Qwen3-4B 量化，OpenAI 兼容端点），MICC vLLM 只在 M3 正式实验使用 —— M2 收尾不再等服务器。实测数据的属主是 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。
 
-2026-08-21 拍板**本地优先**：生成端点默认本地 Ollama（Qwen3-4B 量化，OpenAI 兼容端点），MICC vLLM 只在 M3 正式实验使用 —— M2 收尾不再等服务器。
-
-- [ ] 本地装 Ollama + 拉 Qwen3-4B 量化模型（用户执行，命令见 [README.md](README.md)）
-- [ ] 全语料**本地** ingest：31 份约 1200 页 parse → chunk → index，collection 定名 `slides`（经典管线约 1 小时，含 1 份 527s OCR；取代原「服务器侧全语料解析」，抽样实测见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)）
-- [ ] 冒烟 gold set：30–50 个 EN→EN 问答对，人工撰写，每题带 `source_file` + `page` 引用。问题与页码引用可进 git（本人撰写），含课件原文片段的参考答案放 `data/gold/`（gitignore）。用途：chunk 大小 / top-k / prompt 的调参依据 —— 没有它，M2 所有调参决定都是盲做，M3 才能事后评估。M3 扩为全量 gold set
+- [x] 本地装 Ollama + 拉 Qwen3-4B 量化模型（Ollama 0.32.15 · `qwen3:4b-instruct-2507-q4_K_M`，命令见 [README.md](README.md)）
+- [x] 全语料**本地** ingest：31 份约 1200 页 parse → chunk → index，collection 定名 `slides`（实测 ~15 分钟 · 1234 chunks，路由分布 classic 26 / formula 4 / OCR 1）
+- [x] 冒烟 gold set：40 题 EN→EN（LLM 起草 + 人工按来源核验，[gold/smoke.jsonl](gold/smoke.jsonl)）+ 5 题防泄漏对照组（[gold/control.jsonl](gold/control.jsonl)）；参考答案在 `data/gold/answers/`（gitignore）。M3 扩为全量 gold set
 - [x] Ingest 步骤 2 — chunking：HybridChunker + 与 Qwen3-Embedding 对齐的 tokenizer（[rag/chunk.py](rag/chunk.py)），chunk payload 字段定义在 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)
 - [x] Hybrid 检索：Qdrant 本地模式（dense Qwen3-Embedding-0.6B + sparse fastembed BM25 + RRF）+ Qwen3-Reranker-0.6B，小模型全部本地跑 —— [rag/index.py](rag/index.py) · [rag/search.py](rag/search.py)
-- [~] Qwen3 生成回答：[rag/answer.py](rag/answer.py) 代码与测试就绪（检索 → 带引用 prompt → OpenAI 兼容端点，流式）；缺配置更名 `llm_*`（默认 Ollama）后的实测
-- [~] 用真实课程材料端到端跑通，冒烟 gold set 上报告检索命中率：检索侧已通 —— 4 deck 样本索引后 gold 冒烟 hit@5 = 2/2（[rag/gold.py](rag/gold.py)，题量待用户补到 30-50）；生成侧待 Ollama 实测
+- [x] Qwen3 生成回答：[rag/answer.py](rag/answer.py) 经本地 Ollama 实测 —— groundedness、IT 语言跟随、语料外拒答通过；4B 量化的引用 marker 忠实度问题与显存峰值 7761 MiB 记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)
+- [x] 用真实课程材料端到端跑通：全量索引上 `just gold` **hit@5 = 38/40（95%）**，对照组 5/5（无泄漏虚高迹象）
 
 ### M2.5 — 校园信息源 + agentic 编排 🔜
 
@@ -111,7 +109,6 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 | 阻塞                                                | 谁解锁              |
 | --------------------------------------------------- | ------------------- |
 | 毕业 session / 截止日期                             | 用户 + relatore     |
-| Ollama 安装与模型拉取（M2 生成实测、M2.5 路由器）   | 用户                |
 
 ## 暂缓项
 

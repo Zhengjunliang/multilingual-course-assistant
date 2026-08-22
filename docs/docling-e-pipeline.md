@@ -2,7 +2,7 @@
 
 面向开发的概念梳理 + ingest 进度。决策结论不在这里（属主是 [architettura.md](architettura.md)），路线对比不在这里（属主是 [analisi-rag.md](analisi-rag.md)）。本文回答：**每个环节在干什么、为什么需要它、本项目怎么落、进度在哪。**
 
-进度一览：步骤 0 探测 ✅（[rag/probe.py](../rag/probe.py)）· 步骤 1 解析 ✅（[rag/parse.py](../rag/parse.py)）· 步骤 2 chunking ✅（[rag/chunk.py](../rag/chunk.py)）· 索引 ✅（[rag/index.py](../rag/index.py)）· hybrid 检索 + rerank ✅（[rag/search.py](../rag/search.py)）· 生成 🔶（[rag/answer.py](../rag/answer.py) 代码与测试就绪，实测待本地 Ollama；服务器 vLLM 只在 M3 正式实验）。
+进度一览：步骤 0 探测 ✅（[rag/probe.py](../rag/probe.py)）· 步骤 1 解析 ✅（[rag/parse.py](../rag/parse.py)）· 步骤 2 chunking ✅（[rag/chunk.py](../rag/chunk.py)）· 索引 ✅（[rag/index.py](../rag/index.py)）· hybrid 检索 + rerank ✅（[rag/search.py](../rag/search.py)）· 生成 ✅（[rag/answer.py](../rag/answer.py) 经本地 Ollama 实测，记录见 [diario-sperimentale.md](diario-sperimentale.md)；服务器 vLLM 只在 M3 正式实验）。
 
 ## 1. 全景：RAG 是两条 pipeline，不是一条
 
