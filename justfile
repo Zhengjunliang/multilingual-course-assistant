@@ -74,3 +74,7 @@ crawl *args:
 # Parse a crawl snapshot (HTML + PDF attachments) into chunkable artifact pairs.
 webparse snapshot *args:
     uv run python -m rag.webparse "{{ snapshot }}" {{ args }}
+
+# Fetch one URL live, gate it and (if relevant) grow the shared index; also --rollback / --measure-gate.
+live *args:
+    uv run python -m rag.live {{ args }}

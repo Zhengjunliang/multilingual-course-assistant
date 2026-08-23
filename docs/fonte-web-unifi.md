@@ -65,7 +65,7 @@ stateDiagram-v2
     Refuse --> [*]
 ```
 
-硬上限与预算（全部代码常量，非约定）：≤3 步/题 · 单步墙钟 60s（超时按「没拿到」继续）· live 解析走 CPU + classic 禁 OCR + 页数 ≤40 · live 的 dense encode 走 CPU（独立实例，懒加载一次/进程，首次加载单独计时不占步预算）· LLM 段间卸载（`OLLAMA_KEEP_ALIVE=0` + 控制流内卸载点）。降级开关 `--no-deepen`：只抓目标页 + 直链 PDF，不跳链接。
+硬上限与预算（全部代码常量，非约定）：≤3 步/题 · 单步墙钟 60s（超时按「没拿到」继续）· **PDF 解析步独立预算 120s**（`rag/live.py` `PDF_PARSE_TIMEOUT_SECONDS`；实测语料最大 PDF 18.4MB 走 CPU classic 40 页顶需 66–69s，压在 60s 步钟内会把恰恰最值得抓的长文档全部判成 PARTIAL_SUCCESS 不可入库）· live 解析走 CPU + classic 禁 OCR + 页数 ≤40 · live 的 dense encode 走 CPU（独立实例，懒加载一次/进程，首次加载单独计时不占步预算）· LLM 段间卸载（`OLLAMA_KEEP_ALIVE=0` + 控制流内卸载点）。降级开关 `--no-deepen`：只抓目标页 + 直链 PDF，不跳链接。
 
 逐题决策日志（M3 错误分类法原料）schema：`run_id · question_id · step · candidates[] · choice · reason · outcome`。
 

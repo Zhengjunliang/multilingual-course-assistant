@@ -40,15 +40,17 @@ logger = logging.getLogger(__name__)
 DEFAULT_OUT_ROOT = Path(__file__).resolve().parent.parent / "data" / "webparsed"
 
 # Structural noise stripped before conversion: navigation, chrome and code the
-# retrieval index must never surface as content.
-_PRUNE_TAGS = ("script", "style", "nav", "header", "footer", "aside", "form", "noscript")
+# retrieval index must never surface as content. Shared with the relevance
+# gate's stdlib text sampler (`rag.live`), so the gate judges a page by the same
+# content the index would keep.
+PRUNE_TAGS = ("script", "style", "nav", "header", "footer", "aside", "form", "noscript")
 
 
 def prune_html(html: str) -> str:
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(html, "html.parser")
-    for tag_name in _PRUNE_TAGS:
+    for tag_name in PRUNE_TAGS:
         for tag in soup.find_all(tag_name):
             tag.decompose()
     return str(soup)

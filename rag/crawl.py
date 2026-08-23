@@ -155,6 +155,24 @@ class HttpxFetcher:
         )
 
 
+def is_pdf(url: str, content_type: str) -> bool:
+    """PDF by declared type or by extension: an extensionless download URL and
+    a server that types everything `application/octet-stream` each need the
+    other half. Shared with the live ingest path, which routes on the same
+    judgment."""
+    return "pdf" in content_type or url.lower().endswith(".pdf")
+
+
+def supported_content(url: str, content_type: str) -> bool:
+    """The second net after the link filter: extensionless office/binary URLs
+    slip past it, and the content type is what stops them
+    (`application/xhtml+xml` stays in). Shared with the live ingest path — a
+    student can paste the same kind of URL the crawler stumbles on."""
+    if is_pdf(url, content_type):
+        return True
+    return not (content_type.startswith("application/") and "html" not in content_type)
+
+
 def rule_for(url: str, rules: Sequence[ScopeRule]) -> ScopeRule | None:
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https"):
@@ -290,7 +308,10 @@ def latest_by_url(entries: Iterable[RegistryEntry]) -> dict[str, RegistryEntry]:
     return latest
 
 
-def _artifact_name(url: str, suffix: str) -> str:
+def artifact_name(url: str, suffix: str) -> str:
+    """Stable per-URL artifact stem: URL paths across a site collide on
+    basenames (`index.html` everywhere), hashes never do. Shared with the live
+    ingest path so the same URL keeps one identity whichever way it arrived."""
     return hashlib.sha256(url.encode("utf-8")).hexdigest()[:16] + suffix
 
 
@@ -367,24 +388,18 @@ def crawl(
             continue
         fetched += 1
 
-        is_pdf = "pdf" in reply.content_type or url.lower().endswith(".pdf")
-        if is_pdf and len(reply.body) > MAX_ATTACHMENT_BYTES:
+        pdf = is_pdf(url, reply.content_type)
+        if pdf and len(reply.body) > MAX_ATTACHMENT_BYTES:
             logger.warning("%s: attachment over %d bytes, skipped", url, MAX_ATTACHMENT_BYTES)
             continue
-        # Extensionless office/binary URLs slip past the link filter; the
-        # content type is the second net (application/xhtml+xml stays in).
-        if (
-            not is_pdf
-            and reply.content_type.startswith("application/")
-            and "html" not in reply.content_type
-        ):
+        if not supported_content(url, reply.content_type):
             logger.info("%s: unsupported content type %s, skipped", url, reply.content_type)
             continue
-        name = _artifact_name(url, ".pdf" if is_pdf else ".html")
+        name = artifact_name(url, ".pdf" if pdf else ".html")
         (snapshot / name).write_bytes(reply.body)
 
         outlinks: list[Outlink] = []
-        if not is_pdf:
+        if not pdf:
             html = reply.body.decode("utf-8", errors="replace")
             for link, text in extract_links(url, html):
                 outlinks.append(Outlink(url=link, text=text))
