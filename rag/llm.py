@@ -12,6 +12,11 @@ Two call shapes cover every consumer:
   malformed reply degrades into `None` instead of an exception mid-pipeline —
   every caller has a deterministic fallback (route -> both, gate -> do not
   persist).
+
+Both shapes decode greedily by default (`temperature=0.0`, optional `seed`)
+instead of inheriting the server's sampling defaults — an intentional
+reproducibility change made when the router landed (M2.5b), so a measurement
+can be repeated. Ollama's OpenAI-compatible endpoint accepts both fields.
 """
 
 from __future__ import annotations
@@ -23,6 +28,8 @@ from pydantic import BaseModel, ValidationError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
+
+    from openai import Omit
 
 logger = logging.getLogger(__name__)
 
@@ -43,17 +50,31 @@ class Completer(Protocol):
 
 
 class _OpenAIClient:
-    def __init__(self, base_url: str, api_key: str, model: str) -> None:
-        from openai import OpenAI
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        temperature: float = 0.0,
+        seed: int | None = None,
+    ) -> None:
+        from openai import OpenAI, omit
 
         self._client = OpenAI(base_url=base_url, api_key=api_key)
         self._model = model
+        self._temperature = temperature
+        # `omit` is the SDK sentinel for "leave the field out of the request":
+        # a server that does not implement `seed` can reject an explicit null
+        # where an absent field costs nothing.
+        self._seed: int | Omit = omit if seed is None else seed
 
     def stream(self, messages: Sequence[Message]) -> Iterator[str]:
         events = self._client.chat.completions.create(
             model=self._model,
             messages=cast("Any", list(messages)),  # our Message shape matches the typed dicts
             stream=True,
+            temperature=self._temperature,
+            seed=self._seed,
         )
         for event in events:
             delta = event.choices[0].delta.content
@@ -64,16 +85,30 @@ class _OpenAIClient:
         response = self._client.chat.completions.create(
             model=self._model,
             messages=cast("Any", list(messages)),
+            temperature=self._temperature,
+            seed=self._seed,
         )
         return response.choices[0].message.content or ""
 
 
-def build_streamer(base_url: str, api_key: str, model: str) -> ChatStreamer:
-    return _OpenAIClient(base_url, api_key, model)
+def build_streamer(
+    base_url: str,
+    api_key: str,
+    model: str,
+    temperature: float = 0.0,
+    seed: int | None = None,
+) -> ChatStreamer:
+    return _OpenAIClient(base_url, api_key, model, temperature, seed)
 
 
-def build_completer(base_url: str, api_key: str, model: str) -> Completer:
-    return _OpenAIClient(base_url, api_key, model)
+def build_completer(
+    base_url: str,
+    api_key: str,
+    model: str,
+    temperature: float = 0.0,
+    seed: int | None = None,
+) -> Completer:
+    return _OpenAIClient(base_url, api_key, model, temperature, seed)
 
 
 def parse_json_reply[ModelT: BaseModel](text: str, schema: type[ModelT]) -> ModelT | None:

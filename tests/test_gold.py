@@ -5,10 +5,11 @@ rate that survives an empty index without dividing by zero."""
 from pathlib import Path
 
 import pytest
+from test_agent import ScriptedCompleter
 from test_index import StubDense, StubSparse, make_chunk
 from test_search import ORM_TEXT, TASSE_TEXT, TASSE_URL, make_web_chunk
 
-from rag.gold import GoldQuestion, is_hit, load_gold, main, missing_answer_refs
+from rag.gold import GoldQuestion, is_hit, load_gold, main, missing_answer_refs, routing_report
 from rag.index import WEB_COLLECTION, ensure_collection, index_chunks, open_client
 from rag.search import Hit
 
@@ -152,3 +153,74 @@ def test_cli_scores_each_question_against_its_target_collection(
     assert "c001 HIT " in out
     assert TASSE_URL in out  # campus rows report the wanted url, not file/page
     assert "hit@5: 2/2 (100%)" in out
+
+
+def routed(target: str, reason: str = "routed") -> str:
+    return f'{{"target": "{target}", "query": "q", "fresh": false, "reason": "{reason}"}}'
+
+
+def test_routing_report_scores_exact_wide_both_and_fallback() -> None:
+    """Four numbers because one cannot separate the failure modes: `both` is a
+    wide hit and never an exact one, and a fallback is a `both` the model never
+    actually chose."""
+    campus = make_campus_question()
+    questions = [
+        make_question(),  # slides -> slides: exact and wide
+        campus,  # unifi_web -> both: wide only
+        campus.model_copy(update={"id": "c002"}),  # unifi_web -> slides: neither
+        campus.model_copy(update={"id": "c003"}),  # unparseable -> fallback both: wide only
+    ]
+    completer = ScriptedCompleter(
+        [routed("slides"), routed("both"), routed("slides"), "sorry, no JSON"]
+    )
+
+    report = routing_report(questions, completer)
+    assert [row.routed_target for row in report.rows] == ["slides", "both", "slides", "both"]
+    assert report.exact == 1
+    assert report.wide == 3
+    assert report.both == 2
+    assert report.fallback == 1
+    assert [row.id for row in report.rows if row.fallback] == ["c003"]
+
+
+def test_routing_report_short_circuits_before_the_retrieval_stack(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """`--routing` is report-only: the dense/sparse/rerank stack costs ~2.4GB of
+    VRAM that a report which never retrieves anything has no use for. Passing a
+    retrieval flag alongside it must be called out, or `--routing --no-rerank`
+    reads as a measurement of something it never touched."""
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise AssertionError("the routing report must not build the retrieval stack")
+
+    def stub_completer(
+        base_url: str, api_key: str, model: str, temperature: float = 0.0, seed: int | None = None
+    ) -> ScriptedCompleter:
+        assert (temperature, seed) == (0.0, 0)  # routing is pinned: greedy plus a fixed seed
+        return ScriptedCompleter([routed("slides"), routed("both")])
+
+    monkeypatch.setattr("rag.index.build_dense_encoder", boom)
+    monkeypatch.setattr("rag.index.build_sparse_encoder", boom)
+    monkeypatch.setattr("rag.index.open_client", boom)
+    monkeypatch.setattr("rag.gold.build_reranker", boom)
+    monkeypatch.setattr("rag.llm.build_completer", stub_completer)
+
+    gold_file = tmp_path / "routing.jsonl"
+    gold_file.write_text(
+        make_question().model_dump_json() + "\n" + make_campus_question().model_dump_json() + "\n",
+        encoding="utf-8",
+    )
+
+    main([str(gold_file), "--routing", "--no-rerank"])
+    assert "retrieval flags ignored: no_rerank" in caplog.text
+    out = capsys.readouterr().out
+    assert "q001 slides -> slides" in out
+    assert "c001 unifi_web -> both" in out
+    assert "exact-hit: 1/2 (50%)" in out
+    assert "wide-hit: 2/2 (100%)" in out
+    assert "both: 1/2 (50%)" in out
+    assert "fallback: 0/2 (0%)" in out
