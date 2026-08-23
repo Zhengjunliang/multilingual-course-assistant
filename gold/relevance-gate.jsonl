@@ -1,0 +1,20 @@
+{"url": "https://www.dsu.toscana.it/borsa-di-studio", "label": "relevant", "note": "DSU Toscana 奖学金——非 unifi 域的校园服务边界例"}
+{"url": "https://www.dsu.toscana.it/posto-alloggio", "label": "relevant", "note": "DSU 学生住宿申请"}
+{"url": "https://www.dsu.toscana.it/dove-e-cosa-mangiare", "label": "relevant", "note": "DSU 食堂与就餐点信息"}
+{"url": "https://www.dsu.toscana.it/web/ardsu/-/tariffa-agevolata-su-base-isee", "label": "relevant", "note": "按 ISEE 的餐费优惠——ISEE 边界例"}
+{"url": "https://www.cisiaonline.it/area-tematica-tolc-ingegneria/struttura-della-prova-e-syllabus/", "label": "relevant", "note": "CISIA TOLC-I 考试结构与大纲——入学考试边界例"}
+{"url": "https://testcisia.it/calendario.php?tolc=ingegneria", "label": "relevant", "note": "TOLC 工程考试日历"}
+{"url": "https://www.unifi.it/internazionalizzazione/destinazione-unifi/alloggi", "label": "relevant", "note": "unifi 官方住宿指引（主域未爬页）"}
+{"url": "https://unifi.coursecatalogue.cineca.it/", "label": "relevant", "note": "官方课程目录——cineca 域承载 unifi 内容的域外边界例"}
+{"url": "https://www.unifi.it/sites/default/files/2024-11/santa_monaca.pdf", "label": "relevant", "note": "学生旅舍信息 PDF——门须能判 PDF 内容"}
+{"url": "https://cercachi.unifi.it/cercachi-per-13.html", "label": "relevant", "note": "教师个人页——联系方式查询场景"}
+{"url": "https://www.cercoalloggio.com/it", "label": "irrelevant", "note": "商业租房平台——从 unifi 住宿页链出的商业硬负例"}
+{"url": "https://www.daad.it/it/cercare-una-borsa-di-studio/borse-di-studio-daad-italia/", "label": "irrelevant", "note": "外部机构（DAAD）奖学金——学生相关但非 UniFi 校园信息"}
+{"url": "https://www.facebook.com/UNIFIOFFICIAL", "label": "irrelevant", "note": "官方社媒账号页——无可入库正文"}
+{"url": "https://twitter.com/UNI_FIRENZE", "label": "irrelevant", "note": "官方社媒账号页——无可入库正文"}
+{"url": "https://www.youtube.com/user/UNIFIRENZE", "label": "irrelevant", "note": "视频频道页——无可解析正文"}
+{"url": "https://docs.google.com/forms/d/e/1FAIpQLSfiI7wGlsiiFGO_rMzcOLoU_4uuLHkMuuYOGC-9GV7OU1eACA/viewform", "label": "irrelevant", "note": "临时报名表单——时效性内容不入长期库"}
+{"url": "https://www.google.com/maps?q=Via+di+Santa+Marta,+3,+Firenze", "label": "irrelevant", "note": "Santa Marta 校区地图链接——语义贴近校园但无可解析正文的硬负例"}
+{"url": "http://www.google.com/", "label": "irrelevant", "note": "通用搜索引擎首页"}
+{"url": "https://www.mur.gov.it/it/atti-e-normativa/decreto-ministeriale-n-1062-del-10-08-2021", "label": "irrelevant", "note": "部委法令原文——科研管理向，非学生问答内容"}
+{"url": "https://sol.unifi.it/tesionlinestudente/engine", "label": "irrelevant", "note": "unifi 域内登录后服务引擎页——门不能见域名就放行"}
