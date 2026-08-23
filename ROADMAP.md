@@ -35,6 +35,7 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 - [ ] `rag/live.py`（唯一写模块）：实时抓取 → LLM 相关性门（JSON 二分，校验失败=不落库；20 条标注集真机验收 **≥18/20**，低于走规则表兜底并记 diario 为论文发现）→ 持久写入（`ingest_source="live"`）+ registry 溯源 + 按 `ingest_run_id` 回滚 CLI；**整轮显存预算**：解析与 encode 走 CPU · LLM 段间卸载 · 页数 ≤40 · 60s/步（真机峰值 < 8188 MiB 验收）
 - [ ] 深化循环：抓页 → 「够答？」判定（**原 self-assess 并入此停止条件**）→ 编号候选（出链 ≤10 + PDF 附件）选一 → ≤3 步硬上限；`--no-deepen` 降级开关；逐题决策日志（run_id，M3 错误分类法原料）
 - [ ] autogrow 验收：`rag/gold.py` 加 `--live {off,on}`（默认 off）；未收录题组前 0/N → 跑流程后 **≥⌈0.7N⌉**（降级触发则分数附注状态、不与正常态混比）；content_hash 变/不变 → 重索引/跳过日志；回滚后 campus 基线恒等（快照未被 live 打洞的证据）
+- [ ] eval 读侧隔离：`rag/gold.py` 加 `--ingest-source`（默认 `crawl`）+ `--snapshot <run_id>`，透传进 `search()`（ADR-1 eval 条款兑现，解锁 [docs/architettura.md](docs/architettura.md) 的 🔶 行）
 
 ### M3 — 评估（双场景）
 

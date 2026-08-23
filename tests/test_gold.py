@@ -155,6 +155,66 @@ def test_cli_scores_each_question_against_its_target_collection(
     assert "hit@5: 2/2 (100%)" in out
 
 
+def record_search_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
+    """Replace `rag.gold`'s `search` with a recorder and stub the encoders, so a
+    run reaches the call site without an index or a model behind it."""
+    calls: list[dict[str, object]] = []
+
+    def recorder(*args: object, **kwargs: object) -> list[Hit]:
+        calls.append(kwargs)
+        return []
+
+    def stub_dense(model_name: str) -> StubDense:
+        return StubDense()
+
+    def stub_sparse() -> StubSparse:
+        return StubSparse()
+
+    monkeypatch.setattr("rag.gold.search", recorder)
+    monkeypatch.setattr("rag.index.build_dense_encoder", stub_dense)
+    monkeypatch.setattr("rag.index.build_sparse_encoder", stub_sparse)
+    return calls
+
+
+def test_cli_pins_retrieval_to_the_crawl_snapshot_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Eval reads the frozen crawl snapshot unless told otherwise: a live
+    increment written between two runs must never move a gate number (ADR-1)."""
+    calls = record_search_calls(monkeypatch)
+    gold_file = tmp_path / "campus.jsonl"
+    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
+
+    main([str(gold_file), "--qdrant-path", str(tmp_path / "qdrant"), "--no-rerank"])
+    capsys.readouterr()
+    assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [("crawl", None)]
+
+
+def test_cli_forwards_snapshot_and_ingest_source_to_search(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Autogrow acceptance opens the filter explicitly, and `--snapshot` narrows
+    to one ingest run; both reach `search` unchanged."""
+    calls = record_search_calls(monkeypatch)
+    gold_file = tmp_path / "campus.jsonl"
+    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
+
+    main(
+        [
+            str(gold_file),
+            "--qdrant-path",
+            str(tmp_path / "qdrant"),
+            "--no-rerank",
+            "--snapshot",
+            "run-x",
+            "--ingest-source",
+            "live",
+        ]
+    )
+    capsys.readouterr()
+    assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [("live", "run-x")]
+
+
 def routed(target: str, reason: str = "routed") -> str:
     return f'{{"target": "{target}", "query": "q", "fresh": false, "reason": "{reason}"}}'
 

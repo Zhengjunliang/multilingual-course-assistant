@@ -159,6 +159,16 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--qdrant-path", type=Path, default=DEFAULT_QDRANT_DIR)
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
+    # Eval reads the frozen crawl snapshot by default: a live increment written
+    # between two runs would otherwise move a gate number, and the gates are the
+    # thesis' regression evidence (ADR-1, docs/architettura.md).
+    parser.add_argument("--ingest-source", choices=["crawl", "live"], default="crawl")
+    parser.add_argument(
+        "--snapshot",
+        metavar="run_id",
+        default=None,
+        help="narrow web retrieval to a single ingest run",
+    )
     parser.add_argument(
         "--routing",
         action="store_true",
@@ -231,6 +241,10 @@ def main(argv: list[str] | None = None) -> None:
             reranker,
             limit=args.top_k,
             collections=(question.target,),
+            # Single passthrough, no per-collection branching: `search()` drops
+            # both web-source conditions on every non-web prefetch branch.
+            ingest_source=args.ingest_source,
+            ingest_run_id=args.snapshot,
         )
         hit = is_hit(question, hits)
         scored += hit
