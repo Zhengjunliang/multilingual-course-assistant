@@ -2,7 +2,9 @@
 file AND the right page inside the chunk's span, and the CLI must report a
 rate that survives an empty index without dividing by zero."""
 
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from test_agent import ScriptedCompleter
@@ -213,6 +215,95 @@ def test_cli_forwards_snapshot_and_ingest_source_to_search(
     )
     capsys.readouterr()
     assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [("live", "run-x")]
+
+
+@pytest.fixture
+def live_module_off_limits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Eval must not so much as look at the query-time writer while `--live` is
+    off: a gate number that grew its own evidence is not a gate number.
+
+    Three doors, because they are three different objects: an `import rag.live`
+    made during the run reads `sys.modules`, a module that already imported it
+    reaches the real one through the `rag` package attribute, and `rag.agent`
+    holds its own binding to the write entry point.
+    """
+
+    def forbid(name: str) -> object:
+        raise AssertionError(f"the --live off path reached rag.live.{name}")
+
+    class Forbidden(ModuleType):
+        def __getattr__(self, name: str) -> object:
+            return forbid(name)
+
+    forbidden = Forbidden("rag.live")
+    monkeypatch.setitem(sys.modules, "rag.live", forbidden)
+    monkeypatch.setattr("rag.live", forbidden)
+    monkeypatch.setattr("rag.agent.fetch_and_ingest", lambda *args, **kwargs: forbid("fetch"))
+
+
+def test_live_off_keeps_the_crawl_filter_and_never_touches_the_live_module(
+    live_module_off_limits: None,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The default arm of the autogrow acceptance: eval scores the frozen
+    snapshot and grows nothing, whether or not `--live off` is spelled out."""
+    calls = record_search_calls(monkeypatch)
+    gold_file = tmp_path / "campus.jsonl"
+    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
+
+    main(
+        [str(gold_file), "--qdrant-path", str(tmp_path / "qdrant"), "--no-rerank", "--live", "off"]
+    )
+    capsys.readouterr()
+    assert [call["ingest_source"] for call in calls] == ["crawl"]
+
+
+def test_live_on_opens_the_read_side_filter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """ADR-1's explicit release for the acceptance run: the condition is dropped
+    rather than pointed at "live", because a question may be answered by either
+    version of a page and the exam scores what the assistant can actually
+    retrieve. The filter still travels through `search()`'s prefetch branches —
+    a top-level filter is silently ignored under fusion."""
+    calls = record_search_calls(monkeypatch)
+    gold_file = tmp_path / "autogrow.jsonl"
+    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
+
+    main([str(gold_file), "--qdrant-path", str(tmp_path / "qdrant"), "--no-rerank", "--live", "on"])
+    capsys.readouterr()
+    assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [(None, None)]
+
+
+def test_live_on_says_which_ingest_source_it_overrode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Two flags on the same dial: silently winning would let `--live on
+    --ingest-source live` be recorded as a live-only measurement it never was."""
+    calls = record_search_calls(monkeypatch)
+    gold_file = tmp_path / "autogrow.jsonl"
+    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
+
+    main(
+        [
+            str(gold_file),
+            "--qdrant-path",
+            str(tmp_path / "qdrant"),
+            "--no-rerank",
+            "--live",
+            "on",
+            "--ingest-source",
+            "live",
+        ]
+    )
+    capsys.readouterr()
+    assert "--ingest-source live ignored" in caplog.text
+    assert [call["ingest_source"] for call in calls] == [None]
 
 
 def routed(target: str, reason: str = "routed") -> str:

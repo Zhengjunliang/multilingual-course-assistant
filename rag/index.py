@@ -212,6 +212,29 @@ def delete_web_versions(
         )
 
 
+def count_web_versions(
+    client: QdrantClient, url: str, source: str, collection: str = COLLECTION
+) -> int:
+    """How many points the index holds for one (url, ingest_source) pair.
+
+    The live incremental check asks this before believing the ledger that a page
+    is unchanged: the registry is append-only, so `delete_by_run` leaves the
+    rolled-back run's rows behind, and a matching content_hash on its own would
+    skip re-indexing a page whose points are gone.
+    """
+    from qdrant_client import models
+
+    return client.count(
+        collection,
+        count_filter=models.Filter(
+            must=[
+                models.FieldCondition(key="url", match=models.MatchValue(value=url)),
+                models.FieldCondition(key="ingest_source", match=models.MatchValue(value=source)),
+            ]
+        ),
+    ).count
+
+
 def delete_by_run(client: QdrantClient, run_id: str, collection: str = WEB_COLLECTION) -> None:
     """Roll back one live ingest run: every point it wrote, and nothing else.
 

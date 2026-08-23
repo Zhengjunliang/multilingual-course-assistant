@@ -12,7 +12,8 @@ Two branches, and both of them must be able to answer the current turn
   this URL's previous *live* version, upsert, and append one registry row
   naming the trigger and the run, so the whole run rolls back in one call
   (`delete_by_run`). The crawl snapshot version of the same URL is a different
-  (url, ingest_source) pair and is never touched (ADR-1);
+  (url, ingest_source) pair and is never touched (ADR-1). A page whose bytes
+  have not moved since its last fetch skips all of that: it is already stored;
 - the gate says no, or its reply does not validate -> ephemeral branch: parse
   and chunk exactly the same way, then return the chunks in memory and write
   nothing at all. A 4B gate misjudging a link a student pasted must cost the
@@ -70,6 +71,8 @@ from rag.crawl import (
     artifact_name,
     extract_links,
     is_pdf,
+    latest_by_url,
+    read_registry,
     rule_for,
     supported_content,
 )
@@ -81,6 +84,7 @@ from rag.index import (
     SparseEncoder,
     build_sparse_encoder,
     cached_dense_encoder,
+    count_web_versions,
     delete_by_run,
     delete_web_versions,
     ensure_collection,
@@ -215,7 +219,9 @@ class LiveResult:
     candidates, so Stage 8 never refetches to get them) and the gate's verdict.
 
     `persisted` can be False while `verdict.relevant` is True: the gate wanted
-    the page, the parse did not finish.
+    the page, the parse did not finish. It can also be True with no chunks in
+    hand: the page was already stored unchanged, so nothing was parsed and the
+    outlinks come off the ledger row instead.
     """
 
     persisted: bool
@@ -521,6 +527,26 @@ def fetch_and_ingest(
         referrer_url=referrer_url,
         section=rule.section if rule else None,
     )
+
+    # Incremental refresh, the ledger's second duty (docs/fonte-web-unifi.md):
+    # the same bytes as this URL's last fetch mean the parse and the index write
+    # would only reproduce what is already stored, and the parse is the
+    # expensive half of the step. The ledger's outlinks stand in for the ones
+    # that parse would have extracted, so the deepening loop keeps its
+    # candidates. Only the persisting branch may skip — a refused gate parses
+    # anyway, or the ephemeral turn loses its answer. The index is asked as
+    # well, because the ledger is append-only: `delete_by_run` leaves the
+    # rolled-back run's rows in place, and believing them alone would skip a
+    # page whose points are gone.
+    previous = latest_by_url(read_registry(registry_path)).get(url) if verdict.relevant else None
+    if (
+        previous is not None
+        and previous.content_hash == entry.content_hash
+        and count_web_versions(client, url, previous.ingest_source, collection)
+    ):
+        logger.info("%s: unchanged since %s, nothing re-indexed", url, previous.ingest_run_id)
+        return LiveResult(persisted=True, chunks=[], outlinks=previous.outlinks, verdict=verdict)
+
     parsed = parse_page(url, response, entry)
 
     if not verdict.relevant or not parsed.complete:
@@ -543,7 +569,13 @@ def fetch_and_ingest(
     # The outlinks ride into the ledger the way the crawler writes them: the
     # deepening loop reads its candidates from the registry's outlink graph.
     append_registry(registry_path, entry.model_copy(update={"outlinks": parsed.outlinks}))
-    logger.info("%s: %d chunks persisted under %s", url, len(parsed.chunks), run_id)
+    logger.info(
+        "%s: %s, %d chunks persisted under %s",
+        url,
+        "first fetch" if previous is None else "content changed",
+        len(parsed.chunks),
+        run_id,
+    )
     return LiveResult(
         persisted=True, chunks=parsed.chunks, outlinks=parsed.outlinks, verdict=verdict
     )

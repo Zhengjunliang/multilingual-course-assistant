@@ -81,6 +81,8 @@ HUB = "https://ingegneria.unifi.it/vp-220-diploma-supplement.html"
 ANSWER_PDF = "https://ingegneria.unifi.it/upload/sub/modulo-diploma-supplement.pdf"
 ROBOTS = "https://ingegneria.unifi.it/robots.txt"
 
+RUN_ID = "live-20260823-120000"
+
 NOTHING = LiveResult(
     persisted=False, chunks=[], outlinks=[], verdict=RelevanceVerdict(relevant=False, reason="stub")
 )
@@ -219,7 +221,7 @@ def run_loop(
         fetch=fetch,
         registry=registry,
         dense_encoder=KeywordDense,
-        run_id="live-20260823-120000",
+        run_id=RUN_ID,
         question_id="g001",
         **options,
     )
@@ -747,7 +749,7 @@ def test_a_two_hop_pdf_answer_is_reached_through_the_link_graph(
             "--question-id",
             "g001",
             "--run-id",
-            "live-20260823-120000",
+            RUN_ID,
             "--qdrant-path",
             str(qdrant_path),
             "--registry",
@@ -787,6 +789,16 @@ def test_a_two_hop_pdf_answer_is_reached_through_the_link_graph(
     stored.close()
     by_url = {str((point.payload or {})["url"]): dict(point.payload or {}) for point in points}
     assert by_url[ANSWER_PDF]["referrer_url"] == HUB
+
+    # Every hop of the turn is stamped with the run id the caller supplied, on
+    # the chunks and on the ledger alike: the autogrow acceptance runs seven
+    # questions under one id so a single `delete_by_run` rolls the whole exam
+    # back, and an id minted per fetch would leave half of it behind.
+    assert {
+        row.ingest_run_id for row in read_registry(registry) if row.ingest_source == "live"
+    } == {RUN_ID}
+    assert by_url[ANSWER_PDF]["ingest_run_id"] == RUN_ID
+    assert {row.run_id for row in rows} == {RUN_ID}
 
 
 @pytest.fixture

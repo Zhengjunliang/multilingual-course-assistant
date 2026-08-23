@@ -23,6 +23,7 @@ from rag.chunk import Chunk
 from rag.crawl import Outlink, Response, Throttle, read_registry
 from rag.index import (
     WEB_COLLECTION,
+    delete_by_run,
     delete_web_versions,
     ensure_collection,
     index_chunks,
@@ -245,6 +246,78 @@ def test_a_gated_page_persists_and_replaces_only_its_own_live_version(
     assert result.outlinks == entry.outlinks  # and this turn gets them without refetching
 
 
+def test_an_unchanged_page_is_never_re_parsed_or_written_twice(
+    web_client: QdrantClient,
+    tmp_path: Path,
+    recorded_deletes: list[tuple[list[tuple[str, str]], str]],
+    stub_chunking: None,
+) -> None:
+    """The ledger's incremental duty: identical bytes mean the stored version is
+    still the current one, so the second fetch pays for neither the parse — the
+    expensive half of the step — nor the write. The outlinks come off the ledger
+    row instead, which is what keeps the deepening loop's candidate graph intact
+    across a skip. The page is still fetched: only the bytes can say so."""
+    registry = tmp_path / "registry.jsonl"
+    fetcher = StubFetcher(site())
+    first = ingest(web_client, fetcher, RELEVANT, registry)
+    again = ingest(web_client, fetcher, RELEVANT, registry)
+
+    assert fetcher.requested.count(URL) == 2
+    assert again.persisted is True  # stored, it simply did not have to be written again
+    assert again.chunks == []
+    assert again.outlinks == first.outlinks
+    assert recorded_deletes == [([(URL, "live")], WEB_COLLECTION)]
+    assert web_client.count(WEB_COLLECTION).count == 1
+    assert len(read_registry(registry)) == 1
+
+
+def test_changed_content_replaces_the_stored_version_and_appends_a_row(
+    web_client: QdrantClient,
+    tmp_path: Path,
+    recorded_deletes: list[tuple[list[tuple[str, str]], str]],
+    stub_chunking: None,
+) -> None:
+    """The other half of the same check: a page that moved is re-parsed and
+    re-indexed, and the ledger keeps both fetches — the append-only history is
+    what tells a stale answer from a page that never changed."""
+    registry = tmp_path / "registry.jsonl"
+    ingest(web_client, StubFetcher(site()), RELEVANT, registry)
+    updated = site()
+    updated[URL] = page(URL, PAGE.replace(b"settembre", b"ottobre"))
+
+    result = ingest(web_client, StubFetcher(updated), RELEVANT, registry)
+
+    assert result.persisted is True
+    assert result.chunks
+    assert len(recorded_deletes) == 2
+    rows = read_registry(registry)
+    assert len(rows) == 2
+    assert rows[0].content_hash != rows[1].content_hash
+    # Only the new version is retrievable: the check skips writes, never cleanups.
+    assert [payload["content_hash"] for payload in payloads(web_client)] == [rows[1].content_hash]
+
+
+def test_a_rolled_back_page_is_re_indexed_although_the_ledger_says_unchanged(
+    web_client: QdrantClient, tmp_path: Path, stub_chunking: None
+) -> None:
+    """A rollback deletes points, not ledger rows — the registry is append-only.
+    So the incremental check asks the index as well: after `delete_by_run` the
+    same bytes must be indexed again, or the acceptance run that rolls the live
+    layer back before it starts would keep scoring an empty knowledge base."""
+    registry = tmp_path / "registry.jsonl"
+    fetcher = StubFetcher(site())
+    ingest(web_client, fetcher, RELEVANT, registry)
+    delete_by_run(web_client, RUN_ID, WEB_COLLECTION)
+    assert web_client.count(WEB_COLLECTION).count == 0
+
+    result = ingest(web_client, fetcher, RELEVANT, registry)
+
+    assert result.persisted is True
+    assert result.chunks  # parsed again, not skipped on the surviving ledger row
+    assert web_client.count(WEB_COLLECTION).count == 1
+    assert len(read_registry(registry)) == 2
+
+
 @pytest.mark.parametrize(
     ("reply", "reason"),
     [
@@ -347,9 +420,14 @@ def test_the_pdf_converter_is_built_once_and_reused(
     converted: list[dict[str, Any]] = []
     stub_pdf_converter(monkeypatch, built, converted, "success")
 
+    # Two attachments rather than the same one twice: an unchanged page is the
+    # incremental check's business and never reaches a converter at all.
+    other = PDF_URL.replace("modulo_tesi", "modulo_borsa")
+    pages = pdf_site()
+    pages[other] = page(other, b"%PDF-1.4 other", "application/pdf")
     registry = tmp_path / "registry.jsonl"
-    for _ in range(2):
-        ingest(web_client, StubFetcher(pdf_site()), RELEVANT, registry, url=PDF_URL)
+    for url in (PDF_URL, other):
+        ingest(web_client, StubFetcher(pages), RELEVANT, registry, url=url)
 
     assert len(built) == 1
     assert len(converted) == 2

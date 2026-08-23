@@ -12,6 +12,7 @@ all — no encoders, no reranker, no index.
     uv run python -m rag.gold gold/smoke.jsonl
     uv run python -m rag.gold gold/smoke.jsonl --no-rerank --top-k 10
     uv run python -m rag.gold gold/campus.jsonl --routing
+    uv run python -m rag.gold gold/campus-autogrow.jsonl --live on
 """
 
 from __future__ import annotations
@@ -170,6 +171,13 @@ def main(argv: list[str] | None = None) -> None:
         help="narrow web retrieval to a single ingest run",
     )
     parser.add_argument(
+        "--live",
+        choices=["off", "on"],
+        default="off",
+        help="'on' drops the web-source condition so retrieval also sees what "
+        "the autogrow run wrote; 'off' keeps eval on the crawl snapshot",
+    )
+    parser.add_argument(
         "--routing",
         action="store_true",
         help="report-only: score the router's collection choice per question, "
@@ -221,6 +229,13 @@ def main(argv: list[str] | None = None) -> None:
             print(f"{label}: {count}/{total} ({count / total if total else 0.0:.0%})")
         return
 
+    # ADR-1's explicit release: the autogrow acceptance has to see the pages the
+    # run just wrote, and the answer may sit in either version of a page, so
+    # `--live on` drops the condition rather than pointing it at "live".
+    ingest_source = None if args.live == "on" else args.ingest_source
+    if ingest_source is None and args.ingest_source != parser.get_default("ingest_source"):
+        logger.warning("--live on opens the filter; --ingest-source %s ignored", args.ingest_source)
+
     dense = build_dense_encoder(args.dense_model)
     sparse = build_sparse_encoder()
     reranker = None if args.no_rerank else build_reranker(args.rerank_model)
@@ -243,7 +258,7 @@ def main(argv: list[str] | None = None) -> None:
             collections=(question.target,),
             # Single passthrough, no per-collection branching: `search()` drops
             # both web-source conditions on every non-web prefetch branch.
-            ingest_source=args.ingest_source,
+            ingest_source=ingest_source,
             ingest_run_id=args.snapshot,
         )
         hit = is_hit(question, hits)
