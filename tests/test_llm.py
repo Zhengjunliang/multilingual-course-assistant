@@ -11,7 +11,15 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from rag.llm import Message, build_completer, build_streamer, complete_json, parse_json_reply
+from rag.live import STEP_TIMEOUT_SECONDS
+from rag.llm import (
+    DEFAULT_TIMEOUT_SECONDS,
+    Message,
+    build_completer,
+    build_streamer,
+    complete_json,
+    parse_json_reply,
+)
 
 
 class Verdict(BaseModel):
@@ -52,6 +60,25 @@ def test_complete_json_round_trips_through_the_completer() -> None:
     assert completer.messages == messages
 
 
+class HungCompleter:
+    """An endpoint that never answers: the SDK exhausts its retries and raises
+    from inside `complete()`, exactly what a downed Ollama looks like."""
+
+    def complete(self, messages: Sequence[Message]) -> str:
+        import httpx
+        from openai import APITimeoutError
+
+        raise APITimeoutError(request=httpx.Request("POST", "http://localhost:11434/v1"))
+
+
+def test_complete_json_degrades_a_dead_endpoint_to_none() -> None:
+    """A timeout that escaped as an exception would cost the whole deepening
+    turn; the callers' contract is "one step missed, not the turn", so the dead
+    endpoint must land on the same None as a malformed reply."""
+    messages: list[Message] = [{"role": "user", "content": "relevant?"}]
+    assert complete_json(HungCompleter(), messages, Verdict) is None
+
+
 class RecordingCompletions:
     """Stands in for `client.chat.completions`: records the request kwargs and
     answers in both shapes (streamed deltas / one full message)."""
@@ -75,8 +102,10 @@ def test_decoding_parameters_reach_both_call_shapes(monkeypatch: pytest.MonkeyPa
     from openai import omit
 
     completions = RecordingCompletions()
+    clients: list[float] = []
 
-    def fake_openai(base_url: str, api_key: str) -> Any:
+    def fake_openai(base_url: str, api_key: str, timeout: float) -> Any:
+        clients.append(timeout)
         return SimpleNamespace(chat=SimpleNamespace(completions=completions))
 
     monkeypatch.setattr("openai.OpenAI", fake_openai)
@@ -92,3 +121,8 @@ def test_decoding_parameters_reach_both_call_shapes(monkeypatch: pytest.MonkeyPa
     assert streamed["seed"] is omit  # unset seed is left out of the request
     assert completed["temperature"] == 0.0
     assert completed["seed"] == 42
+    # Every request is bounded: the SDK's own default is ten minutes, which
+    # would make the deepening loop's step budget fiction the moment an
+    # endpoint stops answering.
+    assert clients == [DEFAULT_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS]
+    assert DEFAULT_TIMEOUT_SECONDS < STEP_TIMEOUT_SECONDS

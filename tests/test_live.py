@@ -379,6 +379,41 @@ def test_a_timed_out_conversion_answers_this_turn_but_is_never_stored(
     assert not registry.exists()
 
 
+def test_a_half_converted_page_answers_this_turn_but_is_never_stored(
+    web_client: QdrantClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    recorded_deletes: list[tuple[list[tuple[str, str]], str]],
+    stub_chunking: None,
+) -> None:
+    """The HTML branch reads the same `ConversionStatus` as the PDF branch, and
+    for the same reason: chunks of a half-converted page would be indexed under
+    the *whole* document's content_hash, so the incremental check would see no
+    change and no later fetch would ever repair it. Assuming HTML always
+    succeeds would freeze exactly those pages."""
+    from docling.datamodel.base_models import ConversionStatus
+
+    class HalfConverter:
+        def convert(self, source: object, **kwargs: Any) -> Any:
+            return SimpleNamespace(
+                document=SimpleNamespace(texts=[]),
+                status=ConversionStatus("partial_success"),
+            )
+
+    monkeypatch.setattr("rag.live.build_html_converter", HalfConverter)
+
+    registry = tmp_path / "registry.jsonl"
+    result = ingest(web_client, StubFetcher(site()), RELEVANT, registry)
+
+    assert result.verdict.relevant is True  # the gate wanted it...
+    assert result.persisted is False  # ...the conversion did not finish
+    assert result.chunks  # still usable for this turn
+    assert result.outlinks  # and the outlink graph survives for the loop
+    assert recorded_deletes == []
+    assert web_client.count(WEB_COLLECTION).count == 0
+    assert not registry.exists()
+
+
 def test_a_parse_crash_costs_the_candidate_not_the_turn(
     web_client: QdrantClient,
     tmp_path: Path,
@@ -638,3 +673,21 @@ def test_cli_refuses_a_run_id_that_no_rollback_could_find() -> None:
     would write chunks that no rollback command can reach."""
     with pytest.raises(SystemExit):
         main([URL, "--run-id", "crawl-20260822-143647"])
+
+
+def test_importing_live_does_not_load_docling() -> None:
+    """Live imports both parse modules at module level, and docling drags torch
+    along: the converters are built behind `lru_cache` precisely so that the
+    import costs nothing until a page is actually parsed."""
+    import subprocess
+    import sys
+
+    base_dir = Path(__file__).resolve().parent.parent
+    result = subprocess.run(
+        [sys.executable, "-c", "import rag.live, sys; print('docling' in sys.modules)"],
+        cwd=base_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "False"

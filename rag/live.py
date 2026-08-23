@@ -424,7 +424,9 @@ def parse_page(url: str, response: Response, entry: RegistryEntry) -> ParsedPage
     as PARTIAL_SUCCESS with a truncated document and no exception — that is not
     a page to store, so it is reported as incomplete. A conversion that raises
     is the same answer with a warning: one encrypted or malformed PDF must cost
-    the candidate, never the turn.
+    the candidate, never the turn. Both branches judge completeness off the same
+    `ConversionStatus`: a half-converted page is no more storable than a
+    truncated attachment, and guessing `True` for HTML would freeze it.
 
     Live keeps no snapshot file, so the artifact name is the one a crawl of the
     same URL would use — same identity, no bytes on disk.
@@ -442,18 +444,17 @@ def parse_page(url: str, response: Response, entry: RegistryEntry) -> ParsedPage
 
             stream = DocumentStream(name=artifact.name, stream=BytesIO(response.body))
             result = live_pdf_converter().convert(stream, page_range=(1, LIVE_MAX_PDF_PAGES))
-            document = result.document
-            # Anything short of a clean success leaves a partial document.
-            complete = result.status == ConversionStatus.SUCCESS
-            if not complete:
-                logger.warning("%s: conversion %s, not storable", url, result.status)
             meta = meta_for(entry, artifact=artifact, variant="classic", lang=None)
         else:
             raw = response.body.decode("utf-8", errors="replace")
             outlinks = [Outlink(url=link, text=text) for link, text in extract_links(url, raw)]
-            document = convert_html(prune_html(raw), artifact.stem, live_html_converter())
-            complete = True
+            result = convert_html(prune_html(raw), artifact.stem, live_html_converter())
             meta = meta_for(entry, artifact=artifact, variant="html", lang=html_lang(raw))
+        document = result.document
+        # Anything short of a clean success leaves a partial document.
+        complete = result.status == ConversionStatus.SUCCESS
+        if not complete:
+            logger.warning("%s: conversion %s, not storable", url, result.status)
         locale = meta.lang or detect_locale("\n".join(item.text for item in document.texts))
         chunks = chunk_document(document, live_chunker(), meta, locale)
     except Exception:  # a broken document is one lost candidate, not a lost turn

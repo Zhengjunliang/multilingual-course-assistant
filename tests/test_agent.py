@@ -1,24 +1,89 @@
-"""Routing is a 4B model's decision, so what the tests pin is the contract that
-makes it safe: an unusable reply routes to `both` instead of raising, a target
-maps to real collection names, and an empty retrieval refuses with the pointer
-that lets a student grow the knowledge base. All of it runs offline on stubs —
-no endpoint, no models."""
+"""Routing is a 4B model's decision and the deepening loop spends real fetches
+on it, so what these tests pin is the contract that makes both safe: an unusable
+reply routes to `both` instead of raising, a target maps to real collection
+names, and an empty retrieval refuses with the pointer that lets a student grow
+the knowledge base.
 
-from collections.abc import Sequence
+The loop's own contract is the hard caps: never more than three fetches, a
+shortlist chosen by cosine and never by DOM order, PDF attachments on a quota of
+their own, a step over budget that moves on instead of ending the turn, and
+exhausted steps that still answer from whatever was gathered. All of it runs
+offline — stub fetcher, stub completer, stub encoders, an embedded Qdrant under
+tmp_path — and the step clock runs on a fake one."""
+
+import subprocess
+import sys
+import time
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import Literal
+from types import SimpleNamespace
+from typing import Any, Literal
 
 import pytest
 from test_answer import StubStreamer
-from test_index import StubDense, StubSparse, make_chunk
+from test_crawl import StubFetcher, page
+from test_index import StubDense, StubSparse, make_chunk, make_web_chunk
 from test_llm import StubCompleter
 from test_search import ORM_TEXT
 
-from rag.agent import RouteDecision, collections_for, main, pointer_line, route
+from rag.agent import (
+    ASSESS_FALLBACK_REASON,
+    EPHEMERAL_CHUNK_LIMIT,
+    MAX_LINK_CANDIDATES,
+    MAX_PDF_CANDIDATES,
+    PICK_FALLBACK_REASON,
+    Candidate,
+    Decision,
+    RouteDecision,
+    assess_answerable,
+    collections_for,
+    deepen,
+    main,
+    narrow_candidates,
+    pointer_line,
+    route,
+)
+from rag.chunk import Chunk
+from rag.crawl import Outlink, RegistryEntry, Throttle, append_registry, read_registry
 from rag.index import COLLECTION, WEB_COLLECTION, ensure_collection, index_chunks, open_client
-from rag.llm import Message
+from rag.live import (
+    LiveResult,
+    RelevanceVerdict,
+    live_chunker,
+    live_html_converter,
+    live_pdf_converter,
+    shared_robots,
+    shared_throttle,
+)
+from rag.llm import Completer, Message
+from rag.parse import ParsedMeta
+from rag.search import Hit
+
+Fetch = Callable[[str, str | None, Callable[[], None]], LiveResult]
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 SLIDES_REPLY = '{"target": "slides", "query": "ORM definition", "fresh": false, "reason": "course"}'
+WEB_REPLY = (
+    '{"target": "unifi_web", "query": "diploma supplement", "fresh": false, "reason": "campus"}'
+)
+
+# One reply that validates as both an assessment and a pick: pydantic ignores the
+# fields the other schema does not declare, which keeps a loop test to one canned
+# reply instead of a script that has to predict every call.
+KEEP_LOOKING = '{"answerable": false, "choice": 1, "reason": "keep looking"}'
+ANSWERABLE = '{"answerable": true, "reason": "the excerpts state it"}'
+RELEVANT = '{"relevant": true, "reason": "campus page"}'
+
+QUERY = "diploma supplement"
+SEED = "https://ingegneria.unifi.it/vp-185-per-laurearsi.html"
+HUB = "https://ingegneria.unifi.it/vp-220-diploma-supplement.html"
+ANSWER_PDF = "https://ingegneria.unifi.it/upload/sub/modulo-diploma-supplement.pdf"
+ROBOTS = "https://ingegneria.unifi.it/robots.txt"
+
+NOTHING = LiveResult(
+    persisted=False, chunks=[], outlinks=[], verdict=RelevanceVerdict(relevant=False, reason="stub")
+)
 
 
 class ScriptedCompleter:
@@ -34,8 +99,131 @@ class ScriptedCompleter:
         return self.replies.pop(0)
 
 
+class CountingCompleter:
+    """`StubCompleter` plus a call count: the step-clock rules are about how
+    many LLM calls a step is allowed to pay for, which is only assertable if
+    the calls are counted."""
+
+    def __init__(self, reply: str) -> None:
+        self.reply = reply
+        self.calls = 0
+
+    def complete(self, messages: Sequence[Message]) -> str:
+        self.calls += 1
+        return self.reply
+
+
+class KeywordDense:
+    """A dense encoder whose cosine ordering is legible by construction: one
+    axis per keyword plus a constant one that keeps every vector non-zero, so a
+    ranking string pointing the same way as the query outranks one that merely
+    repeats a single word. Four dimensions, matching `StubDense`, because the
+    shared CPU encoder is also what the live path indexes with."""
+
+    WORDS = ("diploma", "supplement", "borsa")
+
+    def dimension(self) -> int:
+        return len(self.WORDS) + 1
+
+    def encode_documents(self, texts: Sequence[str]) -> list[list[float]]:
+        return [self.encode_query(text) for text in texts]
+
+    def encode_query(self, text: str) -> list[float]:
+        lowered = text.lower()
+        return [float(lowered.count(word)) for word in self.WORDS] + [0.1]
+
+
+class StubFetch:
+    """Stands in for `rag.live.fetch_and_ingest`: records what the loop asked
+    for and fires the gate hook the step clock stops on."""
+
+    def __init__(self, results: Mapping[str, LiveResult] | None = None) -> None:
+        self.results = dict(results or {})
+        self.calls: list[str] = []
+
+    def __call__(self, url: str, referrer: str | None, unload: Callable[[], None]) -> LiveResult:
+        self.calls.append(url)
+        unload()
+        return self.results.get(url, NOTHING)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_process_caches() -> Iterator[None]:
+    """The live module's converters, chunker, throttle and robots cache are
+    process-wide on purpose; a loop test must not inherit another test's stubs."""
+    providers = (
+        live_chunker,
+        live_pdf_converter,
+        live_html_converter,
+        shared_throttle,
+        shared_robots,
+    )
+    for provider in providers:
+        provider.cache_clear()
+    yield
+    for provider in providers:
+        provider.cache_clear()
+
+
+def link(text: str, path: str) -> Outlink:
+    return Outlink(url=f"https://ingegneria.unifi.it{path}", text=text)
+
+
+def candidate(text: str, path: str, referrer: str = SEED) -> Candidate:
+    """A link plus the stored page that carried it — the pair the loop ranks,
+    because the referrer has to survive as far as the registry row."""
+    return Candidate(link=link(text, path), referrer=referrer)
+
+
+def entry(url: str, outlinks: Sequence[Outlink] = ()) -> RegistryEntry:
+    return RegistryEntry(
+        url=url,
+        content_hash="aa" * 32,
+        fetch_date="2026-08-23",
+        ingest_run_id="crawl-20260822-143647",
+        outlinks=list(outlinks),
+    )
+
+
+def web_hit(url: str) -> Hit:
+    return Hit(chunk=make_web_chunk("aa" * 32, "crawl", url), score=1.0)
+
+
+def hub_registry() -> dict[str, RegistryEntry]:
+    """A seed page already in the ledger, carrying one link: the referrer page
+    the loop is meant to hop to."""
+    return {SEED: entry(SEED, [link("Diploma Supplement", "/vp-220-diploma-supplement.html")])}
+
+
 def make_decision(target: Literal["slides", "unifi_web", "both"]) -> RouteDecision:
     return RouteDecision(target=target, query="q", fresh=False, reason="r")
+
+
+def run_loop(
+    completer: Completer,
+    *,
+    hits: Sequence[Hit],
+    registry: Mapping[str, RegistryEntry],
+    fetch: Fetch,
+    query: str = QUERY,
+    retrieve: Callable[[str], list[Hit]] | None = None,
+    **options: Any,
+) -> tuple[list[Hit], list[Decision]]:
+    """One deepening run over a fixed retrieval: the loop's collaborators are
+    all injected, so nothing here touches a network, a model or an index."""
+    result = deepen(
+        "Come chiedo il Diploma Supplement?",
+        RouteDecision(target="unifi_web", query=query, fresh=False, reason="campus"),
+        completer,
+        retrieve=retrieve or (lambda _: list(hits)),
+        fetch=fetch,
+        registry=registry,
+        dense_encoder=KeywordDense,
+        run_id="live-20260823-120000",
+        question_id="g001",
+        **options,
+    )
+    return result.hits, result.decisions
 
 
 def test_unparseable_reply_falls_back_to_both() -> None:
@@ -62,8 +250,9 @@ def test_valid_reply_round_trips_every_field() -> None:
 
 
 def test_reply_without_fresh_still_validates() -> None:
-    """`fresh` has no consumer before the deepening loop, so a 4B model dropping
-    it must cost the flag, not the whole routing decision."""
+    """A 4B model dropping the flag must cost the hint, not the whole routing
+    decision — the deepening loop reads `fresh` as "fetch before believing the
+    snapshot", so its default has to be the conservative one."""
     completer = StubCompleter('{"target": "slides", "query": "ORM", "reason": "course topic"}')
     decision = route("What is an ORM?", completer)
     assert decision.target == "slides"
@@ -74,6 +263,530 @@ def test_collections_for_maps_each_target_to_real_collection_names() -> None:
     assert collections_for(make_decision("slides")) == (COLLECTION,)
     assert collections_for(make_decision("unifi_web")) == (WEB_COLLECTION,)
     assert collections_for(make_decision("both")) == (COLLECTION, WEB_COLLECTION)
+
+
+def test_narrowing_keeps_a_link_dom_order_would_have_dropped() -> None:
+    """The whole reason the ranking exists: a page's first links are its
+    navigation, so an implementation that kept registry order would return ten
+    menu entries and drop the one link that answers the question."""
+    navigation = [candidate(f"Sezione {number}", f"/vp-{number}.html") for number in range(12)]
+    answer_link = candidate("Diploma Supplement", "/vp-220-diploma-supplement.html")
+
+    candidates = narrow_candidates(QUERY, [*navigation, answer_link], KeywordDense())
+
+    assert len(candidates) == MAX_LINK_CANDIDATES
+    assert candidates[0] == answer_link  # last in DOM order, first by cosine
+    assert candidates[0].referrer == SEED  # and it still knows which page carried it
+
+
+def test_pdf_candidates_hold_a_quota_that_never_costs_a_page_slot() -> None:
+    """One referrer page can link forty decrees. A shared cap would let them
+    flood the shortlist; a shared *ranking* would let navigation links push out
+    the single attachment that answers the question. Hence two quotas."""
+    navigation = [candidate(f"Sezione {number}", f"/vp-{number}.html") for number in range(12)]
+    answer_link = candidate("Diploma Supplement", "/vp-220-diploma-supplement.html")
+    attachments = [
+        candidate(f"Modulo diploma supplement {number}", f"/upload/diploma-supplement-{number}.pdf")
+        for number in range(8)
+    ]
+
+    candidates = narrow_candidates(QUERY, [*attachments, *navigation, answer_link], KeywordDense())
+
+    pdfs = [one for one in candidates if one.link.url.endswith(".pdf")]
+    pages = [one for one in candidates if not one.link.url.endswith(".pdf")]
+    assert len(pdfs) == MAX_PDF_CANDIDATES
+    assert len(pages) == MAX_LINK_CANDIDATES
+    assert answer_link in pages  # the attachments took none of the page slots
+
+
+def test_narrowing_returns_at_most_ten_pages_in_cosine_order() -> None:
+    """Three legible grades: a link pointing the same way as the query, one that
+    over-weights half of it, and navigation that matches nothing."""
+    best = candidate("Diploma Supplement", "/vp-220.html")
+    second = candidate("Diploma Supplement", "/diploma.html")  # the same words, skewed
+    third = candidate("Diploma", "/vp-221.html")  # half the query
+    navigation = [candidate(f"Sezione {number}", f"/vp-{number}.html") for number in range(12)]
+
+    candidates = narrow_candidates(QUERY, [*navigation, third, second, best], KeywordDense())
+
+    assert len(candidates) == MAX_LINK_CANDIDATES
+    assert [one.link.url for one in candidates[:3]] == [
+        best.link.url,
+        second.link.url,
+        third.link.url,
+    ]
+
+
+def test_the_loop_never_fetches_more_than_three_times_and_answers_from_what_it_got() -> None:
+    """The hard cap, and what happens when it is reached: running out of steps
+    is not a refusal — the ephemeral page the gate refused along the way is
+    still part of what generation answers from."""
+    refused = make_web_chunk("cc" * 32, "live", HUB).model_copy(
+        update={"text": "orario segreteria"}
+    )
+    fetch = StubFetch(
+        {
+            HUB: LiveResult(
+                persisted=False,
+                chunks=[refused],
+                outlinks=[],
+                verdict=RelevanceVerdict(relevant=False, reason="commercial page"),
+            )
+        }
+    )
+    outlinks = [
+        link("Diploma Supplement", "/vp-220-diploma-supplement.html"),
+        link("Diploma", "/vp-221.html"),
+        link("Supplement", "/vp-222.html"),
+        link("Sezione", "/vp-1.html"),
+    ]
+    hits = [web_hit(SEED)]
+
+    answered, decisions = run_loop(
+        CountingCompleter(KEEP_LOOKING),
+        hits=hits,
+        registry={SEED: entry(SEED, outlinks)},
+        fetch=fetch,
+    )
+
+    assert len(fetch.calls) == 3
+    assert len(set(fetch.calls)) == 3  # never the same candidate twice
+    assert fetch.calls[0] == HUB  # cosine order, not registry order
+    assert [decision.outcome for decision in decisions] == [
+        "ephemeral",
+        "not retrieved",
+        "not retrieved",
+        "steps exhausted",
+    ]
+    assert refused in [hit.chunk for hit in answered]  # readable this turn all the same
+
+
+def test_no_deepen_fetches_only_attachments_and_keeps_the_whole_ranked_list() -> None:
+    """The degraded arm isolates one variable — following page links — so it
+    inherits the cosine ranking and drops only the top-5 truncation. Keeping the
+    cap too would couple both arms to the same suspect component."""
+    attachments = [
+        link(f"Decreto {number}", f"/upload/decreto-{number}.pdf") for number in range(8)
+    ]
+    answer_attachment = link("Modulo Diploma Supplement", "/upload/modulo-diploma-supplement.pdf")
+    pages = [link("Diploma Supplement", "/vp-220-diploma-supplement.html")]
+    fetch = StubFetch()
+
+    _, decisions = run_loop(
+        StubCompleter(KEEP_LOOKING),
+        hits=[web_hit(SEED)],
+        registry={SEED: entry(SEED, [*pages, *attachments, answer_attachment])},
+        fetch=fetch,
+        link_hopping=False,
+    )
+
+    candidates = decisions[0].candidates
+    assert len(candidates) == 9  # every attachment, no top-5 truncation
+    assert all(candidate.url.endswith(".pdf") for candidate in candidates)
+    assert candidates[0] == answer_attachment  # ranked, just not truncated
+    assert all(url.endswith(".pdf") for url in fetch.calls)  # no page was ever hopped to
+
+
+def test_a_question_with_no_graph_around_it_gathers_nothing_to_answer_from() -> None:
+    """The refusal path of the same state machine: no outlink graph and nothing
+    retrieved leaves generation with an empty candidate set, which `rag.answer`
+    turns into an honest refusal rather than a guess."""
+    fetch = StubFetch()
+
+    answered, decisions = run_loop(StubCompleter(KEEP_LOOKING), hits=[], registry={}, fetch=fetch)
+
+    assert fetch.calls == []
+    assert answered == []
+    assert [decision.outcome for decision in decisions] == ["no candidates"]
+
+
+@pytest.mark.parametrize(
+    ("before_gate", "outcome"),
+    [(10.0, "persisted"), (90.0, "timeout")],
+)
+def test_the_step_clock_stops_when_the_relevance_gate_answers(
+    before_gate: float, outcome: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The budget ruling in one assertion. The 60s step clock covers four
+    things, all of them network or model waits: the assessment, the pick, the
+    fetch and the relevance gate. The assessment is in there because the
+    previous step unloaded the LLM, so the reload is paid on the first call
+    after it and a reload nobody is charged for is a budget nobody can exceed.
+    The parse and the encode behind the gate run on budgets of their own — a
+    CPU encode of one page's chunks measures 117s, so counting it here would
+    mark every single successful ingest as a step that never arrived."""
+    now = [0.0]
+    monkeypatch.setattr(time, "monotonic", lambda: now[0])
+
+    def fetch(url: str, referrer: str | None, unload: Callable[[], None]) -> LiveResult:
+        now[0] += before_gate  # network wait plus the gate: on the clock
+        unload()
+        now[0] += 300.0  # parse and encode: off it, by their own budgets
+        return LiveResult(
+            persisted=True,
+            chunks=[],
+            outlinks=[],
+            verdict=RelevanceVerdict(relevant=True, reason="ok"),
+        )
+
+    _, decisions = run_loop(
+        StubCompleter(KEEP_LOOKING),
+        hits=[web_hit(SEED)],
+        registry={SEED: entry(SEED, [link("Diploma Supplement", "/vp-220.html")])},
+        fetch=fetch,
+    )
+
+    assert decisions[0].outcome == outcome
+
+
+def test_a_fetch_that_never_reaches_the_gate_is_counted_whole(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The other half of the same rule: robots.txt refusing, a dead URL or an
+    unusable content type all end the fetch before the gate, so the unload hook
+    never fires and there is no boundary to stop the clock at. Every second of
+    it was network wait, so every second of it counts."""
+    now = [0.0]
+    monkeypatch.setattr(time, "monotonic", lambda: now[0])
+
+    def refused_before_the_gate(
+        url: str, referrer: str | None, unload: Callable[[], None]
+    ) -> LiveResult:
+        now[0] += 90.0  # a slow robots.txt and a dead URL behind it
+        return LiveResult(
+            persisted=False,
+            chunks=[],
+            outlinks=[],
+            verdict=RelevanceVerdict(relevant=False, reason="fetch: page not retrieved"),
+        )
+
+    _, decisions = run_loop(
+        StubCompleter(KEEP_LOOKING),
+        hits=[web_hit(SEED)],
+        registry={SEED: entry(SEED, [link("Diploma Supplement", "/vp-220.html")])},
+        fetch=refused_before_the_gate,
+    )
+
+    assert decisions[0].outcome == "timeout"
+
+
+def test_a_persisted_step_that_blew_its_budget_still_reaches_the_answer() -> None:
+    """A timed-out step drops what it saw, but `rag.live` already wrote the page
+    to the shared index — the write is not undone by the clock. Ending the turn
+    on the pre-fetch hits would cite what the new version replaced, so one last
+    retrieval runs before generation. It costs no LLM call and no fetch."""
+    before = web_hit(SEED)
+    after = web_hit(HUB)
+    # Two retrievals only: the opening one, then the closing one the timed-out
+    # persist earns. Nothing in between — the timed-out step skips it by design.
+    retrievals = [[before], [before, after]]
+    fetch = StubFetch(
+        {
+            HUB: LiveResult(
+                persisted=True,
+                chunks=[],
+                outlinks=[],
+                verdict=RelevanceVerdict(relevant=True, reason="ok"),
+            )
+        }
+    )
+
+    answered, decisions = run_loop(
+        StubCompleter(KEEP_LOOKING),
+        hits=[before],
+        registry=hub_registry(),
+        fetch=fetch,
+        retrieve=lambda _: retrievals.pop(0),
+        step_timeout=-1.0,
+    )
+
+    assert [decision.outcome for decision in decisions] == ["timeout", "no candidates"]
+    assert answered == [before, after]  # the stored page reached generation after all
+
+
+def test_an_unparseable_assessment_reads_as_not_yet_and_keeps_the_loop_going() -> None:
+    """A 4B model failing to produce JSON must not end the turn as "answered":
+    the loop reads it as "not yet", which costs one fetch out of a bounded
+    three, while the opposite reading would answer from material nobody judged."""
+    question = "Come chiedo il Diploma Supplement?"
+    verdict = assess_answerable(question, [web_hit(SEED)], StubCompleter("not json"))
+    assert verdict.answerable is False
+    assert verdict.reason == ASSESS_FALLBACK_REASON
+
+    fetch = StubFetch()
+    _, decisions = run_loop(
+        ScriptedCompleter(["not json", '{"choice": 1, "reason": "the modulo"}', ANSWERABLE]),
+        hits=[web_hit(SEED)],
+        registry={SEED: entry(SEED, [link("Diploma Supplement", "/vp-220.html")])},
+        fetch=fetch,
+    )
+
+    assert len(fetch.calls) == 1  # it kept going instead of stopping on the bad reply
+    assert decisions[-1].outcome == "answered"
+
+
+def test_a_pick_outside_the_shortlist_falls_back_to_the_top_ranked_candidate() -> None:
+    """The numbered list has two entries and the model answers "99". Raising
+    would cost the turn; the ranking already put its best guess first, so that
+    is what gets fetched — and the log says the choice was not the model's."""
+    fetch = StubFetch()
+
+    _, decisions = run_loop(
+        ScriptedCompleter([KEEP_LOOKING, '{"choice": 99, "reason": "nonsense"}', ANSWERABLE]),
+        hits=[web_hit(SEED)],
+        registry={
+            SEED: entry(
+                SEED,
+                [
+                    link("Sezione", "/vp-1.html"),
+                    link("Diploma Supplement", "/vp-220-diploma-supplement.html"),
+                ],
+            )
+        },
+        fetch=fetch,
+    )
+
+    assert fetch.calls == [HUB]  # the top-ranked candidate, not the first in the list
+    assert decisions[0].reason == PICK_FALLBACK_REASON
+
+
+def test_an_ephemeral_page_rides_in_ranked_not_truncated_at_its_head() -> None:
+    """A refused page is not in the index, so retrieval cannot rank it and the
+    whole document cannot ride into the prompt either. Ranking it by the same
+    cosine rule the outlinks use beats taking the first chunks: the answer is as
+    often in the middle of a modulo as on its first page — here it is the last
+    chunk of eight, which head-of-document selection would drop."""
+    filler = [
+        make_web_chunk(f"{number:02d}" * 32, "live", HUB).model_copy(
+            update={"chunk_id": f"filler:{number}", "embed_text": f"orario segreteria {number}"}
+        )
+        for number in range(7)
+    ]
+    buried = make_web_chunk("ff" * 32, "live", HUB).model_copy(
+        update={"chunk_id": "buried", "embed_text": "diploma supplement richiesta"}
+    )
+    fetch = StubFetch(
+        {
+            HUB: LiveResult(
+                persisted=False,
+                chunks=[*filler, buried],
+                outlinks=[],
+                verdict=RelevanceVerdict(relevant=False, reason="commercial page"),
+            )
+        }
+    )
+
+    answered, _ = run_loop(
+        ScriptedCompleter([KEEP_LOOKING, KEEP_LOOKING, ANSWERABLE]),
+        hits=[web_hit(SEED)],
+        registry=hub_registry(),
+        fetch=fetch,
+    )
+
+    page_ids = {"buried", *(f"filler:{number}" for number in range(7))}
+    carried = [hit.chunk for hit in answered if hit.chunk.chunk_id in page_ids]
+    assert len(carried) == EPHEMERAL_CHUNK_LIMIT  # the whole page never rides along
+    assert buried in carried  # last in document order, first by cosine
+
+
+def test_a_step_over_budget_moves_on_without_reassessing_unchanged_material() -> None:
+    """A step that ran over is a step that did not arrive: its chunks are
+    dropped and the loop goes straight to the next candidate, because paying an
+    LLM call to reassess material that has not changed spends the next step's
+    budget on a question already answered."""
+    stale = make_web_chunk("dd" * 32, "live", HUB)
+    fetch = StubFetch(
+        {
+            HUB: LiveResult(
+                persisted=True,
+                chunks=[stale],
+                outlinks=[],
+                verdict=RelevanceVerdict(relevant=True, reason="ok"),
+            )
+        }
+    )
+    completer = CountingCompleter(KEEP_LOOKING)
+    hits = [web_hit(SEED)]
+
+    answered, decisions = run_loop(
+        completer,
+        hits=hits,
+        registry={
+            SEED: entry(
+                SEED,
+                [
+                    link("Diploma Supplement", "/vp-220-diploma-supplement.html"),
+                    link("Diploma", "/vp-221.html"),
+                    link("Supplement", "/vp-222.html"),
+                ],
+            )
+        },
+        fetch=fetch,
+        step_timeout=-1.0,  # every step is over budget, whatever the clock says
+    )
+
+    assert [decision.outcome for decision in decisions] == [
+        "timeout",
+        "timeout",
+        "timeout",
+        "steps exhausted",
+    ]
+    assert len(fetch.calls) == 3
+    assert completer.calls == 4  # one assessment, then three picks
+    assert answered == hits  # the timed-out step's chunks are not answered from
+
+
+HUB_PAGE = (
+    b'<html lang="it"><body><h1>Diploma Supplement</h1>'
+    b'<a href="/vp-1-home.html">Home</a>'
+    + b"".join(
+        b'<a href="/upload/sub/decreto-%d.pdf">Decreto rettorale %d</a>' % (number, number)
+        for number in range(7)
+    )
+    + b'<a href="/upload/sub/modulo-diploma-supplement.pdf">Modulo Diploma Supplement</a>'
+    b"</body></html>"
+)
+
+
+def fake_chunk_document(
+    document: object, chunker: object, meta: ParsedMeta, locale: str
+) -> list[Chunk]:
+    """Stands in for the real chunker, whose tokenizer is a hub download; the
+    payload fields the loop reads back come from the sidecar, so they stay real."""
+    return [
+        make_web_chunk(meta.content_hash or "ee" * 32, "live", meta.url or "").model_copy(
+            update={
+                "text": f"content of {meta.url}",
+                "embed_text": f"content of {meta.url}",
+                "ingest_run_id": meta.ingest_run_id,
+                "trigger": meta.trigger,
+                "referrer_url": meta.referrer_url,
+            }
+        )
+    ]
+
+
+def test_a_two_hop_pdf_answer_is_reached_through_the_link_graph(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """End to end over the real CLI: the answer sits in an attachment two hops
+    from anything the index holds, and the referrer page links eight PDFs with
+    the right one last in DOM order. Reaching it means the shortlist truncated
+    to five and the ranking beat document order — both at once, which is what
+    the stub-level narrowing tests cannot show."""
+    from docling.datamodel.base_models import ConversionStatus
+
+    qdrant_path = tmp_path / "qdrant"
+    qdrant = open_client(qdrant_path)
+    ensure_collection(qdrant, StubDense().dimension(), WEB_COLLECTION)
+    index_chunks(
+        qdrant,
+        [make_web_chunk("aa" * 32, "crawl", SEED)],
+        StubDense(),
+        StubSparse(),
+        WEB_COLLECTION,
+    )
+    qdrant.close()
+
+    registry = tmp_path / "registry.jsonl"
+    append_registry(
+        registry, entry(SEED, [link("Diploma Supplement", "/vp-220-diploma-supplement.html")])
+    )
+
+    fetcher = StubFetcher(
+        {
+            ROBOTS: page(ROBOTS, b"User-agent: *\nAllow: /\n", "text/plain"),
+            HUB: page(HUB, HUB_PAGE),
+            ANSWER_PDF: page(ANSWER_PDF, b"%PDF-1.4 fake", "application/pdf"),
+        }
+    )
+
+    class RecordingConverter:
+        def convert(self, source: object, **kwargs: Any) -> Any:
+            return SimpleNamespace(
+                document=SimpleNamespace(texts=[]), status=ConversionStatus("success")
+            )
+
+    unloaded: list[str] = []
+
+    monkeypatch.setattr("rag.live.build_converter", lambda *a, **k: RecordingConverter())
+    monkeypatch.setattr("rag.live.build_html_converter", RecordingConverter)
+    monkeypatch.setattr("rag.live.live_chunker", lambda: None)
+    monkeypatch.setattr("rag.live.chunk_document", fake_chunk_document)
+    monkeypatch.setattr("rag.index.build_dense_encoder", lambda model_name: StubDense())
+    monkeypatch.setattr("rag.index.build_sparse_encoder", StubSparse)
+    monkeypatch.setattr(
+        "rag.index.cached_dense_encoder", lambda model_name, device=None: KeywordDense()
+    )
+    monkeypatch.setattr("rag.crawl.HttpxFetcher", lambda: fetcher)
+    monkeypatch.setattr("rag.agent.shared_throttle", lambda: Throttle(interval=0.0))
+    monkeypatch.setattr("rag.agent.build_streamer", lambda *a, **k: StubStreamer())
+    monkeypatch.setattr(
+        "rag.agent.maybe_unload_llm", lambda base_url, model: unloaded.append(model)
+    )
+    monkeypatch.setattr(
+        "rag.agent.build_completer",
+        lambda *a, **k: ScriptedCompleter(
+            [
+                WEB_REPLY,
+                KEEP_LOOKING,  # nothing retrieved answers it
+                KEEP_LOOKING,  # pick candidate 1: the referrer page
+                RELEVANT,  # the gate keeps it
+                KEEP_LOOKING,  # still not answerable
+                KEEP_LOOKING,  # pick candidate 1: the attachment
+                RELEVANT,
+                ANSWERABLE,
+            ]
+        ),
+    )
+
+    log = tmp_path / "decisions.jsonl"
+    main(
+        [
+            "Come chiedo il Diploma Supplement?",
+            "--question-id",
+            "g001",
+            "--run-id",
+            "live-20260823-120000",
+            "--qdrant-path",
+            str(qdrant_path),
+            "--registry",
+            str(registry),
+            "--decision-log",
+            str(log),
+            "--no-rerank",
+        ]
+    )
+
+    out = capsys.readouterr().out
+    assert "route: unifi_web (campus)" in out
+    assert f"step 1: persisted {HUB}" in out
+    assert f"step 2: persisted {ANSWER_PDF}" in out
+    assert "step 2: answered" in out
+    # The VRAM hook fires once per fetch, between the gate and the heavy work.
+    assert len(unloaded) == 2
+
+    rows = [Decision.model_validate_json(line) for line in log.read_text("utf-8").splitlines()]
+    attachments = [c for c in rows[1].candidates if c.url.endswith(".pdf")]
+    assert len(attachments) == MAX_PDF_CANDIDATES  # eight on the page, five offered
+    assert attachments[0].url == ANSWER_PDF  # last in DOM order, first by cosine
+    # The anchor text rides along verbatim, or M3 cannot tell a shortlist that
+    # never offered the answer from a model that picked the wrong entry.
+    assert attachments[0].text == "Modulo Diploma Supplement"
+    assert rows[-1].question_id == "g001"
+
+    # Provenance survives both hops: the ledger and the chunk payload name the
+    # page each fetch was linked from, which is the payload contract for web
+    # chunks (docs/docling-e-pipeline.md 3.6) and the only record of the path
+    # the loop actually walked.
+    ledger = {row.url: row for row in read_registry(registry)}
+    assert ledger[HUB].referrer_url == SEED
+    assert ledger[ANSWER_PDF].referrer_url == HUB
+    stored = open_client(qdrant_path)
+    points, _ = stored.scroll(WEB_COLLECTION, limit=100, with_payload=True)
+    stored.close()
+    by_url = {str((point.payload or {})["url"]): dict(point.payload or {}) for point in points}
+    assert by_url[ANSWER_PDF]["referrer_url"] == HUB
 
 
 @pytest.fixture
@@ -99,6 +812,7 @@ def test_empty_retrieval_refuses_then_points_to_a_url(
     refusal: str,
     pointer: str,
     empty_index: Path,
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -121,6 +835,7 @@ def test_empty_retrieval_refuses_then_points_to_a_url(
 
     monkeypatch.setattr("rag.index.build_dense_encoder", stub_dense)
     monkeypatch.setattr("rag.index.build_sparse_encoder", stub_sparse)
+    monkeypatch.setattr("rag.crawl.HttpxFetcher", lambda: StubFetcher({}))
     monkeypatch.setattr("rag.agent.build_completer", stub_completer)
     monkeypatch.setattr("rag.agent.build_streamer", stub_streamer)
 
@@ -131,11 +846,16 @@ def test_empty_retrieval_refuses_then_points_to_a_url(
             locale,
             "--qdrant-path",
             str(empty_index),
+            "--registry",
+            str(tmp_path / "registry.jsonl"),
+            "--decision-log",
+            str(tmp_path / "decisions.jsonl"),
             "--no-rerank",
         ]
     )
     out = capsys.readouterr().out
     assert "route: slides (course)" in out
+    assert "step 0: no candidates" in out  # nothing retrieved, so nothing to follow
     assert refusal in out
     assert pointer in out
     assert "Sources:" not in out  # nothing was retrieved, so nothing may be cited
@@ -162,9 +882,9 @@ def test_cli_answers_from_the_routed_collection_with_sources(
 
     def stub_completer(
         base_url: str, api_key: str, model: str, temperature: float = 0.0, seed: int | None = None
-    ) -> StubCompleter:
+    ) -> ScriptedCompleter:
         assert (temperature, seed) == (0.0, 0)  # routing is pinned: greedy plus a fixed seed
-        return StubCompleter(SLIDES_REPLY)
+        return ScriptedCompleter([SLIDES_REPLY, ANSWERABLE])
 
     def stub_streamer(
         base_url: str, api_key: str, model: str, temperature: float = 0.0
@@ -173,15 +893,35 @@ def test_cli_answers_from_the_routed_collection_with_sources(
 
     monkeypatch.setattr("rag.index.build_dense_encoder", stub_dense)
     monkeypatch.setattr("rag.index.build_sparse_encoder", stub_sparse)
+    monkeypatch.setattr("rag.crawl.HttpxFetcher", lambda: StubFetcher({}))
     monkeypatch.setattr("rag.agent.build_completer", stub_completer)
     monkeypatch.setattr("rag.agent.build_streamer", stub_streamer)
 
-    main(["What is an ORM?", "--qdrant-path", str(qdrant_path), "--no-rerank"])
+    main(
+        [
+            "What is an ORM?",
+            "--qdrant-path",
+            str(qdrant_path),
+            "--registry",
+            str(tmp_path / "registry.jsonl"),
+            "--decision-log",
+            str(tmp_path / "decisions.jsonl"),
+            "--no-rerank",
+        ]
+    )
     out = capsys.readouterr().out
+    assert "step 0: answered" in out  # the index already had it: no fetch at all
     assert "An ORM maps objects to tables" in out
     assert "Sources:" in out
     assert "[deck.pdf p.1]" in out
     assert streamer.messages[-1]["content"].endswith("Question: What is an ORM?")
+
+
+def test_cli_refuses_a_run_id_that_no_rollback_could_find() -> None:
+    """The loop writes through `rag.live`, so its run id is a rollback unit:
+    a crawl-shaped id would leave points no rollback command can reach."""
+    with pytest.raises(SystemExit):
+        main(["What is an ORM?", "--run-id", "crawl-20260822-143647"])
 
 
 def test_pointer_line_covers_every_declared_locale() -> None:
@@ -190,3 +930,21 @@ def test_pointer_line_covers_every_declared_locale() -> None:
     assert pointer_line("it").startswith("Se mi incolli")
     assert pointer_line("zh").startswith("把包含答案的网页链接")
     assert pointer_line("de") == pointer_line("en")  # unknown locales keep the English pointer
+
+
+def test_importing_agent_loads_neither_docling_nor_django() -> None:
+    """The agent pulls in the live write path, which pulls in the parse modules;
+    docling drags torch along and costs seconds, and `rag/` must stay runnable
+    without the web project at all."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import rag.agent, sys; print('docling' in sys.modules, 'django' in sys.modules)",
+        ],
+        cwd=BASE_DIR,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "False False"
