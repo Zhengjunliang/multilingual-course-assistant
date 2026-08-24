@@ -2,13 +2,16 @@
 file AND the right page inside the chunk's span, and the CLI must report a
 rate that survives an empty index without dividing by zero."""
 
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
+from test_agent import ScriptedCompleter
 from test_index import StubDense, StubSparse, make_chunk
 from test_search import ORM_TEXT, TASSE_TEXT, TASSE_URL, make_web_chunk
 
-from rag.gold import GoldQuestion, is_hit, load_gold, main, missing_answer_refs
+from rag.gold import GoldQuestion, is_hit, load_gold, main, missing_answer_refs, routing_report
 from rag.index import WEB_COLLECTION, ensure_collection, index_chunks, open_client
 from rag.search import Hit
 
@@ -152,3 +155,245 @@ def test_cli_scores_each_question_against_its_target_collection(
     assert "c001 HIT " in out
     assert TASSE_URL in out  # campus rows report the wanted url, not file/page
     assert "hit@5: 2/2 (100%)" in out
+
+
+def record_search_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
+    """Replace `rag.gold`'s `search` with a recorder and stub the encoders, so a
+    run reaches the call site without an index or a model behind it."""
+    calls: list[dict[str, object]] = []
+
+    def recorder(*args: object, **kwargs: object) -> list[Hit]:
+        calls.append(kwargs)
+        return []
+
+    def stub_dense(model_name: str) -> StubDense:
+        return StubDense()
+
+    def stub_sparse() -> StubSparse:
+        return StubSparse()
+
+    monkeypatch.setattr("rag.gold.search", recorder)
+    monkeypatch.setattr("rag.index.build_dense_encoder", stub_dense)
+    monkeypatch.setattr("rag.index.build_sparse_encoder", stub_sparse)
+    return calls
+
+
+def test_cli_pins_retrieval_to_the_crawl_snapshot_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Eval reads the frozen crawl snapshot unless told otherwise: a live
+    increment written between two runs must never move a gate number (ADR-1)."""
+    calls = record_search_calls(monkeypatch)
+    gold_file = tmp_path / "campus.jsonl"
+    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
+
+    main([str(gold_file), "--qdrant-path", str(tmp_path / "qdrant"), "--no-rerank"])
+    capsys.readouterr()
+    assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [("crawl", None)]
+
+
+def test_cli_forwards_snapshot_and_ingest_source_to_search(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Autogrow acceptance opens the filter explicitly, and `--snapshot` narrows
+    to one ingest run; both reach `search` unchanged."""
+    calls = record_search_calls(monkeypatch)
+    gold_file = tmp_path / "campus.jsonl"
+    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
+
+    main(
+        [
+            str(gold_file),
+            "--qdrant-path",
+            str(tmp_path / "qdrant"),
+            "--no-rerank",
+            "--snapshot",
+            "run-x",
+            "--ingest-source",
+            "live",
+        ]
+    )
+    capsys.readouterr()
+    assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [("live", "run-x")]
+
+
+@pytest.fixture
+def live_module_off_limits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Eval must not so much as look at the query-time writer while `--live` is
+    off: a gate number that grew its own evidence is not a gate number.
+
+    Three doors, because they are three different objects: an `import rag.live`
+    made during the run reads `sys.modules`, a module that already imported it
+    reaches the real one through the `rag` package attribute, and `rag.agent`
+    holds its own binding to the write entry point.
+    """
+
+    def forbid(name: str) -> object:
+        raise AssertionError(f"the --live off path reached rag.live.{name}")
+
+    class Forbidden(ModuleType):
+        def __getattr__(self, name: str) -> object:
+            return forbid(name)
+
+    forbidden = Forbidden("rag.live")
+    monkeypatch.setitem(sys.modules, "rag.live", forbidden)
+    monkeypatch.setattr("rag.live", forbidden)
+    monkeypatch.setattr("rag.agent.fetch_and_ingest", lambda *args, **kwargs: forbid("fetch"))
+
+
+def test_the_live_off_guard_is_armed(live_module_off_limits: None) -> None:
+    """The positive control for the test below: a sentinel nobody can trip would
+    let the guard rot away unnoticed, and the test would keep passing. Each of
+    the three doors is checked shut here, so removing one fails a test."""
+    import rag.agent
+    import rag.live
+
+    with pytest.raises(AssertionError):
+        from rag.live import fetch_and_ingest  # noqa: F401 - the import is the assertion
+    with pytest.raises(AssertionError):
+        _ = rag.live.fetch_and_ingest
+    with pytest.raises(AssertionError):
+        # Through the module dict: the binding is what door three closes, and
+        # reading it this way calls the patched object rather than asking the
+        # type checker to satisfy the real signature.
+        vars(rag.agent)["fetch_and_ingest"]()
+
+
+def test_live_off_keeps_the_crawl_filter_and_never_touches_the_live_module(
+    live_module_off_limits: None,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The default arm of the autogrow acceptance: eval scores the frozen
+    snapshot and grows nothing, whether or not `--live off` is spelled out."""
+    calls = record_search_calls(monkeypatch)
+    gold_file = tmp_path / "campus.jsonl"
+    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
+
+    main(
+        [str(gold_file), "--qdrant-path", str(tmp_path / "qdrant"), "--no-rerank", "--live", "off"]
+    )
+    capsys.readouterr()
+    assert [call["ingest_source"] for call in calls] == ["crawl"]
+
+
+def test_live_on_opens_the_read_side_filter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """ADR-1's explicit release for the acceptance run: the condition is dropped
+    rather than pointed at "live", because a question may be answered by either
+    version of a page and the exam scores what the assistant can actually
+    retrieve. The filter still travels through `search()`'s prefetch branches —
+    a top-level filter is silently ignored under fusion."""
+    calls = record_search_calls(monkeypatch)
+    gold_file = tmp_path / "autogrow.jsonl"
+    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
+
+    main([str(gold_file), "--qdrant-path", str(tmp_path / "qdrant"), "--no-rerank", "--live", "on"])
+    capsys.readouterr()
+    assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [(None, None)]
+
+
+def test_live_on_says_which_ingest_source_it_overrode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Two flags on the same dial: silently winning would let `--live on
+    --ingest-source live` be recorded as a live-only measurement it never was."""
+    calls = record_search_calls(monkeypatch)
+    gold_file = tmp_path / "autogrow.jsonl"
+    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
+
+    main(
+        [
+            str(gold_file),
+            "--qdrant-path",
+            str(tmp_path / "qdrant"),
+            "--no-rerank",
+            "--live",
+            "on",
+            "--ingest-source",
+            "live",
+        ]
+    )
+    capsys.readouterr()
+    assert "--ingest-source live ignored" in caplog.text
+    assert [call["ingest_source"] for call in calls] == [None]
+
+
+def routed(target: str, reason: str = "routed") -> str:
+    return f'{{"target": "{target}", "query": "q", "fresh": false, "reason": "{reason}"}}'
+
+
+def test_routing_report_scores_exact_wide_both_and_fallback() -> None:
+    """Four numbers because one cannot separate the failure modes: `both` is a
+    wide hit and never an exact one, and a fallback is a `both` the model never
+    actually chose."""
+    campus = make_campus_question()
+    questions = [
+        make_question(),  # slides -> slides: exact and wide
+        campus,  # unifi_web -> both: wide only
+        campus.model_copy(update={"id": "c002"}),  # unifi_web -> slides: neither
+        campus.model_copy(update={"id": "c003"}),  # unparseable -> fallback both: wide only
+    ]
+    completer = ScriptedCompleter(
+        [routed("slides"), routed("both"), routed("slides"), "sorry, no JSON"]
+    )
+
+    report = routing_report(questions, completer)
+    assert [row.routed_target for row in report.rows] == ["slides", "both", "slides", "both"]
+    assert report.exact == 1
+    assert report.wide == 3
+    assert report.both == 2
+    assert report.fallback == 1
+    assert [row.id for row in report.rows if row.fallback] == ["c003"]
+
+
+def test_routing_report_short_circuits_before_the_retrieval_stack(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """`--routing` is report-only: the dense/sparse/rerank stack costs ~2.4GB of
+    VRAM that a report which never retrieves anything has no use for. Passing a
+    retrieval flag alongside it must be called out, or `--routing --no-rerank`
+    reads as a measurement of something it never touched."""
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise AssertionError("the routing report must not build the retrieval stack")
+
+    def stub_completer(
+        base_url: str, api_key: str, model: str, temperature: float = 0.0, seed: int | None = None
+    ) -> ScriptedCompleter:
+        assert (temperature, seed) == (0.0, 0)  # routing is pinned: greedy plus a fixed seed
+        return ScriptedCompleter([routed("slides"), routed("both")])
+
+    monkeypatch.setattr("rag.index.build_dense_encoder", boom)
+    monkeypatch.setattr("rag.index.build_sparse_encoder", boom)
+    monkeypatch.setattr("rag.index.open_client", boom)
+    monkeypatch.setattr("rag.gold.build_reranker", boom)
+    monkeypatch.setattr("rag.llm.build_completer", stub_completer)
+
+    gold_file = tmp_path / "routing.jsonl"
+    gold_file.write_text(
+        make_question().model_dump_json() + "\n" + make_campus_question().model_dump_json() + "\n",
+        encoding="utf-8",
+    )
+
+    main([str(gold_file), "--routing", "--no-rerank"])
+    assert "retrieval flags ignored: no_rerank" in caplog.text
+    out = capsys.readouterr().out
+    assert "q001 slides -> slides" in out
+    assert "c001 unifi_web -> both" in out
+    assert "exact-hit: 1/2 (50%)" in out
+    assert "wide-hit: 2/2 (100%)" in out
+    assert "both: 1/2 (50%)" in out
+    assert "fallback: 0/2 (0%)" in out
+
+    # `--live` rides the same ignored-flags report as every retrieval flag.
+    main([str(gold_file), "--routing", "--live", "on"])
+    assert "retrieval flags ignored: live" in caplog.text

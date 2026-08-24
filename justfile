@@ -59,6 +59,10 @@ search query *args:
 answer question *args:
     uv run python -m rag.answer "{{ question }}" {{ args }}
 
+# Route a question (course vs campus), retrieve and answer (needs Ollama running locally).
+ask question *args:
+    uv run python -m rag.agent "{{ question }}" {{ args }}
+
 # Retrieval hit@k over the gold smoke set.
 gold *args:
     uv run python -m rag.gold gold/smoke.jsonl {{ args }}
@@ -70,3 +74,7 @@ crawl *args:
 # Parse a crawl snapshot (HTML + PDF attachments) into chunkable artifact pairs.
 webparse snapshot *args:
     uv run python -m rag.webparse "{{ snapshot }}" {{ args }}
+
+# Fetch one URL live, gate it and (if relevant) grow the shared index; also --rollback / --measure-gate.
+live *args:
+    uv run python -m rag.live {{ args }}

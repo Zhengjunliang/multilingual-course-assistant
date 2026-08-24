@@ -2,6 +2,62 @@
 
 Registro degli esperimenti e dei problemi riscontrati durante lo sviluppo, in italiano (stile formale): il contenuto confluirà nei capitoli sperimentali della tesi (M6). Una voce per data; i dati citati sono riproducibili con i comandi indicati. Le decisioni architetturali restano di proprietà di [architettura.md](architettura.md).
 
+## 2026-08-24 — M2.5b: gate di rilevanza, ciclo di approfondimento, collaudo autogrow
+
+### 1. Gate di rilevanza: 15/20 → 18/20 senza toccare le etichette
+
+Il gate LLM (Qwen3-4B q4, giudizio binario JSON, `temperature=0.0`, `seed=0`) è stato misurato contro un insieme di annotazione di 20 URL **congelato con un commit dedicato prima di ogni misurazione** (`gold/relevance-gate.jsonl`, 10 rilevanti + 10 non rilevanti, tratti dal grafo dei link non ancora acquisiti): la disciplina «prima si congela il metro, poi si misura» esclude per costruzione l'aggiustamento delle etichette a posteriori.
+
+- **Prima misurazione: 15/20.** Analisi dei cinque disaccordi: due falsi negativi sistematici (calendari TOLC rifiutati perché nominano altri atenei toscani), un falso positivo sistematico (piattaforma commerciale di alloggi che si autodefinisce «servizio ufficiale»), un caso di design (PDF giudicabile solo dal nome file), due casi di confine discutibili.
+- **Interventi — solo sul gate, mai sulle etichette**: due regole aggiunte al prompt di sistema (i servizi studenteschi su scala regionale toscana — DSU, CISIA/TOLC — servono anche gli studenti UniFi; il test dell'operatore: istituzione che pubblica informazione propria vs. azienda che vende) e un'anteprima testuale per i PDF (`pypdf`, prima pagina, solo text layer: una sbirciata, non un parsing — il costo del pipeline classico non è pagabile prima del gate).
+- **Seconda misurazione: 18/20 ≥ 18 (soglia).** Una sola iterazione di revisione. I due disaccordi residui sono i casi di confine già noti: la rubrica telefonica interna (etichetta: rilevante; gate: non rilevante) e la pagina di accesso a Tesi Online (contro-esempio «hard negative»; il gate si lascia convincere dal nome del servizio).
+
+Con decodifica greedy e seed fissato, la misura ripetuta produce verdetti identici (verificato anche per il report di routing, eseguito due volte con esito identico); l'accordo del gate non poggia quindi sulla fortuna del campionamento.
+
+### 2. Budget di memoria video e di tempo (RTX 4070 Laptop, 8 GB)
+
+- **Picco VRAM durante l'intero collaudo: 7923 MiB < 8188**, incremento di **+162 MiB** sul baseline 7761 di M2 (< 200 consentiti). Campionamento `nvidia-smi -l 1`: la risoluzione di 1 Hz può in linea di principio perdere picchi sub-secondo, il margine residuo (265 MiB) copre questa incertezza.
+- **Parsing PDF su CPU**: il PDF più grande del corpus (18,4 MB, cap a 40 pagine, pipeline classic) richiede **68,8 s / 65,9 s** su due esecuzioni. Il budget di parsing è stato quindi separato dall'orologio di passo (60 s) e fissato a **120 s** (`PDF_PARSE_TIMEOUT_SECONDS`): un parsing tenuto dentro i 60 s renderebbe non archiviabili esattamente i documenti lunghi (decreti) per cui il livello live esiste. Nel collaudo il parsing reale ha toccato al massimo 46,6 s.
+- **Encoding denso su CPU, fuori dall'orologio di passo**: 13 chunk ≈ 77 s, 18 chunk ≈ 117 s; un batch anomalo da **1470 s** (24,5 min, probabile throttling termico) non ha prodotto alcun falso timeout — conferma empirica della scelta di non contare parsing/encoding nel budget di passo (contarli avrebbe marcato «perso» ogni inserimento riuscito).
+- **Orologio di passo (60 s)**: copre le quattro attese di rete/LLM (giudizio «basta per rispondere?», scelta del candidato, fetch, gate); il ricaricamento del modello dopo lo scarico (`OLLAMA_KEEP_ALIVE=0`) cade per costruzione sulla prima chiamata LLM del passo successivo ed è quindi **incluso** nel budget. Tetto per singola richiesta LLM: 30 s (il default SDK di 10 minuti renderebbe fittizio qualunque budget).
+
+### 3. Collaudo autogrow: 0/7 su entrambi i bracci (obiettivo ≥ 5/7 non raggiunto)
+
+Protocollo (KB riportata allo stato di snapshot prima di ogni braccio; un solo `run_id` per braccio, rollback in un comando):
+
+1. pre-test `--live on`: **0/7** (baseline pulita: nessuna delle 11 pagine-risposta è nello snapshot);
+2. sette domande end-to-end (`rag.agent`, `--question-id` per l'attribuzione, `--run-id live-stage9-autogrow`);
+3. post-test `--live on`: **0/7**; rollback (33 punti rimossi → 29098);
+4. braccio degradato `--no-deepen` (`live-stage9-nodeepen`): post-test **0/7**; rollback (31 punti → 29098).
+
+| Domanda | Braccio principale | Braccio `--no-deepen` | Attribuzione |
+| --- | --- | --- | --- |
+| g001 | risponde al passo 0, nessun fetch | identico | **saturazione del giudizio**: il testo della pagina indice (moduli-e-certificati) basta al 4B; la risposta è corretta e cita il modulo RIT_02, ma il PDF bersaglio non viene mai acquisito — il punteggio per URL e la qualità della risposta divergono |
+| g002 | 3 passi, 2 rifiuti del gate corretti, 1 pagina irrilevante | pool di candidati vuoto | perdita di contesto («Annex 1» senza il bando di riferimento); i top hit sono PDF, che non portano out-link |
+| g004 | 3 pagine tasse/ISEE persistite (21 chunk), non quelle bersaglio | 3 PDF irrilevanti | **scelta forzata**: il modello dichiara «nessun candidato è pertinente… ma dovendo sceglierne uno» — il prompt di scelta non prevede l'opzione «nessuno» |
+| g005 | 2 pagine adiacenti + 1 rifiuto corretto (piattaforma commerciale) | pool vuoto | pagine semanticamente vicine ma diverse da quella d'oro |
+| g006 | gate rifiuta la pagina degli organi di governo → ephemeral → **risposta corretta e completa** | 3 PDF fuori tema | il criterio «servizi agli studenti» del gate non copre le domande di governance; il ramo ephemeral mantiene la promessa di Stage 7 (l'errore del gate costa alla KB, non alla risposta) |
+| g007 | pool vuoto | identico | i top hit sono guide PDF: nessun out-link nel registro → grafo cieco |
+| g008 | instradata su `slides` | identico | errore di routing (domanda campus classificata come materiale di corso) |
+
+**L'uguaglianza dei due bracci è essa stessa il risultato**: il fallimento non dipende dal salto di link (l'unica variabile progettata tra i bracci, con la nota che i bracci differiscono di fatto anche nel troncamento top-5), ma da quattro colli di bottiglia a monte — saturazione del giudizio di sufficienza, scelta forzata senza opzione di rifiuto, instradamento errato, criterio del gate disallineato sulle domande di governance. Questi quattro, più il grafo cieco dei PDF, costituiscono lo scheletro della tassonomia degli errori di M3.
+
+L'infrastruttura risulta invece interamente validata sul campo: il gate ha rifiutato correttamente 4 candidati inadatti in produzione; il log incrementale a tre stati ha classificato onestamente ogni scrittura (6 × `first fetch`, 6 × `content changed`, nessun salto errato); i due rollback hanno riportato la collezione esattamente a 29098 punti; l'isolamento di lettura ha retto (campus 28/32 **con** 33 punti live in collezione).
+
+### 4. Regressioni finali (stato post-rollback, collezione a 29098 punti)
+
+| Insieme | Esito | Invariante |
+| --- | --- | --- |
+| campus (32 domande) | **28/32 = 88%** (EN 92% · IT 85% · ZH 86%) | MISS identici: c003 · c011 · c012 · c034 |
+| smoke slides (40) | **38/40 = 95%** | MISS identici: q018 · q028 |
+| controllo (5) | **5/5 = 100%** | — |
+
+Lo snapshot non è stato intaccato da due esami completi con scritture live e rollback: la dualità lettura/scrittura (filtro `ingest_source` nei rami prefetch; cancellazione vincolata a `(url, ingest_source)`) è verificata end-to-end.
+
+### Riproducibilità
+
+Gate: `uv run python -m rag.live --measure-gate` (annotazioni in `gold/relevance-gate.jsonl`). Esame: `uv run python -m rag.agent "<domanda>" --question-id gNNN --run-id live-<id>` per le sette domande di `gold/campus-autogrow.jsonl`; punteggio con `uv run python -m rag.gold gold/campus-autogrow.jsonl --live on`; rollback con `uv run python -m rag.live --rollback <run_id>`. Log decisionale per domanda in `data/webcorpus/decisions.jsonl` (fuori repository). Modelli: Qwen3-Embedding-0.6B (CPU per il ramo live), reranker Qwen3 0.6B, LLM `qwen3:4b-instruct-2507-q4_K_M` via Ollama, `temperature=0.0`, `seed=0`.
+
 ## 2026-08-21 — Indicizzazione completa del corpus, gold set esteso, generazione locale
 
 ### 1. Espansione dell'indice: da 4 a 31 slide deck

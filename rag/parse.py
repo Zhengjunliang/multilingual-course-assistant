@@ -104,9 +104,22 @@ def sha256_of(path: Path) -> str:
 
 
 def build_converter(
-    pipeline: Pipeline, *, ocr: bool = False, formula: bool = False
+    pipeline: Pipeline,
+    *,
+    ocr: bool = False,
+    formula: bool = False,
+    device: str | None = None,
+    document_timeout: float | None = None,
 ) -> DocumentConverter:
     """Classic is layout model + TableFormer (+ OCR, + formulas); vlm runs granite-docling 258M.
+
+    `device` and `document_timeout` are classic-pipeline knobs for the live
+    ingest path (`rag.live`), where parsing must stay off the GPU and inside a
+    step budget. Both default to leaving docling's own behaviour untouched, so
+    every existing call is unchanged. `device=None` means exactly that and is
+    not the same as `device="auto"`: `AcceleratorOptions` is a `BaseSettings`,
+    so constructing one at all overrides whatever `DOCLING_DEVICE` says, even
+    with docling's own sentinel value.
 
     Both enrichments default off here against Docling's own default for OCR, because
     a CLI run pays the model download and load in full. That reasoning does not carry
@@ -133,6 +146,11 @@ def build_converter(
         options = PdfPipelineOptions()
         options.do_ocr = ocr
         options.do_formula_enrichment = formula
+        if device is not None:
+            from docling.datamodel.accelerator_options import AcceleratorOptions
+
+            options.accelerator_options = AcceleratorOptions(device=device)
+        options.document_timeout = document_timeout
         return DocumentConverter(
             format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)}
         )

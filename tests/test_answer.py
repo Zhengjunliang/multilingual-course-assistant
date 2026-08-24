@@ -76,7 +76,10 @@ def test_cli_answers_end_to_end_with_sources(
     def stub_sparse() -> StubSparse:
         return StubSparse()
 
-    def stub_streamer(base_url: str, api_key: str, model: str) -> StubStreamer:
+    def stub_streamer(
+        base_url: str, api_key: str, model: str, temperature: float = 0.0
+    ) -> StubStreamer:
+        assert temperature == 0.0  # decoding stays greedy: two runs, one answer
         return StubStreamer()
 
     monkeypatch.setattr("rag.index.build_dense_encoder", stub_dense)

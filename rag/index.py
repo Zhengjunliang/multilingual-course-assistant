@@ -60,10 +60,13 @@ class _QwenDense:
     queries get the model's built-in `query` prompt — the asymmetry is part of
     the model contract, not a stylistic choice."""
 
-    def __init__(self, model_name: str) -> None:
+    def __init__(self, model_name: str, device: str | None = None) -> None:
         from sentence_transformers import SentenceTransformer
 
-        self._model = SentenceTransformer(model_name)
+        # sentence-transformers has no "auto" sentinel the way docling's
+        # AcceleratorOptions does: None means "let the library pick", and the
+        # live ingest path passes "cpu" to stay out of the VRAM budget.
+        self._model = SentenceTransformer(model_name, device=device)
 
     def dimension(self) -> int:
         dimension = self._model.get_embedding_dimension()
@@ -102,8 +105,34 @@ class _Bm25Sparse:
         return (embedding.indices.tolist(), embedding.values.tolist())
 
 
-def build_dense_encoder(model_name: str = DEFAULT_DENSE_MODEL) -> DenseEncoder:
-    return _QwenDense(model_name)
+def build_dense_encoder(
+    model_name: str = DEFAULT_DENSE_MODEL, device: str | None = None
+) -> DenseEncoder:
+    return _QwenDense(model_name, device)
+
+
+# One instance per (model, device), owned here and nowhere else: the live
+# ingest path and the agent's candidate narrowing both want the CPU encoder,
+# and a second instance would cost another ~2.4GB of host RAM and a second
+# first load. Modules that need a shared encoder ask for it, they never cache
+# one of their own (the module boundary rule, docs/architettura.md).
+_DENSE_CACHE: dict[tuple[str, str | None], DenseEncoder] = {}
+
+
+def cached_dense_encoder(
+    model_name: str = DEFAULT_DENSE_MODEL, device: str | None = None
+) -> DenseEncoder:
+    """The shared encoder for that (model, device) pair, loaded on first use.
+
+    Ingest CLIs keep calling `build_dense_encoder` directly: a one-shot process
+    that loads one encoder and exits has nothing to share.
+    """
+    key = (model_name, device)
+    encoder = _DENSE_CACHE.get(key)
+    if encoder is None:
+        encoder = build_dense_encoder(model_name, device)
+        _DENSE_CACHE[key] = encoder
+    return encoder
 
 
 def build_sparse_encoder() -> SparseEncoder:
@@ -181,6 +210,59 @@ def delete_web_versions(
                 )
             ),
         )
+
+
+def count_web_versions(
+    client: QdrantClient, url: str, source: str, collection: str = COLLECTION
+) -> int:
+    """How many points the index holds for one (url, ingest_source) pair.
+
+    The live incremental check asks this before believing the ledger that a page
+    is unchanged: the registry is append-only, so `delete_by_run` leaves the
+    rolled-back run's rows behind, and a matching content_hash on its own would
+    skip re-indexing a page whose points are gone.
+    """
+    from qdrant_client import models
+
+    return client.count(
+        collection,
+        count_filter=models.Filter(
+            must=[
+                models.FieldCondition(key="url", match=models.MatchValue(value=url)),
+                models.FieldCondition(key="ingest_source", match=models.MatchValue(value=source)),
+            ]
+        ),
+    ).count
+
+
+def delete_by_run(client: QdrantClient, run_id: str, collection: str = WEB_COLLECTION) -> None:
+    """Roll back one live ingest run: every point it wrote, and nothing else.
+
+    The predicate is two conditions, and the second one is hardcoded rather
+    than a parameter: crawl chunks carry an `ingest_run_id` too, so a single
+    condition plus one mistyped run id would delete a frozen crawl snapshot
+    that no rollback can restore. With `ingest_source == "live"` welded into
+    the filter, a crawl run id deletes exactly zero points — ADR-1 ("live never
+    touches the crawl snapshot") enforced at the predicate, the same reason
+    `delete_web_versions` is scoped by pair.
+    """
+    from qdrant_client import models
+
+    client.delete(
+        collection,
+        points_selector=models.FilterSelector(
+            filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="ingest_run_id", match=models.MatchValue(value=run_id)
+                    ),
+                    models.FieldCondition(
+                        key="ingest_source", match=models.MatchValue(value="live")
+                    ),
+                ]
+            )
+        ),
+    )
 
 
 def index_chunks(

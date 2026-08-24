@@ -32,23 +32,25 @@ from rag.parse import ParsedMeta, build_converter, docling_version, persist
 from rag.probe import configure_cli_logging
 
 if TYPE_CHECKING:
+    from docling.datamodel.document import ConversionResult
     from docling.document_converter import DocumentConverter
-    from docling_core.types.doc.document import DoclingDocument
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_OUT_ROOT = Path(__file__).resolve().parent.parent / "data" / "webparsed"
 
 # Structural noise stripped before conversion: navigation, chrome and code the
-# retrieval index must never surface as content.
-_PRUNE_TAGS = ("script", "style", "nav", "header", "footer", "aside", "form", "noscript")
+# retrieval index must never surface as content. Shared with the relevance
+# gate's stdlib text sampler (`rag.live`), so the gate judges a page by the same
+# content the index would keep.
+PRUNE_TAGS = ("script", "style", "nav", "header", "footer", "aside", "form", "noscript")
 
 
 def prune_html(html: str) -> str:
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(html, "html.parser")
-    for tag_name in _PRUNE_TAGS:
+    for tag_name in PRUNE_TAGS:
         for tag in soup.find_all(tag_name):
             tag.decompose()
     return str(soup)
@@ -77,13 +79,17 @@ def build_html_converter() -> DocumentConverter:
     return DocumentConverter(allowed_formats=[InputFormat.HTML])
 
 
-def convert_html(pruned_html: str, name: str, converter: DocumentConverter) -> DoclingDocument:
+def convert_html(pruned_html: str, name: str, converter: DocumentConverter) -> ConversionResult:
+    """The whole conversion result, not just `.document`: the live path decides
+    whether a page may be stored from `status`, and an HTML conversion that only
+    partly succeeded is as unstorable as a truncated PDF (`rag.live`). Snapshot
+    parsing reads `.document` and lets its own try/except judge the failures."""
     from io import BytesIO
 
     from docling.datamodel.base_models import DocumentStream
 
     stream = DocumentStream(name=f"{name}.html", stream=BytesIO(pruned_html.encode("utf-8")))
-    return converter.convert(stream).document
+    return converter.convert(stream)
 
 
 def meta_for(entry: RegistryEntry, *, artifact: Path, variant: str, lang: str | None) -> ParsedMeta:
@@ -153,7 +159,7 @@ def main(argv: list[str] | None = None) -> None:
             else:
                 raw = artifact.read_text(encoding="utf-8", errors="replace")
                 pruned = prune_html(raw)
-                document = convert_html(pruned, artifact.stem, html_converter)
+                document = convert_html(pruned, artifact.stem, html_converter).document
                 meta = meta_for(entry, artifact=artifact, variant="html", lang=html_lang(raw))
             persist(document, meta, out_dir)
         except Exception:

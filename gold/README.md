@@ -6,6 +6,7 @@ campus 集（M2.5，LLM 起草 → Claude 逐题核对 → 人工按 URL 抽查�
 
 - `campus.jsonl` — 校园信息题（it/en/zh 混合），按 URL 判分；验收门 EN/IT hit@5 ≥ 0.80，ZH 单独报告
 - `campus-autogrow.jsonl` — 答案页**故意不在库里**的题（含 modulo PDF 题），M2.5b 自增长验收用（先 0/N，跑完流程 ≥⌈0.7N⌉），PR1 不跑分
+- `relevance-gate.jsonl` — M2.5b 相关性门标注集（见下方专节；**非本页 GoldQuestion schema，不可传给 `rag.gold`**）
 
 ## 存放
 
@@ -30,6 +31,20 @@ campus 集（M2.5，LLM 起草 → Claude 逐题核对 → 人工按 URL 抽查�
 | `answer_ref` | 参考答案文件相对仓库根的路径 |
 | `target` | 路由标签（agent 应查哪个库）；可省，默认 `slides`；campus 题写 `unifi_web` |
 | `urls` | campus 题的 ground truth：命中 = top-k 里任一 web chunk 的 `url` ∈ 此列表（尾斜杠不敏感）。带 `urls` 的题按 URL 判分，不看 `source_file`/`page`。同一答案存在于多个页面时列出所有**核实过的**等价页（多参考；只加验证过含答案的页，不加"检索碰巧返回的"页） |
+
+## relevance-gate.jsonl（M2.5b 相关性门标注集）
+
+**不是 GoldQuestion**：缺 `id`/`question`/`answer_ref` 必填项，传给 `uv run python -m rag.gold` 会校验报错。唯一消费方 = M2.5b Stage 7 相关性门质量测量（真机 ≥18/20，先 commit 冻结再测）。20 条 URL 全部取自 `data/webcorpus/registry.jsonl` 出链图的未爬候选（LLM 起草 → Claude 逐条核对 → 用户抽查定稿）。
+
+```json
+{"url": "https://...", "label": "relevant", "note": "为何该入库/不该入库"}
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `url` | 待判定页面；10 相关（含 DSU/CISIA/PDF 边界例）+ 10 无关（含商业页与 unifi 域内登录页硬负例） |
+| `label` | `relevant`（应持久入库）/ `irrelevant`（不入库）——判据是「内容值得进校园 KB」，不是域名 |
+| `note` | 标注理由，人工抽查与 M3 错误分析用 |
 
 ## 撰写规则
 

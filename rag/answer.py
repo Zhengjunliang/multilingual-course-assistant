@@ -88,6 +88,19 @@ def answer(
     yield from streamer.stream(build_messages(question, hits, locale))
 
 
+def print_sources(hits: Sequence[Hit]) -> None:
+    """The footer every CLI prints under an answer (callers skip it when there
+    is nothing to cite): each distinct marker once, in retrieval order, in the
+    exact shape the model was told to cite."""
+    print("\nSources:")
+    seen: list[str] = []
+    for hit in hits:
+        marker = source_marker(hit)
+        if marker not in seen:
+            seen.append(marker)
+            print(f"  {marker}")
+
+
 def main(argv: list[str] | None = None) -> None:
     from config.env import env
     from rag.index import (
@@ -140,19 +153,15 @@ def main(argv: list[str] | None = None) -> None:
     )
     client.close()
 
-    streamer = build_streamer(env.llm_base_url, env.llm_api_key, env.llm_model)
+    # Greedy decoding is stated here rather than inherited: the same question
+    # must produce the same answer across two runs of a gate (rag/llm.py).
+    streamer = build_streamer(env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0)
     for token in answer(args.question, hits, streamer, locale):
         print(token, end="", flush=True)
     print()
 
     if hits:
-        print("\nSources:")
-        seen: list[str] = []
-        for hit in hits:
-            marker = source_marker(hit)
-            if marker not in seen:
-                seen.append(marker)
-                print(f"  {marker}")
+        print_sources(hits)
 
 
 if __name__ == "__main__":

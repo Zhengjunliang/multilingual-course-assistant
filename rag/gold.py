@@ -5,8 +5,14 @@ its `page`. This is the M2 tuning signal (chunk size / top-k / prompt) — the
 real evaluation harness (RAGAS, retrieval metrics, error taxonomy) belongs to
 M3 and does not live here.
 
+`--routing` is a second, independent report over the same file: it scores the
+router's collection choice against the gold `target` and runs no retrieval at
+all — no encoders, no reranker, no index.
+
     uv run python -m rag.gold gold/smoke.jsonl
     uv run python -m rag.gold gold/smoke.jsonl --no-rerank --top-k 10
+    uv run python -m rag.gold gold/campus.jsonl --routing
+    uv run python -m rag.gold gold/campus-autogrow.jsonl --live on
 """
 
 from __future__ import annotations
@@ -18,12 +24,14 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from rag.agent import FALLBACK_REASON, collections_for, route
 from rag.probe import configure_cli_logging
 from rag.search import DEFAULT_RERANK_MODEL, build_reranker, search
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from rag.llm import Completer
     from rag.search import Hit
 
 logger = logging.getLogger(__name__)
@@ -79,6 +87,63 @@ def is_hit(question: GoldQuestion, hits: Sequence[Hit]) -> bool:
     )
 
 
+class RoutingRow(BaseModel):
+    """One question's routing outcome under `--routing`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    gold_target: str
+    routed_target: str
+    exact: bool
+    wide: bool
+    fallback: bool
+
+
+class RoutingReport(BaseModel):
+    """Four counts side by side, because one rate cannot tell the failure modes
+    apart: `exact` scores `both` against a specific gold target as a miss (the
+    primary number), `wide` accepts any routed set that contains the gold
+    target, and the `both`/`fallback` counts say how much of the gap is the 4B
+    model hedging versus failing schema validation outright."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rows: list[RoutingRow]
+    exact: int
+    wide: int
+    both: int
+    fallback: int
+
+
+def routing_report(questions: Sequence[GoldQuestion], completer: Completer) -> RoutingReport:
+    """Route every question and score the choice. Pure report: the collections
+    are scored as names, never opened."""
+    rows: list[RoutingRow] = []
+    for question in questions:
+        decision = route(question.question, completer)
+        rows.append(
+            RoutingRow(
+                id=question.id,
+                gold_target=question.target,
+                routed_target=decision.target,
+                exact=decision.target == question.target,
+                wide=question.target in collections_for(decision),
+                # Identity against the router's own constant, not a prefix: a
+                # validated reply is free to explain itself with the word
+                # "fallback" without being counted as a schema failure.
+                fallback=decision.reason == FALLBACK_REASON,
+            )
+        )
+    return RoutingReport(
+        rows=rows,
+        exact=sum(row.exact for row in rows),
+        wide=sum(row.wide for row in rows),
+        both=sum(row.routed_target == "both" for row in rows),
+        fallback=sum(row.fallback for row in rows),
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     from rag.index import (
         DEFAULT_DENSE_MODEL,
@@ -95,6 +160,29 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--qdrant-path", type=Path, default=DEFAULT_QDRANT_DIR)
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
+    # Eval reads the frozen crawl snapshot by default: a live increment written
+    # between two runs would otherwise move a gate number, and the gates are the
+    # thesis' regression evidence (ADR-1, docs/architettura.md).
+    parser.add_argument("--ingest-source", choices=["crawl", "live"], default="crawl")
+    parser.add_argument(
+        "--snapshot",
+        metavar="run_id",
+        default=None,
+        help="narrow web retrieval to a single ingest run",
+    )
+    parser.add_argument(
+        "--live",
+        choices=["off", "on"],
+        default="off",
+        help="'on' drops the web-source condition so retrieval also sees what "
+        "the autogrow run wrote; 'off' keeps eval on the crawl snapshot",
+    )
+    parser.add_argument(
+        "--routing",
+        action="store_true",
+        help="report-only: score the router's collection choice per question, "
+        "without retrieving anything",
+    )
     args = parser.parse_args(argv)
 
     configure_cli_logging()
@@ -102,6 +190,51 @@ def main(argv: list[str] | None = None) -> None:
     dangling = missing_answer_refs(questions, Path())
     if dangling:
         logger.warning("answer_ref not on disk for: %s", ", ".join(dangling))
+
+    if args.routing:
+        # Short-circuit before any model is built: the retrieval stack costs
+        # ~2.4GB of VRAM that the routing report has no use for.
+        from config.env import env
+        from rag.llm import build_completer
+
+        overridden = [
+            name
+            for name in ("top_k", "no_rerank", "qdrant_path", "dense_model", "rerank_model", "live")
+            if getattr(args, name) != parser.get_default(name)
+        ]
+        if overridden:
+            logger.warning(
+                "routing report is LLM-only; retrieval flags ignored: %s", ", ".join(overridden)
+            )
+        # Fixed seed: the run-twice-identical gate must not rest on greedy
+        # decoding alone; recorded in diario at Stage 9.
+        report = routing_report(
+            questions,
+            build_completer(
+                env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0, seed=0
+            ),
+        )
+        for row in report.rows:
+            print(
+                f"{row.id} {row.gold_target} -> {row.routed_target}"
+                f"{' FALLBACK' if row.fallback else ''}"
+            )
+        total = len(report.rows)
+        for label, count in (
+            ("exact-hit", report.exact),
+            ("wide-hit", report.wide),
+            ("both", report.both),
+            ("fallback", report.fallback),
+        ):
+            print(f"{label}: {count}/{total} ({count / total if total else 0.0:.0%})")
+        return
+
+    # ADR-1's explicit release: the autogrow acceptance has to see the pages the
+    # run just wrote, and the answer may sit in either version of a page, so
+    # `--live on` drops the condition rather than pointing it at "live".
+    ingest_source = None if args.live == "on" else args.ingest_source
+    if ingest_source is None and args.ingest_source != parser.get_default("ingest_source"):
+        logger.warning("--live on opens the filter; --ingest-source %s ignored", args.ingest_source)
 
     dense = build_dense_encoder(args.dense_model)
     sparse = build_sparse_encoder()
@@ -123,6 +256,10 @@ def main(argv: list[str] | None = None) -> None:
             reranker,
             limit=args.top_k,
             collections=(question.target,),
+            # Single passthrough, no per-collection branching: `search()` drops
+            # both web-source conditions on every non-web prefetch branch.
+            ingest_source=ingest_source,
+            ingest_run_id=args.snapshot,
         )
         hit = is_hit(question, hits)
         scored += hit
