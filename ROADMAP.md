@@ -34,10 +34,12 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 - [x] `rag/agent.py` 路由器：RouteDecision（target/query/fresh/reason，校验失败 fallback `both`）+ 带理由拒答 + 兜底拒答+指路（出链图无候选时提示「贴 URL 可教会系统」）+ `ask` CLI；`rag/gold.py` `--routing`（路由准确率 · both 占比 · fallback 率）——实测 exact 22/32 · wide 26/32 · both 4 · fallback 0，两跑恒等
 - [x] `rag/live.py`（唯一写模块）：实时抓取 → LLM 相关性门（JSON 二分，校验失败=不落库；20 条标注集真机验收 **≥18/20**——实测 **18/20**，一轮门修订、金标未动）→ 持久写入（`ingest_source="live"`）+ registry 溯源 + 按 `ingest_run_id` 回滚 CLI；**整轮显存预算**：解析与 encode 走 CPU · LLM 段间卸载 · 页数 ≤40 · 60s/步 + 解析独立 120s（真机峰值 **7923** < 8188 MiB）
 - [x] 深化循环：抓页 → 「够答？」判定（**原 self-assess 并入此停止条件**）→ 编号候选（出链 ≤10 + PDF 附件）选一 → ≤3 步硬上限；`--no-deepen` 降级开关；逐题决策日志（run_id，M3 错误分类法原料）
-- [~] autogrow 验收：`rag/gold.py` 加 `--live {off,on}`（默认 off）；未收录题组前 0/N → 跑流程后 **≥⌈0.7N⌉**（降级触发则分数附注状态、不与正常态混比）；content_hash 变/不变 → 重索引/跳过日志；回滚后 campus 基线恒等（快照未被 live 打洞的证据）——工装与协议全部落地并真机验证（三态日志 · 两次回滚精确归位 29098 · campus/smoke/control 终跑恒等基线），**分数门未达：双臂均 0/7**（主臂与 `--no-deepen` 同分 = 瓶颈不在跳链），五种失败模式逐题归因见 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)，作为 M3 错误分类法骨架
+- [~] autogrow 验收：`rag/gold.py` 加 `--live {off,on}`（默认 off）；未收录题组前 0/N → 跑流程后 **≥⌈0.7N⌉**（降级触发则分数附注状态、不与正常态混比）；content_hash 变/不变 → 重索引/跳过日志；回滚后 campus 基线恒等（快照未被 live 打洞的证据）——工装与协议全部落地并真机验证（三态日志 · 两次回滚精确归位 29098 · campus/smoke/control 终跑恒等基线），**分数门未达：双臂均 0/7**（主臂与 `--no-deepen` 同分 = 瓶颈不在跳链），五种失败模式逐题归因见 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)，作为 M3 错误分类法骨架。其中两个属于本里程碑自身的设计缺陷（选一无拒绝出口 · PDF 命中时出链图盲区）已就地修复但**未重测**；分数门余下部分归 M3 的「autogrow 分数门重测」项
 - [x] eval 读侧隔离：`rag/gold.py` 加 `--ingest-source`（默认 `crawl`）+ `--snapshot <run_id>`，透传进 `search()`（ADR-1 eval 条款兑现，解锁 [docs/architettura.md](docs/architettura.md) 的 🔶 行）——33 个 live 点在库时 campus 仍 28/32，隔离实测成立
 
 ### M3 — 评估（双场景）
+
+**执行顺序**：排在 M5 的 `docker compose up` 全通之后，决策与理由见本文件「自主拍板项（2026-08-24，执行顺序调整）」。
 
 无现成 gold set，M2/M2.5 的冒烟版扩为全量；**slides QA 与 campus QA 双场景同评，gold 含 EN/IT/ZH**（吸收原 M4：跨语言即核心）。工作量粗估：约 3–4 周（模型尺寸对比的 3×3 网格是大头，逐配置重启 vLLM 的墙钟成本先估算再开跑）。
 
@@ -46,7 +48,8 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 - [ ] RAGAS 指标（忠实度、相关性、context precision/recall）+ 检索指标（hit@k、MRR），可复现评估脚本，遵循 [docs/architettura.md](docs/architettura.md) 的实验可复现性协议
 - [ ] LLM judge 校验：抽子样本人工打分，报告 judge 与人工的一致性 —— judge 与被评系统同为 Qwen 系，自偏好是已知效应，答辩必被问
 - [ ] agent 指标：路由准确率 / `both` 占比 / fallback 率 / 拒答桶细分，纳入错误分类法
-- [ ] 错误分类法：失败题逐个归因分桶（解析丢失 / 死 chunk / 切分不当 / 检索 miss / 路由错库 / rerank 降位 / 上下文截断 / 生成幻觉 / 误拒答），聚合分数不构成实验章，逐桶分析才构成
+- [ ] 错误分类法：失败题逐个归因分桶（解析丢失 / 死 chunk / 切分不当 / 检索 miss / 路由错库 / rerank 降位 / 上下文截断 / 生成幻觉 / 误拒答 / 判定饱和 / 强制选择 / 出链图盲区 / 门判据范围），聚合分数不构成实验章，逐桶分析才构成。后四个桶由 M2.5b autogrow 跑观察到（见 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)）
+- [ ] autogrow 分数门重测（M2.5b `[~]` 的余下部分）：双臂 0/7 测于 `ee15f37`，此后两个设计缺陷已修（选一拒绝出口 · PDF 命中回溯 referrer）**未重测**。在尺寸网格上重测，报告须并列 0/7 与新分数并注明配置差异（修复 + 尺寸两处同时变化）；「判定饱和」需先决断按 URL 判分是否仍是 autogrow 的正确判据（g001 答对但目标页未入库）
 - [ ] 基线三件套：纯 BM25（Qwen-Agent 路线，见 [docs/analisi-rag.md](docs/analisi-rag.md)）· dense-only vs hybrid · 有/无 rerank —— 「rerank 是质量主要来源」这一断言要有测量支撑
 - [ ] Langfuse 接入（tracing，自托管）
 - [ ] 模型尺寸对比（0.6B / 4B / 8B）：质量与运行成本
@@ -58,6 +61,8 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 2026-08-21 拍板：任意语言提问 → 同语言回答是双场景（slides QA + campus QA）核心能力，评估语言 EN/IT/ZH（± 一个欧洲语言），并入 M2.5/M3；本里程碑不再单独存在，保留编号避免 M5–M7 引用重排。relatore 原 «eventualmente» 门控随新方向关闭（Meet 报备项）。
 
 ### M5 — 网站（PPM 部分）
+
+**执行顺序**：本里程碑提前到 M3 之前执行，做到 M6 的「干净机器 `docker compose up` 一条命令起全套 + 浏览器完成双库问答演示」为止，含账号与多租户隔离；「Celery beat 定时刷新」留到 M3 之后，「UniFi SSO」仍为 post-tesi。决策与理由见本文件「自主拍板项（2026-08-24，执行顺序调整）」。
 
 工作量粗估：约 4–6 周（后端 + docker-compose + SPA，是研究里程碑之外最大的工程块）。
 
@@ -115,6 +120,13 @@ Meet 🔜 未安排，不阻塞任何里程碑。
 3. 开发期生成本地 Ollama（Qwen3-4B 量化），MICC vLLM 留 M3 正式实验。
 4. 爬取姿态：robots 遵守 · 限速 1 req/s · ≤500 页 · 只读 · UA 表明论文用途（ingegneria.unifi.it 封 GPTBot 类训练爬虫，但通配 UA 无限制；我们是检索索引非模型训练）。
 5. 自增长姿态（2026-08-22 定案）：学生触发的实时抓取经 LLM 相关性门判定后才持久入库，registry 溯源可整批回滚；范围不锁 unifi.it 域（Santa Marta/DSU/CISIA 类学生刚需域可进）；评估用冻结快照与 live 写入隔离，论文数字不受演示影响；论文期演示环境免登录。
+
+自主拍板项（2026-08-24，执行顺序调整）报备即可：
+
+1. **M5 提前到 M3 之前**，做到 M6 的「干净机器 `docker compose up` 一条命令起全套 + 浏览器完成双库问答演示」为止（含账号与多租户隔离）。三条理由：① 研究成果目前只有终端输出，Meet 与答辩都需要看得见的东西；② `migrate` 从未跑过（无 `migrations/`、无 `db.sqlite3`），此刻建自定义 User 与换 PostgreSQL 的成本≈0，越往后越贵（M5 首条已警告事后改造要重写全部迁移）；③ 数据库与检索后端一次换到位，M3 的全部基线建在同一后端上，不会跑到一半换。
+2. **Qdrant 由嵌入式改为 compose 中的服务进程**：网站起来后 Django web、Celery worker、终端评估三方同时要这份索引，嵌入式的单进程文件锁下网站起不来。切换排在 M2.5b「autogrow 分数门重测」记账**之后**，避免一次改动同时变「修了缺陷」与「换了后端」两个变量；切换后重索引并重跑 slides 与 campus gold，两组分数并列记录并注明后端变更。
+3. **访问模型以 M5「访问模型」条为准**：campus QA 免登录、slides 上传与问答需账号 + 多租户隔离。2026-08-22 报备里的「论文期演示环境免登录」限于 campus 场景。
+4. **重排触发条件**：毕业 session 日期一经确定即重新评估 M5/M3 顺序 —— M5 约 4–6 周 + M3 约 3–4 周，当前顺序把 M3 排在了一个边界未知的时间轴之后。
 
 待 relatore 答复：
 

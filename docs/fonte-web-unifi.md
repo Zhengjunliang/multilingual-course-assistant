@@ -68,10 +68,13 @@ stateDiagram-v2
     Assess --> Pick: 不够 & 步数 < 3
     Assess --> Refuse: 不够 & 步数 = 3 → 用现有内容答或拒答
     Pick --> Fetch: 从编号候选（非 PDF 余弦 top-10 + PDF 余弦 top-5）选一
+    Pick --> Refuse: 候选全部不可能含答案 → 拒绝选择，不抓取
     Refuse --> [*]
 ```
 
 ✅ 实现于 `rag/agent.py` `deepen()`（状态机）与 `narrow_candidates()`（候选收窄）；`ask` 入口 `uv run python -m rag.agent "<question>" [--no-deepen]`。
+
+**允许拒绝选择（mini-ADR）**：编号候选**不得强制选一**——抓取写的是**共享**知识库，跟进一条模型自己判定为无关的链接，代价落在此后每一个问题上（验收跑 g004 双臂 · g006 降级臂：模型在 reason 里写下「没有链接含答案，但任务要求必须选一个」后抓了无关页）。Pick 步因此带显式拒绝位（`rag/agent.py` `CandidateChoice.unsuitable`，提示词明写「never required to pick」），✅ 实现于 `pick_candidate()`：拒绝 → 停止深化、**不发起任何抓取**、按「用现有内容答或拒答」收尾，决策日志记 `unsuitable`。与**回退**语义分开且都保留：回复解析不了或编号越界仍取余弦第一名并记 `PICK_FALLBACK_REASON`（坏回复不该花掉一步）——前者 `choice` 为空且 reason 是模型原话，后者 `choice` 有 URL 且 reason 是固定回退串，M3 归因据此区分「模型主动拒绝」与「回复坏了」。
 
 硬上限与预算（全部代码常量，非约定）：≤3 步/题（`DEEPEN_MAX_STEPS`）· 单步墙钟 60s（`rag/live.py` `STEP_TIMEOUT_SECONDS`；超时按「没拿到」继续——该步内容丢弃、不再对未变内容付一次「够答？」判定，直接换下一候选）· **PDF 解析步独立预算 120s**（`rag/live.py` `PDF_PARSE_TIMEOUT_SECONDS`；实测语料最大 PDF 18.4MB 走 CPU classic 40 页顶需 66–69s，压在 60s 步钟内会把恰恰最值得抓的长文档全部判成 PARTIAL_SUCCESS 不可入库）· 单次 LLM 请求 30s（`rag/llm.py` `DEFAULT_TIMEOUT_SECONDS`；SDK 默认 600s + 重试会让任何墙钟预算变成空文，这是步钟下面的硬兜底）· ephemeral 页带入本轮上下文的 chunk 数 ≤5（`rag/agent.py` `EPHEMERAL_CHUNK_LIMIT`，按同一余弦排序取前 5——不在库中，检索排不了它）· live 解析走 CPU + classic 禁 OCR + 页数 ≤40 · live 的 dense encode 走 CPU（`rag/index.py` `(model, device)` 键控懒缓存单实例，**首次加载单独计时不占步预算**——懒加载一次/进程可摊销）· LLM 段间卸载（`OLLAMA_KEEP_ALIVE=0` + 控制流内卸载点）。降级开关 `--no-deepen`：只抓目标页 + 直链 PDF，不跳链接（继承同一余弦排序，**不继承 top-5 截断**——两臂只差「跳链接」单变量，归因才成立）。
 
@@ -88,10 +91,12 @@ stateDiagram-v2
 - 排序串：非 PDF = `anchor_text + url path`；PDF = `anchor_text + 文件名 + url path`（文件名本就在 path 内，重复即加权：法令式 PDF 没有 anchor 句子、path 段也无语义，文件名是它仅有的文本）。
 - 打分：排序串经 `rag/index.py` 的 CPU dense encoder 编码，与 `RouteDecision.query` 算余弦；余弦是 `rag/agent.py` 私有纯 Python helper（dot/norm over `list[float]`），**不引 numpy**——非声明依赖，且候选量级下这层开销可忽略（编码开销另守步钟 ADR）。
 - 名额：非 PDF top-10 与 PDF top-5 **两个独立配额**，PDF 不挤占非 PDF 名额。理由两侧对称：g001/g002 的唯一 referrer 页各挂 32/40 个法令式 PDF，无条件保留 = 洪水口从出链搬到 PDF；合并配额则让导航链把唯一含答案的附件挤出去。输出为两组合并后按余弦降序的单一编号列表。
+- 候选来源：命中页 registry 行的 `outlinks`（本轮现抓的页由 `LiveResult.outlinks` 当场交出，不回头重抓）；命中行**无出链**时（只有 HTML 页记出链，PDF 附件行不记）回落到该行 `referrer_url` 指向的**承载页**行，用承载页的出链当候选，候选的 referrer 记承载页 URL——否则 top 命中全是 PDF 的问题（验收跑 g007/g008 双臂 · g002 降级臂）永远无候选可跳。✅ 实现于 `rag/agent.py` `graph_outlinks()` + `_carrier_row()`；既无出链又无 `referrer_url`（或 referrer 行不在账本里）的命中不贡献候选，静默跳过；候选按 URL 去重，承载页本身也是命中时不会重复出候选。
+- **检索已命中的页不作候选**：承载页必然把它挂的附件也列在出链里（爬虫就是从那儿发现它的——首爬 132 个附件行 132/132 如此），不排除就等于把本轮命中原样递回候选列表，白耗三步预算之一去重读一份文本已在上下文里的页；而增量判定会把这次抓取记成 `already indexed`，那个取值的定义恰恰是「库里有、**检索没捞出来**」，于是往 M3 归因原料里系统性写入语义相反的行。✅ `rag/agent.py` `graph_outlinks()` 按本步全部命中 URL 过滤（不只过滤读图的那一行——承载页自身也是命中时，附件会从承载页那一行漏回来）。
 - 候选带 referrer：每个候选连同**挂它的那一页 URL** 一起排序、一起交给 `fetch_and_ingest`（`rag/agent.py` `Candidate`），registry 行与 chunk payload 的 `referrer_url` 由此而来——字段属主 [docling-e-pipeline.md](docling-e-pipeline.md) §3.6：web chunk 必须记住附件挂在哪一页，只有 slides 可为空。
 - 离线排序质量实测（gold 问题 × 真实 referrer 页）：g001 正解 PDF 名次 **2/32**，top-5 边界分差 **+0.267**；g002 名次 **3/40**，分差 **+0.056**。两题均在 top-5 内，具名 fallback（词法预筛 / GPU 编码窗口 / anchor 向量缓存）无需启用。g002 分差薄 = 已知脆弱点（同页有逐字相同 anchor 的兄弟 PDF，区分信号只在 DOM 分节标题里，`extract_links` 不采集），记为 M3 错误分类法改进候选。
 
-逐题决策日志（M3 错误分类法原料）schema：`run_id · question_id · step · candidates[] · choice · reason · outcome`。✅ `rag/agent.py` `Decision` 模型，append-only 落 `data/webcorpus/decisions.jsonl`（`--decision-log` 可改）。`candidates[]` 落 anchor 原文，否则无法区分「候选没给对」与「模型选错」；`outcome` 取值 `answered · persisted · already indexed · ephemeral · not retrieved · timeout · no candidates · steps exhausted`（`already indexed` = 增量判定认出该页未变、库未增长，与 `persisted` 分开记以便 M3 归因）。
+逐题决策日志（M3 错误分类法原料）schema：`run_id · question_id · step · candidates[] · choice · reason · outcome`。✅ `rag/agent.py` `Decision` 模型，append-only 落 `data/webcorpus/decisions.jsonl`（`--decision-log` 可改）。`candidates[]` 落 anchor 原文，否则无法区分「候选没给对」与「模型选错」；`outcome` 取值 `answered · persisted · already indexed · ephemeral · not retrieved · timeout · no candidates · unsuitable · steps exhausted`（`already indexed` = 增量判定认出该页未变、库未增长，与 `persisted` 分开记以便 M3 归因；`unsuitable` = 候选列表给了、模型判定全部不可能含答案而拒绝选择，与 `no candidates` 的「图里本就没有候选」是两种不同失败）。
 
 ## 兜底行为
 

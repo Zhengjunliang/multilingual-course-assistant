@@ -13,7 +13,8 @@ costs latency, never correctness.
 
 When the stored corpus cannot answer, `deepen()` follows links instead of
 refusing: assess what was retrieved, narrow the outlink graph to a numbered
-shortlist, let the model pick one, fetch it through `rag.live`, retrieve again.
+shortlist, let the model pick one — or say none of them can hold the answer —
+fetch it through `rag.live`, retrieve again.
 Three steps at most, and the state machine (docs/fonte-web-unifi.md owns it)
 ends by answering from whatever was gathered — an honest refusal is the last
 resort, not the default. A refusal still carries the one thing a student can
@@ -126,9 +127,15 @@ You pick the one link most likely to contain the answer to the student's \
 question. The candidates are numbered and PDF attachments are marked [PDF]; \
 a form or a decree is often where an administrative answer actually lives.
 
-Reply with the number of exactly one candidate, and ONLY one JSON object, no \
-prose:
-{"choice": 1, "reason": "..."}"""
+You are never required to pick. When none of the numbered candidates can \
+plausibly contain the answer, set "unsuitable" to true instead of taking the \
+least bad one: what gets fetched is stored for every later question too, so \
+following a link you have already judged irrelevant costs more than leaving \
+this question unanswered.
+
+Reply with the number of exactly one candidate, or with that refusal, and ONLY \
+one JSON object, no prose:
+{"choice": 1, "unsuitable": false, "reason": "..."}"""
 
 
 class RouteDecision(BaseModel):
@@ -160,11 +167,21 @@ class AnswerVerdict(BaseModel):
 
 
 class CandidateChoice(BaseModel):
-    """One 1-based index into the numbered shortlist, plus why."""
+    """One 1-based index into the numbered shortlist, plus why — or the refusal.
+
+    `unsuitable` is the model saying that no candidate on the shortlist can hold
+    the answer at all, and it is a real branch rather than a formality: forced
+    to choose, a 4B model fetches a link it has just called irrelevant, and what
+    a fetch writes lands in the *shared* knowledge base. A refusal therefore
+    does not have to invent a number either, hence the default on `choice`;
+    `unsuitable` itself defaults to False, so a dropped flag costs one fetch out
+    of three rather than the whole turn.
+    """
 
     model_config = ConfigDict(frozen=True)
 
-    choice: int
+    choice: int = 0
+    unsuitable: bool = False
     reason: str
 
 
@@ -178,7 +195,9 @@ class Decision(BaseModel):
     fetches made when the row was written, so a row that ends the turn carries
     the number of hops it took. `outcome` is one of `answered` · `persisted` ·
     `already indexed` · `ephemeral` · `not retrieved` · `timeout` ·
-    `no candidates` · `steps exhausted`.
+    `no candidates` · `unsuitable` · `steps exhausted` (`unsuitable` = the
+    shortlist was offered and the model rejected all of it, which is not the
+    same failure as `no candidates`, where the graph had nothing to offer).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -325,6 +344,24 @@ def narrow_candidates(
     return kept
 
 
+def _carrier_row(
+    entry: RegistryEntry, registry: Mapping[str, RegistryEntry]
+) -> RegistryEntry | None:
+    """The ledger row whose outlinks stand in for this one's.
+
+    Only HTML pages record outlinks, so a hit that is a PDF attachment has no
+    graph of its own: a question whose every top hit is an attachment could
+    never deepen, which is a class of questions rather than an edge case. The
+    ledger already holds the way out — an attachment row names the page that
+    linked it (`referrer_url`), and that page's row carries the links. A row
+    with neither outlinks nor a referrer still in the ledger contributes
+    nothing, silently: there is no graph around it to read.
+    """
+    if entry.outlinks:
+        return entry
+    return registry.get(entry.referrer_url or "")
+
+
 def graph_outlinks(
     hits: Sequence[Hit],
     registry: Mapping[str, RegistryEntry],
@@ -340,17 +377,35 @@ def graph_outlinks(
     referrer; pages fetched during the turn hand theirs over the same way,
     through `LiveResult.outlinks`. Either way no page is ever refetched just to
     discover a candidate.
+
+    A hit whose own row records no links — every PDF attachment — is read
+    through the page that carried it instead (`_carrier_row`), and the referrer
+    is that carrier page: the link is listed there, not in the attachment.
+
+    What retrieval already surfaced is never a candidate. A carrier page lists
+    the attachment it carries — that is where the crawler found it, and it holds
+    for all 132 attachment rows of the first snapshot — so without this the step
+    offers the hit back to itself and the loop spends one of its three fetches
+    re-reading a page whose text is already in this turn's context. The
+    incremental check would even call that fetch `already indexed`, whose whole
+    meaning is "the index holds it and retrieval had *not* surfaced it".
     """
+    surfaced = {hit.chunk.url for hit in hits if hit.chunk.url}
     recorded = [
-        Candidate(link=link, referrer=entry.url)
+        Candidate(link=link, referrer=source.url)
         for hit in hits
         if (entry := registry.get(hit.chunk.url or "")) is not None
-        for link in entry.outlinks
+        if (source := _carrier_row(entry, registry)) is not None
+        for link in source.outlinks
     ]
     pool: dict[str, Candidate] = {}
     for candidate in (*recorded, *handed_over):
-        if candidate.link.url not in visited and candidate.link.url not in pool:
-            pool[candidate.link.url] = candidate
+        # Both sources are filtered, not just the ledger's: a page fetched
+        # earlier this turn links back to its section hub, and a hub is exactly
+        # what retrieval tends to surface.
+        url = candidate.link.url
+        if url not in visited and url not in surfaced and url not in pool:
+            pool[url] = candidate
     return list(pool.values())
 
 
@@ -407,18 +462,27 @@ def assess_answerable(question: str, hits: Sequence[Hit], completer: Completer) 
 
 def pick_candidate(
     question: str, candidates: Sequence[Candidate], completer: Completer
-) -> tuple[Candidate, str]:
-    """One choice out of the numbered shortlist, with the model's reason.
+) -> tuple[Candidate | None, str]:
+    """One choice out of the numbered shortlist with the model's reason, or
+    `None` when the model judges that none of them can hold the answer.
 
-    An unusable reply — or a number outside the list — takes the top-ranked
-    candidate, which is where the narrowing already put its best guess. Picking
-    wrong costs one fetch out of three, so there is nothing here worth raising.
+    That refusal is deliberate and the loop stops deepening on it: a fetch
+    writes to the shared knowledge base, so following a link the model has just
+    called irrelevant costs every later question, not only this one.
+
+    An unusable reply — or a number outside the list — is a different event and
+    keeps its own contract: take the top-ranked candidate, which is where the
+    narrowing already put its best guess. Picking wrong costs one fetch out of
+    three, so there is nothing here worth raising, and a garbled reply must
+    never read as a judgement the model did not make.
     """
     messages: list[Message] = [
         {"role": "system", "content": PICK_SYSTEM_PROMPT},
         {"role": "user", "content": f"{format_candidates(candidates)}\n\nQuestion: {question}"},
     ]
     choice = complete_json(completer, messages, CandidateChoice)
+    if choice is not None and choice.unsuitable:
+        return None, choice.reason
     if choice is None or not 1 <= choice.choice <= len(candidates):
         return candidates[0], PICK_FALLBACK_REASON
     return candidates[choice.choice - 1], choice.reason
@@ -477,8 +541,10 @@ def deepen(
     Retrieve, ask whether that answers the question, and if it does not, narrow
     the outlink graph to a shortlist, pick one, fetch it through `rag.live` and
     retrieve again — at most `max_steps` fetches, then answer from whatever was
-    gathered. Running out of steps is not a refusal: generation gets the hits
-    either way and refuses only if there is nothing to ground on.
+    gathered. A pick step that rejects the whole shortlist ends the deepening
+    the same way, one fetch earlier. Running out of steps is not a refusal:
+    generation gets the hits either way and refuses only if there is nothing to
+    ground on.
 
     A step over `step_timeout` counts as a step that did not arrive: its content
     is dropped and the loop moves to the next candidate without paying for a
@@ -553,6 +619,14 @@ def deepen(
         pick = partial(pick_candidate, question, candidates, completer)
         (picked, why), elapsed = _timed(pick)
         spent += elapsed
+        if picked is None:
+            # The model read the shortlist and rejected all of it. Fetching one
+            # anyway would write a page it has just called irrelevant into the
+            # shared index, so the turn stops deepening and answers from what it
+            # already holds. The shortlist is recorded with the row: this is a
+            # graph that offered candidates, not an empty one.
+            record(fetched, candidates, None, why, "unsuitable")
+            break
         fetched += 1
         url = picked.link.url
         visited.append(url)

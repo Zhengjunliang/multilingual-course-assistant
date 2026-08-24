@@ -6,8 +6,9 @@ the knowledge base.
 
 The loop's own contract is the hard caps: never more than three fetches, a
 shortlist chosen by cosine and never by DOM order, PDF attachments on a quota of
-their own, a step over budget that moves on instead of ending the turn, and
-exhausted steps that still answer from whatever was gathered. All of it runs
+their own, a step over budget that moves on instead of ending the turn, a
+shortlist the model rejects outright that costs no fetch at all, and exhausted
+steps that still answer from whatever was gathered. All of it runs
 offline — stub fetcher, stub completer, stub encoders, an embedded Qdrant under
 tmp_path — and the step clock runs on a fake one."""
 
@@ -38,6 +39,7 @@ from rag.agent import (
     assess_answerable,
     collections_for,
     deepen,
+    graph_outlinks,
     main,
     narrow_candidates,
     pointer_line,
@@ -74,6 +76,14 @@ WEB_REPLY = (
 KEEP_LOOKING = '{"answerable": false, "choice": 1, "reason": "keep looking"}'
 ANSWERABLE = '{"answerable": true, "reason": "the excerpts state it"}'
 RELEVANT = '{"relevant": true, "reason": "campus page"}'
+# The pick step's refusal, and it names no candidate on purpose: a model that
+# has just rejected the whole shortlist must not have to invent a number to
+# say so.
+UNSUITABLE = '{"unsuitable": true, "reason": "none of these can hold the answer"}'
+# The same refusal from a model that copied the prompt's example shape anyway.
+UNSUITABLE_WITH_CHOICE = (
+    '{"choice": 2, "unsuitable": true, "reason": "none of these can hold the answer"}'
+)
 
 QUERY = "diploma supplement"
 SEED = "https://ingegneria.unifi.it/vp-185-per-laurearsi.html"
@@ -192,12 +202,13 @@ def candidate(text: str, path: str, referrer: str = SEED) -> Candidate:
     return Candidate(link=link(text, path), referrer=referrer)
 
 
-def entry(url: str, outlinks: Sequence[Outlink] = ()) -> RegistryEntry:
+def entry(url: str, outlinks: Sequence[Outlink] = (), referrer: str | None = None) -> RegistryEntry:
     return RegistryEntry(
         url=url,
         content_hash="aa" * 32,
         fetch_date="2026-08-23",
         ingest_run_id="crawl-20260822-143647",
+        referrer_url=referrer,
         outlinks=list(outlinks),
     )
 
@@ -332,6 +343,56 @@ def test_narrowing_returns_at_most_ten_pages_in_cosine_order() -> None:
         second.link.url,
         third.link.url,
     ]
+
+
+def test_a_pdf_hit_deepens_through_the_page_that_carried_it() -> None:
+    """Every top hit being a PDF must not blind the loop. An attachment's
+    registry row records no outlinks — only HTML pages do — so the graph around
+    it is empty and a whole class of questions could never deepen at all. The
+    ledger holds the way out already: the row names the page the attachment hung
+    on, and that page's links are this step's candidates."""
+    # The carrier lists the attachment among its links — it is where the crawler
+    # found it, so this holds for every attachment row of the real snapshot. The
+    # hit must not come back as a candidate for itself.
+    carrier = entry(
+        SEED,
+        [
+            link("Diploma Supplement", "/vp-220-diploma-supplement.html"),
+            link("Modulo", "/upload/sub/modulo-diploma-supplement.pdf"),
+        ],
+    )
+    registry = {ANSWER_PDF: entry(ANSWER_PDF, referrer=SEED), SEED: carrier}
+    fetch = StubFetch()
+
+    pool = graph_outlinks([web_hit(ANSWER_PDF)], registry)
+
+    assert [one.link.url for one in pool] == [HUB]  # and ANSWER_PDF is not offered back
+    assert pool[0].referrer == SEED  # the page that lists the link, never the PDF
+    # The carrier page being a hit in its own right must not offer its links twice.
+    assert graph_outlinks([web_hit(ANSWER_PDF), web_hit(SEED)], registry) == pool
+    # Nor may a page fetched earlier this turn hand a current hit back as a
+    # candidate: a fetched page links to its section hub, and hubs are what
+    # retrieval surfaces.
+    handed_over = [candidate("Modulo", "/upload/sub/modulo-diploma-supplement.pdf")]
+    assert graph_outlinks([web_hit(ANSWER_PDF)], registry, handed_over=handed_over) == pool
+
+    run_loop(
+        StubCompleter(KEEP_LOOKING), hits=[web_hit(ANSWER_PDF)], registry=registry, fetch=fetch
+    )
+
+    assert fetch.calls == [HUB]  # and the loop really hops, instead of stopping on an empty graph
+
+
+@pytest.mark.parametrize("referrer", [None, "https://ingegneria.unifi.it/vp-999-sparita.html"])
+def test_an_attachment_the_ledger_cannot_trace_back_offers_no_candidates(
+    referrer: str | None,
+) -> None:
+    """The fallback is a ledger lookup, not a guess: an attachment row naming no
+    referrer, or naming a page the ledger does not hold, has no graph to read and
+    contributes nothing — silently, and without costing the turn."""
+    pool = graph_outlinks([web_hit(ANSWER_PDF)], {ANSWER_PDF: entry(ANSWER_PDF, referrer=referrer)})
+
+    assert pool == []
 
 
 def test_the_loop_never_fetches_more_than_three_times_and_answers_from_what_it_got() -> None:
@@ -586,14 +647,23 @@ def test_an_unparseable_assessment_reads_as_not_yet_and_keeps_the_loop_going() -
     assert decisions[-1].outcome == "answered"
 
 
-def test_a_pick_outside_the_shortlist_falls_back_to_the_top_ranked_candidate() -> None:
-    """The numbered list has two entries and the model answers "99". Raising
-    would cost the turn; the ranking already put its best guess first, so that
-    is what gets fetched — and the log says the choice was not the model's."""
+@pytest.mark.parametrize(
+    "reply",
+    [
+        '{"choice": 99, "reason": "nonsense"}',  # a number outside the two-entry list
+        '{"reason": "no number at all"}',  # the field dropped: `choice` defaults to 0
+    ],
+)
+def test_a_pick_outside_the_shortlist_falls_back_to_the_top_ranked_candidate(reply: str) -> None:
+    """The numbered list has two entries and the model answers "99", or drops the
+    field entirely. Raising would cost the turn; the ranking already put its best
+    guess first, so that is what gets fetched — and the log says the choice was
+    not the model's. The range guard carries the defaulted 0 as well: without it
+    `candidates[0 - 1]` would silently take the last-ranked candidate."""
     fetch = StubFetch()
 
     _, decisions = run_loop(
-        ScriptedCompleter([KEEP_LOOKING, '{"choice": 99, "reason": "nonsense"}', ANSWERABLE]),
+        ScriptedCompleter([KEEP_LOOKING, reply, ANSWERABLE]),
         hits=[web_hit(SEED)],
         registry={
             SEED: entry(
@@ -609,6 +679,68 @@ def test_a_pick_outside_the_shortlist_falls_back_to_the_top_ranked_candidate() -
 
     assert fetch.calls == [HUB]  # the top-ranked candidate, not the first in the list
     assert decisions[0].reason == PICK_FALLBACK_REASON
+
+
+def test_an_unparseable_pick_falls_back_instead_of_reading_as_a_refusal() -> None:
+    """A garbled reply and a deliberate refusal must stay two different events.
+    A reply that does not validate keeps the older contract — fetch the
+    top-ranked candidate and record that the choice was not the model's — while
+    a refusal stops the loop; collapsing them would make a broken 4B reply cost
+    the turn, and make the decision log unable to tell the two apart."""
+    fetch = StubFetch()
+
+    _, decisions = run_loop(
+        ScriptedCompleter([KEEP_LOOKING, "not json", ANSWERABLE]),
+        hits=[web_hit(SEED)],
+        registry={
+            SEED: entry(
+                SEED,
+                [
+                    link("Sezione", "/vp-1.html"),
+                    link("Diploma Supplement", "/vp-220-diploma-supplement.html"),
+                ],
+            )
+        },
+        fetch=fetch,
+    )
+
+    assert fetch.calls == [HUB]  # a fetch still happened, on the ranking's best guess
+    assert [decision.outcome for decision in decisions] == ["not retrieved", "answered"]
+    assert decisions[0].choice == HUB  # a refusal would have recorded no choice at all
+    assert decisions[0].reason == PICK_FALLBACK_REASON
+
+
+@pytest.mark.parametrize("reply", [UNSUITABLE, UNSUITABLE_WITH_CHOICE])
+def test_a_refused_pick_fetches_nothing_and_answers_from_what_the_turn_already_had(
+    reply: str,
+) -> None:
+    """The forced choice was the defect: with no refusal available the model
+    wrote "none of the links contain the answer ... however, since the task
+    requires selecting one" and fetched an irrelevant page — into the *shared*
+    knowledge base, where every later question pays for it. Rejecting the whole
+    shortlist therefore stops the deepening without a fetch, and the turn still
+    answers from what it holds instead of crashing or refusing.
+
+    A refusal that also carries a number is the same refusal: the prompt's only
+    example shows `choice`, so a 4B model rejecting the shortlist will often
+    copy that shape and fill in a digit anyway. The flag wins — the alternative
+    is fetching a page the model has just called irrelevant."""
+    fetch = StubFetch()
+    hits = [web_hit(SEED)]
+
+    answered, decisions = run_loop(
+        ScriptedCompleter([KEEP_LOOKING, reply]),
+        hits=hits,
+        registry={SEED: entry(SEED, [link("Sezione", "/vp-1.html"), link("Home", "/vp-2.html")])},
+        fetch=fetch,
+    )
+
+    assert fetch.calls == []  # nothing was fetched, so nothing was written
+    assert [decision.outcome for decision in decisions] == ["unsuitable"]
+    assert decisions[0].choice is None
+    assert len(decisions[0].candidates) == 2  # the graph did offer a shortlist: not "no candidates"
+    assert decisions[0].reason == "none of these can hold the answer"  # the model's own words
+    assert answered == hits  # generation still gets everything retrieval had found
 
 
 def test_an_ephemeral_page_rides_in_ranked_not_truncated_at_its_head() -> None:
