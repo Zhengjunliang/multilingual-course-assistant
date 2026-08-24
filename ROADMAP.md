@@ -31,11 +31,11 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 
 **M2.5b — 路由器 + 自增长实时层**
 
-- [ ] `rag/agent.py` 路由器：RouteDecision（target/query/fresh/reason，校验失败 fallback `both`）+ 带理由拒答 + 兜底拒答+指路（出链图无候选时提示「贴 URL 可教会系统」）+ `ask` CLI；`rag/gold.py` `--routing`（路由准确率 · both 占比 · fallback 率）
-- [ ] `rag/live.py`（唯一写模块）：实时抓取 → LLM 相关性门（JSON 二分，校验失败=不落库；20 条标注集真机验收 **≥18/20**，低于走规则表兜底并记 diario 为论文发现）→ 持久写入（`ingest_source="live"`）+ registry 溯源 + 按 `ingest_run_id` 回滚 CLI；**整轮显存预算**：解析与 encode 走 CPU · LLM 段间卸载 · 页数 ≤40 · 60s/步（真机峰值 < 8188 MiB 验收）
-- [ ] 深化循环：抓页 → 「够答？」判定（**原 self-assess 并入此停止条件**）→ 编号候选（出链 ≤10 + PDF 附件）选一 → ≤3 步硬上限；`--no-deepen` 降级开关；逐题决策日志（run_id，M3 错误分类法原料）
-- [ ] autogrow 验收：`rag/gold.py` 加 `--live {off,on}`（默认 off）；未收录题组前 0/N → 跑流程后 **≥⌈0.7N⌉**（降级触发则分数附注状态、不与正常态混比）；content_hash 变/不变 → 重索引/跳过日志；回滚后 campus 基线恒等（快照未被 live 打洞的证据）
-- [ ] eval 读侧隔离：`rag/gold.py` 加 `--ingest-source`（默认 `crawl`）+ `--snapshot <run_id>`，透传进 `search()`（ADR-1 eval 条款兑现，解锁 [docs/architettura.md](docs/architettura.md) 的 🔶 行）
+- [x] `rag/agent.py` 路由器：RouteDecision（target/query/fresh/reason，校验失败 fallback `both`）+ 带理由拒答 + 兜底拒答+指路（出链图无候选时提示「贴 URL 可教会系统」）+ `ask` CLI；`rag/gold.py` `--routing`（路由准确率 · both 占比 · fallback 率）——实测 exact 22/32 · wide 26/32 · both 4 · fallback 0，两跑恒等
+- [x] `rag/live.py`（唯一写模块）：实时抓取 → LLM 相关性门（JSON 二分，校验失败=不落库；20 条标注集真机验收 **≥18/20**——实测 **18/20**，一轮门修订、金标未动）→ 持久写入（`ingest_source="live"`）+ registry 溯源 + 按 `ingest_run_id` 回滚 CLI；**整轮显存预算**：解析与 encode 走 CPU · LLM 段间卸载 · 页数 ≤40 · 60s/步 + 解析独立 120s（真机峰值 **7923** < 8188 MiB）
+- [x] 深化循环：抓页 → 「够答？」判定（**原 self-assess 并入此停止条件**）→ 编号候选（出链 ≤10 + PDF 附件）选一 → ≤3 步硬上限；`--no-deepen` 降级开关；逐题决策日志（run_id，M3 错误分类法原料）
+- [~] autogrow 验收：`rag/gold.py` 加 `--live {off,on}`（默认 off）；未收录题组前 0/N → 跑流程后 **≥⌈0.7N⌉**（降级触发则分数附注状态、不与正常态混比）；content_hash 变/不变 → 重索引/跳过日志；回滚后 campus 基线恒等（快照未被 live 打洞的证据）——工装与协议全部落地并真机验证（三态日志 · 两次回滚精确归位 29098 · campus/smoke/control 终跑恒等基线），**分数门未达：双臂均 0/7**（主臂与 `--no-deepen` 同分 = 瓶颈不在跳链），五种失败模式逐题归因见 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)，作为 M3 错误分类法骨架
+- [x] eval 读侧隔离：`rag/gold.py` 加 `--ingest-source`（默认 `crawl`）+ `--snapshot <run_id>`，透传进 `search()`（ADR-1 eval 条款兑现，解锁 [docs/architettura.md](docs/architettura.md) 的 🔶 行）——33 个 live 点在库时 campus 仍 28/32，隔离实测成立
 
 ### M3 — 评估（双场景）
 

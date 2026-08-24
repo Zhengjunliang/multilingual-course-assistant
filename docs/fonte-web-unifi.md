@@ -2,7 +2,7 @@
 
 校园信息源（UniFi 网站 → Qdrant `unifi_web` collection）的设计属主：scope 规则、快照与 registry 布局、深化循环。chunk 字段表的属主是 [docling-e-pipeline.md](docling-e-pipeline.md)（§3.6，含 web 侧取值规则与替换粒度）；里程碑清单在 [ROADMAP.md](../ROADMAP.md) M2.5；架构决策（自增长写入门 · eval 隔离 · agent 编排）在 [docs/architettura.md](architettura.md) 决策表。
 
-本文件大部分内容 🔜 M2.5a/b——描述已定案、待实现的设计；实现落地时逐节翻 ✅ 并补实测。
+各节状态随实现逐节标注；自增长验收的完整实测记录（门 18/20 · 双臂 0/7 · 逐题归因）归 [diario-sperimentale.md](diario-sperimentale.md)。
 
 ## Scope 规则表
 
@@ -11,9 +11,9 @@
 | 板块（section slug） | 规则 | 状态 |
 | --- | --- | --- |
 | `ingegneria` | `ingegneria.unifi.it/*`（sitemap.php + link-BFS） | ✅ 首爬 2026-08-22：497 页 + 127 PDF（`data/webcorpus/crawl-20260822-143647`），撞 500 页顶时队列剩 940 |
-| `servizi` | `www.unifi.it/it/studia-con-noi*`（报名、学费、segreterie） | 🔜 补爬（`--sections` 定向） |
-| `mobilita` | `www.unifi.it/it/ateneo/nel-mondo*`（Erasmus 与国际流动） | 🔜 补爬（`--sections` 定向） |
-| `international` | `www.unifi.it/en/*`（英文版，国际学生入口） | 🔜 补爬（`--sections` 定向） |
+| `servizi` | `www.unifi.it/it/studia-con-noi*`（报名、学费、segreterie） | ✅ 二爬 2026-08-22：328 页（`data/webcorpus/crawl-20260822-164843`，本轮 3 板块合计 501 页，收队时队列剩 2101） |
+| `mobilita` | `www.unifi.it/it/ateneo/nel-mondo*`（Erasmus 与国际流动） | ✅ 二爬 2026-08-22：74 页（同 run） |
+| `international` | `www.unifi.it/en/*`（英文版，国际学生入口） | ✅ 二爬 2026-08-22：99 页（同 run） |
 | 校外学生刚需域（DSU Toscana、CISIA 等） | 显式条目按需加 | 🔜 查询缺口驱动 |
 
 硬底线（全部路径共用）：robots 遵守 · 1 req/s · `--max-pages` 500 硬顶 · UA 表明论文用途 · PDF 附件 ≤20MB · 只读。附件只收 PDF：Office 后缀（`.doc(x)` `.xls(x)` `.ppt(x)` `.rtf` …）不跟进——首爬实测 46 个全是空白申请表模板，无问答价值；出链图仍记录这些链接。`--sections` 取规则表子集，补爬时把页数配额留给新板块（首爬 ingegneria 一家即打满 500 页）。
@@ -25,9 +25,13 @@
 - **rerank 路径**：每库各出一个 fusion 候选池（每池 20）→ 合并成一个池 → 统一 rerank 取 top-k。跨库可比性由 reranker 保证（它只看 query×文本）。
 - **`--no-rerank` 路径**：RRF 分数**跨库不可比**，不合并——每库各取 top-k，按名次 round-robin 交错后截断到 k（是定义不是融合；长池的余名次补满剩余名额）。
 - **ADR-1 作用域**（决策属主 [architettura.md](architettura.md)）：`ingest_source`/`ingest_run_id` 过滤条件只进 `unifi_web` 的两个 prefetch 分支，slides 分支永不携带——slides 非回归门的语义因此不可能漂移。
-- 多库合并只发生在 agent 路由 `both`（🔜 M2.5b）；两个非回归门（slides · campus）恒单库。
+- 多库合并只发生在 agent 路由 `both`（✅ `rag/agent.py` `collections_for()`）；两个非回归门（slides · campus）恒单库。
 
-## 快照与 registry 布局 🔜 M2.5a
+快照总量（两轮爬取合计）：**998 页 · 4 板块 · `unifi_web` 29098 点**——这是 eval 隔离与回滚验证反复对照的基线点数。
+
+## 快照与 registry 布局
+
+✅ 实现于 `rag/crawl.py`（快照 + manifest + registry 写入）与 `rag/live.py`（live 行追加）；布局如下：
 
 两个工件，生命周期相反：
 
@@ -46,9 +50,9 @@ data/webcorpus/
 - 回滚连带：删除某次 live 写入后，同 URL 更早的 crawl 版本**保留**（回到快照态，期望行为）。
 - 存放：`data/`（gitignore）内，与语料同风险姿态；备份随 `data/gold` 同批。
 
-## 深化循环 🔶 M2.5b
+## 深化循环
 
-状态机与预算落代码（下方逐项标注真实路径），🔜 M2.5b 收尾补自增长验收实测数字（单步预算分解墙钟 · 7 题得分）。
+状态机与预算落代码（下方逐项标注真实路径）。自增长验收实测：**双臂（主臂 · `--no-deepen`）均 0/7**，等分证明瓶颈不在跳链而在上游（判定饱和 · 强制选择 · 路由误送 · 门判据范围）；步预算分解墙钟（解析 ≤46.6s · encode 77–117s/页 · 显存峰值 7923 MiB）与逐题归因见 [diario-sperimentale.md](diario-sperimentale.md)。
 
 以「有可以回答的信息」为停止条件的 agent 迭代抓取（原 self-assess 并入「够答？」判定）：
 
@@ -89,6 +93,6 @@ stateDiagram-v2
 
 逐题决策日志（M3 错误分类法原料）schema：`run_id · question_id · step · candidates[] · choice · reason · outcome`。✅ `rag/agent.py` `Decision` 模型，append-only 落 `data/webcorpus/decisions.jsonl`（`--decision-log` 可改）。`candidates[]` 落 anchor 原文，否则无法区分「候选没给对」与「模型选错」；`outcome` 取值 `answered · persisted · already indexed · ephemeral · not retrieved · timeout · no candidates · steps exhausted`（`already indexed` = 增量判定认出该页未变、库未增长，与 `persisted` 分开记以便 M3 归因）。
 
-## 兜底行为 🔜 M2.5b
+## 兜底行为
 
-出链图无候选且问题未带 URL → 拒答 + 指路：建议去 unifi.it 搜索，并提示「把网址贴给我，我就能学会」（自增长留给贴链接路径）。
+出链图无候选且问题未带 URL → 拒答 + 指路：建议去 unifi.it 搜索，并提示「把网址贴给我，我就能学会」（自增长留给贴链接路径）。✅ 实现于 `rag/agent.py` `pointer_line`（it/en/zh 按 locale 出文案），验收跑中 g007/g008 实际触发。
