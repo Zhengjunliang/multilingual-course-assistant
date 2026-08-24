@@ -84,7 +84,22 @@ ROBOTS = "https://ingegneria.unifi.it/robots.txt"
 RUN_ID = "live-20260823-120000"
 
 NOTHING = LiveResult(
-    persisted=False, chunks=[], outlinks=[], verdict=RelevanceVerdict(relevant=False, reason="stub")
+    persisted=False,
+    stored_now=False,
+    chunks=[],
+    outlinks=[],
+    verdict=RelevanceVerdict(relevant=False, reason="stub"),
+)
+
+# What `rag.live` hands back when the incremental check recognizes a page: the
+# index holds it, this fetch did not put it there, and its outlinks came off the
+# ledger row rather than a parse.
+ALREADY_INDEXED = LiveResult(
+    persisted=True,
+    stored_now=False,
+    chunks=[],
+    outlinks=[],
+    verdict=RelevanceVerdict(relevant=True, reason="campus page"),
 )
 
 
@@ -330,6 +345,7 @@ def test_the_loop_never_fetches_more_than_three_times_and_answers_from_what_it_g
         {
             HUB: LiveResult(
                 persisted=False,
+                stored_now=False,
                 chunks=[refused],
                 outlinks=[],
                 verdict=RelevanceVerdict(relevant=False, reason="commercial page"),
@@ -426,6 +442,7 @@ def test_the_step_clock_stops_when_the_relevance_gate_answers(
         now[0] += 300.0  # parse and encode: off it, by their own budgets
         return LiveResult(
             persisted=True,
+            stored_now=True,
             chunks=[],
             outlinks=[],
             verdict=RelevanceVerdict(relevant=True, reason="ok"),
@@ -457,6 +474,7 @@ def test_a_fetch_that_never_reaches_the_gate_is_counted_whole(
         now[0] += 90.0  # a slow robots.txt and a dead URL behind it
         return LiveResult(
             persisted=False,
+            stored_now=False,
             chunks=[],
             outlinks=[],
             verdict=RelevanceVerdict(relevant=False, reason="fetch: page not retrieved"),
@@ -486,6 +504,7 @@ def test_a_persisted_step_that_blew_its_budget_still_reaches_the_answer() -> Non
         {
             HUB: LiveResult(
                 persisted=True,
+                stored_now=True,
                 chunks=[],
                 outlinks=[],
                 verdict=RelevanceVerdict(relevant=True, reason="ok"),
@@ -504,6 +523,46 @@ def test_a_persisted_step_that_blew_its_budget_still_reaches_the_answer() -> Non
 
     assert [decision.outcome for decision in decisions] == ["timeout", "no candidates"]
     assert answered == [before, after]  # the stored page reached generation after all
+
+
+def test_an_already_indexed_page_is_recorded_apart_and_costs_no_reassessment() -> None:
+    """The incremental skip seen from the loop. "The knowledge base grew" and
+    "retrieval had simply not surfaced this page" are different M3 signals, so
+    they get different outcomes. And since the index did not move, neither did
+    the hits: paying an "answerable?" call to re-judge identical material would
+    spend the next step's budget on a question already answered — the rule the
+    timed-out branch follows for the same reason."""
+    completer = CountingCompleter(KEEP_LOOKING)
+    fetch = StubFetch({HUB: ALREADY_INDEXED})
+
+    _, decisions = run_loop(completer, hits=[web_hit(SEED)], registry=hub_registry(), fetch=fetch)
+
+    assert fetch.calls == [HUB]
+    assert [decision.outcome for decision in decisions] == ["already indexed", "no candidates"]
+    assert completer.calls == 2  # one assessment and one pick, never a second assessment
+
+
+def test_an_already_indexed_step_over_budget_earns_no_catch_up_retrieval() -> None:
+    """The catch-up retrieval exists because a timed-out step had already written
+    a page this turn never saw. A step that only recognized an already-stored
+    page wrote nothing, so there is nothing to catch up on."""
+    retrievals: list[str] = []
+
+    def retrieve(query: str) -> list[Hit]:
+        retrievals.append(query)
+        return [web_hit(SEED)]
+
+    _, decisions = run_loop(
+        StubCompleter(KEEP_LOOKING),
+        hits=[web_hit(SEED)],
+        registry=hub_registry(),
+        fetch=StubFetch({HUB: ALREADY_INDEXED}),
+        retrieve=retrieve,
+        step_timeout=-1.0,
+    )
+
+    assert [decision.outcome for decision in decisions] == ["timeout", "no candidates"]
+    assert len(retrievals) == 1  # the opening one, and no closing one
 
 
 def test_an_unparseable_assessment_reads_as_not_yet_and_keeps_the_loop_going() -> None:
@@ -571,6 +630,7 @@ def test_an_ephemeral_page_rides_in_ranked_not_truncated_at_its_head() -> None:
         {
             HUB: LiveResult(
                 persisted=False,
+                stored_now=False,
                 chunks=[*filler, buried],
                 outlinks=[],
                 verdict=RelevanceVerdict(relevant=False, reason="commercial page"),
@@ -601,6 +661,7 @@ def test_a_step_over_budget_moves_on_without_reassessing_unchanged_material() ->
         {
             HUB: LiveResult(
                 persisted=True,
+                stored_now=True,
                 chunks=[stale],
                 outlinks=[],
                 verdict=RelevanceVerdict(relevant=True, reason="ok"),

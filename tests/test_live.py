@@ -251,6 +251,7 @@ def test_an_unchanged_page_is_never_re_parsed_or_written_twice(
     tmp_path: Path,
     recorded_deletes: list[tuple[list[tuple[str, str]], str]],
     stub_chunking: None,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """The ledger's incremental duty: identical bytes mean the stored version is
     still the current one, so the second fetch pays for neither the parse — the
@@ -260,8 +261,11 @@ def test_an_unchanged_page_is_never_re_parsed_or_written_twice(
     registry = tmp_path / "registry.jsonl"
     fetcher = StubFetcher(site())
     first = ingest(web_client, fetcher, RELEVANT, registry)
-    again = ingest(web_client, fetcher, RELEVANT, registry)
+    with caplog.at_level("INFO"):
+        again = ingest(web_client, fetcher, RELEVANT, registry)
 
+    # The wording is diario evidence: a skip must say so, not "persisted".
+    assert "unchanged since" in caplog.text
     assert fetcher.requested.count(URL) == 2
     assert again.persisted is True  # stored, it simply did not have to be written again
     assert again.chunks == []
@@ -276,6 +280,7 @@ def test_changed_content_replaces_the_stored_version_and_appends_a_row(
     tmp_path: Path,
     recorded_deletes: list[tuple[list[tuple[str, str]], str]],
     stub_chunking: None,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """The other half of the same check: a page that moved is re-parsed and
     re-indexed, and the ledger keeps both fetches — the append-only history is
@@ -285,8 +290,10 @@ def test_changed_content_replaces_the_stored_version_and_appends_a_row(
     updated = site()
     updated[URL] = page(URL, PAGE.replace(b"settembre", b"ottobre"))
 
-    result = ingest(web_client, StubFetcher(updated), RELEVANT, registry)
+    with caplog.at_level("INFO"):
+        result = ingest(web_client, StubFetcher(updated), RELEVANT, registry)
 
+    assert "content changed" in caplog.text  # the diario's changed-count reads this
     assert result.persisted is True
     assert result.chunks
     assert len(recorded_deletes) == 2
@@ -298,7 +305,10 @@ def test_changed_content_replaces_the_stored_version_and_appends_a_row(
 
 
 def test_a_rolled_back_page_is_re_indexed_although_the_ledger_says_unchanged(
-    web_client: QdrantClient, tmp_path: Path, stub_chunking: None
+    web_client: QdrantClient,
+    tmp_path: Path,
+    stub_chunking: None,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A rollback deletes points, not ledger rows — the registry is append-only.
     So the incremental check asks the index as well: after `delete_by_run` the
@@ -310,8 +320,11 @@ def test_a_rolled_back_page_is_re_indexed_although_the_ledger_says_unchanged(
     delete_by_run(web_client, RUN_ID, WEB_COLLECTION)
     assert web_client.count(WEB_COLLECTION).count == 0
 
-    result = ingest(web_client, fetcher, RELEVANT, registry)
+    with caplog.at_level("INFO"):
+        result = ingest(web_client, fetcher, RELEVANT, registry)
 
+    # Not "content changed": the bytes never moved, only the points were gone.
+    assert "reindexed after rollback" in caplog.text
     assert result.persisted is True
     assert result.chunks  # parsed again, not skipped on the surviving ledger row
     assert web_client.count(WEB_COLLECTION).count == 1
@@ -709,6 +722,41 @@ def test_cli_ingests_a_url_and_unloads_the_llm_before_the_heavy_work(
     assert f"{RUN_ID}: persisted {URL}" in capsys.readouterr().out
     assert len(unloaded) == 1
     assert read_registry(registry)[0].ingest_run_id == RUN_ID
+
+
+def test_cli_says_unchanged_rather_than_persisted_when_nothing_was_written(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    stub_chunking: None,
+) -> None:
+    """A skip is not a persist, and the run id is what makes the difference
+    matter: the second run owns no point at all, so printing "persisted" beside
+    it would promise a `--rollback live-...-130000` that removes this page."""
+    monkeypatch.setattr(
+        "rag.live.cached_dense_encoder", lambda model_name, device=None: StubDense()
+    )
+    monkeypatch.setattr("rag.live.build_sparse_encoder", StubSparse)
+    monkeypatch.setattr("rag.live.HttpxFetcher", lambda: StubFetcher(site()))
+    monkeypatch.setattr("rag.live.maybe_unload_llm", lambda base_url, model: None)
+    monkeypatch.setattr("rag.live.build_completer", lambda *args, **kwargs: StubCompleter(RELEVANT))
+
+    second_run = "live-20260823-130000"
+    argv = [
+        URL,
+        "--trigger",
+        "g001",
+        "--qdrant-path",
+        str(tmp_path / "qdrant"),
+        "--registry",
+        str(tmp_path / "registry.jsonl"),
+    ]
+    main([*argv, "--run-id", RUN_ID])
+    main([*argv, "--run-id", second_run])
+
+    first, again = capsys.readouterr().out.splitlines()
+    assert first.startswith(f"{RUN_ID}: persisted {URL}")
+    assert again.startswith(f"{second_run}: unchanged {URL}")
 
 
 def test_rollback_cli_removes_one_run_and_reports_what_is_left(

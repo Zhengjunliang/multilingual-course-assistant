@@ -199,7 +199,7 @@ def main(argv: list[str] | None = None) -> None:
 
         overridden = [
             name
-            for name in ("top_k", "no_rerank", "qdrant_path", "dense_model", "rerank_model")
+            for name in ("top_k", "no_rerank", "qdrant_path", "dense_model", "rerank_model", "live")
             if getattr(args, name) != parser.get_default(name)
         ]
         if overridden:

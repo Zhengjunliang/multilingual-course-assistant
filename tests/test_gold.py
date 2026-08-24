@@ -241,6 +241,24 @@ def live_module_off_limits(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("rag.agent.fetch_and_ingest", lambda *args, **kwargs: forbid("fetch"))
 
 
+def test_the_live_off_guard_is_armed(live_module_off_limits: None) -> None:
+    """The positive control for the test below: a sentinel nobody can trip would
+    let the guard rot away unnoticed, and the test would keep passing. Each of
+    the three doors is checked shut here, so removing one fails a test."""
+    import rag.agent
+    import rag.live
+
+    with pytest.raises(AssertionError):
+        from rag.live import fetch_and_ingest  # noqa: F401 - the import is the assertion
+    with pytest.raises(AssertionError):
+        _ = rag.live.fetch_and_ingest
+    with pytest.raises(AssertionError):
+        # Through the module dict: the binding is what door three closes, and
+        # reading it this way calls the patched object rather than asking the
+        # type checker to satisfy the real signature.
+        vars(rag.agent)["fetch_and_ingest"]()
+
+
 def test_live_off_keeps_the_crawl_filter_and_never_touches_the_live_module(
     live_module_off_limits: None,
     tmp_path: Path,
@@ -375,3 +393,7 @@ def test_routing_report_short_circuits_before_the_retrieval_stack(
     assert "wide-hit: 2/2 (100%)" in out
     assert "both: 1/2 (50%)" in out
     assert "fallback: 0/2 (0%)" in out
+
+    # `--live` rides the same ignored-flags report as every retrieval flag.
+    main([str(gold_file), "--routing", "--live", "on"])
+    assert "retrieval flags ignored: live" in caplog.text

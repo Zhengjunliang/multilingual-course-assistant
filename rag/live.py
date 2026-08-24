@@ -218,13 +218,19 @@ class LiveResult:
     can answer from either way, the page's outlinks (the deepening loop's
     candidates, so Stage 8 never refetches to get them) and the gate's verdict.
 
-    `persisted` can be False while `verdict.relevant` is True: the gate wanted
-    the page, the parse did not finish. It can also be True with no chunks in
-    hand: the page was already stored unchanged, so nothing was parsed and the
-    outlinks come off the ledger row instead.
+    `persisted` answers "is this page in the shared index", `stored_now` answers
+    "did this fetch put it there" — and the two really do come apart in both
+    directions. `persisted` is False while `verdict.relevant` is True when the
+    gate wanted the page and the parse did not finish; `persisted` is True with
+    `stored_now` False when the incremental check found the page already stored
+    unchanged, in which case nothing was parsed and the outlinks come off the
+    ledger row. Callers that mean "the knowledge base grew" must read
+    `stored_now`: an empty `chunks` is no substitute, because a page that now
+    parses to nothing is a real write with no chunks to show for it.
     """
 
     persisted: bool
+    stored_now: bool
     chunks: list[Chunk]
     outlinks: list[Outlink]
     verdict: RelevanceVerdict
@@ -501,6 +507,7 @@ def fetch_and_ingest(
     if response is None:
         return LiveResult(
             persisted=False,
+            stored_now=False,
             chunks=[],
             outlinks=[],
             verdict=RelevanceVerdict(relevant=False, reason="fetch: page not retrieved"),
@@ -545,7 +552,13 @@ def fetch_and_ingest(
         and count_web_versions(client, url, previous.ingest_source, collection)
     ):
         logger.info("%s: unchanged since %s, nothing re-indexed", url, previous.ingest_run_id)
-        return LiveResult(persisted=True, chunks=[], outlinks=previous.outlinks, verdict=verdict)
+        return LiveResult(
+            persisted=True,
+            stored_now=False,
+            chunks=[],
+            outlinks=previous.outlinks,
+            verdict=verdict,
+        )
 
     parsed = parse_page(url, response, entry)
 
@@ -555,7 +568,11 @@ def fetch_and_ingest(
         # page under the full document's hash would make it permanent.
         logger.info("%s: not persisted - %s", url, verdict.reason)
         return LiveResult(
-            persisted=False, chunks=parsed.chunks, outlinks=parsed.outlinks, verdict=verdict
+            persisted=False,
+            stored_now=False,
+            chunks=parsed.chunks,
+            outlinks=parsed.outlinks,
+            verdict=verdict,
         )
 
     # Scoped to (url, "live"): the crawl snapshot version of this page survives
@@ -569,15 +586,24 @@ def fetch_and_ingest(
     # The outlinks ride into the ledger the way the crawler writes them: the
     # deepening loop reads its candidates from the registry's outlink graph.
     append_registry(registry_path, entry.model_copy(update={"outlinks": parsed.outlinks}))
-    logger.info(
-        "%s: %s, %d chunks persisted under %s",
-        url,
-        "first fetch" if previous is None else "content changed",
-        len(parsed.chunks),
-        run_id,
-    )
+    if previous is None:
+        change = "first fetch"
+    elif previous.content_hash != entry.content_hash:
+        change = "content changed"
+    else:
+        # Same bytes as the ledger's last row and here all the same: the check
+        # found no points for them, so the run that wrote them was rolled back
+        # (`delete_by_run` deletes points, never rows). That is the acceptance
+        # protocol's main path, and calling it "content changed" would put a
+        # change in the diario that never happened.
+        change = "reindexed after rollback"
+    logger.info("%s: %s, %d chunks persisted under %s", url, change, len(parsed.chunks), run_id)
     return LiveResult(
-        persisted=True, chunks=parsed.chunks, outlinks=parsed.outlinks, verdict=verdict
+        persisted=True,
+        stored_now=True,
+        chunks=parsed.chunks,
+        outlinks=parsed.outlinks,
+        verdict=verdict,
     )
 
 
@@ -726,10 +752,17 @@ def main(argv: list[str] | None = None) -> None:
         unload_llm=lambda: maybe_unload_llm(env.llm_base_url, env.llm_model),
     )
     client.close()
-    print(
-        f"{run_id}: {'persisted' if result.persisted else 'ephemeral'} "
-        f"{args.url} ({len(result.chunks)} chunks) [{result.verdict.reason}]"
-    )
+    # Three outcomes, not two: a skipped page is in the index but owns no point
+    # under *this* run, so printing "persisted" beside this run id would promise
+    # a `--rollback` that removes it — the run it really belongs to is the one
+    # named in the log line above.
+    if not result.persisted:
+        state = "ephemeral"
+    elif result.stored_now:
+        state = "persisted"
+    else:
+        state = "unchanged"
+    print(f"{run_id}: {state} {args.url} ({len(result.chunks)} chunks) [{result.verdict.reason}]")
 
 
 if __name__ == "__main__":

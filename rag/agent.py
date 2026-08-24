@@ -177,8 +177,8 @@ class Decision(BaseModel):
     model picked the wrong one from a shortlist that did". `step` counts the
     fetches made when the row was written, so a row that ends the turn carries
     the number of hops it took. `outcome` is one of `answered` · `persisted` ·
-    `ephemeral` · `not retrieved` · `timeout` · `no candidates` ·
-    `steps exhausted`.
+    `already indexed` · `ephemeral` · `not retrieved` · `timeout` ·
+    `no candidates` · `steps exhausted`.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -563,15 +563,28 @@ def deepen(
             logger.info("%s: step %d over budget (%.1fs), moving on", url, fetched, spent)
             record(fetched, candidates, url, why, "timeout")
             # The write already happened inside `rag.live`; only this turn's
-            # view of it is discarded, so the index is now ahead of `hits`.
-            stale_index = stale_index or result.persisted
+            # view of it is discarded, so the index is now ahead of `hits`. A
+            # step that only recognized an already-stored page wrote nothing,
+            # so there is nothing for the catch-up retrieval to find.
+            stale_index = stale_index or result.stored_now
             reassess = False  # nothing the loop may use arrived, so nothing changed
             continue
 
         reassess = True
         handed_over.extend(Candidate(link=link, referrer=url) for link in result.outlinks)
-        if result.persisted:
+        if result.stored_now:
             outcome = "persisted"
+        elif result.persisted:
+            # The page was already in the index, unchanged, and the incremental
+            # check said so: the knowledge base did not grow and retrieval had
+            # simply not surfaced the page — two different signals for M3, so
+            # they get two different outcomes. Nothing moved, so reassessing
+            # would spend an LLM call on material already judged — unless a
+            # timed-out write left the index ahead of `hits`, in which case the
+            # retrieval below brings in genuinely new material that has never
+            # been judged. `stale_index` is exactly that distinction.
+            outcome = "already indexed"
+            reassess = stale_index
         elif result.chunks:
             # Refused by the gate or cut short by the parse: readable this turn,
             # invisible to the index, so it rides along instead of being retrieved.
