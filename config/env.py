@@ -4,6 +4,7 @@ Deliberately free of Django imports: `rag/` must stay runnable without Django,
 so both sides can read their configuration from this one source.
 """
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,7 +15,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    django_secret_key: str
+    # SecretStr, not str: Django's debug page cleanses *settings* whose name
+    # looks secret, but it prints every local variable of every traceback frame
+    # verbatim. A `Settings` instance bound as a local — which is what
+    # `from config.env import env` does inside a function — would therefore
+    # render its whole repr, secret key and database password included, to
+    # whoever triggered the error. SecretStr makes that repr `**********`.
+    django_secret_key: SecretStr
     django_debug: bool = False
     django_allowed_hosts: str = "localhost,127.0.0.1"
     django_log_level: str = "INFO"
@@ -25,7 +32,7 @@ class Settings(BaseSettings):
     # committed to the repo is a working credential wherever the repo lands.
     django_db_name: str = "mca"
     django_db_user: str = "mca"
-    django_db_password: str
+    django_db_password: SecretStr
     django_db_host: str = "localhost"
     django_db_port: int = 5432
 

@@ -14,7 +14,9 @@ from config.env import env
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = env.django_secret_key
+# Unwrapped here and only here: Django needs the string, and a settings name
+# containing SECRET is one Django's own debug page cleanses.
+SECRET_KEY = env.django_secret_key.get_secret_value()
 
 DEBUG = env.django_debug
 
@@ -30,7 +32,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
     "apps.accounts",
+    "apps.qa",
 ]
 
 MIDDLEWARE = [
@@ -77,7 +81,9 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env.django_db_name,
         "USER": env.django_db_user,
-        "PASSWORD": env.django_db_password,
+        # As with SECRET_KEY: unwrapped at the one place Django reads it, under
+        # a key its debug page cleanses.
+        "PASSWORD": env.django_db_password.get_secret_value(),
         "HOST": env.django_db_host,
         "PORT": env.django_db_port,
         # Without this every management command hangs indefinitely when the
@@ -90,6 +96,35 @@ DATABASES = {
 
 # Swapped from the first migration: see apps/accounts/models.py.
 AUTH_USER_MODEL = "accounts.User"
+
+
+# REST framework
+# https://www.django-rest-framework.org/api-guide/settings/
+
+# Throttling is not deferrable: one POST occupies the GPU for tens of seconds
+# and answers are served one at a time (apps/qa/engine.py), so without a limit a
+# burst becomes a queue that times out instead of an honest 429. The counters
+# live in Django's default local-memory cache, which is exactly right for one
+# process; Redis arrives with Celery.
+#
+# Both scopes, because `AnonRateThrottle` exempts anyone authenticated and there
+# is already an account that qualifies — the admin superuser. A rate for a role
+# nobody can reach would be dead configuration; a role that bypasses the limit
+# entirely is a hole.
+REST_FRAMEWORK = {
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {"anon": "10/min", "user": "30/min"},
+    # Without this, DRF's default is to trust a client-supplied
+    # X-Forwarded-For as the throttle identity, so
+    # `curl -H "X-Forwarded-For: <anything>"` earns a fresh bucket on every
+    # request and the limit above stops existing. Nothing proxies this service,
+    # so the identity is REMOTE_ADDR and only REMOTE_ADDR.
+    "NUM_PROXIES": 0,
+    "TEST_REQUEST_DEFAULT_FORMAT": "json",
+}
 
 
 # Password validation
