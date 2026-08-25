@@ -37,6 +37,10 @@ INSTALLED_APPS = [
     "apps.qa",
 ]
 
+# One entry that must never be added here: `GZipMiddleware`. It compresses a
+# response as a whole, which means holding a streaming one until it ends —
+# `/api/ask` would then deliver its answer as a single block at the finish, the
+# exact behaviour the event stream exists to remove (apps/qa/views.py).
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

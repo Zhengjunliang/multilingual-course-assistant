@@ -1,4 +1,4 @@
-"""The `/api/ask` response contract.
+"""The `/api/ask` wire contract: what the answer stream is made of.
 
 Pydantic, and deliberately only in this direction. Every contract the pipeline
 already has — `Chunk`, `Hit`, `RouteDecision` — is a pydantic model, so a
@@ -7,14 +7,35 @@ in sync. The request direction is a DRF serializer instead
 (apps/qa/serializers.py): that is what `APIView` calls, and it is where the
 standard 400 body comes from.
 
-This module is the single source for the wire shape. Stage 3 (SSE) and Stage 4
-(the SPA) both read it: adding a field is additive for them, renaming one
-breaks both at once.
+The framing lives here too. Server-sent events are a media type the way JSON is,
+not an HTTP semantic, so keeping the event names apart from the models that
+define them would split one wire shape across two files. `apps/qa/engine.py`
+yields these models and never sees the framing; `apps/qa/views.py` frames them
+and never builds one.
+
+A stream is one `start`, any number of `token`s, and one terminator::
+
+    event: start
+    data: {"question": "...", "locale": "en", "route": {...}, "citations": [...]}
+
+    event: token
+    data: {"text": "An ORM "}
+
+    event: end
+    data: {}
+
+`end` is the completion signal. A stream that stops without it failed — either
+`error` arrived in its place or the connection dropped — which lets a client
+treat both the same way instead of inferring failure from a sentence that
+happens to end mid-word.
+
+This module is the single source for that shape. Stage 4 (the SPA) reads it:
+adding a field is additive there, renaming one breaks it.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -32,6 +53,12 @@ class Citation(BaseModel):
     was instructed to copy into its answer — so a client can match a bracketed
     label in the prose against this list without parsing anything.
 
+    Whether a marker *did* turn up is the client's own `marker in answer` and is
+    deliberately not computed here: the answer arrives in pieces that respect no
+    boundary of their own, a marker is routinely split across two of them, and
+    the check is therefore only meaningful once the whole stream has been
+    joined — which is exactly where the client already stands.
+
     `text` is carried because a slides citation has nothing to click: the PDF is
     not served, so the excerpt itself is its readable form. A web citation adds
     `url` and `fetch_date`, which is the page a student can actually open.
@@ -40,7 +67,6 @@ class Citation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     marker: str
-    cited: bool
     kind: Literal["slides", "web"]
     text: str
     heading_path: list[str]
@@ -53,19 +79,10 @@ class Citation(BaseModel):
     fetch_date: str | None
 
     @classmethod
-    def of(cls, hit: Hit, answer_text: str) -> Citation:
-        """`cited` is a literal substring test, never a judgement.
-
-        The generation prompt spends three lines fighting the model's habit of
-        shortening a marker (rag/answer.py), so `False` here means "did not
-        appear character for character" and nothing more. Reading it as "this
-        excerpt went unused" would turn a formatting slip into a missing source.
-        """
-        marker = source_marker(hit)
+    def of(cls, hit: Hit) -> Citation:
         chunk = hit.chunk
         return cls(
-            marker=marker,
-            cited=marker in answer_text,
+            marker=source_marker(hit),
             kind=chunk.kind,
             text=chunk.text,
             heading_path=chunk.heading_path,
@@ -79,28 +96,87 @@ class Citation(BaseModel):
         )
 
 
-class AskResponse(BaseModel):
-    """One answered question, on the wire.
+class Event(BaseModel):
+    """One event in the answer stream.
+
+    `NAME` is the value of the `event:` line, declared beside the fields it
+    labels so that framing an event never needs a dispatch table somewhere else.
+    The `ClassVar` annotation is load-bearing: without it pydantic reads the
+    attribute as a field and it would be serialised into every payload.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    NAME: ClassVar[str]
+
+
+class StartEvent(Event):
+    """Everything known before a single token exists.
 
     `route` is `rag.agent.RouteDecision` itself rather than a parallel model:
     the router owns that schema, and a copy here would drift the first time a
     field is added to it.
 
-    `citations` is the grounding set the answer was generated from — every
+    `citations` is the grounding set the answer is being generated from — every
     retrieved hit, in retrieval order, one entry each, no deduplication. Two
-    chunks of the same page share a marker but carry different text and
-    different scores, so merging them here would throw away something the client
-    can recover for itself by grouping on `marker`. It is not a parse of the
-    answer prose; see `Citation.of`.
+    chunks of one page share a marker but carry different text and different
+    scores, so merging them here would drop an excerpt the reader was answered
+    from; a client that wants them merged can group on `marker`. They travel
+    first, ahead of the prose, because sources and answer appearing together is
+    the claim this system is making.
 
     `locale` is the language generation was actually asked for, whether the
-    request named it or `Engine.ask` detected it from the question.
+    request named it or the engine detected it from the question.
     """
 
-    model_config = ConfigDict(frozen=True)
+    NAME = "start"
 
     question: str
     locale: str
-    answer: str
     route: RouteDecision
     citations: list[Citation]
+
+
+class TokenEvent(Event):
+    """One piece of the answer, exactly as the model produced it.
+
+    The pieces carry no structure — they break wherever the tokenizer did — so
+    the answer is their concatenation and nothing else.
+    """
+
+    NAME = "token"
+
+    text: str
+
+
+class EndEvent(Event):
+    """The answer is complete. Empty on purpose: its arrival is the message."""
+
+    NAME = "end"
+
+
+class ErrorEvent(Event):
+    """Generation failed after the response had already started.
+
+    By then there is no status code left to send, so this stands in for the 503
+    the same failure would have produced a moment earlier — apps/qa/views.py
+    draws that line. `detail` is written for whoever called the API.
+    """
+
+    NAME = "error"
+
+    detail: str
+
+
+def sse(name: str, data: str) -> str:
+    """One event, framed.
+
+    `data` must already be JSON. A `data:` field ends at the first newline, and
+    JSON is the reason no payload here can contain one outside a string literal
+    — which is why every event in this module is a model rather than raw text.
+    """
+    return f"event: {name}\ndata: {data}\n\n"
+
+
+def sse_event(event: Event) -> str:
+    return sse(type(event).NAME, event.model_dump_json())

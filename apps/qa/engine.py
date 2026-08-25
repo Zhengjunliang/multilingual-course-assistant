@@ -21,8 +21,9 @@ collision arrives here as `EngineUnavailableError`.
 
 Retrieval and generation logic is not reimplemented here. This module routes
 through `rag.agent.route`, retrieves through `rag.search.search` and generates
-through `rag.answer.answer`, which is the same generator Stage 3 will stream
-token by token instead of joining.
+through `rag.answer.answer`, whose tokens it forwards one at a time. What it
+yields are the event models of apps/qa/contract.py; the SSE framing around them
+belongs to the HTTP layer and never appears in this file.
 """
 
 from __future__ import annotations
@@ -34,13 +35,15 @@ from typing import TYPE_CHECKING
 
 from django.utils.translation import gettext_lazy as _
 
-from apps.qa.contract import AskResponse, Citation
+from apps.qa.contract import Citation, EndEvent, ErrorEvent, Event, StartEvent, TokenEvent
 from rag.agent import collections_for, route
 from rag.answer import answer
 from rag.chunk import detect_locale
 from rag.search import search
 
 if TYPE_CHECKING:
+    from collections.abc import Generator, Iterator
+
     from qdrant_client import QdrantClient
 
     from rag.index import DenseEncoder, SparseEncoder
@@ -75,6 +78,10 @@ class EngineUnavailableError(Exception):
     shown to whoever called the API — no filesystem paths, no stack — while the
     original exception travels as `__cause__` for the log.
 
+    Raised only from the part of `Engine.stream` that runs before its first
+    event. Once an event has been yielded the response is already on the wire
+    and a failure has to travel as `ErrorEvent` instead.
+
     Its messages are marked for translation like every other user-facing string
     here. No catalogue exists yet, so they currently read as the English written
     below while DRF's own validation errors — which ship with translations —
@@ -108,13 +115,18 @@ class Engine:
     completer: Completer
     streamer: ChatStreamer
 
-    def ask(self, question: str, locale: str | None = None) -> AskResponse:
+    def stream(self, question: str, locale: str | None = None) -> Iterator[Event]:
         """Route, retrieve, generate — the read-only three quarters of `rag.agent`.
 
         The deepening loop is not here on purpose: it fetches live pages and
         writes them into the *shared* index, which the roadmap puts behind an
         account and a rate limit, and three fetches at tens of seconds each do
         not belong in one synchronous request.
+
+        Everything up to `StartEvent` can still fail into a status code, which
+        is why routing and retrieval happen before the first `yield` rather than
+        lazily alongside the tokens. After it, the only way to report a failure
+        is to describe it inside the stream.
         """
         # Lazy on purpose: `rag/` imports the OpenAI SDK inside the functions
         # that need it, and Django's startup should not pay for it either.
@@ -167,25 +179,27 @@ class Engine:
             collections=available,
         )
 
-        try:
-            # `answer` is a generator; joining it is all that separates this
-            # endpoint from the streaming one. An empty hit list never reaches
-            # the model — it becomes an honest refusal inside `rag.answer`.
-            answer_text = "".join(answer(question, hits, self.streamer, answer_locale))
-        except APIError as exc:
-            # Unlike `complete_json`, which swallows a dead endpoint into a
-            # fallback, the streaming path raises: a half-generated answer is
-            # worse than none.
-            logger.warning("generation failed: %s", exc)
-            raise EngineUnavailableError(LLM_DOWN) from exc
-
-        return AskResponse(
+        yield StartEvent(
             question=question,
             locale=answer_locale,
-            answer=answer_text,
             route=decision,
-            citations=[Citation.of(hit, answer_text) for hit in hits],
+            citations=[Citation.of(hit) for hit in hits],
         )
+
+        try:
+            # An empty hit list never reaches the model — it becomes an honest
+            # refusal inside `rag.answer`, which arrives here as one token.
+            for delta in answer(question, hits, self.streamer, answer_locale):
+                yield TokenEvent(text=delta)
+        except APIError as exc:
+            # Unlike `complete_json`, which swallows a dead endpoint into a
+            # fallback, the streaming path raises. `str()` because the message
+            # is a lazy translation proxy and the event field is a string.
+            logger.warning("generation failed: %s", exc)
+            yield ErrorEvent(detail=str(LLM_DOWN))
+            return
+
+        yield EndEvent()
 
 
 def build_engine() -> Engine:
@@ -264,10 +278,26 @@ class _Holder:
 _HOLDER = _Holder()
 
 
-def answer_question(question: str, locale: str | None = None) -> AskResponse:
+def stream_answer(question: str, locale: str | None = None) -> Generator[Event, None, None]:
     """One question at a time, on the one set of models this process loaded.
 
-    The lock covers the build as well as the call: two first requests arriving
+    Typed as a generator rather than an iterator because `close()` is part of
+    what the caller is handed, not an implementation detail: it is the only way
+    to give the lock back without reading the stream to its end.
+
+    **Nothing here runs until the caller asks for the first event.** A generator
+    body starts on the first `next()`, so that call is where the lock is taken —
+    which is deliberate: it lets the caller run routing and retrieval while it
+    can still answer with a status code (apps/qa/views.py), and it means a
+    generator built and dropped without being read costs nothing.
+
+    The lock is released by the `finally` below on all three ways out: the
+    stream ended, it raised, or the caller closed it. That last one is the
+    everyday case — a reader who navigates away — and it does more than free the
+    queue: the generator is suspended on a `yield`, so closing it also stops
+    pulling tokens from a model nobody is listening to.
+
+    The lock covers the build as well, because two first requests arriving
     together must not each load a reranker. A failed build is not cached — the
     slot stays empty, so the next request tries again once whatever broke has
     been fixed.
@@ -285,6 +315,6 @@ def answer_question(question: str, locale: str | None = None) -> AskResponse:
     try:
         if _HOLDER.engine is None:
             _HOLDER.engine = build_engine()
-        return _HOLDER.engine.ask(question, locale)
+        yield from _HOLDER.engine.stream(question, locale)
     finally:
         _HOLDER.lock.release()
