@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "beautifulsoup4>=4.15.0",
     "django>=5.2,<6",
+    "djangorestframework>=3.18.0",
     "docling>=2.117.0",
     "fastembed>=0.8.0",
     "httpx>=0.28.1",
@@ -27,6 +28,7 @@ dev = [
     # flags things `just typecheck` never sees. Pinning it here makes both read
     # the same declarations.
     "django-stubs>=6.1.0",
+    "djangorestframework-stubs>=3.18.0",
     "pre-commit",
     "pyright",
     "pytest",
@@ -80,6 +82,12 @@ select = [
 # seconds, so it is imported inside the functions that actually need it (see
 # rag/parse.py) — a rule that forces imports to the top would undo that.
 ignore = ["PLC0415"]
+
+[tool.ruff.lint.flake8-type-checking]
+# Pydantic resolves field annotations at class-creation time, so an import used
+# only inside one is a runtime import. Without this, TC001 moves it into a
+# type-checking block and the model fails to build.
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.ruff.lint.per-file-ignores]
 # assert is the tool in tests; the smoke tests exist to spawn subprocesses.

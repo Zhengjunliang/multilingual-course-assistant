@@ -6,7 +6,7 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 
 ## 状态
 
-✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔜 M2.5（UniFi 校园信息源 + agentic 路由）。尚无 web 业务逻辑。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + 非流式问答 API `/api/ask` 已可用（见下面「问答 API」一节），SSE、SPA、账号、异步 ingest 🔜 后续 Stage。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
@@ -31,8 +31,10 @@ just up          # 起 PostgreSQL 容器（Docker Desktop 引擎要先开着）
 just serve       # 开发服务器
 ```
 
-- 管理后台在 <http://127.0.0.1:8000/admin/>
-- 根路径 `/` 无内容：[config/urls.py](config/urls.py) 只注册了 admin，Django 显示它的默认欢迎页。问答界面 🔜 M5（React SPA 一条）
+- 管理后台在 <http://127.0.0.1:8000/admin/>；问答 API 在 `/api/ask`（见下节）
+- 根路径 `/` 无内容：[config/urls.py](config/urls.py) 只挂了 admin 与 api，Django 显示它的默认欢迎页。问答界面 🔜 M5 后续 Stage（React SPA 一条）
+
+**`just serve` 跑着的时候，终端里的 `just index` / `just search` / `just ask` 会失败**：本地 Qdrant 是嵌入式的，独占 `data/qdrant` 目录锁，网站进程先开就轮不到 CLI（反过来也一样，那时端点返回 503 并说明冲突）。要两边同时用，先 `Ctrl+C` 停掉网站。这条随「Qdrant 改服务进程」🔜 解除，见 [ROADMAP.md](ROADMAP.md) 自主拍板项一节。
 
 收工 `just down`——容器停掉，数据留在命名卷里，下次 `just up` 原样还在。连数据一起清是 `docker compose down -v`（不可逆）。
 
@@ -113,17 +115,46 @@ ollama pull qwen3:4b-instruct-2507-q4_K_M
 
 M3 正式实验改 `.env` 指向服务器 vLLM 隧道（`ssh -L 8000:localhost:8000 <server>`）。端点与模型名在 `.env`（`LLM_BASE_URL` · `LLM_MODEL`）。分工依据见 [docs/architettura.md](docs/architettura.md) 算力策略一节。
 
+## 问答 API
+
+同一条链路的 HTTP 形式：`POST /api/ask`，路由 → 检索 → 生成，返回答案 + 路由决策 + 引用清单。前置条件和 CLI 一样——Ollama 在跑、`data/qdrant` 已索引——外加 `just up` 与 `just serve`。
+
+```powershell
+$body = @{ question = "What is an ORM?" } | ConvertTo-Json
+Invoke-RestMethod -Uri http://127.0.0.1:8000/api/ask -Method Post -Body $body -ContentType application/json
+```
+
+可选 `locale`（BCP-47 primary subtag，如 `it`；省略则从问题里检测）。响应契约在 [apps/qa/contract.py](apps/qa/contract.py)，它是唯一源：
+
+| 字段 | 内容 |
+| ---- | ---- |
+| `answer` | 生成的答案全文 |
+| `locale` | 实际用于生成的语言 |
+| `route` | 路由决策，直接复用 `rag.agent.RouteDecision`（`target` · `query` · `fresh` · `reason`） |
+| `citations` | 生成所依据的检索集，按检索顺序逐条，**不去重**（同一页的两个 chunk marker 相同但正文与分数不同；要合并由前端按 `marker` 分组） |
+
+`citations` 每条的字段：`marker`（模型被要求逐字复制的那个标记）· `cited`（marker 是否**逐字**出现在 `answer` 里）· `text`（模型看到的原文）· `kind`（`slides` / `web`）· `score` · `heading_path` · `course` · `locale`，以及 slides 的 `source_file`+`page` 或 web 的 `url`+`fetch_date`。
+
+`cited` 是纯子串判断，不是「这条被用到了吗」的推断——4B 模型时常把 marker 缩写成 `[Excerpt 1]`，那时 `cited` 就是 `false`。判 false 只代表「没有逐字出现」。
+
+**首次请求慢**（约一分钟）：embedding 与 reranker 要加载进显存。之后常驻。**答案串行**：8GB 显存装不下两路并发的 rerank + 生成，所以端点一次只答一个问题。两道闸：匿名限流 10 次/分钟（按 `REMOTE_ADDR`，登录后 30 次/分钟），以及排队上限 90 秒——超过就 503 带 `Retry-After`，而不是把连接吊到超时。
+
+错误按类型分：400 校验失败 · 429 限流 · 503 依赖不可用（生成端点没响应、索引被别的进程占着、还没索引过、前面的问题还没答完）。DRF 自带的校验消息跟随 `Accept-Language`（`LANGUAGE_CODE` 是 `it`，默认意大利语）；本项目自己的 503 文案已标记待译，但仓库还没有 `locale/` 目录，所以目前是英文。
+
+**深挖循环（`deepen`）不在这个端点里**：它会联网抓页并写入共享索引，最多 3 次抓取。演示自增长仍用 CLI 的 `just ask`。它进 web 的路径是「账号 + Celery 异步」，见 [ROADMAP.md](ROADMAP.md)。
+
 ## 代码布局
 
 | 路径              | 内容                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------ |
 | `config/`         | Django project：settings（单一模块，安全响应头按 `DEBUG` 与 `DJANGO_BEHIND_TLS` 条件生效）· urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入，`rag/` 与 Django 两侧共用） |
 | `apps/accounts/`  | 自定义 User（`AUTH_USER_MODEL`）。`AbstractUser` + `locale`（偏好语言，取值域对齐 `settings.LANGUAGES`）；admin 里可见可筛 |
+| `apps/qa/`        | 问答 API。`contract.py` 响应契约（唯一源，Stage 3 的 SSE 与 SPA 都消费它）· `serializers.py` 请求校验 · `engine.py` 进程级模型资源 + 串行的 `ask()`（路由→检索→回答，复用 `rag/`，不重写逻辑）· `views.py` 只做 HTTP 翻译 |
 | `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`crawl.py` 抓校园 web 源快照 + registry，`webparse.py` 快照转可切块工件，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`llm.py` OpenAI 兼容客户端（Streamer/Completer + pydantic JSON 校验助手），`answer.py` 生成带引用回答，`agent.py` 路由问题到课程库/校园库（只读控制流），`gold.py` 检索冒烟跑分与 `--routing` 路由报告，`golddraft.py` 起草 gold 题（人工把关后才进 `gold/`） |
 | `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性                                |
 | `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
 
-`apps/qa/`（DRF 问答 API）与 `frontend/`（React SPA）🔜 M5 后续 Stage，届时再建。
+`frontend/`（React SPA）🔜 M5 后续 Stage，届时再建。
 
 ## MICC 服务器日常使用
 
