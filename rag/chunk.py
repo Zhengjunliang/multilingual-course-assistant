@@ -41,14 +41,30 @@ _LOCALE_PATTERN = r"^[a-z]{2,3}$"
 Locale = Annotated[str, StringConstraints(pattern=_LOCALE_PATTERN)]
 
 
-def locale_arg(value: str) -> str:
-    """argparse type for --locale flags: normalize a BCP-47 tag to its primary
-    subtag (`it-IT` -> `it`) and reject junk loudly instead of letting a typo
-    like `itt` silently filter every result to nothing."""
+def normalize_locale(value: str) -> str:
+    """A BCP-47 tag reduced to its primary subtag (`it-IT` -> `it`).
+
+    Junk raises instead of passing through: `english` would become a payload
+    filter matching nothing, and the caller would read that as "the corpus has
+    no answer" rather than "that is not a language tag". The pattern is
+    deliberately permissive about *which* two or three letters — `nap` and
+    `fur` are real, and the web source can surface a language nobody listed.
+
+    Plain `ValueError` because the callers are not all argparse — the web
+    layer validates the same field against this same rule (apps/qa).
+    """
     subtag = value.strip().lower().replace("_", "-").split("-")[0]
     if not re.fullmatch(_LOCALE_PATTERN, subtag):
-        raise argparse.ArgumentTypeError(f"not a BCP-47 primary subtag: {value!r}")
+        raise ValueError(f"not a BCP-47 primary subtag: {value!r}")
     return subtag
+
+
+def locale_arg(value: str) -> str:
+    """argparse adapter for --locale flags; the rule itself is `normalize_locale`."""
+    try:
+        return normalize_locale(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 DEFAULT_OUT_DIR = Path(__file__).resolve().parent.parent / "data" / "chunks"
