@@ -72,10 +72,10 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 - [x] docker-compose 骨架：**一份文件用 profiles 分层**（无 profile = 有状态服务，本机开发只起这些，Django/Celery 走 `uv run` 在宿主机以直接用 GPU；`app` profile = 整套容器化，MICC/答辩路径）。PostgreSQL 已就位；Redis · Qdrant · Langfuse 与 `app` profile 随各自消费方到位
 - [ ] 上传材料 → Celery 异步 ingest
 - [ ] 上传滥用防护：文件大小/页数上限 · ingest 超时 · rate limit · 索引多租户隔离（谁的材料谁可检索）—— 单份 32 页图片密集 deck 实测吃掉 527s OCR，无上限等于开放算力
-- [~] DRF 问答 API（`/api/ask`，带 `locale` 参数）：非流式 ✅（`apps/qa/views.py`，路由→检索→回答，`uv run python manage.py runserver` 后可 POST）· SSE 流式 🔜 下一 Stage（`rag.answer.answer` 本就是 generator，非流式只是把它 join 了）。**deepen 不在这个端点里**：它写共享索引且最多 3 次抓取，按下面「访问模型」条排在账号 + Celery 异步之后
+- [x] DRF 问答 API（`/api/ask`，SSE 流式，带 `locale` 参数）：✅ `apps/qa/views.py`，路由→检索→生成，回 `text/event-stream`（`start` 带路由决策与来源 · `token` 逐片 · `end` 收尾），`curl.exe -N` 可见逐字到达。**没有非流式版本**，一条 URL 一种行为。状态码只在第一个字节之前有效：路由/检索阶段的失败仍是 503，生成中途失败是 200 里的 `error` 事件。**deepen 不在这个端点里**：它写共享索引且最多 3 次抓取，按下面「访问模型」条排在账号 + Celery 异步之后
 - [ ] React + TypeScript SPA（Vite）：问答界面、流式渲染、来源引用展示
 - [ ] admin 后台管理材料
-- [x] `/api/ask` 暴露路由决策与 URL 引用：响应契约 `apps/qa/contract.py` 带 `route`（复用 `rag.agent.RouteDecision`）与 `citations`（每条含 `marker` · `cited` · slides 的 file+page 或 web 的 url+fetch_date）
+- [x] `/api/ask` 暴露路由决策与 URL 引用：事件契约 `apps/qa/contract.py`，`start` 事件带 `route`（复用 `rag.agent.RouteDecision`）与 `citations`（每条含 `marker` · slides 的 file+page 或 web 的 url+fetch_date），在第一个 token 之前就到达。「这条被引用了吗」由客户端算（`marker in answer`）——marker 常被劈在两个 token 事件里，只有拼完的答案判得准
 - [ ] admin 爬取快照状态页（run_id、页数、content_hash 变更；可选）
 - [ ] 访问模型：campus QA **免登录**可问；slides 上传/问答需账号（多租户隔离见上）；触发自增长的写操作挂账号 + rate limit
 - [ ] Celery beat 定时刷新 web 快照（content_hash 增量：变了才重解析重索引，没变跳过）——「⛔ 调度器」non-goal 到此解除，论文期只有查询保鲜 + 手动重爬

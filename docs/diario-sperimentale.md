@@ -47,6 +47,24 @@ Nessuna scrittura ha raggiunto la base di conoscenza: `unifi_web` è rimasta a 2
 
 **Conseguenza operativa**: le misurazioni che coinvolgono l'LLM passano al server MICC; la macchina locale resta destinata allo sviluppo e alle verifiche funzionali. La separazione è resa possibile dal vincolo architetturale per cui `rag/` non importa Django ed è eseguibile fuori dal web. Decisioni registrate in [ROADMAP.md](../ROADMAP.md), «自主拍板项（2026-08-25，测量场地划线）».
 
+### 4. Passaggio allo streaming SSE: due vincoli non evidenti
+
+`POST /api/ask` è stato convertito a **server-sent events** e non possiede più una forma non in streaming: la generazione dura decine di secondi, e un client che le attende in silenzio è precisamente il difetto che lo streaming rimuove. Il flusso è un evento `start` (lingua, decisione di instradamento, excerpt di ancoraggio), un evento `token` per ogni frammento generato e un evento `end` conclusivo — la cui assenza è il segnale di fallimento.
+
+Due vincoli sono emersi durante l'implementazione e vanno registrati perché condizionano il capitolo architetturale.
+
+**Il codice di stato esiste solo prima del primo byte.** Le intestazioni della risposta partono insieme al primo evento: un endpoint di generazione che muore a metà risposta non può più diventare un 503. Il generatore del motore viene quindi *innescato* esplicitamente nella vista (una prima `next()`), affinché instradamento e recupero avvengano finché una risposta di stato è ancora disponibile; ciò che fallisce dopo viaggia come evento `error` dentro un 200 già impegnato. Il confine è verificabile in entrambe le direzioni: un modello mai scaricato (404 dal server durante l'instradamento) resta un 503, un endpoint di generazione spento produce la sequenza `["start", "error"]`.
+
+**Il corpo della risposta non può essere un generatore.** Il lucchetto che serializza le risposte (una sola GPU, un solo indice embedded) viene preso quando la vista innesca il flusso e restituito quando il flusso viene chiuso. Django chiude la risposta quando il client se ne va — ed è esattamente il caso in cui un generatore non funziona: chiudere un generatore **mai iterato** non esegue nulla, perché il suo corpo non è mai partito e non ha alcun `finally` da eseguire. Un lettore che chiudesse la connessione senza leggere un solo byte lascerebbe il lucchetto preso, e da quel momento ogni domanda successiva riceverebbe 503. Il corpo della risposta è quindi una classe con un `close()` esplicito.
+
+La verifica è stata condotta in modo avversariale: reintroducendo la versione a generatore, il test `test_a_client_that_never_reads_a_byte_releases_the_lock` fallisce riportando `<locked _thread.lock object>`, mentre il test complementare — lettore che si interrompe *dopo* il primo frammento — continua a passare. I due casi sono distinti e servono entrambi.
+
+Effetto collaterale utile: poiché la chiusura si propaga fino al generatore sospeso in `rag/answer.py`, **un lettore che se ne va annulla anche la generazione**; la coda passa immediatamente alla domanda successiva invece di far scrivere il modello per nessuno.
+
+Nota su DRF: la negoziazione del contenuto avviene *prima* dell'esecuzione del gestore (`APIView.initial`). Senza un renderer che dichiari `text/event-stream`, l'endpoint rifiuterebbe con 406 un client che chiede l'unico tipo di media che l'endpoint parla. Il renderer aggiunto serve solo alla negoziazione: la risposta riuscita non lo attraversa mai.
+
+Conseguenza sul contratto: il campo `cited` è stato rimosso dalle citazioni. Un marcatore viene regolarmente spezzato fra due eventi `token`, quindi il test di sottostringa è significativo solo sulla risposta ricomposta — che è ciò che il client possiede, insieme al marcatore. La metrica di fedeltà delle citazioni annunciata nella sezione 2 non scompare ma cambia sede: appartiene al percorso di valutazione di M3 (`rag/`, dove girano i gold set), non all'API.
+
 ### Riproducibilità
 
 Endpoint: `uv run python manage.py runserver`, quindi `POST /api/ask` con corpo JSON codificato **esplicitamente in UTF-8** (`Invoke-RestMethod` di Windows PowerShell 5.1 codifica in ASCII un corpo stringa quando il `Content-Type` non dichiara il charset: le domande cinesi arrivavano al server come `????????` e venivano di conseguenza instradate su `both` con `locale=en`). Pre-test autogrow: `uv run python -m rag.gold gold/campus-autogrow.jsonl --live on`. Modelli invariati rispetto alla voce precedente: Qwen3-Embedding-0.6B, reranker Qwen3 0.6B, LLM `qwen3:4b-instruct-2507-q4_K_M` via Ollama, `temperature=0.0`.

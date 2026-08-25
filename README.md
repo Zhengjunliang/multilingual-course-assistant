@@ -6,7 +6,7 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 
 ## 状态
 
-✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + 非流式问答 API `/api/ask` 已可用（见下面「问答 API」一节），SSE、SPA、账号、异步 ingest 🔜 后续 Stage。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节），SPA、账号、异步 ingest 🔜 后续 Stage。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
@@ -117,34 +117,53 @@ M3 正式实验改 `.env` 指向服务器 vLLM 隧道（`ssh -L 8000:localhost:8
 
 ## 问答 API
 
-同一条链路的 HTTP 形式：`POST /api/ask`，路由 → 检索 → 生成，返回答案 + 路由决策 + 引用清单。前置条件和 CLI 一样——Ollama 在跑、`data/qdrant` 已索引——外加 `just up` 与 `just serve`。
+同一条链路的 HTTP 形式：`POST /api/ask`，路由 → 检索 → 生成。**回的是 SSE 事件流**（`text/event-stream`），不是一整块 JSON——一次生成要几十秒，边写边发才看得出系统在工作。没有非流式版本。前置条件和 CLI 一样——Ollama 在跑、`data/qdrant` 已索引——外加 `just up` 与 `just serve`。
 
 ```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$json = @{ question = "学费什么时候交？" } | ConvertTo-Json
-$body = [System.Text.Encoding]::UTF8.GetBytes($json)
-Invoke-RestMethod http://127.0.0.1:8000/api/ask -Method Post -Body $body `
-  -ContentType "application/json; charset=utf-8" -TimeoutSec 300
+$json = @{ question = "What is an ORM?" } | ConvertTo-Json
+[System.IO.File]::WriteAllText("$PWD\ask.json", $json, (New-Object System.Text.UTF8Encoding $false))
+curl.exe -N -X POST http://127.0.0.1:8000/api/ask `
+  -H "Content-Type: application/json" -H "Accept: text/event-stream" `
+  --data-binary "@ask.json"
 ```
 
-**body 必须显式转成 UTF-8 字节。** Windows PowerShell 5.1 的 `Invoke-RestMethod` 在 `Content-Type` 不带 charset 时按 ASCII 编码字符串 body，`学费` 和 `Università` 一样会变成 `?` —— 这是个多语言项目，直接传字符串的写法在这里是错的。
+`-N` 不能省：不加的话 curl 自己缓冲，看起来仍是一次性返回。
 
-可选 `locale`（BCP-47 primary subtag，如 `it`；省略则从问题里检测）。响应契约在 [apps/qa/contract.py](apps/qa/contract.py)，它是唯一源：
+**问题走文件而不是 `-d`**，哪怕是英文问题也照此写。PowerShell 把参数交给原生程序时按控制台编码转换，`学费` 与 `Università` 都会变成 `?`；`WriteAllText` + 无 BOM 的 `UTF8Encoding` 是唯一稳的写法。这是个多语言项目，只在示例里成立的写法等于错的写法。
 
-| 字段 | 内容 |
-| ---- | ---- |
-| `answer` | 生成的答案全文 |
-| `locale` | 实际用于生成的语言 |
-| `route` | 路由决策，直接复用 `rag.agent.RouteDecision`（`target` · `query` · `fresh` · `reason`） |
-| `citations` | 生成所依据的检索集，按检索顺序逐条，**不去重**（同一页的两个 chunk marker 相同但正文与分数不同；要合并由前端按 `marker` 分组） |
+看到的是：
 
-`citations` 每条的字段：`marker`（模型被要求逐字复制的那个标记）· `cited`（marker 是否**逐字**出现在 `answer` 里）· `text`（模型看到的原文）· `kind`（`slides` / `web`）· `score` · `heading_path` · `course` · `locale`，以及 slides 的 `source_file`+`page` 或 web 的 `url`+`fetch_date`。
+```text
+event: start
+data: {"question":"What is an ORM?","locale":"en","route":{...},"citations":[...]}
 
-`cited` 是纯子串判断，不是「这条被用到了吗」的推断——4B 模型时常把 marker 缩写成 `[Excerpt 1]`，那时 `cited` 就是 `false`。判 false 只代表「没有逐字出现」。
+event: token
+data: {"text":"An ORM "}
 
-**首次请求慢**（约一分钟）：embedding 与 reranker 要加载进显存。之后常驻。**答案串行**：8GB 显存装不下两路并发的 rerank + 生成，所以端点一次只答一个问题。两道闸：匿名限流 10 次/分钟（按 `REMOTE_ADDR`，登录后 30 次/分钟），以及排队上限 90 秒——超过就 503 带 `Retry-After`，而不是把连接吊到超时。
+event: end
+data: {}
+```
 
-错误按类型分：400 校验失败 · 429 限流 · 503 依赖不可用（生成端点没响应、索引被别的进程占着、还没索引过、前面的问题还没答完）。DRF 自带的校验消息跟随 `Accept-Language`（`LANGUAGE_CODE` 是 `it`，默认意大利语）；本项目自己的 503 文案已标记待译，但仓库还没有 `locale/` 目录，所以目前是英文。
+可选 `locale`（BCP-47 primary subtag，如 `it`；省略则从问题里检测）。事件契约在 [apps/qa/contract.py](apps/qa/contract.py)，它是唯一源：
+
+| 事件 | 何时 | 内容 |
+| ---- | ---- | ---- |
+| `start` | 路由与检索之后、生成之前，一次 | `question` · `locale`（实际生成语言）· `route`（复用 `rag.agent.RouteDecision`：`target` · `query` · `fresh` · `reason`）· `citations` |
+| `token` | 生成期间，每片一次 | `text`，模型吐出来的原样片段 |
+| `end` | 结尾，一次 | 空。**它到了才算答案完整** |
+| `error` | 代替 `end` | `detail`，生成中途失败 |
+
+**答案 = 所有 `token` 的 `text` 拼接**，别无其他：切分点由 tokenizer 决定，一个引用 marker 经常被劈成两半。
+
+`citations` 是生成所依据的检索集，按检索顺序逐条，**不去重**（同一页的两个 chunk marker 相同但正文与分数不同；要合并由前端按 `marker` 分组）。每条：`marker`（模型被要求逐字复制的那个标记）· `text`（模型看到的原文）· `kind`（`slides` / `web`）· `score` · `heading_path` · `course` · `locale`，以及 slides 的 `source_file`+`page` 或 web 的 `url`+`fetch_date`。
+
+**「这条被引用了吗」由客户端算**（`marker in answer`），服务端不提供这个字段：marker 常被劈在两个 `token` 事件里，只有拿到拼完的答案才判得准，而客户端本来就同时握着答案和 marker。4B 模型时常把 marker 缩写成 `[Excerpt 1]`，那就是没引用。
+
+**首次请求慢**（约一分钟）：embedding 与 reranker 要加载进显存。之后常驻。**答案串行**：8GB 显存装不下两路并发的 rerank + 生成，所以端点一次只答一个问题。两道闸：匿名限流 10 次/分钟（按 `REMOTE_ADDR`，登录后 30 次/分钟），以及排队上限 90 秒——超过就 503 带 `Retry-After`，而不是把连接吊到超时。**中途 Ctrl+C 掐断流会连带取消生成**，队列立刻让给下一个。
+
+**状态码只在第一个字节之前有效。** 响应头随第一个事件一起发走，所以「生成端点半路死了」只能是 200 里的一条 `error` 事件；路由或检索阶段的失败仍是 503。
+
+错误按类型分：400 校验失败 · 429 限流 · 503 依赖不可用（路由端点没响应、索引被别的进程占着、还没索引过、前面的问题还没答完）。请求带 `Accept: text/event-stream` 时这些错误体也框成一条 `error` 事件；不带（curl 默认 `*/*`）就是普通 JSON。DRF 自带的校验消息跟随 `Accept-Language`（`LANGUAGE_CODE` 是 `it`，默认意大利语）；本项目自己的 503 与 `error` 文案已标记待译，但仓库还没有 `locale/` 目录，所以目前是英文。
 
 **深挖循环（`deepen`）不在这个端点里**：它会联网抓页并写入共享索引，最多 3 次抓取。演示自增长仍用 CLI 的 `just ask`。它进 web 的路径是「账号 + Celery 异步」，见 [ROADMAP.md](ROADMAP.md)。
 
@@ -154,7 +173,7 @@ Invoke-RestMethod http://127.0.0.1:8000/api/ask -Method Post -Body $body `
 | ----------------- | ------------------------------------------------------------------------------------------ |
 | `config/`         | Django project：settings（单一模块，安全响应头按 `DEBUG` 与 `DJANGO_BEHIND_TLS` 条件生效）· urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入，`rag/` 与 Django 两侧共用） |
 | `apps/accounts/`  | 自定义 User（`AUTH_USER_MODEL`）。`AbstractUser` + `locale`（偏好语言，取值域对齐 `settings.LANGUAGES`）；admin 里可见可筛 |
-| `apps/qa/`        | 问答 API。`contract.py` 响应契约（唯一源，Stage 3 的 SSE 与 SPA 都消费它）· `serializers.py` 请求校验 · `engine.py` 进程级模型资源 + 串行的 `ask()`（路由→检索→回答，复用 `rag/`，不重写逻辑）· `views.py` 只做 HTTP 翻译 |
+| `apps/qa/`        | 问答 API。`contract.py` SSE 事件契约（唯一源，SPA 消费它）· `serializers.py` 请求校验 · `engine.py` 进程级模型资源 + 串行的 `stream_answer()`（路由→检索→生成，复用 `rag/`，不重写逻辑；锁随流的关闭释放）· `views.py` 只做 HTTP 翻译与 SSE 分帧 |
 | `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`crawl.py` 抓校园 web 源快照 + registry，`webparse.py` 快照转可切块工件，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`llm.py` OpenAI 兼容客户端（Streamer/Completer + pydantic JSON 校验助手），`answer.py` 生成带引用回答，`agent.py` 路由问题到课程库/校园库（只读控制流），`gold.py` 检索冒烟跑分与 `--routing` 路由报告，`golddraft.py` 起草 gold 题（人工把关后才进 `gold/`） |
 | `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性                                |
 | `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
