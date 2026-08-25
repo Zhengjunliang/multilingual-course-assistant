@@ -49,7 +49,7 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 - [ ] LLM judge 校验：抽子样本人工打分，报告 judge 与人工的一致性 —— judge 与被评系统同为 Qwen 系，自偏好是已知效应，答辩必被问
 - [ ] agent 指标：路由准确率 / `both` 占比 / fallback 率 / 拒答桶细分，纳入错误分类法
 - [ ] 错误分类法：失败题逐个归因分桶（解析丢失 / 死 chunk / 切分不当 / 检索 miss / 路由错库 / rerank 降位 / 上下文截断 / 生成幻觉 / 误拒答 / 判定饱和 / 强制选择 / 出链图盲区 / 门判据范围），聚合分数不构成实验章，逐桶分析才构成。后四个桶由 M2.5b autogrow 跑观察到（见 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)）
-- [ ] autogrow 分数门重测（M2.5b `[~]` 的余下部分）：双臂 0/7 测于 `ee15f37`，此后两个设计缺陷已修（选一拒绝出口 · PDF 命中回溯 referrer）**未重测**。在尺寸网格上重测，报告须并列 0/7 与新分数并注明配置差异（修复 + 尺寸两处同时变化）；「判定饱和」需先决断按 URL 判分是否仍是 autogrow 的正确判据（g001 答对但目标页未入库）
+- [ ] autogrow 分数门重测（M2.5b `[~]` 的余下部分）：双臂 0/7 测于 `ee15f37`，此后两个设计缺陷已修（选一拒绝出口 · PDF 命中回溯 referrer）**未重测**。**在 MICC 上、与尺寸网格同场**（本机不承担带 LLM 的测量跑，理由见本文件「自主拍板项（2026-08-25）」）；报告须并列 0/7 与新分数并注明配置差异（修复 + 尺寸两处同时变化）；「判定饱和」需先决断按 URL 判分是否仍是 autogrow 的正确判据（g001 答对但目标页未入库——2026-08-25 在修复后的代码上原样复现：仍 step 0 作答、不抓取，答案正确且点名 RIT_02，按 URL 判 MISS）
 - [ ] 基线三件套：纯 BM25（Qwen-Agent 路线，见 [docs/analisi-rag.md](docs/analisi-rag.md)）· dense-only vs hybrid · 有/无 rerank —— 「rerank 是质量主要来源」这一断言要有测量支撑
 - [ ] Langfuse 接入（tracing，自托管）
 - [ ] 模型尺寸对比（0.6B / 4B / 8B）：质量与运行成本
@@ -124,9 +124,15 @@ Meet 🔜 未安排，不阻塞任何里程碑。
 自主拍板项（2026-08-24，执行顺序调整）报备即可：
 
 1. **M5 提前到 M3 之前**，做到 M6 的「干净机器 `docker compose up` 一条命令起全套 + 浏览器完成双库问答演示」为止（含账号与多租户隔离）。三条理由：① 研究成果目前只有终端输出，Meet 与答辩都需要看得见的东西；② `migrate` 从未跑过（无 `migrations/`、无 `db.sqlite3`），此刻建自定义 User 与换 PostgreSQL 的成本≈0，越往后越贵（M5 首条已警告事后改造要重写全部迁移）；③ 数据库与检索后端一次换到位，M3 的全部基线建在同一后端上，不会跑到一半换。
-2. **Qdrant 由嵌入式改为 compose 中的服务进程**：网站起来后 Django web、Celery worker、终端评估三方同时要这份索引，嵌入式的单进程文件锁下网站起不来。切换排在 M2.5b「autogrow 分数门重测」记账**之后**，避免一次改动同时变「修了缺陷」与「换了后端」两个变量；切换后重索引并重跑 slides 与 campus gold，两组分数并列记录并注明后端变更。
+2. **Qdrant 由嵌入式改为 compose 中的服务进程**：网站起来后 Django web、Celery worker、终端评估三方同时要这份索引，嵌入式的单进程文件锁下网站起不来。**迁移不是「重索引」**——`rag/live.py` 明写 `Live keeps no snapshot file`，自增长抓来的页面只存在于索引里、`data/chunks/` 没有副本，需从嵌入式 `scroll(with_vectors=True, with_payload=True)` 读出再 `upsert` 进服务端（零 GPU），该路径切换时实测验证。
 3. **访问模型以 M5「访问模型」条为准**：campus QA 免登录、slides 上传与问答需账号 + 多租户隔离。2026-08-22 报备里的「论文期演示环境免登录」限于 campus 场景。
 4. **重排触发条件**：毕业 session 日期一经确定即重新评估 M5/M3 顺序 —— M5 约 4–6 周 + M3 约 3–4 周，当前顺序把 M3 排在了一个边界未知的时间轴之后。
+
+自主拍板项（2026-08-25，测量场地划线）报备即可：
+
+1. **本机不再承担带 LLM 的测量跑**，只承担开发与功能自查（起服务、问几个问题、看响应形状）。依据是实测：本机 CPU dense encoding 在 autogrow 循环里出现 **293 s/batch**（单批 19 分半）与 55.9 s/batch，七题跑到第二题已逾 25 分钟且未近尾声——2026-08-24 diario 记为「probabile throttling termico」的 1470 s 异常，实为可复现常态。带 LLM 的评估一律移到 MICC（`rag/` 无 Django 依赖，可脱离 web 单独跑，正是为此）。本机仍必须能跑通全链，这条只约束**测量**，不约束可运行性。
+2. **「autogrow 分数门重测」移至 MICC 执行**，与 M3 尺寸网格同场，符合 M3 该条原本就写下的「在尺寸网格上重测」。前置任务：把 `data/qdrant`（或 chunk 与快照）搬上服务器，与 vLLM 一起备齐。
+3. **Stage 8（Qdrant 换服务进程）的门改为检索门**：切换 + 重索引后重跑 smoke 与 campus gold，须复现 **38/40** 与 **28/32**；复现即视为「换后端未动检索」，后端就此从 autogrow 分数的混淆变量里剔除，MICC 上的重测仍只有 M3 该条已写明的两个变量（缺陷修复 + 模型尺寸）。原门（等重测记账）作废——重测既已移至 M3，照原门走会连带阻塞硬依赖 Stage 8 的 Celery 一条，把网站卡死在登录那一步。
 
 待 relatore 答复：
 

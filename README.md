@@ -120,9 +120,14 @@ M3 正式实验改 `.env` 指向服务器 vLLM 隧道（`ssh -L 8000:localhost:8
 同一条链路的 HTTP 形式：`POST /api/ask`，路由 → 检索 → 生成，返回答案 + 路由决策 + 引用清单。前置条件和 CLI 一样——Ollama 在跑、`data/qdrant` 已索引——外加 `just up` 与 `just serve`。
 
 ```powershell
-$body = @{ question = "What is an ORM?" } | ConvertTo-Json
-Invoke-RestMethod -Uri http://127.0.0.1:8000/api/ask -Method Post -Body $body -ContentType application/json
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$json = @{ question = "学费什么时候交？" } | ConvertTo-Json
+$body = [System.Text.Encoding]::UTF8.GetBytes($json)
+Invoke-RestMethod http://127.0.0.1:8000/api/ask -Method Post -Body $body `
+  -ContentType "application/json; charset=utf-8" -TimeoutSec 300
 ```
+
+**body 必须显式转成 UTF-8 字节。** Windows PowerShell 5.1 的 `Invoke-RestMethod` 在 `Content-Type` 不带 charset 时按 ASCII 编码字符串 body，`学费` 和 `Università` 一样会变成 `?` —— 这是个多语言项目，直接传字符串的写法在这里是错的。
 
 可选 `locale`（BCP-47 primary subtag，如 `it`；省略则从问题里检测）。响应契约在 [apps/qa/contract.py](apps/qa/contract.py)，它是唯一源：
 

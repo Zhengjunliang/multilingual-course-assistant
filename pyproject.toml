@@ -119,7 +119,16 @@ addopts = "-ra --strict-markers --strict-config"
 xfail_strict = true
 # Warnings are failures: a deprecation seen today is a break at the next `uv sync`
 # upgrade. Third-party warnings get individually targeted ignores, never a blanket one.
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # Django warns this when it cannot open the `postgres` maintenance database
+    # and falls back to the first configured one. Promoted to an error it hides
+    # the actual problem: with the container down every database-backed test
+    # reports a puzzle about maintenance connections instead of "connection
+    # refused". Ignoring it conceals nothing — the fallback connection then
+    # fails on its own terms, with the message that names the real cause.
+    "ignore:Normally Django will use a connection to the 'postgres' database:RuntimeWarning",
+]
 
 [tool.coverage.run]
 source = ["rag", "config", "apps"]

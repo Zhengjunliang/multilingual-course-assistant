@@ -2,6 +2,55 @@
 
 Registro degli esperimenti e dei problemi riscontrati durante lo sviluppo, in italiano (stile formale): il contenuto confluirà nei capitoli sperimentali della tesi (M6). Una voce per data; i dati citati sono riproducibili con i comandi indicati. Le decisioni architetturali restano di proprietà di [architettura.md](architettura.md).
 
+## 2026-08-25 — Interrogazione via HTTP, conformità delle citazioni, limite della macchina locale
+
+### 1. Il percorso interlinguistico regge end-to-end sull'endpoint
+
+Con l'endpoint `POST /api/ask` (non in streaming, `apps/qa/`) la catena instradamento → recupero → generazione è stata percorsa per la prima volta da un client esterno al terminale. Tre lingue, corpus campus (italiano):
+
+| Domanda | `locale` rilevato | Instradamento | Esito |
+| --- | --- | --- | --- |
+| «学费什么时候交？» | `zh` | `unifi_web` | query riscritta in cinese («学费缴纳时间»), 5 excerpt recuperati |
+| «Quando si pagano le tasse universitarie?» | `it` | `unifi_web` | risposta completa e corretta |
+| c003 · c008 · c018 (cinese, `gold/campus.jsonl`) | `zh` | `unifi_web` | risposte fluenti in cinese |
+
+**La capacità centrale della tesi — domanda in una lingua qualsiasi, corpus in italiano, risposta nella lingua della domanda — risulta quindi verificata anche sul cinese**, non solo sull'italiano come nella voce del 2026-08-21.
+
+Una sola domanda degenera in modo riproducibile: «学费什么时候交？» produce l'output `[febbraio]` (due esecuzioni identiche) pur avendo recuperato gli stessi 5 excerpt che, interrogati in italiano, danno una risposta corretta. Il difetto è quindi nella generazione e non nel recupero, ed è specifico della coppia (domanda breve, lingua cinese): le altre tre domande cinesi non lo mostrano. Voce per la tassonomia degli errori di M3, non un difetto dell'endpoint.
+
+### 2. La conformità del marcatore di citazione è il problema sistematico
+
+Il prompt di generazione (`rag/answer.py`) dedica tre righe a imporre la copia **carattere per carattere** del marcatore fra parentesi quadre. In nessuna delle esecuzioni reali di questa giornata il modello vi si è attenuto:
+
+| Lingua della domanda | Corpus | Ciò che il modello ha scritto |
+| --- | --- | --- |
+| inglese | slides | `[Excerpt 1]` |
+| italiano | campus | `[Excerpt 1][Excerpt 3][Excerpt 4][Excerpt 5]` |
+| cinese | campus | collegamenti markdown, es. `[毕业学期日历](p602.html)` |
+
+Il campo `cited` del contratto di risposta (`apps/qa/contract.py`) è un test di sottostringa letterale e riporta di conseguenza `false` su tutte le citazioni: **il campo non è difettoso, sta contando onestamente**. Ne discende una metrica di fedeltà delle citazioni già pronta per M3.
+
+La correzione (prompt o dimensione del modello) è deliberatamente **rinviata**: il prompt di generazione fa parte della catena della rimisurazione autogrow, e modificarlo ora aggiungerebbe una variabile a una misura il cui scopo è isolarne altre due.
+
+### 3. La macchina locale non può ospitare la rimisurazione autogrow
+
+Tentativo di rieseguire il braccio principale del collaudo autogrow (protocollo della voce 2026-08-24, `run_id` `live-retest-main`). Pre-test pulito: **0/7**, collezione a 29098 punti. L'esecuzione è stata interrotta durante la seconda domanda:
+
+| Fase | Misura |
+| --- | --- |
+| g001 | risponde al passo 0 senza alcun fetch — comportamento **invariato** dopo le due correzioni, come atteso (correggevano la scelta forzata e il grafo cieco, non la saturazione del giudizio); risposta corretta, cita il modulo RIT_02, ma il punteggio per URL la marca MISS |
+| g002 | encoding denso su CPU: un batch da **293,30 s/it** (19 min 33 s per 4 batch) e uno da 55,93 s/it; oltre 25 minuti spesi senza avvicinarsi alla fine delle sette domande |
+
+Il batch anomalo da 1470 s registrato il 2026-08-24 come «probabile throttling termico» **non è un'anomalia ma il regime normale** di questa macchina. La stima di «circa due ore per braccio» è quindi errata e il costo reale non è limitato superiormente.
+
+Nessuna scrittura ha raggiunto la base di conoscenza: `unifi_web` è rimasta a 29098 punti e i punti con `ingest_run_id='live-retest-main'` sono **0** (g001 non ha acquisito nulla; dei due fetch di g002 uno è risultato invariato dal crawl e l'altro è stato rifiutato dal gate). Nessun rollback necessario.
+
+**Conseguenza operativa**: le misurazioni che coinvolgono l'LLM passano al server MICC; la macchina locale resta destinata allo sviluppo e alle verifiche funzionali. La separazione è resa possibile dal vincolo architetturale per cui `rag/` non importa Django ed è eseguibile fuori dal web. Decisioni registrate in [ROADMAP.md](../ROADMAP.md), «自主拍板项（2026-08-25，测量场地划线）».
+
+### Riproducibilità
+
+Endpoint: `uv run python manage.py runserver`, quindi `POST /api/ask` con corpo JSON codificato **esplicitamente in UTF-8** (`Invoke-RestMethod` di Windows PowerShell 5.1 codifica in ASCII un corpo stringa quando il `Content-Type` non dichiara il charset: le domande cinesi arrivavano al server come `????????` e venivano di conseguenza instradate su `both` con `locale=en`). Pre-test autogrow: `uv run python -m rag.gold gold/campus-autogrow.jsonl --live on`. Modelli invariati rispetto alla voce precedente: Qwen3-Embedding-0.6B, reranker Qwen3 0.6B, LLM `qwen3:4b-instruct-2507-q4_K_M` via Ollama, `temperature=0.0`.
+
 ## 2026-08-24 — M2.5b: gate di rilevanza, ciclo di approfondimento, collaudo autogrow
 
 ### 1. Gate di rilevanza: 15/20 → 18/20 senza toccare le etichette

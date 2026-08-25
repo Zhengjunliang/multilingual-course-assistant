@@ -6,6 +6,13 @@ models and store — the same substitution `tests/test_index.py` and
 retrieval and citation code rather than a mock of it. Only the two LLM roles
 are scripted, because a canned router reply is what makes a routing assertion
 mean anything.
+
+No `django_db` marker anywhere, deliberately. Answering a question touches no
+model: the throttle reads `request.user`, but an anonymous request carries no
+session cookie and Django hands back `AnonymousUser` without a query. Leaving
+the marker off keeps the file runnable with no database at all *and* makes it
+strict — the day this path grows a query, these tests fail loudly instead of
+silently acquiring a dependency.
 """
 
 import threading
@@ -191,7 +198,6 @@ def ask(question: str = "What is an ORM?", forwarded_for: str | None = None, **e
     return APIClient().post(ASK_URL, {"question": question, **extra}, format="json", **meta)
 
 
-@pytest.mark.django_db
 def test_a_question_is_answered_from_the_index(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE, ["An ORM maps objects ", SLIDES_MARKER])
     response = ask()
@@ -202,7 +208,6 @@ def test_a_question_is_answered_from_the_index(index: QdrantClient) -> None:
     assert body["citations"][0]["text"] == ORM_TEXT
 
 
-@pytest.mark.django_db
 def test_the_router_decision_reaches_the_response(index: QdrantClient) -> None:
     install_engine(index, WEB_ROUTE)
     body = ask("Quando scadono le tasse?").json()
@@ -215,7 +220,6 @@ def test_the_router_decision_reaches_the_response(index: QdrantClient) -> None:
     assert [citation["text"] for citation in body["citations"]] == [TASSE_TEXT]
 
 
-@pytest.mark.django_db
 def test_a_web_citation_carries_the_page_a_student_can_open(index: QdrantClient) -> None:
     install_engine(index, WEB_ROUTE)
     citation = ask("Quando scadono le tasse?").json()["citations"][0]
@@ -225,7 +229,6 @@ def test_a_web_citation_carries_the_page_a_student_can_open(index: QdrantClient)
     assert citation["fetch_date"] == FETCH_DATE
 
 
-@pytest.mark.django_db
 def test_a_slides_citation_cites_the_file_and_page(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
     citation = ask().json()["citations"][0]
@@ -235,7 +238,6 @@ def test_a_slides_citation_cites_the_file_and_page(index: QdrantClient) -> None:
     assert citation["fetch_date"] is None
 
 
-@pytest.mark.django_db
 def test_only_a_verbatim_marker_counts_as_cited(index: QdrantClient) -> None:
     """A shortened marker is exactly the failure the generation prompt fights;
     `cited` must report it as absent rather than guess the intent."""
@@ -246,7 +248,6 @@ def test_only_a_verbatim_marker_counts_as_cited(index: QdrantClient) -> None:
     assert ask().json()["citations"][0]["cited"] is False
 
 
-@pytest.mark.django_db
 def test_a_blank_question_is_rejected(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
     response = ask("   ")
@@ -254,7 +255,6 @@ def test_a_blank_question_is_rejected(index: QdrantClient) -> None:
     assert "question" in response.json()
 
 
-@pytest.mark.django_db
 def test_a_question_over_the_length_cap_is_rejected(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
     response = ask("a" * (MAX_QUESTION_CHARS + 1))
@@ -262,7 +262,6 @@ def test_a_question_over_the_length_cap_is_rejected(index: QdrantClient) -> None
     assert "question" in response.json()
 
 
-@pytest.mark.django_db
 def test_a_regional_locale_tag_is_normalised(index: QdrantClient) -> None:
     install_engine(index, WEB_ROUTE)
     response = ask("Quando scadono le tasse?", locale="it-IT")
@@ -270,13 +269,11 @@ def test_a_regional_locale_tag_is_normalised(index: QdrantClient) -> None:
     assert response.json()["locale"] == "it"
 
 
-@pytest.mark.django_db
 def test_an_omitted_locale_is_detected_from_the_question(index: QdrantClient) -> None:
     install_engine(index, WEB_ROUTE)
     assert ask("Quando scadono le tasse universitarie?").json()["locale"] == "it"
 
 
-@pytest.mark.django_db
 def test_an_explicit_null_locale_means_detect_it(index: QdrantClient) -> None:
     """`allow_null` is what separates "decide for me" from "" — a client that
     has no preference sends null rather than omitting the key."""
@@ -286,7 +283,6 @@ def test_an_explicit_null_locale_means_detect_it(index: QdrantClient) -> None:
     assert response.json()["locale"] == "it"
 
 
-@pytest.mark.django_db
 def test_a_blank_locale_is_rejected_rather_than_defaulted(index: QdrantClient) -> None:
     """The other half of that pair: an empty string is not a way of saying
     "decide for me", it is a client sending a field it failed to fill in."""
@@ -296,7 +292,6 @@ def test_a_blank_locale_is_rejected_rather_than_defaulted(index: QdrantClient) -
     assert "locale" in response.json()
 
 
-@pytest.mark.django_db
 def test_a_locale_that_is_not_a_subtag_is_rejected(index: QdrantClient) -> None:
     """`english` is a language name, not a tag; passing it through would filter
     every result away and read as an empty corpus."""
@@ -306,7 +301,6 @@ def test_a_locale_that_is_not_a_subtag_is_rejected(index: QdrantClient) -> None:
     assert "locale" in response.json()
 
 
-@pytest.mark.django_db
 def test_a_dead_generation_endpoint_becomes_503(index: QdrantClient) -> None:
     engine = install_engine(index, SLIDES_ROUTE)
     engine_module._HOLDER.engine = Engine(
@@ -322,7 +316,6 @@ def test_a_dead_generation_endpoint_becomes_503(index: QdrantClient) -> None:
     assert "model server" in response.json()["detail"]
 
 
-@pytest.mark.django_db
 def test_an_unbuilt_index_becomes_503(tmp_path: Path) -> None:
     """A fresh checkout has no collection; the answer is a remedy, not a 500."""
     empty = open_client(tmp_path / "empty")
@@ -346,7 +339,6 @@ HELD_INDEX_ERROR = (
 )
 
 
-@pytest.mark.django_db
 def test_an_index_held_by_another_process_becomes_503(monkeypatch: pytest.MonkeyPatch) -> None:
     """The everyday conflict, and the only route into `build_engine`'s error
     branch: the autouse fixture leaves the slot empty, so the view really does
@@ -363,7 +355,6 @@ def test_an_index_held_by_another_process_becomes_503(monkeypatch: pytest.Monkey
     assert "another process" in response.json()["detail"]
 
 
-@pytest.mark.django_db
 def test_a_router_the_server_refuses_becomes_503(index: QdrantClient) -> None:
     """The first-run mistake — the model was never pulled — reaches routing
     before generation, so guarding only the generation call would leave it a
@@ -382,7 +373,6 @@ def test_a_router_the_server_refuses_becomes_503(index: QdrantClient) -> None:
     assert "model server" in response.json()["detail"]
 
 
-@pytest.mark.django_db
 def test_a_both_route_survives_a_collection_the_index_never_built(tmp_path: Path) -> None:
     """`both` is what the router falls back to on an unusable reply, and a
     fresh checkout has only `slides` — `rag.index` builds that one by default.
@@ -399,7 +389,6 @@ def test_a_both_route_survives_a_collection_the_index_never_built(tmp_path: Path
     assert [citation["text"] for citation in body["citations"]] == [ORM_TEXT]
 
 
-@pytest.mark.django_db
 def test_a_failed_build_releases_the_index_and_is_not_cached(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -429,7 +418,6 @@ def test_a_failed_build_releases_the_index_and_is_not_cached(
     reopened.close()
 
 
-@pytest.mark.django_db
 def test_the_anonymous_rate_limit_returns_429(index: QdrantClient) -> None:
     """Answers are serialised on one GPU, so a burst has to be refused rather
     than queued into a timeout."""
@@ -441,7 +429,6 @@ def test_the_anonymous_rate_limit_returns_429(index: QdrantClient) -> None:
     assert codes[10] == 429
 
 
-@pytest.mark.django_db
 def test_a_forwarded_header_cannot_buy_a_fresh_rate_limit_bucket(index: QdrantClient) -> None:
     """DRF's default is to take the throttle identity from a client-supplied
     X-Forwarded-For, which would make the limit above a suggestion: one header
@@ -454,7 +441,6 @@ def test_a_forwarded_header_cannot_buy_a_fresh_rate_limit_bucket(index: QdrantCl
     assert codes[10] == 429
 
 
-@pytest.mark.django_db
 def test_a_queue_deeper_than_the_wait_is_refused_with_a_retry_hint(
     index: QdrantClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -474,7 +460,6 @@ def test_a_queue_deeper_than_the_wait_is_refused_with_a_retry_hint(
     assert response.headers["Retry-After"] == str(views_module.RETRY_AFTER_SECONDS)
 
 
-@pytest.mark.django_db
 def test_two_chunks_of_one_page_stay_two_citations(tmp_path: Path) -> None:
     """The contract says the grounding set is not deduplicated. Two chunks of
     one page share a marker but carry different text, and merging them would
