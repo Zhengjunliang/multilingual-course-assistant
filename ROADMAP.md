@@ -66,10 +66,10 @@ relatore 2026-08-21 口头新方向（Lightning «agentic RAG powered by Qwen3»
 
 工作量粗估：约 4–6 周（后端 + docker-compose + SPA，是研究里程碑之外最大的工程块）。
 
-- [ ] **首个 `migrate` 前**建自定义 User（`AUTH_USER_MODEL`）—— Django 官方明确建议，事后改造要重写全部迁移
-- [ ] settings 拆 dev/prod + prod 安全响应头（HSTS · secure cookies 等），CI 加 `manage.py check --deploy` 与 `makemigrations --check` 漂移守卫
+- [x] **首个 `migrate` 前**建自定义 User（`AUTH_USER_MODEL`）：`apps/accounts/` 的 `User(AbstractUser)` 带 `locale`（取值域对齐 `settings.LANGUAGES`）；`0001_initial` 已生成
+- [x] 安全响应头 + CI 守卫：**settings 不拆 dev/prod**（单人单部署，`DJANGO_DEBUG` 已承担这个区分；拆两个模块是噪音），改为单一 `config/settings.py` 里按 `DEBUG` 与 `DJANGO_BEHIND_TLS` 条件生效——后者独立于 `DEBUG`，因为「不在调试」与「背后有 TLS」是两个问题，MICC 内网或答辩机可能无 TLS，硬开重定向会让站点打不开。CI 加 `makemigrations --check` 与 `check --deploy --fail-level WARNING`（`--fail-level` 是关键：不加它只打印不失败）
 - [ ] Django + DRF + Celery/Redis 后端项目
-- [ ] docker-compose：PostgreSQL · Redis · Qdrant · Langfuse
+- [x] docker-compose 骨架：**一份文件用 profiles 分层**（无 profile = 有状态服务，本机开发只起这些，Django/Celery 走 `uv run` 在宿主机以直接用 GPU；`app` profile = 整套容器化，MICC/答辩路径）。PostgreSQL 已就位；Redis · Qdrant · Langfuse 与 `app` profile 随各自消费方到位
 - [ ] 上传材料 → Celery 异步 ingest
 - [ ] 上传滥用防护：文件大小/页数上限 · ingest 超时 · rate limit · 索引多租户隔离（谁的材料谁可检索）—— 单份 32 页图片密集 deck 实测吃掉 527s OCR，无上限等于开放算力
 - [ ] DRF 问答 API（`/api/ask`，SSE 流式，带 `locale` 参数）

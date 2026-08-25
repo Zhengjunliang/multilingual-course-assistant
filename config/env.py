@@ -19,6 +19,24 @@ class Settings(BaseSettings):
     django_allowed_hosts: str = "localhost,127.0.0.1"
     django_log_level: str = "INFO"
 
+    # PostgreSQL, served by docker-compose.yml. The defaults match the compose
+    # service so a fresh checkout only has to `docker compose up -d` before
+    # migrating; the password has none on purpose — a working credential
+    # committed to the repo is a working credential wherever the repo lands.
+    django_db_name: str = "mca"
+    django_db_user: str = "mca"
+    django_db_password: str
+    django_db_host: str = "localhost"
+    django_db_port: int = 5432
+
+    # HTTPS redirect, HSTS and secure cookies are meaningless — or actively
+    # break the site — when nothing terminates TLS, and a demo on the MICC
+    # intranet or on the defence machine may well have nothing. One flag gates
+    # all of them rather than DEBUG, because "not debugging" and "behind TLS"
+    # are different questions. CI sets it so `check --deploy` verifies the
+    # configuration that would actually be deployed.
+    django_behind_tls: bool = False
+
     # Generation endpoint: any OpenAI-compatible server. Dev default is local
     # Ollama (fully offline loop); M3 experiments point this at the MICC vLLM
     # tunnel by overriding `.env` — nothing else changes. Both servers ignore

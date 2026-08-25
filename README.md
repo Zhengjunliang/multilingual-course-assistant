@@ -14,21 +14,56 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 git clone git@github.com:Zhengjunliang/multilingual-course-assistant.git
 cd multilingual-course-assistant
 uv sync                       # uv 自带 Python 3.12，不动系统的 3.10
-Copy-Item .env.example .env   # 填 DJANGO_SECRET_KEY，命令见文件内注释
+Copy-Item .env.example .env   # 填 DJANGO_SECRET_KEY 与 DJANGO_DB_PASSWORD，命令见文件内注释
 uv run pre-commit install
+docker compose up -d          # PostgreSQL（需 Docker Desktop 引擎在跑）
+uv run python manage.py migrate
 ```
+
+`docker-compose.yml` 只起有状态服务；Django 与后续的 Celery worker 用 `uv run` 跑在宿主机上，因为 `rag/` 的 embedding 与 reranker 要用本机 GPU。整套进容器的部署路径走 `--profile app`（🔜 M5 末），文件顶部有约定说明。
 
 ## 开发
 
-任务入口在 [justfile](justfile)（`scoop install just` 一次性安装）：
+### 日常开工
+
+```powershell
+just up          # 起 PostgreSQL 容器（Docker Desktop 引擎要先开着）
+just serve       # 开发服务器
+```
+
+- 管理后台在 <http://127.0.0.1:8000/admin/>
+- 根路径 `/` 无内容：[config/urls.py](config/urls.py) 只注册了 admin，Django 显示它的默认欢迎页。问答界面 🔜 M5（React SPA 一条）
+
+收工 `just down`——容器停掉，数据留在命名卷里，下次 `just up` 原样还在。连数据一起清是 `docker compose down -v`（不可逆）。
+
+**改过模型之后必须补两步**，漏掉会让 `just test` 变红（`tests/test_accounts.py` 的 `test_no_pending_migrations` 守着模型与迁移不漂移）：
+
+```powershell
+just makemigrations   # 生成迁移文件，进 git
+just migrate          # 应用到数据库
+```
+
+管理员账号用 `just superuser` 建（交互式）；改密码是 `uv run python manage.py changepassword <用户名>`。
+
+### 任务入口
+
+全部在 [justfile](justfile)（`scoop install just` 一次性安装）：
 
 ```powershell
 just lint        # ruff check
 just format      # ruff format
-just typecheck   # pyright
+just typecheck   # pyright（含 django-stubs，与 IDE 看到的类型一致）
 just test        # pytest（快跑，无覆盖率开销）
 just cov         # pytest --cov，带覆盖率门禁，与 CI 相同
 just check       # 完整 CI 链：lint + format + 类型 + Django check + 测试
+
+just up          # 起后台服务（PostgreSQL）
+just down        # 停后台服务，数据留在命名卷里
+just serve       # 开发服务器
+just superuser   # 建管理员账号（交互式）
+just makemigrations  # 模型改动 -> 迁移文件
+just migrate     # 应用数据库迁移
+
 just probe data\corpus\PPM
 just parse data\corpus\PPM
 just chunk data\parsed
@@ -82,12 +117,13 @@ M3 正式实验改 `.env` 指向服务器 vLLM 隧道（`ssh -L 8000:localhost:8
 
 | 路径              | 内容                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------ |
-| `config/`         | Django project：settings · urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入）        |
+| `config/`         | Django project：settings（单一模块，安全响应头按 `DEBUG` 与 `DJANGO_BEHIND_TLS` 条件生效）· urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入，`rag/` 与 Django 两侧共用） |
+| `apps/accounts/`  | 自定义 User（`AUTH_USER_MODEL`）。`AbstractUser` + `locale`（偏好语言，取值域对齐 `settings.LANGUAGES`）；admin 里可见可筛 |
 | `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`crawl.py` 抓校园 web 源快照 + registry，`webparse.py` 快照转可切块工件，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`llm.py` OpenAI 兼容客户端（Streamer/Completer + pydantic JSON 校验助手），`answer.py` 生成带引用回答，`agent.py` 路由问题到课程库/校园库（只读控制流），`gold.py` 检索冒烟跑分与 `--routing` 路由报告，`golddraft.py` 起草 gold 题（人工把关后才进 `gold/`） |
 | `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性                                |
 | `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
 
-`apps/qa/`（DRF）与 `frontend/`（React SPA）🔜 M5，届时再建。
+`apps/qa/`（DRF 问答 API）与 `frontend/`（React SPA）🔜 M5 后续 Stage，届时再建。
 
 ## MICC 服务器日常使用
 

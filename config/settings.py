@@ -1,8 +1,9 @@
-"""Django settings — single flat module while there is nothing to differentiate.
+"""Django settings — one module, driven by the environment.
 
-The dev/prod split, PostgreSQL, and the production security headers arrive with the
-web milestone (M5, see ROADMAP.md); adding them now would be configuration for an
-environment that does not exist yet.
+The dev/prod split this file used to anticipate was dropped: one developer and
+one deployment do not need two settings modules to keep in sync, and
+`DJANGO_DEBUG` in .env already carries the distinction. The production security
+headers at the bottom are therefore conditional rather than a separate file.
 """
 
 from pathlib import Path
@@ -29,6 +30,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "apps.accounts",
 ]
 
 MIDDLEWARE = [
@@ -67,12 +69,27 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# PostgreSQL rather than SQLite because the web milestone puts three writers on
+# this database at once — the Django process, the Celery worker and whatever is
+# running in a terminal — and SQLite's single-writer lock would serialise them.
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env.django_db_name,
+        "USER": env.django_db_user,
+        "PASSWORD": env.django_db_password,
+        "HOST": env.django_db_host,
+        "PORT": env.django_db_port,
+        # Without this every management command hangs indefinitely when the
+        # database is down, instead of saying so: Docker Desktop's port proxy on
+        # Windows keeps accepting connections on the published port while the
+        # engine itself is stopped, and the connect never resolves.
+        "OPTIONS": {"connect_timeout": 5},
     }
 }
+
+# Swapped from the first migration: see apps/accounts/models.py.
+AUTH_USER_MODEL = "accounts.User"
 
 
 # Password validation
@@ -143,3 +160,22 @@ LOGGING = {
     },
     "root": {"handlers": ["console"], "level": env.django_log_level},
 }
+
+
+# Security headers
+# https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+
+# `manage.py check --deploy --fail-level WARNING` runs in CI against DEBUG=false
+# and DJANGO_BEHIND_TLS=true, so this block is what that gate verifies. Django's
+# own defaults already cover X_FRAME_OPTIONS, SECURE_CONTENT_TYPE_NOSNIFF and
+# SECURE_REFERRER_POLICY; restating them here would be a second copy to drift.
+if not DEBUG and env.django_behind_tls:
+    SECURE_SSL_REDIRECT = True
+    # One year, the value the preload lists require. Subdomains and preload
+    # travel with it: HSTS without them protects only the exact host that was
+    # already reached over HTTPS once.
+    SECURE_HSTS_SECONDS = 31_536_000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True

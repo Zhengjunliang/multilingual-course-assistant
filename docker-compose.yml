@@ -1,0 +1,46 @@
+# One compose file for every environment; profiles tell the services apart.
+#
+# No profile => always starts. `docker compose up -d` brings up the stateful
+# backing services and nothing else, which is what local development needs:
+# Django and the Celery worker run on the host under `uv run` so they can reach
+# the GPU that rag/ requires (rag/search.py picks cuda when it is there).
+#
+# profiles: ["app"] => starts only when named, `docker compose --profile app up`.
+# That is the MICC / defence-demo path, where the whole stack is containerised
+# on a Linux host.
+#
+# redis (Celery broker), qdrant (retrieval backend) and the app profile itself
+# join this file when the code that uses them does. Values come from .env, the
+# same file config/env.py reads, so there is one place to change a credential.
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${DJANGO_DB_NAME:-mca}
+      POSTGRES_USER: ${DJANGO_DB_USER:-mca}
+      POSTGRES_PASSWORD: ${DJANGO_DB_PASSWORD:?set DJANGO_DB_PASSWORD in .env}
+    ports:
+      - "${DJANGO_DB_PORT:-5432}:5432"
+    volumes:
+      # A named volume, not a bind mount: PostgreSQL needs POSIX ownership and
+      # fsync semantics that a Windows host directory does not give it.
+      #
+      # /var/lib/postgresql, not the /var/lib/postgresql/data every pre-18
+      # example shows. The 18 images store data under a major-version
+      # subdirectory so that `pg_upgrade --link` does not cross a mount
+      # boundary, and they refuse to start when they find the old layout.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      # -U and -d are not optional here: bare `pg_isready` only probes the
+      # socket and reports ready while first-run initdb is still building the
+      # database, so anything waiting on this condition would start too early.
+      test:
+        ["CMD-SHELL", "pg_isready -U ${DJANGO_DB_USER:-mca} -d ${DJANGO_DB_NAME:-mca}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

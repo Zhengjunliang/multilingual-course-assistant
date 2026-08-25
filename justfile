@@ -35,6 +35,30 @@ check:
     uv run python manage.py check
     uv run pytest --cov
 
+# Start the backing services (PostgreSQL) in the background.
+up:
+    docker compose up -d
+
+# Stop the backing services; the named volume keeps their data.
+down:
+    docker compose down
+
+# Apply database migrations (needs `just up` first).
+migrate:
+    uv run python manage.py migrate
+
+# Write the migration for a model change; `just migrate` then applies it.
+makemigrations:
+    uv run python manage.py makemigrations
+
+# Development server on http://127.0.0.1:8000/ (needs `just up` first).
+serve:
+    uv run python manage.py runserver
+
+# Create an admin account (interactive).
+superuser:
+    uv run python manage.py createsuperuser
+
 # Profile PDFs and show the routing decision without parsing.
 probe target:
     uv run python -m rag.probe "{{ target }}"

@@ -20,9 +20,31 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # Not a secret: this key only ever signs throwaway CI sessions.
-      DJANGO_SECRET_KEY: ci-only-key-never-used-outside-this-runner
+      # Not a secret: this key only ever signs throwaway CI sessions. Its length
+      # is not arbitrary — `check --deploy` rejects anything under 50 characters.
+      DJANGO_SECRET_KEY: ci-only-key-never-used-outside-this-runner-and-not-a-secret
       DJANGO_DEBUG: "false"
+      DJANGO_DB_NAME: mca
+      DJANGO_DB_USER: mca
+      DJANGO_DB_PASSWORD: ci-only-password
+      DJANGO_DB_HOST: localhost
+      DJANGO_DB_PORT: "5432"
+    services:
+      # Migrations and the model tests need a real PostgreSQL; the version
+      # tracks docker-compose.yml so CI tests what the developer runs.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: mca
+          POSTGRES_USER: mca
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mca -d mca"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -44,6 +66,18 @@ jobs:
 
       - name: Django system checks
         run: uv run python manage.py check
+
+      - name: Migration drift
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Deployment checks
+        # --fail-level WARNING is what makes this a gate: without it the command
+        # prints its findings and exits 0. BEHIND_TLS only here, not job-wide —
+        # it turns on SECURE_SSL_REDIRECT, which would make the test client
+        # follow a 301 out of every request.
+        env:
+          DJANGO_BEHIND_TLS: "true"
+        run: uv run python manage.py check --deploy --fail-level WARNING
 
       - name: Tests
         run: uv run pytest --cov
