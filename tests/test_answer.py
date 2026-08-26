@@ -3,6 +3,7 @@ with their citation markers, an empty candidate set short-circuits into a
 refusal without ever calling the LLM, and the OpenAI client stays behind a
 protocol so every test runs offline."""
 
+import hashlib
 import subprocess
 import sys
 from collections.abc import Iterator, Sequence
@@ -12,7 +13,17 @@ import pytest
 from test_index import StubDense, StubSparse, make_chunk
 from test_search import ORM_TEXT
 
-from rag.answer import Message, answer, build_messages, format_context, main, source_marker
+from rag.answer import (
+    HISTORY_ANSWER_CHARS,
+    SYSTEM_PROMPT,
+    Message,
+    Turn,
+    answer,
+    build_messages,
+    format_context,
+    main,
+    source_marker,
+)
 from rag.index import ensure_collection, index_chunks, open_client
 from rag.search import Hit
 
@@ -43,6 +54,86 @@ def test_messages_carry_the_answer_language_and_the_question() -> None:
     assert messages[0]["role"] == "system"
     assert "Italian" in messages[0]["content"]
     assert messages[1]["content"].endswith("Question: What is an ORM?")
+
+
+# The prompt every generation-side result in docs/diario-sperimentale.md was
+# produced with. Same reasoning as the router's pin in tests/test_agent.py: the
+# identity tests below compare new code against new code, so without this a
+# prompt edit retires those results while every test stays green.
+GENERATION_PROMPT_SHA256 = "1706cf3f6bf211179d31c73c8a7b1d50148f3a4281b3824c759f316464160d0d"
+
+
+def test_the_generation_prompt_is_the_one_the_recorded_answers_were_produced_with() -> None:
+    assert hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest() == GENERATION_PROMPT_SHA256
+
+
+def test_a_question_with_no_history_builds_exactly_the_prompt_it_did_before() -> None:
+    hits = make_hits()
+
+    assert build_messages("What is an ORM?", hits, "it") == build_messages(
+        "What is an ORM?", hits, "it", ()
+    )
+
+
+def test_history_never_becomes_extra_messages() -> None:
+    """Two messages, however long the conversation.
+
+    Real `assistant` turns would show a 4B model what an assistant reply looks
+    like here — and the same model is asked for bare JSON when it routes
+    (rag/agent.py). Both call sites keep the same shape so that neither can
+    teach it the other's habits.
+    """
+    messages = build_messages(
+        "How does it differ?",
+        make_hits(),
+        "en",
+        [Turn(question="What is an ORM?", answer="It maps objects to tables.")],
+    )
+
+    assert [message["role"] for message in messages] == ["system", "user"]
+
+
+def test_history_comes_before_the_excerpts_and_the_question() -> None:
+    """Order is the grounding rule: whatever the answer must be built from is
+    the last thing the model reads before what it is being asked."""
+    content = build_messages(
+        "How does it differ?",
+        make_hits(),
+        "en",
+        [Turn(question="What is an ORM?", answer="It maps objects to tables.")],
+    )[1]["content"]
+
+    assert content.index("What is an ORM?") < content.index("Excerpt 1")
+    assert content.endswith("Question: How does it differ?")
+
+
+def test_an_earlier_answer_arrives_without_its_citation_markers() -> None:
+    """A marker names an excerpt that is not in front of the model this turn.
+    Left in, it is a label to copy into a citation that resolves to nothing."""
+    content = build_messages(
+        "And the second one?",
+        make_hits(),
+        "en",
+        [Turn(question="What is an ORM?", answer="It maps objects [deck.pdf p.1] to tables.")],
+    )[1]["content"]
+
+    assert "It maps objects to tables." in content
+    # `Excerpt 1 [deck.pdf p.1]` is this turn's own, and must survive.
+    assert content.count("[deck.pdf p.1]") == 1
+
+
+def test_a_long_earlier_answer_is_truncated() -> None:
+    """Three whole answers would crowd out the excerpts this turn is grounded
+    in — the one thing in the prompt that must not be squeezed."""
+    content = build_messages(
+        "And?",
+        make_hits(),
+        "en",
+        [Turn(question="Explain ORMs.", answer="word " * 500)],
+    )[1]["content"]
+
+    assert "…" in content
+    assert content.index("Excerpt 1") < HISTORY_ANSWER_CHARS + 200
 
 
 def test_answer_streams_through_the_client() -> None:

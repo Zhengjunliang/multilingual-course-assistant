@@ -40,7 +40,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict
 
-from rag.answer import answer, format_context, print_sources
+from rag.answer import Turn, answer, format_context, format_history_questions, print_sources
 from rag.chunk import detect_locale, locale_arg
 from rag.crawl import Outlink, is_pdf, latest_by_url, read_registry
 from rag.index import COLLECTION, WEB_COLLECTION, DenseEncoder
@@ -235,11 +235,30 @@ class DeepenResult:
     decisions: list[Decision]
 
 
-def route(question: str, completer: Completer) -> RouteDecision:
-    """An unusable reply is a routing decision too: `both` searches everything."""
+def route(question: str, completer: Completer, history: Sequence[Turn] = ()) -> RouteDecision:
+    """An unusable reply is a routing decision too: `both` searches everything.
+
+    `history` is what makes "how does it differ from Active Record?" routable:
+    the antecedent of "it" is in the student's previous question, and without it
+    the router is reading a sentence with a hole in it. Only their questions
+    travel — `format_history_questions` explains why the answers do not.
+
+    It arrives as a prefix inside the one user message, never as extra
+    conversation turns. The system prompt above demands a bare JSON object, and
+    an `assistant` message holding prose is a demonstration of the opposite; the
+    measured cost of a mis-taught router is `route` falling back to `both` on
+    questions it used to place, which is the M2.5b fallback count moving off
+    zero without a single test noticing.
+
+    With no history the two messages below are byte for byte what they were when
+    that count was measured — `content is question`, not a copy of it.
+    """
+    content = (
+        question if not history else f"{format_history_questions(history)}\n\nQuestion: {question}"
+    )
     messages: list[Message] = [
         {"role": "system", "content": ROUTER_SYSTEM_PROMPT},
-        {"role": "user", "content": question},
+        {"role": "user", "content": content},
     ]
     decision = complete_json(completer, messages, RouteDecision)
     if decision is None:

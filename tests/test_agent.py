@@ -12,6 +12,7 @@ steps that still answer from whatever was gathered. All of it runs
 offline — stub fetcher, stub completer, stub encoders, an embedded Qdrant under
 tmp_path — and the step clock runs on a fake one."""
 
+import hashlib
 import subprocess
 import sys
 import time
@@ -33,6 +34,7 @@ from rag.agent import (
     MAX_LINK_CANDIDATES,
     MAX_PDF_CANDIDATES,
     PICK_FALLBACK_REASON,
+    ROUTER_SYSTEM_PROMPT,
     Candidate,
     Decision,
     RouteDecision,
@@ -45,6 +47,7 @@ from rag.agent import (
     pointer_line,
     route,
 )
+from rag.answer import Turn
 from rag.chunk import Chunk
 from rag.crawl import Outlink, RegistryEntry, Throttle, append_registry, read_registry
 from rag.index import COLLECTION, WEB_COLLECTION, ensure_collection, index_chunks, open_client
@@ -285,6 +288,82 @@ def test_reply_without_fresh_still_validates() -> None:
     decision = route("What is an ORM?", completer)
     assert decision.target == "slides"
     assert decision.fresh is False
+
+
+# The prompt the 22/32 routing accuracy in docs/diario-sperimentale.md was
+# measured against. Pinned rather than described, because every guard below is
+# otherwise circular: they compare new code to new code, so a prompt edit would
+# keep them all green while quietly retiring the number the thesis reports.
+# Changing this constant is allowed — rerunning the 32-question routing report
+# in the same commit is what makes it allowed.
+ROUTER_PROMPT_SHA256 = "8bc4c4908d75741799721031e6424420f2ee2130614f476764505dcdb78134c8"
+
+ORM_REPLY = '{"target": "slides", "query": "ORM", "fresh": false, "reason": "course topic"}'
+
+
+def test_the_router_prompt_is_the_one_the_reported_accuracy_was_measured_with() -> None:
+    assert hashlib.sha256(ROUTER_SYSTEM_PROMPT.encode()).hexdigest() == ROUTER_PROMPT_SHA256
+
+
+def test_a_question_with_no_history_reaches_the_router_exactly_as_before() -> None:
+    """Conversations must be free for the first question of one.
+
+    The whole messages list is compared, not the question inside it: a change to
+    the system prompt or to the number of messages is precisely what would move
+    the fallback count without touching anything a routing assertion reads.
+    """
+    without = StubCompleter(ORM_REPLY)
+    empty = StubCompleter(ORM_REPLY)
+
+    route("What is an ORM?", without)
+    route("What is an ORM?", empty, history=())
+
+    assert without.messages == empty.messages
+    assert without.messages[-1]["content"] == "What is an ORM?"
+
+
+def test_history_puts_the_earlier_questions_ahead_of_this_one() -> None:
+    """What makes a pronoun routable: "it" has no antecedent on its own."""
+    completer = StubCompleter(ORM_REPLY)
+
+    route(
+        "How does it differ from Active Record?",
+        completer,
+        history=[
+            Turn(question="What is an ORM?", answer="An ORM maps objects to tables."),
+            Turn(question="Which one does Django use?", answer="Django's own."),
+        ],
+    )
+
+    content = completer.messages[-1]["content"]
+    assert content.index("What is an ORM?") < content.index("Which one does Django use?")
+    assert content.endswith("Question: How does it differ from Active Record?")
+
+
+def test_the_router_never_sees_an_earlier_answer() -> None:
+    """The reason `format_history_questions` exists.
+
+    An answer is full of citation markers, and a web marker is a unifi.it URL.
+    Three turns of those in front of a 4B router is a standing argument for
+    `unifi_web` on every question that follows, whatever the question is about.
+    """
+    completer = StubCompleter(ORM_REPLY)
+
+    route(
+        "What is an ORM?",
+        completer,
+        history=[
+            Turn(
+                question="Quando scadono le tasse?",
+                answer="Scadono il 30 novembre [https://www.unifi.it/it/tasse · 2026-08-01].",
+            )
+        ],
+    )
+
+    prompt = "".join(message["content"] for message in completer.messages)
+    assert "Quando scadono le tasse?" in prompt
+    assert "30 novembre" not in prompt
+    assert "unifi.it" not in prompt
 
 
 def test_collections_for_maps_each_target_to_real_collection_names() -> None:

@@ -13,8 +13,11 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from pydantic import BaseModel, ConfigDict
 
 from rag.chunk import detect_locale, locale_arg
 from rag.llm import ChatStreamer, Message, build_streamer
@@ -33,6 +36,17 @@ logger = logging.getLogger(__name__)
 
 LOCALE_NAMES = {"en": "English", "it": "Italian", "zh": "Chinese"}
 
+# How much of an earlier answer travels with the next question. Long enough to
+# carry what a pronoun could be pointing at, short enough that three of them do
+# not crowd out the excerpts this turn is actually grounded on.
+HISTORY_ANSWER_CHARS = 400
+
+# Anything bracketed, not the two marker shapes specifically. Over-removal is
+# the safe direction: what is being prevented is the model copying a marker that
+# belonged to a previous turn's excerpts, which are not in front of it now, and
+# a bracketed aside lost from a truncated old answer costs nothing.
+_BRACKETED = re.compile(r"\[[^\]]*\]")
+
 SYSTEM_PROMPT = """\
 You are a course assistant answering questions about university course material.
 
@@ -44,6 +58,56 @@ write "Excerpt N" — the marker is the [...] label shown next to the excerpt.
 - If the excerpts do not contain the answer, say so plainly instead of guessing.
 - Answer in {language}.
 - Be concise: a student wants the concept, not an essay."""
+
+
+class Turn(BaseModel):
+    """One completed exchange, as plain data.
+
+    A model of its own rather than the database row it will usually be built
+    from: `rag/` may not import Django (tests/test_smoke.py enforces it), and
+    the web layer is not the only conceivable caller. Frozen like every other
+    contract here — a prompt built from a history that something mutated
+    mid-call would be unreproducible.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    question: str
+    answer: str
+
+
+def format_history_questions(turns: Sequence[Turn]) -> str:
+    """What the router sees: the student's own earlier questions, nothing else.
+
+    The antecedent of "it" is in what the student said last, not in what they
+    were told — and an earlier answer is full of citation markers, three turns
+    of which would tug every later routing decision towards `unifi_web`.
+    """
+    asked = "\n".join(f"- {turn.question}" for turn in turns)
+    return f"Earlier questions in this conversation, oldest first:\n{asked}"
+
+
+def format_history(turns: Sequence[Turn]) -> str:
+    """What generation sees: whole exchanges, trimmed and stripped of markers.
+
+    Both edits are about the citation rule the system prompt states. A marker
+    left in an old answer is a label the model can copy while the excerpt behind
+    it is nowhere in this turn's context, which is a citation that resolves to
+    nothing; removing them leaves history as prose to refer back to and nothing
+    to cite from.
+    """
+    blocks = [
+        f"Student: {turn.question}\nAssistant: {_shorten(_BRACKETED.sub('', turn.answer))}"
+        for turn in turns
+    ]
+    return "Earlier in this conversation, oldest first:\n\n" + "\n\n".join(blocks)
+
+
+def _shorten(text: str) -> str:
+    collapsed = " ".join(text.split())
+    if len(collapsed) <= HISTORY_ANSWER_CHARS:
+        return collapsed
+    return collapsed[:HISTORY_ANSWER_CHARS].rstrip() + "…"
 
 
 def source_marker(hit: Hit) -> str:
@@ -67,16 +131,36 @@ def format_context(hits: Sequence[Hit]) -> str:
     return "\n\n".join(blocks)
 
 
-def build_messages(question: str, hits: Sequence[Hit], locale: str) -> list[Message]:
+def build_messages(
+    question: str, hits: Sequence[Hit], locale: str, history: Sequence[Turn] = ()
+) -> list[Message]:
+    """The prompt, as two messages — and two only, however long the conversation.
+
+    History is a text block inside the same user message rather than a run of
+    alternating turns. Real `assistant` messages would be a demonstration to a
+    4B model of what an assistant reply looks like here, and `rag/agent.py` asks
+    the same model for strict JSON; the shape is kept identical on both sides so
+    that neither can teach it the other's habits.
+
+    It sits ahead of the excerpts so that what the answer must be grounded in is
+    the last thing before the question. With no history the two messages are
+    byte for byte what they were before conversations existed, which is what
+    keeps the M3 measurements comparable.
+    """
     language = LOCALE_NAMES.get(locale, "the language of the question")
+    earlier = f"{format_history(history)}\n\n" if history else ""
     return [
         {"role": "system", "content": SYSTEM_PROMPT.format(language=language)},
-        {"role": "user", "content": f"{format_context(hits)}\n\nQuestion: {question}"},
+        {"role": "user", "content": f"{earlier}{format_context(hits)}\n\nQuestion: {question}"},
     ]
 
 
 def answer(
-    question: str, hits: Sequence[Hit], streamer: ChatStreamer, locale: str
+    question: str,
+    hits: Sequence[Hit],
+    streamer: ChatStreamer,
+    locale: str,
+    history: Sequence[Turn] = (),
 ) -> Iterator[str]:
     """No grounding, no LLM call: an empty candidate set becomes an honest
     refusal instead of an invitation to hallucinate."""
@@ -85,7 +169,7 @@ def answer(
             "it": "Non ho trovato materiale del corso pertinente a questa domanda.",
         }.get(locale, "I could not find course material relevant to this question.")
         return
-    yield from streamer.stream(build_messages(question, hits, locale))
+    yield from streamer.stream(build_messages(question, hits, locale, history))
 
 
 def print_sources(hits: Sequence[Hit]) -> None:
