@@ -55,6 +55,24 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # The frontend chain runs before every Django step on purpose. From the
+      # deployment stage on, STATICFILES_DIRS points at frontend/dist — a build
+      # artifact that is not in git — and `check --deploy --fail-level WARNING`
+      # turns the "directory does not exist" warning into a failed job.
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend install
+        run: npm ci
+        working-directory: frontend
+
+      - name: Frontend lint, types, catalogues and build
+        run: npm run lint && npm run typecheck && npm run check:i18n && npm run build
+        working-directory: frontend
+
       - name: Lint
         run: uv run ruff check .
 
@@ -97,3 +115,16 @@ jobs:
         run: |
           uv export --locked --no-emit-project --no-hashes -o requirements.txt
           uvx pip-audit --no-deps --disable-pip -r requirements.txt
+
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Audit frontend dependencies
+        # --omit=dev: only what ships to a browser. The build toolchain's own
+        # advisories are a steady drip that would turn this gate into noise
+        # without ever describing something a visitor could reach.
+        run: npm ci && npm audit --omit=dev --audit-level=high
+        working-directory: frontend

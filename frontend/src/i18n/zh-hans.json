@@ -1,0 +1,33 @@
+{
+  "app": {
+    "title": "课程助手",
+    "subtitle": "可以问课程材料，也可以问校园信息。"
+  },
+  "ask": {
+    "label": "你的问题",
+    "placeholder": "什么是 ORM？",
+    "submit": "提问",
+    "cancel": "停止"
+  },
+  "status": {
+    "queued": "正在等待问答服务…",
+    "streaming": "正在写答案…"
+  },
+  "route": {
+    "label": "检索范围",
+    "slides": "课程材料",
+    "unifi_web": "校园网页",
+    "both": "两个知识源"
+  },
+  "citations": {
+    "title": "来源",
+    "empty": "这个问题没有检索到任何内容。",
+    "uncited": "检索到但答案没引",
+    "page": "第 {{page}} 页",
+    "fetched": "抓取于 {{date}}"
+  },
+  "error": {
+    "title": "答案没有写完",
+    "retryAfter": "服务要求 {{seconds}} 秒后重试。"
+  }
+}

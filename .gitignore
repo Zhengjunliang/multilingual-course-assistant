@@ -20,6 +20,8 @@ htmlcov/
 node_modules/
 dist/
 build/
+.vite/
+*.tsbuildinfo
 *.log
 npm-debug.log*
 yarn-error.log*

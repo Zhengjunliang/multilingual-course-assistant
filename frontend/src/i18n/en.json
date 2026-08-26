@@ -1,0 +1,33 @@
+{
+  "app": {
+    "title": "Course assistant",
+    "subtitle": "Ask about the course material or about campus information."
+  },
+  "ask": {
+    "label": "Your question",
+    "placeholder": "What is an ORM?",
+    "submit": "Ask",
+    "cancel": "Stop"
+  },
+  "status": {
+    "queued": "Waiting for the answering service…",
+    "streaming": "Writing the answer…"
+  },
+  "route": {
+    "label": "Searched",
+    "slides": "course material",
+    "unifi_web": "campus pages",
+    "both": "both sources"
+  },
+  "citations": {
+    "title": "Sources",
+    "empty": "Nothing was retrieved for this question.",
+    "uncited": "retrieved, not cited",
+    "page": "page {{page}}",
+    "fetched": "fetched {{date}}"
+  },
+  "error": {
+    "title": "The answer could not be completed",
+    "retryAfter": "The service asked to retry in {{seconds}} seconds."
+  }
+}

@@ -6,7 +6,7 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 
 ## 状态
 
-✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节），SPA、账号、异步 ingest 🔜 后续 Stage。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节）；React SPA 脚手架已建，开发期在 Vite dev server 上消费同一条流（见「前端」一节）。账号与多轮会话、异步 ingest 🔜 后续 Stage。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
@@ -32,7 +32,7 @@ just serve       # 开发服务器
 ```
 
 - 管理后台在 <http://127.0.0.1:8000/admin/>；问答 API 在 `/api/ask`（见下节）
-- 根路径 `/` 无内容：[config/urls.py](config/urls.py) 只挂了 admin 与 api，Django 显示它的默认欢迎页。问答界面 🔜 M5 后续 Stage（React SPA 一条）
+- Django 的根路径 `/` 仍无内容：[config/urls.py](config/urls.py) 只挂了 admin 与 api。问答界面在开发期由 Vite dev server 自己发（`just fe-dev`，见「前端」一节）；由 Django 发编译产物是 🔜 部署 Stage 的事
 
 **`just serve` 跑着的时候，终端里的 `just index` / `just search` / `just ask` 会失败**：本地 Qdrant 是嵌入式的，独占 `data/qdrant` 目录锁，网站进程先开就轮不到 CLI（反过来也一样，那时端点返回 503 并说明冲突）。要两边同时用，先 `Ctrl+C` 停掉网站。这条随「Qdrant 改服务进程」🔜 解除，见 [ROADMAP.md](ROADMAP.md) 自主拍板项一节。
 
@@ -57,7 +57,11 @@ just format      # ruff format
 just typecheck   # pyright（含 django-stubs，与 IDE 看到的类型一致）
 just test        # pytest（快跑，无覆盖率开销）
 just cov         # pytest --cov，带覆盖率门禁，与 CI 相同
-just check       # 完整 CI 链：lint + format + 类型 + Django check + 测试
+just check       # 完整 CI 链：前端链 + lint + format + 类型 + Django check + 测试
+
+just fe-install  # npm ci（按 frontend/package-lock.json 装依赖）
+just fe-dev      # SPA 开发服务器 http://localhost:5173/
+just fe          # 前端链：biome + tsc + catalogue key 检查 + 生产构建
 
 just up          # 起后台服务（PostgreSQL）
 just down        # 停后台服务，数据留在命名卷里
@@ -80,7 +84,27 @@ just webparse data\webcorpus\<run_id>   # 快照解析 -> 可切块工件对
 
 不装 just 也可以直接跑对应的 `uv run …` 命令（recipe 内容即命令本身）。
 
-CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 push 与 PR 上跑同一条链外加 pip-audit 依赖审计，用 `uv sync --locked`，所以 `uv.lock` 必须跟着 commit。依赖更新手动管理（`uv lock --upgrade` 后跑 `just check`）。
+CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 push 与 PR 上跑同一条链外加 pip-audit 与 `npm audit --omit=dev` 两道依赖审计，用 `uv sync --locked` 与 `npm ci`，所以 `uv.lock` 与 `frontend/package-lock.json` 都必须跟着 commit。依赖更新手动管理（`uv lock --upgrade` / `npm update --prefix frontend` 后跑 `just check`）。
+
+前端链在 CI 里**排在所有 Django 步骤之前**，不是随手排的：部署 Stage 起 `STATICFILES_DIRS` 会指向 `frontend/dist`，而那是不进 git 的构建产物，`check --deploy --fail-level WARNING` 会把「目录不存在」变成失败。`just check` 用 `check: fe` 依赖复现同一顺序。
+
+## 前端
+
+React + TypeScript SPA，Vite 构建，Tailwind + shadcn 风格组件（组件源码在仓库里，不是 npm 包），界面文案三语走 react-i18next。
+
+```powershell
+just fe-install   # 一次性
+just up; just serve    # 终端 A：PostgreSQL + Django
+just fe-dev            # 终端 B：http://localhost:5173/
+```
+
+Vite dev server 把 `/api`、`/admin`、`/static` 代理到 `127.0.0.1:8000`，且 **`changeOrigin: false`** —— 转发时保留 `Host: localhost:5173`，Django 的 CSRF origin 校验因此自然通过，不需要 `CSRF_TRUSTED_ORIGINS`。`/admin` 那条代理是给账号 Stage 与 SPA 登录页之间的空档期用的（在 5173 的 `/admin/` 登录，cookie 落在 SPA 自己的 origin 上）。
+
+**不用 `EventSource`**：它只发 GET，而 `/api/ask` 是带 JSON 体的 POST。[frontend/src/api/sse.ts](frontend/src/api/sse.ts) 手写 `fetch` + `ReadableStream` 解析器，换来 `AbortController`（离开页面立刻掐断生成、归还后端的引擎锁）与流式 `TextDecoder`（一个中文字符会被劈在两个网络分片里）。
+
+引用角标**只在 `end` 到达之后**才算：marker 常被劈在两个 `token` 事件里，边流边匹配会先报缺失再报错位。未被引用的来源卡片置灰，那是「检索到但答案没引」的信号。
+
+[frontend/src/api/contract.ts](frontend/src/api/contract.ts) 是 [apps/qa/contract.py](apps/qa/contract.py) 的镜像，唯一源在 Python 侧；[tests/test_qa_contract.py](tests/test_qa_contract.py) 把镜像当纯文本读，逐个模型逐个字段断言它没漏，两侧因此不会静默漂移。
 
 ## Ingest（课程材料 → 可检索的块）
 
@@ -175,10 +199,9 @@ data: {}
 | `apps/accounts/`  | 自定义 User（`AUTH_USER_MODEL`）。`AbstractUser` + `locale`（偏好语言，取值域对齐 `settings.LANGUAGES`）；admin 里可见可筛 |
 | `apps/qa/`        | 问答 API。`contract.py` SSE 事件契约（唯一源，SPA 消费它）· `serializers.py` 请求校验 · `engine.py` 进程级模型资源 + 串行的 `stream_answer()`（路由→检索→生成，复用 `rag/`，不重写逻辑；锁随流的关闭释放）· `views.py` 只做 HTTP 翻译与 SSE 分帧 |
 | `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`crawl.py` 抓校园 web 源快照 + registry，`webparse.py` 快照转可切块工件，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`llm.py` OpenAI 兼容客户端（Streamer/Completer + pydantic JSON 校验助手），`answer.py` 生成带引用回答，`agent.py` 路由问题到课程库/校园库（只读控制流），`gold.py` 检索冒烟跑分与 `--routing` 路由报告，`golddraft.py` 起草 gold 题（人工把关后才进 `gold/`） |
-| `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性                                |
+| `frontend/`       | React + TypeScript SPA（Vite）。`src/api/` 契约镜像 · SSE 解析器 · fetch 包装 · `src/lib/markers.ts` 引用角标与置灰判定 · `src/i18n/` 三份 catalogue · `src/components/ui/` shadcn 风格组件（源码在仓库里）· `src/features/chat/` 问答界面。自带 biome + tsc + catalogue 检查，`just fe` 一条跑完 |
+| `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性，`test_qa_contract.py` 守着 SSE 契约与它的 TS 镜像不漂移 |
 | `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
-
-`frontend/`（React SPA）🔜 M5 后续 Stage，届时再建。
 
 ## MICC 服务器日常使用
 

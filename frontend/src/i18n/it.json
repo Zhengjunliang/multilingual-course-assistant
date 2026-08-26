@@ -1,0 +1,33 @@
+{
+  "app": {
+    "title": "Assistente del corso",
+    "subtitle": "Chiedi del materiale del corso o delle informazioni di ateneo."
+  },
+  "ask": {
+    "label": "La tua domanda",
+    "placeholder": "Che cos'è un ORM?",
+    "submit": "Chiedi",
+    "cancel": "Ferma"
+  },
+  "status": {
+    "queued": "In attesa del servizio di risposta…",
+    "streaming": "Sto scrivendo la risposta…"
+  },
+  "route": {
+    "label": "Cercato in",
+    "slides": "materiale del corso",
+    "unifi_web": "pagine di ateneo",
+    "both": "entrambe le fonti"
+  },
+  "citations": {
+    "title": "Fonti",
+    "empty": "Nessun estratto recuperato per questa domanda.",
+    "uncited": "recuperata, non citata",
+    "page": "pagina {{page}}",
+    "fetched": "recuperata il {{date}}"
+  },
+  "error": {
+    "title": "La risposta non è stata completata",
+    "retryAfter": "Il servizio ha chiesto di riprovare tra {{seconds}} secondi."
+  }
+}

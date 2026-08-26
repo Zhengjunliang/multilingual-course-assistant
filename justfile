@@ -27,8 +27,25 @@ test:
 cov:
     uv run pytest --cov
 
-# The full CI chain, locally.
-check:
+# Install the SPA's dependencies from the lockfile (Node version in frontend/.nvmrc).
+fe-install:
+    npm ci --prefix frontend
+
+# SPA dev server on http://localhost:5173/ (proxies /api and /admin to `just serve`).
+fe-dev:
+    npm run dev --prefix frontend
+
+# The SPA's own chain: lint, types, catalogue keys, production build.
+fe:
+    npm run lint --prefix frontend
+    npm run typecheck --prefix frontend
+    npm run check:i18n --prefix frontend
+    npm run build --prefix frontend
+
+# The full CI chain, locally. `fe` runs first for the same reason CI puts it
+# first: from the deployment stage on, Django's static settings point at
+# frontend/dist, and `check --deploy` fails on a directory that is not there.
+check: fe
     uv run ruff check .
     uv run ruff format --check .
     uv run pyright

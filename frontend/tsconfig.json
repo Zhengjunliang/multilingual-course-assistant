@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    // The SSE parser indexes into split() results and into a buffer that may be
+    // short; without this, every one of those reads is silently typed as
+    // non-null and a truncated frame becomes an undefined at runtime instead of
+    // a compile error.
+    "noUncheckedIndexedAccess": true,
+
+    // No `baseUrl`: TypeScript 7 removed it, and `paths` alone resolves
+    // relative to this file, which is what the alias in vite.config.ts does too.
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src", "vite.config.ts"]
+}

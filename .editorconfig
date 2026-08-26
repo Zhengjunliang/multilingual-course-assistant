@@ -12,6 +12,11 @@ indent_size = 4
 [*.{yml,yaml,json,toml}]
 indent_size = 2
 
+# Biome's default and the whole JavaScript ecosystem's; frontend/biome.json is
+# what enforces it, this only keeps editors from fighting it.
+[*.{ts,tsx,css,html,mjs}]
+indent_size = 2
+
 [*.md]
 # Trailing double-space is a hard line break in markdown.
 trim_trailing_whitespace = false
