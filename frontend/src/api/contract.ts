@@ -39,6 +39,12 @@ export interface Citation {
 /** Everything known before a single token exists. Arrives first, always. */
 export interface StartEvent {
   question: string;
+  /**
+   * Where the answer was filed. A request that named no conversation started
+   * one, and this is how the client learns which — the value to send back to
+   * make the next question a follow-up.
+   */
+  conversation_id: number;
   locale: string;
   route: RouteDecision;
   citations: Citation[];
@@ -55,6 +61,19 @@ export type EndEvent = Record<string, never>;
 /** Generation failed after the response had already started. */
 export interface ErrorEvent {
   detail: string;
+}
+
+/**
+ * The body of the 503 sent before a stream has begun.
+ *
+ * `reason` separates the two failures that otherwise arrive identically:
+ * `busy` is another question still being answered and clears on its own,
+ * `unavailable` is a model server that is not running and will not start
+ * because we asked again. Only the first is worth an automatic retry.
+ */
+export interface Unavailable {
+  detail: string;
+  reason: "busy" | "unavailable";
 }
 
 /**

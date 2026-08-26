@@ -20,7 +20,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from apps.qa.contract import Citation, EndEvent, ErrorEvent, StartEvent, TokenEvent
+from apps.qa.contract import (
+    Citation,
+    EndEvent,
+    ErrorEvent,
+    StartEvent,
+    TokenEvent,
+    Unavailable,
+)
 from rag.agent import RouteDecision
 
 if TYPE_CHECKING:
@@ -30,7 +37,8 @@ MIRROR = Path(__file__).resolve().parent.parent / "frontend" / "src" / "api" / "
 
 # Every model that crosses the wire. `RouteDecision` is here because `StartEvent`
 # embeds it verbatim rather than copying its fields (apps/qa/contract.py), so the
-# client has to know its shape too.
+# client has to know its shape too. `Unavailable` is not an event at all — it is
+# the 503 body — but it is the same wire and drifts the same way.
 MIRRORED: tuple[type[BaseModel], ...] = (
     RouteDecision,
     Citation,
@@ -38,6 +46,7 @@ MIRRORED: tuple[type[BaseModel], ...] = (
     TokenEvent,
     EndEvent,
     ErrorEvent,
+    Unavailable,
 )
 
 FIELDS = [(model.__name__, field) for model in MIRRORED for field in model.model_fields]

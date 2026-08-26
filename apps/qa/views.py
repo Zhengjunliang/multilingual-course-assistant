@@ -26,11 +26,22 @@ enforced the token against it. The browser sends that token as `X-CSRFToken`,
 the header DRF's `CSRF_HEADER_NAME` names by default, reading it from the cookie
 `GET /api/auth/me` issues. Nothing about the stream is special here; it is the
 same rule every endpoint follows.
+
+**WSGI is a load-bearing assumption, and this is the file it bears on.** Under
+`WSGI_APPLICATION` a synchronous iterator is consumed on the thread that served
+the request, so the response body, the queue lock it holds and the database
+connection it writes through all belong to one thread. Django runs a
+synchronous `StreamingHttpResponse` iterator in a thread pool under ASGI
+instead — and its database connections are thread-local, so the settling write
+below would open a connection on a pool thread that `close_old_connections`
+never reaches. That is one leaked connection per answered question. Moving this
+project to ASGI starts here.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import logging
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from django.http import StreamingHttpResponse
 from rest_framework import status
@@ -38,8 +49,17 @@ from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.qa.contract import ErrorEvent, sse, sse_event
-from apps.qa.engine import EngineUnavailableError, stream_answer
+from apps.qa.contract import (
+    EndEvent,
+    ErrorEvent,
+    StartEvent,
+    TokenEvent,
+    Unavailable,
+    sse,
+    sse_event,
+)
+from apps.qa.conversations import open_conversation, recent_turns, record_exchange, settle
+from apps.qa.engine import EngineBusyError, EngineUnavailableError, stream_answer
 from apps.qa.serializers import AskRequest
 
 if TYPE_CHECKING:
@@ -47,7 +67,10 @@ if TYPE_CHECKING:
 
     from rest_framework.request import Request
 
+    from apps.accounts.models import User
     from apps.qa.contract import Event
+
+logger = logging.getLogger(__name__)
 
 # Every 503 here is transient by construction: a stopped model server, an index
 # another process is holding, a question still being answered. A minute is long
@@ -99,19 +122,59 @@ class _EventStream:
     Closing `rest` is also what stops generation: it is suspended on a `yield`
     inside `rag.answer`, so a reader who leaves takes the model with them
     instead of leaving it writing for nobody.
+
+    It is also where the answer is saved, because this object is the only thing
+    that sees every way a stream can stop: an `end` event, an `error` event in
+    its place, or a reader who left. All three settle the row — what differs is
+    only whether the text in it is complete.
     """
 
-    def __init__(self, first: Event, rest: Generator[Event, None, None]) -> None:
+    def __init__(self, first: Event, rest: Generator[Event, None, None], answer_pk: int) -> None:
         self._first = first
         self._rest = rest
+        self._answer_pk = answer_pk
+        self._parts: list[str] = []
+        self._settled = False
 
     def __iter__(self) -> Iterator[str]:
         yield sse_event(self._first)
+        complete = False
         for event in self._rest:
+            if isinstance(event, TokenEvent):
+                self._parts.append(event.text)
+            elif isinstance(event, EndEvent):
+                complete = True
             yield sse_event(event)
+        # Reached only when `rest` ran out, which means its `finally` has already
+        # returned the queue lock. Settling before this point would put a
+        # database round trip inside everyone else's wait.
+        self._settle(complete=complete)
 
     def close(self) -> None:
+        # Same ordering, same reason, and here it is the expensive case: `rest`
+        # is suspended mid-answer and still holding the lock, so it is closed
+        # first and written about second.
         self._rest.close()
+        self._settle(complete=False)
+
+    def _settle(self, *, complete: bool) -> None:
+        """Once, whichever of the three endings arrives first.
+
+        Django calls `close()` on every response, including one that finished
+        normally, so without the guard a completed answer would be marked
+        incomplete a moment after being marked complete.
+
+        A failure here is logged rather than raised: this runs while the
+        response is being closed, and an exception escaping that path replaces
+        an answer the reader already has with a traceback.
+        """
+        if self._settled:
+            return
+        self._settled = True
+        try:
+            settle(self._answer_pk, "".join(self._parts), complete=complete)
+        except Exception:
+            logger.exception("could not settle answer %s", self._answer_pk)
 
 
 class AskView(APIView):
@@ -134,30 +197,58 @@ class AskView(APIView):
     # be wrong for whichever it was not chosen for (config/settings.py).
     throttle_scope = "ask"
 
+    def unavailable(
+        self, exc: EngineUnavailableError, reason: Literal["busy", "unavailable"]
+    ) -> Response:
+        """A 503 the caller can act on.
+
+        Returned rather than raised so the retry hint can ride along — DRF's
+        `Throttled` sets that header for a 429, and a 503 without one leaves the
+        caller nothing to back off against.
+
+        `reason` is what separates the two failures that would otherwise arrive
+        identically: a queue that is full clears on its own, a model server that
+        is not running does not. Without it a client counts down and retries
+        forever against an outage. The engine has already logged the cause; what
+        travels is the sentence written for whoever called.
+        """
+        return Response(
+            Unavailable(detail=str(exc), reason=reason).model_dump(),
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            headers={"Retry-After": str(RETRY_AFTER_SECONDS)},
+        )
+
     def post(self, request: Request) -> Response | StreamingHttpResponse:
-        payload = AskRequest(data=request.data)
+        payload = AskRequest(data=request.data, context={"request": request})
         payload.is_valid(raise_exception=True)
         validated = payload.validated_data
 
-        events = stream_answer(validated["question"], validated["locale"])
+        # The cast is the one apps/accounts/views.py explains: pyright has no
+        # django-stubs plugin, so `request.user` is the abstract base to it.
+        conversation = open_conversation(cast("User", request.user), validated["conversation"])
+        history = recent_turns(conversation)
+
+        events = stream_answer(validated["question"], conversation.pk, validated["locale"], history)
         try:
             # Routing and retrieval happen inside this call — see the module
             # docstring: it is the last moment a status code is still on offer.
             first = next(events)
+        # Order matters: the busy case is a subclass of the other one.
+        except EngineBusyError as exc:
+            return self.unavailable(exc, "busy")
         except EngineUnavailableError as exc:
-            # Returned rather than raised so the retry hint can ride along —
-            # DRF's `Throttled` sets that header for a 429 and a 503 without one
-            # leaves the caller nothing to back off against. The body keeps
-            # DRF's `{"detail": ...}` shape; the engine already logged the cause,
-            # and what reaches the caller is the message written for them.
-            return Response(
-                {"detail": str(exc)},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-                headers={"Retry-After": str(RETRY_AFTER_SECONDS)},
-            )
+            return self.unavailable(exc, "unavailable")
+
+        # Written here and not a line earlier. Everything above could still have
+        # ended as a 503, and a question refused before it was asked must leave
+        # nothing behind (apps/qa/conversations.py).
+        #
+        # The cast states what apps/qa/contract.py already does: a stream is one
+        # `start`, then tokens, then a terminator.
+        answer_pk = record_exchange(conversation, cast("StartEvent", first))
 
         return StreamingHttpResponse(
-            _EventStream(first, events),
+            _EventStream(first, events, answer_pk),
             content_type="text/event-stream",
             headers={
                 # An answer is not reusable, and anything that buffers this

@@ -6,7 +6,7 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 
 ## 状态
 
-✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节）；React SPA 脚手架已建，开发期在 Vite dev server 上消费同一条流（见「前端」一节）；账号已接上（session 登录 + 开放注册），**全站需登录**（见「账号」一节）。多轮会话、异步 ingest 🔜 后续 Stage。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节）；React SPA 脚手架已建，开发期在 Vite dev server 上消费同一条流（见「前端」一节）；账号已接上（session 登录 + 开放注册），**全站需登录**（见「账号」一节）；服务端多轮会话已可用（history + query rewriting + 落库，见「多轮会话」一节），SPA 的会话界面与异步 ingest 🔜 后续 Stage。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
@@ -181,7 +181,7 @@ curl.exe -N -u <用户名>:<密码> -X POST http://127.0.0.1:8000/api/ask `
 
 ```text
 event: start
-data: {"question":"What is an ORM?","locale":"en","route":{...},"citations":[...]}
+data: {"question":"What is an ORM?","conversation_id":7,"locale":"en","route":{...},"citations":[...]}
 
 event: token
 data: {"text":"An ORM "}
@@ -190,11 +190,11 @@ event: end
 data: {}
 ```
 
-可选 `locale`（BCP-47 primary subtag，如 `it`；省略则从问题里检测）。事件契约在 [apps/qa/contract.py](apps/qa/contract.py)，它是唯一源：
+可选 `locale`（BCP-47 primary subtag，如 `it`；省略则从问题里检测）与 `conversation_id`（见下面「多轮会话」）。事件契约在 [apps/qa/contract.py](apps/qa/contract.py)，它是唯一源：
 
 | 事件 | 何时 | 内容 |
 | ---- | ---- | ---- |
-| `start` | 路由与检索之后、生成之前，一次 | `question` · `locale`（实际生成语言）· `route`（复用 `rag.agent.RouteDecision`：`target` · `query` · `fresh` · `reason`）· `citations` |
+| `start` | 路由与检索之后、生成之前，一次 | `question` · `conversation_id`（这一答归档到哪个会话）· `locale`（实际生成语言）· `route`（复用 `rag.agent.RouteDecision`：`target` · `query` · `fresh` · `reason`）· `citations` |
 | `token` | 生成期间，每片一次 | `text`，模型吐出来的原样片段 |
 | `end` | 结尾，一次 | 空。**它到了才算答案完整** |
 | `error` | 代替 `end` | `detail`，生成中途失败 |
@@ -209,6 +209,37 @@ data: {}
 
 **状态码只在第一个字节之前有效。** 响应头随第一个事件一起发走，所以「生成端点半路死了」只能是 200 里的一条 `error` 事件；路由或检索阶段的失败仍是 503。
 
+503 的 body 带 `reason`：`busy`（前面还有人在问，队列会自己空出来，值得重试）或 `unavailable`（模型服务没在跑，再问也不会自己起来）。没有这个字段客户端会对着一次宕机无限倒计时重试。
+
+## 多轮会话
+
+`POST /api/ask` 可带 `conversation_id` 把这一问接到上一问后面；不带就开一个新会话，新会话的 id 从 `start` 事件里回来。
+
+```powershell
+# 第一问不带 id -> start 事件里拿到 conversation_id
+# 第二问带上它："How does it differ from Active Record?"
+```
+
+**最近 3 轮**（`HISTORY_WINDOW_TURNS`，[apps/qa/models.py](apps/qa/models.py)）随下一问一起进 prompt。窗口有上限不是省钱：4B 模型的上下文和「这一答赖以成立的检索片段」是同一块，历史挤掉片段就是把答案的根据挤掉。
+
+两侧看到的历史**不一样**，这是刻意的：
+
+- **路由器只看学生的历史提问**，不看答案。代词的先行词在学生自己上一句里；而答案里塞满 `[https://www.unifi.it/… · 2026-08-01]` 这类 marker，三轮下来会把任何新问题都往校园库拖。
+- **生成侧看完整轮次**，但答案会截断到 400 字符并**去掉所有 marker** —— 那些 marker 指向的是上一轮的片段，这一轮模型手上没有，留着就是在教它编一个指不到东西的引用。
+
+历史**永远拼成同一条 `user` 消息**，不做 role 交替的多轮消息。原因是同一个 4B 模型在路由时被要求「只输出一个 JSON 对象」，真实的 `assistant` 散文轮就是在示范相反的行为 —— 代价是 M2.5b 实测的 fallback 从 0 起飞，而且没有任何现成测试会发现。`tests/test_agent.py` 与 `tests/test_answer.py` 用两个 prompt 的 sha256 把这条钉死。
+
+会话读取（都要登录，只能读自己的）：
+
+| 方法与路径 | 作用 |
+| ---------- | ---- |
+| `GET /api/conversations` | 侧栏列表。标题由第一条提问派生，不落库；**没有任何消息的会话不列出**（503 会留下一个空会话，见下） |
+| `GET /api/conversations/<id>` | 一个会话连同它的消息。别人的会话是 **404 而不是 403** —— 403 等于承认这个 id 指向真实存在的东西 |
+
+**答案边流边存**：提问与空答案在第一个事件之后、`start` 发出之前写入（此前失败还能是 503，那时应该什么都不留下）；答案文本在流停下时补齐。流怎么停的决定 `complete` 是 true 还是 false —— 收到 `end` 为 true，`error` 或读者关掉页面为 false，**半截答案照样留着**。那是学生真实看到的内容，也是 M3 错误分类法的样本。
+
+`citations` 与 `route` 跟着答案一起落库。侧栏点开旧会话时 `start` 事件早就没了，不存这两列的话历史轮次只剩纯文本 —— 来源卡片、引用角标、可见的路由决策三样全没。
+
 错误按类型分：400 校验失败 · **403 没登录或 CSRF token 不对** · 429 限流 · 503 依赖不可用（路由端点没响应、索引被别的进程占着、还没索引过、前面的问题还没答完）。403 的两种含义靠 `GET /api/auth/me` 区分（见「账号」一节）。请求带 `Accept: text/event-stream` 时这些错误体也框成一条 `error` 事件；不带（curl 默认 `*/*`）就是普通 JSON。DRF 自带的校验消息跟随 `Accept-Language`（`LANGUAGE_CODE` 是 `it`，默认意大利语）；本项目自己的 503 与 `error` 文案已标记待译，但仓库还没有 `locale/` 目录，所以目前是英文。
 
 **深挖循环（`deepen`）不在这个端点里**：它会联网抓页并写入共享索引，最多 3 次抓取。演示自增长仍用 CLI 的 `just ask`。它进 web 的路径是「账号 + Celery 异步」，见 [ROADMAP.md](ROADMAP.md)。
@@ -219,10 +250,10 @@ data: {}
 | ----------------- | ------------------------------------------------------------------------------------------ |
 | `config/`         | Django project：settings（单一模块，安全响应头按 `DEBUG` 与 `DJANGO_BEHIND_TLS` 条件生效）· urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入，`rag/` 与 Django 两侧共用） |
 | `apps/accounts/`  | 账号。自定义 User（`AUTH_USER_MODEL`）= `AbstractUser` + `locale`（偏好语言，取值域对齐 `settings.LANGUAGES`），admin 里可见可筛；`serializers.py` 注册/登录/账号表示 · `views.py` session 登录与 CSRF cookie 发放点 |
-| `apps/qa/`        | 问答 API。`contract.py` SSE 事件契约（唯一源，SPA 消费它）· `serializers.py` 请求校验 · `engine.py` 进程级模型资源 + 串行的 `stream_answer()`（路由→检索→生成，复用 `rag/`，不重写逻辑；锁随流的关闭释放）· `views.py` 只做 HTTP 翻译与 SSE 分帧 |
+| `apps/qa/`        | 问答 API。`contract.py` SSE 事件契约（唯一源，SPA 消费它）· `serializers.py` 请求校验与会话读取形状 · `models.py` `Conversation` / `Message` + 历史窗口常量 · `conversations.py` 这条链路**唯一**的 ORM 落点（开会话 / 切历史 / 落库 / 收尾）· `engine.py` 进程级模型资源 + 串行的 `stream_answer()`（路由→检索→生成，复用 `rag/`，不重写逻辑；锁随流的关闭释放，**零查询**）· `views.py` HTTP 翻译、SSE 分帧、答案落库时机 · `conversation_views.py` 会话读取端点 |
 | `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`crawl.py` 抓校园 web 源快照 + registry，`webparse.py` 快照转可切块工件，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`llm.py` OpenAI 兼容客户端（Streamer/Completer + pydantic JSON 校验助手），`answer.py` 生成带引用回答，`agent.py` 路由问题到课程库/校园库（只读控制流），`gold.py` 检索冒烟跑分与 `--routing` 路由报告，`golddraft.py` 起草 gold 题（人工把关后才进 `gold/`） |
 | `frontend/`       | React + TypeScript SPA（Vite）。`src/api/` 契约镜像 · SSE 解析器 · fetch 包装 · `src/lib/markers.ts` 引用角标与置灰判定 · `src/i18n/` 三份 catalogue · `src/components/ui/` shadcn 风格组件（源码在仓库里）· `src/features/chat/` 问答界面。自带 biome + tsc + catalogue 检查，`just fe` 一条跑完 |
-| `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性，`test_qa_contract.py` 守着 SSE 契约与它的 TS 镜像不漂移 |
+| `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性，`test_qa_contract.py` 守着 SSE 契约与它的 TS 镜像不漂移，`test_qa_engine.py` **不带 `django_db`**，用「没有 marker 的测试碰数据库就报错」这条 pytest-django 规则守着引擎层零查询 |
 | `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
 
 ## MICC 服务器日常使用

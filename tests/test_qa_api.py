@@ -15,29 +15,27 @@ lock — so a test that looks at a 200 and walks away leaves the lock held for t
 next one. Every test below either reads the stream through `events` or closes
 the response through `finish`.
 
-No `django_db` marker anywhere, deliberately, and the login stage did not change
-that. Answering a question still touches no model: `force_authenticate` hands
-the view a `User` built in memory, and everything downstream of it reads
-attributes rather than rows — `is_authenticated` is a property, and the throttle
-keys on `pk`. Leaving the marker off keeps the file runnable with no database at
-all *and* makes it strict: the day this path grows a query, these tests fail
-loudly instead of silently acquiring a dependency.
+This file used to promise that answering a question touched no model, and the
+conversation stage is what ended that: the endpoint now writes the question and
+the answer as it goes. The promise moved rather than disappeared — it is
+`tests/test_qa_engine.py`, which drives the engine directly and carries no
+marker, so the layer that must stay query-free still fails loudly if it stops
+being.
 
-That in-memory user is why the CSRF and session tests are not here. Forced
-authentication bypasses `SessionAuthentication` entirely, so a test of what that
-class enforces would be testing nothing; those live in tests/test_accounts_api.py
-against a real login.
+Sessions are not exercised here either. `force_authenticate` replaces
+authentication wholesale, so a test of what `SessionAuthentication` enforces
+would be testing nothing; CSRF, cookies and login live in
+tests/test_accounts_api.py against a real one.
 """
 
 import json
-import threading
-import time
 from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import httpx
 import pytest
+from django.core.cache import cache
 from django.core.signals import request_finished
 from django.db import close_old_connections
 from openai import APIConnectionError, NotFoundError
@@ -49,23 +47,20 @@ from test_index import StubDense, StubSparse, make_chunk
 from apps.accounts.models import User
 from apps.qa import engine as engine_module
 from apps.qa import views as views_module
-from apps.qa.contract import EndEvent, Event, StartEvent
 from apps.qa.engine import Engine
+from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from apps.qa.serializers import MAX_QUESTION_CHARS
 from rag import index as rag_index
 from rag import search as rag_search
-from rag.agent import RouteDecision
 from rag.chunk import Chunk
 from rag.index import WEB_COLLECTION, ensure_collection, index_chunks, open_client
-from rag.llm import Message
+from rag.llm import Message as ChatMessage
+
+pytestmark = pytest.mark.django_db
 
 ASK_URL = "/api/ask"
+CONVERSATIONS_URL = "/api/conversations"
 SSE_MEDIA_TYPE = "text/event-stream"
-
-# Never saved. A `pk` is all the throttle reads and `is_authenticated` is a
-# property of the class, so this is a whole logged-in student as far as the
-# endpoint is concerned — and it costs no database.
-STUDENT = User(pk=1, username="student")
 
 ORM_TEXT = "An ORM maps objects to database tables."
 TASSE_TEXT = "Le tasse universitarie scadono il 30 novembre."
@@ -100,7 +95,7 @@ class ScriptedStreamer:
     def __init__(self, tokens: Sequence[str]) -> None:
         self.tokens = list(tokens)
 
-    def stream(self, messages: Sequence[Message]) -> Iterator[str]:
+    def stream(self, messages: Sequence[ChatMessage]) -> Iterator[str]:
         yield from self.tokens
 
 
@@ -112,7 +107,7 @@ class DeadStreamer:
     the streaming path raises rather than degrading — and it raises after the
     response has already begun, which is what the `error` event is for."""
 
-    def stream(self, messages: Sequence[Message]) -> Iterator[str]:
+    def stream(self, messages: Sequence[ChatMessage]) -> Iterator[str]:
         raise APIConnectionError(request=httpx.Request("POST", GENERATION_URL))
 
 
@@ -125,44 +120,13 @@ class RefusingCompleter:
     Ollama replies 404 to it.
     """
 
-    def complete(self, messages: Sequence[Message]) -> str:
+    def complete(self, messages: Sequence[ChatMessage]) -> str:
         request = httpx.Request("POST", GENERATION_URL)
         raise NotFoundError(
             "model 'qwen3:4b' not found",
             response=httpx.Response(404, request=request),
             body=None,
         )
-
-
-class CountingEngine:
-    """An engine that records whether two answers were ever in flight at once.
-
-    It sleeps rather than yielding instantly on purpose: with no work inside
-    the critical section, threads would serialise by accident and the test
-    would pass against a missing lock.
-    """
-
-    def __init__(self) -> None:
-        self.guard = threading.Lock()
-        self.inside = 0
-        self.peak_concurrency = 0
-        self.calls = 0
-
-    def stream(self, question: str, locale: str | None = None) -> Iterator[Event]:
-        with self.guard:
-            self.inside += 1
-            self.calls += 1
-            self.peak_concurrency = max(self.peak_concurrency, self.inside)
-        time.sleep(0.02)
-        with self.guard:
-            self.inside -= 1
-        yield StartEvent(
-            question=question,
-            locale=locale or "en",
-            route=RouteDecision.model_validate_json(SLIDES_ROUTE),
-            citations=[],
-        )
-        yield EndEvent()
 
 
 @pytest.fixture
@@ -197,25 +161,37 @@ def install_engine(
     return engine
 
 
-def client_for(user: User | None = STUDENT) -> APIClient:
+def student() -> User:
+    """The account every request below is made as.
+
+    A real row, which it did not have to be until the conversation stage: a
+    `Conversation` carries a foreign key to its owner, and a foreign key does
+    not care that a `User` exists in memory. `get_or_create` so that repeated
+    calls inside one test are the same student rather than a second one.
+    """
+    user, _ = User.objects.get_or_create(username="student")
+    return user
+
+
+def client_for(*, anonymous: bool = False) -> APIClient:
     """A client that is already logged in, without a login having happened.
 
     `force_authenticate` substitutes the whole authentication step, which is
-    what keeps this file free of both a database and a session cookie. Pass
-    `None` for a caller who is not signed in — and note that this is *not*
-    spelled `force_authenticate(user=None)`, which logs the client out, and
-    logging out flushes a session, which is a database write.
+    what keeps this file free of session cookies — the session itself is
+    tests/test_accounts_api.py's subject. Note that an anonymous client is a
+    bare one and *not* `force_authenticate(user=None)`, which logs the client
+    out, and logging out flushes a session.
     """
     client = APIClient()
-    if user is not None:
-        client.force_authenticate(user=user)
+    if not anonymous:
+        client.force_authenticate(user=student())
     return client
 
 
 def ask(
     question: str = "What is an ORM?",
     accept: str | None = None,
-    user: User | None = STUDENT,
+    anonymous: bool = False,
     **extra: object,
 ):
     """One POST. Return type left to inference on purpose: what the test client
@@ -227,7 +203,9 @@ def ask(
     meta: dict[str, Any] = {}
     if accept is not None:
         meta["HTTP_ACCEPT"] = accept
-    return client_for(user).post(ASK_URL, {"question": question, **extra}, format="json", **meta)
+    return client_for(anonymous=anonymous).post(
+        ASK_URL, {"question": question, **extra}, format="json", **meta
+    )
 
 
 def events(response: Any) -> list[tuple[str, Any]]:
@@ -254,15 +232,12 @@ def ask_the_view(question: str = "What is an ORM?"):
     """The view's own response, without the test client's close emulation.
 
     `django.test.Client` wraps a streaming response so that reading it to the
-    end closes it (`closing_iterator_wrapper`), and that wrapper re-attaches
-    `close_old_connections` to `request_finished` partway through a close driven
-    by hand — after which `HttpResponseBase.close` sends the signal
-    unconditionally. The two tests below would then perform the database access
-    this file promises not to. What they are about is the response object the
-    view builds and what closing it releases, so they take it from the view.
+    end closes it (`closing_iterator_wrapper`). The tests below close it by hand
+    instead, because what they are about is the response object the view built
+    and what closing it releases — the wrapper would do that closing for them.
     """
     request = APIRequestFactory().post(ASK_URL, {"question": question}, format="json")
-    force_authenticate(request, user=STUDENT)
+    force_authenticate(request, user=student())
     return views_module.AskView.as_view()(request)
 
 
@@ -278,9 +253,16 @@ def finish(response: Any) -> None:
     lock is held until this response is closed. It goes through the same trick
     Django's test client uses when a stream is read to its end
     (`closing_iterator_wrapper`) — detaching `close_old_connections` from
-    `request_finished` for the duration. Closing by hand without that fires the
-    signal into whatever database connection an earlier test opened, which is
-    how a file that touches no model ends up reporting one.
+    `request_finished` for the duration.
+
+    That detachment used to be about keeping this file away from a database. It
+    now protects the opposite thing: inside a `django_db` test everything runs
+    in one open transaction, and `close_old_connections` sees an autocommit
+    setting that does not match, closes the connection, and — being inside an
+    atomic block — marks it closed-in-transaction. Every ORM assertion after
+    that raises `InterfaceError` instead of failing on its own terms. Production
+    is unaffected: the answer is settled inside `close()`, and the signal fires
+    after it.
     """
     request_finished.disconnect(close_old_connections)
     try:
@@ -622,7 +604,7 @@ def test_an_anonymous_question_is_refused(index: QdrantClient) -> None:
     thing a browser reaches, so the check that it no longer does belongs next to
     the answering it guards, not only in the settings file that turned it on."""
     install_engine(index, SLIDES_ROUTE)
-    response = ask(user=None)
+    response = ask(anonymous=True)
 
     assert response.status_code == 403
     # Nothing was built and nothing was locked: permission is checked before the
@@ -705,20 +687,6 @@ def test_a_client_that_never_reads_a_byte_releases_the_lock(index: QdrantClient)
     engine_module._HOLDER.lock.release()
 
 
-def test_a_stream_nobody_reads_takes_no_lock() -> None:
-    """A generator body does not run until the first `next()`, which is what
-    lets the view do routing and retrieval at the last moment a status code is
-    still available. Building one and dropping it must cost nothing."""
-    engine_module._HOLDER.engine = cast("Engine", CountingEngine())
-
-    unread = engine_module.stream_answer("What is an ORM?")
-    try:
-        assert engine_module._HOLDER.lock.acquire(blocking=False)
-        engine_module._HOLDER.lock.release()
-    finally:
-        unread.close()
-
-
 def test_two_chunks_of_one_page_stay_two_citations(tmp_path: Path) -> None:
     """The contract says the grounding set is not deduplicated. Two chunks of
     one page share a marker but carry different text, and merging them would
@@ -740,50 +708,253 @@ def test_two_chunks_of_one_page_stay_two_citations(tmp_path: Path) -> None:
     assert {citation["text"] for citation in citations} == {first.text, second.text}
 
 
-def drain(question: str = "What is an ORM?") -> None:
-    """Consume a whole stream. The threads below must go through this rather
-    than through `stream_answer` directly: calling a generator function only
-    builds the generator, so a thread that stopped there would take no lock and
-    the two tests would pass against a deleted one."""
-    list(engine_module.stream_answer(question))
+def turns_of(conversation: Conversation) -> list[tuple[str, str, bool]]:
+    """Every stored message as `(role, text, complete)`, oldest first."""
+    return [
+        (message.role, message.text, message.complete)
+        for message in Message.objects.filter(conversation=conversation)
+    ]
 
 
-def test_answers_never_overlap() -> None:
-    """The serialisation is the whole design — one card, one embedded index —
-    and nothing else in this file would notice if the lock were deleted.
-
-    Driven through `stream_answer` rather than HTTP: the claim is about the
-    module's own guard, and threads plus a test client would only add noise.
-    """
-    engine = CountingEngine()
-    engine_module._HOLDER.engine = cast("Engine", engine)
-
-    threads = [threading.Thread(target=drain) for _ in range(4)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-
-    assert engine.calls == 4
-    assert engine.peak_concurrency == 1
+def only_conversation() -> Conversation:
+    """The student's one thread. Scoped by owner because several tests below
+    also create a stranger's, which is the whole point of those tests."""
+    return Conversation.objects.get(owner=student())
 
 
-def test_two_first_requests_build_one_engine(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The lock covers the build, not only the call: two requests arriving
-    before anything is loaded must not each pay for a reranker."""
-    builds: list[int] = []
+def test_a_question_starts_a_conversation_and_the_start_event_names_it(
+    index: QdrantClient,
+) -> None:
+    """The client has no other way to learn the id, and it needs one to ask a
+    follow-up."""
+    install_engine(index, SLIDES_ROUTE, ["An answer."])
+    stream = events(ask())
 
-    def slow_build() -> Engine:
-        builds.append(1)
-        time.sleep(0.05)
-        return cast("Engine", CountingEngine())
+    assert start_of(stream)["conversation_id"] == only_conversation().pk
 
-    monkeypatch.setattr(engine_module, "build_engine", slow_build)
 
-    threads = [threading.Thread(target=drain) for _ in range(3)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
+def test_a_finished_answer_is_stored_whole_and_marked_complete(index: QdrantClient) -> None:
+    install_engine(index, SLIDES_ROUTE, ["An ORM ", "maps objects."])
+    events(ask())
 
-    assert len(builds) == 1
+    assert turns_of(only_conversation()) == [
+        ("user", "What is an ORM?", True),
+        ("assistant", "An ORM maps objects.", True),
+    ]
+
+
+def test_the_stored_answer_carries_its_citations_and_its_routing_decision(
+    index: QdrantClient,
+) -> None:
+    """Without these two columns a reopened conversation is bare prose: no
+    source cards, no citation badges, no visible routing decision."""
+    install_engine(index, SLIDES_ROUTE)
+    stream = events(ask())
+    stored = Message.objects.get(conversation=only_conversation(), role="assistant")
+
+    assert stored.citations == start_of(stream)["citations"]
+    assert stored.route == start_of(stream)["route"]
+
+
+def test_a_generation_failure_keeps_the_fragment_and_marks_it_incomplete(
+    index: QdrantClient,
+) -> None:
+    """What the student saw is what is stored. The fragments are also the raw
+    material for M3's error taxonomy, which deleting them would throw away."""
+    engine = install_engine(index, SLIDES_ROUTE)
+    engine_module._HOLDER.engine = Engine(
+        client=engine.client,
+        dense=engine.dense,
+        sparse=engine.sparse,
+        reranker=None,
+        completer=ScriptedCompleter([SLIDES_ROUTE]),
+        streamer=DeadStreamer(),
+    )
+    events(ask())
+
+    role, text, complete = turns_of(only_conversation())[1]
+    assert (role, text, complete) == ("assistant", "", False)
+
+
+def test_a_reader_who_leaves_still_leaves_the_answer_behind(index: QdrantClient) -> None:
+    """The everyday case — a closed tab — and the one that decides where the
+    settling write goes: it has to be reachable from `close()`, not only from
+    the end of the stream."""
+    install_engine(index, SLIDES_ROUTE, ["An ORM ", "maps objects."])
+    response = ask_the_view()
+
+    read_one(response)  # the start event only
+    finish(response)
+
+    role, text, complete = turns_of(only_conversation())[1]
+    assert role == "assistant"
+    assert complete is False
+    assert text != "An ORM maps objects."
+
+
+def test_a_refused_question_leaves_no_message_behind(tmp_path: Path) -> None:
+    """A 503 happens before the first event, which is exactly why the rows are
+    written after it. Written earlier, every refusal would deposit a question
+    with no answer under it and the next turn's history would have a hole."""
+    empty = open_client(tmp_path / "empty")
+    install_engine(empty, SLIDES_ROUTE)
+    response = ask()
+    empty.close()
+
+    assert response.status_code == 503
+    assert not Message.objects.exists()
+
+
+def test_a_busy_engine_and_a_dead_one_are_told_apart(
+    index: QdrantClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both are 503s and a client acts on them differently: a queue clears on
+    its own, a model server that is not running does not."""
+    install_engine(index, SLIDES_ROUTE)
+    monkeypatch.setattr(engine_module, "QUEUE_TIMEOUT_SECONDS", 0.05)
+
+    engine_module._HOLDER.lock.acquire()
+    try:
+        busy = ask()
+    finally:
+        engine_module._HOLDER.lock.release()
+
+    assert busy.json()["reason"] == "busy"
+
+
+def test_an_outage_is_not_worth_retrying(index: QdrantClient) -> None:
+    engine = install_engine(index, SLIDES_ROUTE)
+    engine_module._HOLDER.engine = Engine(
+        client=engine.client,
+        dense=engine.dense,
+        sparse=engine.sparse,
+        reranker=None,
+        completer=RefusingCompleter(),
+        streamer=ScriptedStreamer(["unreachable"]),
+    )
+
+    assert ask().json()["reason"] == "unavailable"
+
+
+def test_a_follow_up_stays_in_the_same_conversation(index: QdrantClient) -> None:
+    install_engine(index, SLIDES_ROUTE, ["An answer."])
+    first = start_of(events(ask()))
+
+    install_engine(index, SLIDES_ROUTE, ["Another answer."])
+    second = start_of(events(ask("And Active Record?", conversation_id=first["conversation_id"])))
+
+    assert second["conversation_id"] == first["conversation_id"]
+    assert Conversation.objects.count() == 1
+    assert len(turns_of(only_conversation())) == 4
+
+
+def test_a_follow_up_carries_the_earlier_questions_to_the_router(
+    index: QdrantClient,
+) -> None:
+    """The point of the whole stage: "it" has no antecedent without them."""
+    install_engine(index, SLIDES_ROUTE, ["An answer."])
+    conversation_id = start_of(events(ask()))["conversation_id"]
+
+    engine = install_engine(index, SLIDES_ROUTE, ["Another answer."])
+    events(ask("How does it differ?", conversation_id=conversation_id))
+
+    router_prompt = engine.completer.questions[-1]  # pyright: ignore[reportAttributeAccessIssue]
+    assert "What is an ORM?" in router_prompt
+    assert router_prompt.endswith("Question: How does it differ?")
+
+
+def test_the_history_window_stops_at_its_limit(index: QdrantClient) -> None:
+    """Older turns fall out rather than accumulating: the excerpts this answer
+    is grounded in share the same context window."""
+    conversation_id = None
+    for number in range(HISTORY_WINDOW_TURNS + 1):
+        # More questions than the `ask` bucket allows in a minute, and this test
+        # is about the window rather than the limit.
+        cache.clear()
+        install_engine(index, SLIDES_ROUTE, ["An answer."])
+        start = start_of(events(ask(f"Question {number}?", conversation_id=conversation_id)))
+        conversation_id = start["conversation_id"]
+
+    cache.clear()
+    engine = install_engine(index, SLIDES_ROUTE, ["An answer."])
+    events(ask("The last one?", conversation_id=conversation_id))
+
+    router_prompt = engine.completer.questions[-1]  # pyright: ignore[reportAttributeAccessIssue]
+    assert "Question 0?" not in router_prompt
+    assert "Question 1?" in router_prompt
+
+
+def test_somebody_elses_conversation_is_refused(index: QdrantClient) -> None:
+    """An id is a small integer, so this is the whole of the access check. The
+    message is the same one a conversation that never existed gets: telling
+    them apart would say how many exist and whose they are."""
+    install_engine(index, SLIDES_ROUTE)
+    stranger = User.objects.create_user(username="stranger")
+    theirs = Conversation.objects.create(owner=stranger, locale="it")
+
+    response = ask(conversation_id=theirs.pk)
+
+    assert response.status_code == 400
+    assert "conversation_id" in response.json()
+    assert not Message.objects.exists()
+
+
+def test_a_conversation_that_never_existed_is_refused(index: QdrantClient) -> None:
+    install_engine(index, SLIDES_ROUTE)
+
+    assert ask(conversation_id=4321).status_code == 400
+
+
+def test_the_sidebar_lists_a_students_own_conversations(index: QdrantClient) -> None:
+    install_engine(index, SLIDES_ROUTE, ["An answer."])
+    events(ask())
+    stranger = User.objects.create_user(username="stranger")
+    Conversation.objects.create(owner=stranger, locale="it")
+
+    body = client_for().get(CONVERSATIONS_URL).json()
+
+    assert [row["id"] for row in body] == [only_conversation().pk]
+    assert body[0]["title"] == "What is an ORM?"
+
+
+def test_a_conversation_refused_before_it_held_anything_is_not_listed(tmp_path: Path) -> None:
+    """A 503 still starts a thread — the engine needs an id before it can fail
+    — and an empty one in the sidebar would be a row that opens onto nothing."""
+    empty = open_client(tmp_path / "empty")
+    install_engine(empty, SLIDES_ROUTE)
+    ask()
+    empty.close()
+
+    assert Conversation.objects.exists()
+    assert client_for().get(CONVERSATIONS_URL).json() == []
+
+
+def test_reopening_a_conversation_returns_what_the_stream_delivered(
+    index: QdrantClient,
+) -> None:
+    """The guard on the two acceptance items this interface is judged by:
+    citation badges and greyed-out sources have to survive a page reload, which
+    means coming back from the database in the shape `start` delivered them."""
+    install_engine(index, SLIDES_ROUTE, ["An ORM ", SLIDES_MARKER])
+    stream = events(ask())
+    conversation_id = start_of(stream)["conversation_id"]
+
+    body = client_for().get(f"{CONVERSATIONS_URL}/{conversation_id}").json()
+
+    answer_message = body["messages"][1]
+    assert answer_message["text"] == f"An ORM {SLIDES_MARKER}"
+    assert answer_message["citations"] == start_of(stream)["citations"]
+    assert answer_message["route"] == start_of(stream)["route"]
+
+
+def test_somebody_elses_conversation_is_not_there_to_open(index: QdrantClient) -> None:
+    """Missing rather than forbidden: a 403 would confirm the id names
+    something real."""
+    stranger = User.objects.create_user(username="stranger")
+    theirs = Conversation.objects.create(owner=stranger, locale="it")
+
+    assert client_for().get(f"{CONVERSATIONS_URL}/{theirs.pk}").status_code == 404
+
+
+def test_the_conversation_api_needs_a_login() -> None:
+    assert client_for(anonymous=True).get(CONVERSATIONS_URL).status_code == 403

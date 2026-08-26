@@ -16,7 +16,8 @@ and never builds one.
 A stream is one `start`, any number of `token`s, and one terminator::
 
     event: start
-    data: {"question": "...", "locale": "en", "route": {...}, "citations": [...]}
+    data: {"question": "...", "conversation_id": 7, "locale": "en", "route": {...},
+           "citations": [...]}
 
     event: token
     data: {"text": "An ORM "}
@@ -127,11 +128,16 @@ class StartEvent(Event):
 
     `locale` is the language generation was actually asked for, whether the
     request named it or the engine detected it from the question.
+
+    `conversation_id` is where the answer was filed. A request that named no
+    conversation started one, and this is how the client learns which — the
+    value it sends back to make the next question a follow-up.
     """
 
     NAME = "start"
 
     question: str
+    conversation_id: int
     locale: str
     route: RouteDecision
     citations: list[Citation]
@@ -166,6 +172,26 @@ class ErrorEvent(Event):
     NAME = "error"
 
     detail: str
+
+
+class Unavailable(BaseModel):
+    """The body of the 503 this endpoint sends before a stream has begun.
+
+    Not an event — by definition it happens while a status code is still
+    available (apps/qa/views.py draws that line) — but part of the same wire
+    contract, so it is declared here and mirrored on the client like the rest.
+
+    `detail` keeps DRF's shape. `reason` is what makes the two collapsed cases
+    tellable apart: `busy` is somebody else's question still being answered and
+    is worth retrying in a moment, `unavailable` is a model server that is not
+    running and will not become one by asking again. Without it a client counts
+    down and retries forever against an outage.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    detail: str
+    reason: Literal["busy", "unavailable"]
 
 
 def sse(name: str, data: str) -> str:

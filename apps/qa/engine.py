@@ -24,6 +24,13 @@ through `rag.agent.route`, retrieves through `rag.search.search` and generates
 through `rag.answer.answer`, whose tokens it forwards one at a time. What it
 yields are the event models of apps/qa/contract.py; the SSE framing around them
 belongs to the HTTP layer and never appears in this file.
+
+**No query runs in this file, and that is a rule rather than a coincidence.**
+The conversation history arrives already sliced, as `rag.answer.Turn` — plain
+data — and the conversation id arrives as an integer, because this module emits
+the `start` event and that event carries one. Loading either is the view's job
+(apps/qa/conversations.py), and `tests/test_qa_api.py` asserts that answering a
+question touches no database at all.
 """
 
 from __future__ import annotations
@@ -42,10 +49,11 @@ from rag.chunk import detect_locale
 from rag.search import search
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterator
+    from collections.abc import Generator, Iterator, Sequence
 
     from qdrant_client import QdrantClient
 
+    from rag.answer import Turn
     from rag.index import DenseEncoder, SparseEncoder
     from rag.llm import ChatStreamer, Completer
     from rag.search import Reranker
@@ -115,7 +123,13 @@ class Engine:
     completer: Completer
     streamer: ChatStreamer
 
-    def stream(self, question: str, locale: str | None = None) -> Iterator[Event]:
+    def stream(
+        self,
+        question: str,
+        conversation_id: int,
+        locale: str | None = None,
+        history: Sequence[Turn] = (),
+    ) -> Iterator[Event]:
         """Route, retrieve, generate — the read-only three quarters of `rag.agent`.
 
         The deepening loop is not here on purpose: it fetches live pages and
@@ -141,7 +155,10 @@ class Engine:
             # is a different event: `complete_json` only absorbs connection
             # errors, so a refused model name or a 500 from the server arrives
             # here as an exception and must not become one of ours.
-            decision = route(question, self.completer)
+            # History reaches the router as the student's earlier questions and
+            # nothing else — rag/answer.py's `format_history_questions` explains
+            # why the answers stay out of a prompt that demands strict JSON.
+            decision = route(question, self.completer, history)
         except APIError as exc:
             logger.warning("routing failed: %s", exc)
             raise EngineUnavailableError(LLM_DOWN) from exc
@@ -181,6 +198,7 @@ class Engine:
 
         yield StartEvent(
             question=question,
+            conversation_id=conversation_id,
             locale=answer_locale,
             route=decision,
             citations=[Citation.of(hit) for hit in hits],
@@ -189,7 +207,7 @@ class Engine:
         try:
             # An empty hit list never reaches the model — it becomes an honest
             # refusal inside `rag.answer`, which arrives here as one token.
-            for delta in answer(question, hits, self.streamer, answer_locale):
+            for delta in answer(question, hits, self.streamer, answer_locale, history):
                 yield TokenEvent(text=delta)
         except APIError as exc:
             # Unlike `complete_json`, which swallows a dead endpoint into a
@@ -278,7 +296,12 @@ class _Holder:
 _HOLDER = _Holder()
 
 
-def stream_answer(question: str, locale: str | None = None) -> Generator[Event, None, None]:
+def stream_answer(
+    question: str,
+    conversation_id: int,
+    locale: str | None = None,
+    history: Sequence[Turn] = (),
+) -> Generator[Event, None, None]:
     """One question at a time, on the one set of models this process loaded.
 
     Typed as a generator rather than an iterator because `close()` is part of
@@ -315,6 +338,6 @@ def stream_answer(question: str, locale: str | None = None) -> Generator[Event, 
     try:
         if _HOLDER.engine is None:
             _HOLDER.engine = build_engine()
-        yield from _HOLDER.engine.stream(question, locale)
+        yield from _HOLDER.engine.stream(question, conversation_id, locale, history)
     finally:
         _HOLDER.lock.release()
