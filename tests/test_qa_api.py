@@ -15,12 +15,18 @@ lock — so a test that looks at a 200 and walks away leaves the lock held for t
 next one. Every test below either reads the stream through `events` or closes
 the response through `finish`.
 
-No `django_db` marker anywhere, deliberately. Answering a question touches no
-model: the throttle reads `request.user`, but an anonymous request carries no
-session cookie and Django hands back `AnonymousUser` without a query. Leaving
-the marker off keeps the file runnable with no database at all *and* makes it
-strict — the day this path grows a query, these tests fail loudly instead of
-silently acquiring a dependency.
+No `django_db` marker anywhere, deliberately, and the login stage did not change
+that. Answering a question still touches no model: `force_authenticate` hands
+the view a `User` built in memory, and everything downstream of it reads
+attributes rather than rows — `is_authenticated` is a property, and the throttle
+keys on `pk`. Leaving the marker off keeps the file runnable with no database at
+all *and* makes it strict: the day this path grows a query, these tests fail
+loudly instead of silently acquiring a dependency.
+
+That in-memory user is why the CSRF and session tests are not here. Forced
+authentication bypasses `SessionAuthentication` entirely, so a test of what that
+class enforces would be testing nothing; those live in tests/test_accounts_api.py
+against a real login.
 """
 
 import json
@@ -32,15 +38,15 @@ from typing import Any, cast
 
 import httpx
 import pytest
-from django.core.cache import cache
 from django.core.signals import request_finished
 from django.db import close_old_connections
 from openai import APIConnectionError, NotFoundError
 from qdrant_client import QdrantClient
-from rest_framework.test import APIClient, APIRequestFactory
+from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 from test_agent import ScriptedCompleter
 from test_index import StubDense, StubSparse, make_chunk
 
+from apps.accounts.models import User
 from apps.qa import engine as engine_module
 from apps.qa import views as views_module
 from apps.qa.contract import EndEvent, Event, StartEvent
@@ -55,6 +61,11 @@ from rag.llm import Message
 
 ASK_URL = "/api/ask"
 SSE_MEDIA_TYPE = "text/event-stream"
+
+# Never saved. A `pk` is all the throttle reads and `is_authenticated` is a
+# property of the class, so this is a whole logged-in student as far as the
+# endpoint is concerned — and it costs no database.
+STUDENT = User(pk=1, username="student")
 
 ORM_TEXT = "An ORM maps objects to database tables."
 TASSE_TEXT = "Le tasse universitarie scadono il 30 novembre."
@@ -154,18 +165,6 @@ class CountingEngine:
         yield EndEvent()
 
 
-@pytest.fixture(autouse=True)
-def _fresh_process_state() -> Iterator[None]:
-    """The engine slot and the throttle counters are process-wide on purpose
-    (apps/qa/engine.py); tests must not inherit one another's stub engine or
-    request count."""
-    engine_module._HOLDER.engine = None
-    cache.clear()
-    yield
-    engine_module._HOLDER.engine = None
-    cache.clear()
-
-
 @pytest.fixture
 def index(tmp_path: Path) -> Iterator[QdrantClient]:
     """Both collections, one chunk each, so a routing decision is observable in
@@ -198,24 +197,37 @@ def install_engine(
     return engine
 
 
+def client_for(user: User | None = STUDENT) -> APIClient:
+    """A client that is already logged in, without a login having happened.
+
+    `force_authenticate` substitutes the whole authentication step, which is
+    what keeps this file free of both a database and a session cookie. Pass
+    `None` for a caller who is not signed in — and note that this is *not*
+    spelled `force_authenticate(user=None)`, which logs the client out, and
+    logging out flushes a session, which is a database write.
+    """
+    client = APIClient()
+    if user is not None:
+        client.force_authenticate(user=user)
+    return client
+
+
 def ask(
     question: str = "What is an ORM?",
-    forwarded_for: str | None = None,
     accept: str | None = None,
+    user: User | None = STUDENT,
     **extra: object,
 ):
     """One POST. Return type left to inference on purpose: what the test client
     hands back is Django's response wrapper, not the response the view built,
     and naming it here would be naming an implementation detail of the stubs."""
     # WSGI META rather than the `headers=` kwarg: that one reaches the test
-    # client through DRF's `**extra` too, and this spelling is the one the
-    # throttle actually reads (`request.META["HTTP_X_FORWARDED_FOR"]`).
+    # client through DRF's `**extra` too, and this spelling is the one content
+    # negotiation actually reads.
     meta: dict[str, Any] = {}
-    if forwarded_for is not None:
-        meta["HTTP_X_FORWARDED_FOR"] = forwarded_for
     if accept is not None:
         meta["HTTP_ACCEPT"] = accept
-    return APIClient().post(ASK_URL, {"question": question, **extra}, format="json", **meta)
+    return client_for(user).post(ASK_URL, {"question": question, **extra}, format="json", **meta)
 
 
 def events(response: Any) -> list[tuple[str, Any]]:
@@ -250,6 +262,7 @@ def ask_the_view(question: str = "What is an ORM?"):
     view builds and what closing it releases, so they take it from the view.
     """
     request = APIRequestFactory().post(ASK_URL, {"question": question}, format="json")
+    force_authenticate(request, user=STUDENT)
     return views_module.AskView.as_view()(request)
 
 
@@ -604,31 +617,35 @@ def test_a_failed_build_releases_the_index_and_is_not_cached(
     reopened.close()
 
 
-def test_the_anonymous_rate_limit_returns_429(index: QdrantClient) -> None:
+def test_an_anonymous_question_is_refused(index: QdrantClient) -> None:
+    """The endpoint answered anybody until the login stage. It is the first
+    thing a browser reaches, so the check that it no longer does belongs next to
+    the answering it guards, not only in the settings file that turned it on."""
+    install_engine(index, SLIDES_ROUTE)
+    response = ask(user=None)
+
+    assert response.status_code == 403
+    # Nothing was built and nothing was locked: permission is checked before the
+    # handler runs, so an unauthenticated burst never reaches the GPU.
+    assert engine_module._HOLDER.lock.acquire(blocking=False)
+    engine_module._HOLDER.lock.release()
+
+
+def test_the_ask_scope_rate_limit_returns_429(index: QdrantClient) -> None:
     """Answers are serialised on one GPU, so a burst has to be refused rather
-    than queued into a timeout."""
+    than queued into a timeout.
+
+    Its own scope, not a rate shared with the login endpoints: what bounds this
+    one is how fast the card can answer (config/settings.py).
+    """
     codes = []
-    for _ in range(11):
+    for _ in range(5):
         install_engine(index, SLIDES_ROUTE, ["ok"])
         response = ask()
         codes.append(response.status_code)
         finish(response)
-    assert codes[:10] == [200] * 10
-    assert codes[10] == 429
-
-
-def test_a_forwarded_header_cannot_buy_a_fresh_rate_limit_bucket(index: QdrantClient) -> None:
-    """DRF's default is to take the throttle identity from a client-supplied
-    X-Forwarded-For, which would make the limit above a suggestion: one header
-    per request and every request is a new client. Nothing proxies this
-    service, so the identity has to stay REMOTE_ADDR."""
-    codes = []
-    for attempt in range(11):
-        install_engine(index, SLIDES_ROUTE, ["ok"])
-        response = ask(forwarded_for=f"10.0.0.{attempt}")
-        codes.append(response.status_code)
-        finish(response)
-    assert codes[10] == 429
+    assert codes[:4] == [200] * 4
+    assert codes[4] == 429
 
 
 def test_a_queue_deeper_than_the_wait_is_refused_with_a_retry_hint(

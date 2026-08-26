@@ -90,8 +90,10 @@ ignore = ["PLC0415"]
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.ruff.lint.per-file-ignores]
-# assert is the tool in tests; the smoke tests exist to spawn subprocesses.
-"tests/**" = ["S101", "S603"]
+# assert is the tool in tests; the smoke tests exist to spawn subprocesses; and a
+# test that logs in has to write the password down somewhere (S105) — reading it
+# from the environment would only mean a credential that CI has to be given.
+"tests/**" = ["S101", "S105", "S603"]
 # Written by makemigrations, not by hand. E501: the long lines are Django's own
 # help_text strings copied verbatim from the parent model, and rewrapping them
 # would make the migration disagree with the model it was generated from.

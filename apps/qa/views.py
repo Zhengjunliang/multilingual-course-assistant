@@ -18,12 +18,14 @@ retrieval, and until it returns nothing has been sent. Everything after it — a
 model server that dies halfway through an answer — travels as an `error` event
 under a 200 that was already committed.
 
-A debt this leaves for Stage 5 — **CSRF**: DRF's default `SessionAuthentication`
-enforces CSRF only for a request that actually carries a session, so anonymous
-calls (curl, and the SPA before login exists) work today. The moment a browser
-has logged into `/admin/` on this origin its session cookie rides along, CSRF
-becomes live, and a fetch without the token gets a 403. The login work is where
-that has to be handled, not here.
+**CSRF, and why this file does nothing about it.** That debt is paid, and it
+was paid in configuration rather than here: `SessionAuthentication` plus
+`IsAuthenticated` are the project-wide defaults (config/settings.py), so a
+request that reaches this view carries a session cookie and DRF has already
+enforced the token against it. The browser sends that token as `X-CSRFToken`,
+the header DRF's `CSRF_HEADER_NAME` names by default, reading it from the cookie
+`GET /api/auth/me` issues. Nothing about the stream is special here; it is the
+same rule every endpoint follows.
 """
 
 from __future__ import annotations
@@ -125,6 +127,12 @@ class AskView(APIView):
     # `Accept: */*`, which is what curl sends — gets plain JSON for the error
     # bodies; the SSE framing is for whoever explicitly asked for the stream.
     renderer_classes = (JSONRenderer, ServerSentEventRenderer)
+
+    # Its own bucket, separate from the login endpoints': what limits this one
+    # is a GPU that answers about two questions a minute, and what limits those
+    # is how fast a password can be guessed. A single rate covering both would
+    # be wrong for whichever it was not chosen for (config/settings.py).
+    throttle_scope = "ask"
 
     def post(self, request: Request) -> Response | StreamingHttpResponse:
         payload = AskRequest(data=request.data)

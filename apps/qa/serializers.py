@@ -10,9 +10,12 @@ from rest_framework import serializers
 
 from rag.chunk import normalize_locale
 
-# A 4B model's context is a shared, GPU-bound resource and this endpoint takes
-# anonymous requests. The cap is the same reasoning the roadmap applies to
-# upload page counts: an unbounded input is an unbounded cost.
+# A 4B model's context is a shared, GPU-bound resource: every question is queued
+# onto the one card this project has, and the prompt built around it — system
+# instructions, retrieved excerpts, the question — has to fit a window measured
+# in thousands of tokens. The cap is the same reasoning the roadmap applies to
+# upload page counts: an unbounded input is an unbounded cost. A login does not
+# change that; it only says whose cost it is.
 MAX_QUESTION_CHARS = 1000
 
 

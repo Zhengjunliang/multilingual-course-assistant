@@ -105,22 +105,43 @@ AUTH_USER_MODEL = "accounts.User"
 # REST framework
 # https://www.django-rest-framework.org/api-guide/settings/
 
-# Throttling is not deferrable: one POST occupies the GPU for tens of seconds
-# and answers are served one at a time (apps/qa/engine.py), so without a limit a
-# burst becomes a queue that times out instead of an honest 429. The counters
-# live in Django's default local-memory cache, which is exactly right for one
-# process; Redis arrives with Celery.
+# Every endpoint answers only to a logged-in caller. Not for secrecy — the
+# corpus is course material — but because the thing being served is per-student
+# state: a conversation belongs to somebody, and an anonymous caller has nobody
+# to be. Anything that would have to invent a temporary identity for them is a
+# second, weaker account system standing next to this one.
 #
-# Both scopes, because `AnonRateThrottle` exempts anyone authenticated and there
-# is already an account that qualifies — the admin superuser. A rate for a role
-# nobody can reach would be dead configuration; a role that bypasses the limit
-# entirely is a hole.
+# Throttling is not deferrable either: one POST occupies the GPU for tens of
+# seconds and answers are served one at a time (apps/qa/engine.py), so without a
+# limit a burst becomes a queue that times out instead of an honest 429. The
+# counters live in Django's default local-memory cache, which is exactly right
+# for one process; Redis arrives with Celery.
 REST_FRAMEWORK = {
-    "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        # Basic only while developing, which is the point of the condition:
+        # authentication runs before throttling (`APIView.initial`), so a wrong
+        # password is refused without ever reaching a rate limit. Deployed, that
+        # is an unmetered password-guessing budget on every endpoint. It stays
+        # in development because README's curl recipe for the stream needs a
+        # credential that is not a cookie.
+        *(["rest_framework.authentication.BasicAuthentication"] if DEBUG else []),
     ],
-    "DEFAULT_THROTTLE_RATES": {"anon": "10/min", "user": "30/min"},
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    # One scoped class instead of the anon/user pair. `AnonRateThrottle` can no
+    # longer be reached at all now that permission is checked first — it would
+    # be dead configuration — and a single `user` rate cannot say both "four
+    # questions a minute" and "five login attempts a minute" at once.
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
+    # ask: the queue waits 90 seconds and an answer takes tens of them, so about
+    # three in flight is all the engine can absorb. Four puts the 429 just past
+    # that boundary rather than behind it, where the caller would be told to
+    # slow down by a service that was not actually full.
+    #
+    # auth: logging in and registering are one abuse surface, so they share a
+    # bucket. `ScopedRateThrottle` bills an unauthenticated caller by address,
+    # which is the setting below finally carrying weight.
+    "DEFAULT_THROTTLE_RATES": {"ask": "4/min", "auth": "5/min"},
     # Without this, DRF's default is to trust a client-supplied
     # X-Forwarded-For as the throttle identity, so
     # `curl -H "X-Forwarded-For: <anything>"` earns a fresh bucket on every
@@ -129,6 +150,12 @@ REST_FRAMEWORK = {
     "NUM_PROXIES": 0,
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }
+
+# What is deliberately absent: a global cap. Every rate above is per caller,
+# and per-caller limits say nothing about the machine — five accounts at four
+# questions a minute is twenty arriving at an engine that answers about two.
+# `QUEUE_TIMEOUT_SECONDS` (apps/qa/engine.py) is the real capacity control; the
+# rates only stop one caller from being the entire queue.
 
 
 # Password validation

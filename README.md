@@ -6,7 +6,7 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 
 ## 状态
 
-✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节）；React SPA 脚手架已建，开发期在 Vite dev server 上消费同一条流（见「前端」一节）。账号与多轮会话、异步 ingest 🔜 后续 Stage。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节）；React SPA 脚手架已建，开发期在 Vite dev server 上消费同一条流（见「前端」一节）；账号已接上（session 登录 + 开放注册），**全站需登录**（见「账号」一节）。多轮会话、异步 ingest 🔜 后续 Stage。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
@@ -31,7 +31,7 @@ just up          # 起 PostgreSQL 容器（Docker Desktop 引擎要先开着）
 just serve       # 开发服务器
 ```
 
-- 管理后台在 <http://127.0.0.1:8000/admin/>；问答 API 在 `/api/ask`（见下节）
+- 管理后台在 <http://127.0.0.1:8000/admin/>；账号 API 在 `/api/auth/`、问答 API 在 `/api/ask`（都需要登录，见下面两节）
 - Django 的根路径 `/` 仍无内容：[config/urls.py](config/urls.py) 只挂了 admin 与 api。问答界面在开发期由 Vite dev server 自己发（`just fe-dev`，见「前端」一节）；由 Django 发编译产物是 🔜 部署 Stage 的事
 
 **`just serve` 跑着的时候，终端里的 `just index` / `just search` / `just ask` 会失败**：本地 Qdrant 是嵌入式的，独占 `data/qdrant` 目录锁，网站进程先开就轮不到 CLI（反过来也一样，那时端点返回 503 并说明冲突）。要两边同时用，先 `Ctrl+C` 停掉网站。这条随「Qdrant 改服务进程」🔜 解除，见 [ROADMAP.md](ROADMAP.md) 自主拍板项一节。
@@ -98,7 +98,7 @@ just up; just serve    # 终端 A：PostgreSQL + Django
 just fe-dev            # 终端 B：http://localhost:5173/
 ```
 
-Vite dev server 把 `/api`、`/admin`、`/static` 代理到 `127.0.0.1:8000`，且 **`changeOrigin: false`** —— 转发时保留 `Host: localhost:5173`，Django 的 CSRF origin 校验因此自然通过，不需要 `CSRF_TRUSTED_ORIGINS`。`/admin` 那条代理是给账号 Stage 与 SPA 登录页之间的空档期用的（在 5173 的 `/admin/` 登录，cookie 落在 SPA 自己的 origin 上）。
+Vite dev server 把 `/api`、`/admin`、`/static` 代理到 `127.0.0.1:8000`，且 **`changeOrigin: false`** —— 转发时保留 `Host: localhost:5173`，Django 的 CSRF origin 校验因此自然通过，不需要 `CSRF_TRUSTED_ORIGINS`。`/admin` 那条代理正在当前的空档期承重：`/api/ask` 已经需要登录，而 SPA 自己的登录页要到后面的 Stage。**现在要在浏览器里问问题，先开 <http://localhost:5173/admin/> 登录**（`just superuser` 建的账号即可），`sessionid` 与 `csrftoken` 两个 cookie 就落在 SPA 自己的 origin 上，[frontend/src/api/client.ts](frontend/src/api/client.ts) 从 cookie 读 token 发 `X-CSRFToken`。零一次性代码：这两条代理本来就是为此存在的，删它们之前先读这段。
 
 **不用 `EventSource`**：它只发 GET，而 `/api/ask` 是带 JSON 体的 POST。[frontend/src/api/sse.ts](frontend/src/api/sse.ts) 手写 `fetch` + `ReadableStream` 解析器，换来 `AbortController`（离开页面立刻掐断生成、归还后端的引擎锁）与流式 `TextDecoder`（一个中文字符会被劈在两个网络分片里）。
 
@@ -139,19 +139,41 @@ ollama pull qwen3:4b-instruct-2507-q4_K_M
 
 M3 正式实验改 `.env` 指向服务器 vLLM 隧道（`ssh -L 8000:localhost:8000 <server>`）。端点与模型名在 `.env`（`LLM_BASE_URL` · `LLM_MODEL`）。分工依据见 [docs/architettura.md](docs/architettura.md) 算力策略一节。
 
+## 账号
+
+**每个端点都要登录**，包括 `/api/ask`。理由不是保密（语料就是课程材料），是状态：会话属于某个人，匿名调用者没有身份可归属，而给他们发一个临时身份等于并排再造一套弱账号系统。
+
+| 方法与路径 | 作用 |
+| ---------- | ---- |
+| `GET /api/auth/me` | 我是谁。**未登录也返回 200**，body 里 `{"authenticated": false}`；同时下发 CSRF cookie |
+| `PATCH /api/auth/me` | 改界面语言（只有 `locale` 可写） |
+| `POST /api/auth/login` | 用户名 + 密码 → session cookie |
+| `POST /api/auth/logout` | 结束会话（204） |
+| `POST /api/auth/register` | 开放自助注册，注册即登录（201） |
+
+**`me` 未登录返回 200 而不是 403**：只配 `SessionAuthentication` 时 DRF 对未认证发的是 403 而非 401，而 CSRF 校验失败**也是** 403 —— 前端无法区分。把「没人登录」做成正常结果，403 就只剩一个意思：这个请求被拒了。
+
+**CSRF token 只在 `GET /api/auth/me` 下发**，前端启动第一件事就调它：`ensure_csrf_cookie` 通常挂在渲染模板上，而开发期页面由 Vite 发、根本不经过 Django 模板。之后非 GET 请求从 `csrftoken` cookie 读值、发 `X-CSRFToken` 头。
+
+**限流按端点分桶**（[config/settings.py](config/settings.py)）：`ask` 4 次/分钟（按账号）· `auth` 5 次/分钟（登录与注册共用一桶，按 IP —— 匿名调用者只有地址可记账）。⚠ **没有全局上限**：per-caller 限流管不住机器，5 个账号 × 4 次 = 20 次/分钟打进一个每分钟答约 2 题的引擎。真正的容量闸是 `QUEUE_TIMEOUT_SECONDS`。
+
+`just superuser` 建的管理员同样能用这些端点。
+
 ## 问答 API
 
-同一条链路的 HTTP 形式：`POST /api/ask`，路由 → 检索 → 生成。**回的是 SSE 事件流**（`text/event-stream`），不是一整块 JSON——一次生成要几十秒，边写边发才看得出系统在工作。没有非流式版本。前置条件和 CLI 一样——Ollama 在跑、`data/qdrant` 已索引——外加 `just up` 与 `just serve`。
+同一条链路的 HTTP 形式：`POST /api/ask`，路由 → 检索 → 生成。**回的是 SSE 事件流**（`text/event-stream`），不是一整块 JSON——一次生成要几十秒，边写边发才看得出系统在工作。没有非流式版本。前置条件和 CLI 一样——Ollama 在跑、`data/qdrant` 已索引——外加 `just up`、`just serve` 和一个账号。
 
 ```powershell
 $json = @{ question = "What is an ORM?" } | ConvertTo-Json
 [System.IO.File]::WriteAllText("$PWD\ask.json", $json, (New-Object System.Text.UTF8Encoding $false))
-curl.exe -N -X POST http://127.0.0.1:8000/api/ask `
+curl.exe -N -u <用户名>:<密码> -X POST http://127.0.0.1:8000/api/ask `
   -H "Content-Type: application/json" -H "Accept: text/event-stream" `
   --data-binary "@ask.json"
 ```
 
 `-N` 不能省：不加的话 curl 自己缓冲，看起来仍是一次性返回。
+
+**`-u` 走的是 HTTP Basic，而 Basic 只在 `DJANGO_DEBUG=true` 时启用**（[config/settings.py](config/settings.py) 里那行条件）。认证发生在限流之前（DRF 的 `APIView.initial`），所以密码猜错根本走不到限流那一步 —— 部署时留着它等于给每个端点开一个无限次的猜密码额度。浏览器不用它：SPA 走 session cookie。
 
 **问题走文件而不是 `-d`**，哪怕是英文问题也照此写。PowerShell 把参数交给原生程序时按控制台编码转换，`学费` 与 `Università` 都会变成 `?`；`WriteAllText` + 无 BOM 的 `UTF8Encoding` 是唯一稳的写法。这是个多语言项目，只在示例里成立的写法等于错的写法。
 
@@ -183,11 +205,11 @@ data: {}
 
 **「这条被引用了吗」由客户端算**（`marker in answer`），服务端不提供这个字段：marker 常被劈在两个 `token` 事件里，只有拿到拼完的答案才判得准，而客户端本来就同时握着答案和 marker。4B 模型时常把 marker 缩写成 `[Excerpt 1]`，那就是没引用。
 
-**首次请求慢**（约一分钟）：embedding 与 reranker 要加载进显存。之后常驻。**答案串行**：8GB 显存装不下两路并发的 rerank + 生成，所以端点一次只答一个问题。两道闸：匿名限流 10 次/分钟（按 `REMOTE_ADDR`，登录后 30 次/分钟），以及排队上限 90 秒——超过就 503 带 `Retry-After`，而不是把连接吊到超时。**中途 Ctrl+C 掐断流会连带取消生成**，队列立刻让给下一个。
+**首次请求慢**（约一分钟）：embedding 与 reranker 要加载进显存。之后常驻。**答案串行**：8GB 显存装不下两路并发的 rerank + 生成，所以端点一次只答一个问题。两道闸：`ask` 桶 4 次/分钟（按账号，见「账号」一节），以及排队上限 90 秒——超过就 503 带 `Retry-After`，而不是把连接吊到超时。**中途 Ctrl+C 掐断流会连带取消生成**，队列立刻让给下一个。
 
 **状态码只在第一个字节之前有效。** 响应头随第一个事件一起发走，所以「生成端点半路死了」只能是 200 里的一条 `error` 事件；路由或检索阶段的失败仍是 503。
 
-错误按类型分：400 校验失败 · 429 限流 · 503 依赖不可用（路由端点没响应、索引被别的进程占着、还没索引过、前面的问题还没答完）。请求带 `Accept: text/event-stream` 时这些错误体也框成一条 `error` 事件；不带（curl 默认 `*/*`）就是普通 JSON。DRF 自带的校验消息跟随 `Accept-Language`（`LANGUAGE_CODE` 是 `it`，默认意大利语）；本项目自己的 503 与 `error` 文案已标记待译，但仓库还没有 `locale/` 目录，所以目前是英文。
+错误按类型分：400 校验失败 · **403 没登录或 CSRF token 不对** · 429 限流 · 503 依赖不可用（路由端点没响应、索引被别的进程占着、还没索引过、前面的问题还没答完）。403 的两种含义靠 `GET /api/auth/me` 区分（见「账号」一节）。请求带 `Accept: text/event-stream` 时这些错误体也框成一条 `error` 事件；不带（curl 默认 `*/*`）就是普通 JSON。DRF 自带的校验消息跟随 `Accept-Language`（`LANGUAGE_CODE` 是 `it`，默认意大利语）；本项目自己的 503 与 `error` 文案已标记待译，但仓库还没有 `locale/` 目录，所以目前是英文。
 
 **深挖循环（`deepen`）不在这个端点里**：它会联网抓页并写入共享索引，最多 3 次抓取。演示自增长仍用 CLI 的 `just ask`。它进 web 的路径是「账号 + Celery 异步」，见 [ROADMAP.md](ROADMAP.md)。
 
@@ -196,7 +218,7 @@ data: {}
 | 路径              | 内容                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------ |
 | `config/`         | Django project：settings（单一模块，安全响应头按 `DEBUG` 与 `DJANGO_BEHIND_TLS` 条件生效）· urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入，`rag/` 与 Django 两侧共用） |
-| `apps/accounts/`  | 自定义 User（`AUTH_USER_MODEL`）。`AbstractUser` + `locale`（偏好语言，取值域对齐 `settings.LANGUAGES`）；admin 里可见可筛 |
+| `apps/accounts/`  | 账号。自定义 User（`AUTH_USER_MODEL`）= `AbstractUser` + `locale`（偏好语言，取值域对齐 `settings.LANGUAGES`），admin 里可见可筛；`serializers.py` 注册/登录/账号表示 · `views.py` session 登录与 CSRF cookie 发放点 |
 | `apps/qa/`        | 问答 API。`contract.py` SSE 事件契约（唯一源，SPA 消费它）· `serializers.py` 请求校验 · `engine.py` 进程级模型资源 + 串行的 `stream_answer()`（路由→检索→生成，复用 `rag/`，不重写逻辑；锁随流的关闭释放）· `views.py` 只做 HTTP 翻译与 SSE 分帧 |
 | `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`crawl.py` 抓校园 web 源快照 + registry，`webparse.py` 快照转可切块工件，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`llm.py` OpenAI 兼容客户端（Streamer/Completer + pydantic JSON 校验助手），`answer.py` 生成带引用回答，`agent.py` 路由问题到课程库/校园库（只读控制流），`gold.py` 检索冒烟跑分与 `--routing` 路由报告，`golddraft.py` 起草 gold 题（人工把关后才进 `gold/`） |
 | `frontend/`       | React + TypeScript SPA（Vite）。`src/api/` 契约镜像 · SSE 解析器 · fetch 包装 · `src/lib/markers.ts` 引用角标与置灰判定 · `src/i18n/` 三份 catalogue · `src/components/ui/` shadcn 风格组件（源码在仓库里）· `src/features/chat/` 问答界面。自带 biome + tsc + catalogue 检查，`just fe` 一条跑完 |

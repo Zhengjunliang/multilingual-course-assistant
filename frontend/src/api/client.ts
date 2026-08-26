@@ -28,6 +28,21 @@ export interface AskBody {
   locale?: string;
 }
 
+/**
+ * Django's CSRF token, from the cookie it was delivered in.
+ *
+ * Null until something has issued one — `GET /api/auth/me` is what the SPA
+ * calls for that, and logging in through the proxied `/admin/` sets it too.
+ * Sending the header without a value would be worse than omitting it: Django
+ * compares the header against the cookie, so an empty one is a mismatch rather
+ * than an absence.
+ */
+function csrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+  const value = match?.[1];
+  return value === undefined ? null : decodeURIComponent(value);
+}
+
 function retryAfterSeconds(response: Response): number | null {
   const header = response.headers.get("Retry-After");
   if (header === null) return null;
@@ -55,9 +70,16 @@ async function detailOf(response: Response): Promise<string> {
  * leaves the server generating for nobody and holding its one engine slot.
  */
 export async function ask(body: AskBody, signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+  };
+  const token = csrfToken();
+  if (token !== null) headers["X-CSRFToken"] = token;
+
   const response = await fetch(ASK_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    headers,
     body: JSON.stringify(body),
     credentials: "same-origin",
     signal,
