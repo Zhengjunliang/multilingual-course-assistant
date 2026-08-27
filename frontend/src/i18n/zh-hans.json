@@ -1,7 +1,32 @@
 {
   "app": {
     "title": "课程助手",
-    "subtitle": "可以问课程材料，也可以问校园信息。"
+    "subtitle": "可以问课程材料，也可以问学校的信息。"
+  },
+  "auth": {
+    "logInTitle": "登录后即可提问",
+    "registerTitle": "注册账号",
+    "username": "用户名",
+    "password": "密码",
+    "logIn": "登录",
+    "register": "注册",
+    "logOut": "退出登录（{{username}}）",
+    "failed": "登录失败。",
+    "noAccount": "还没有账号？",
+    "haveAccount": "已经有账号了？"
+  },
+  "sidebar": {
+    "title": "你的会话",
+    "new": "新会话",
+    "empty": "还没有会话。",
+    "untitled": "未命名",
+    "open": "打开会话列表",
+    "unreadable": "这个会话不可用。"
+  },
+  "theme": {
+    "system": "主题：跟随系统",
+    "light": "主题：浅色",
+    "dark": "主题：深色"
   },
   "ask": {
     "label": "你的问题",
@@ -10,24 +35,26 @@
     "cancel": "停止"
   },
   "status": {
-    "queued": "正在等待问答服务…",
-    "streaming": "正在写答案…"
+    "queued": "正在等待回答服务…",
+    "streaming": "正在写回答…",
+    "retrying": "前面还有人在问。{{seconds}} 秒后重试（第 {{attempt}} 次，共 {{total}} 次）。"
   },
   "route": {
     "label": "检索范围",
     "slides": "课程材料",
-    "unifi_web": "校园网页",
-    "both": "两个知识源"
+    "unifi_web": "学校网页",
+    "both": "两个来源"
   },
   "citations": {
     "title": "来源",
-    "empty": "这个问题没有检索到任何内容。",
-    "uncited": "检索到但答案没引",
+    "empty": "这个问题没有检索到任何片段。",
+    "uncited": "检索到，但答案没有引用",
     "page": "第 {{page}} 页",
     "fetched": "抓取于 {{date}}"
   },
   "error": {
-    "title": "答案没有写完",
+    "title": "回答没有完成",
+    "incomplete": "回答在结束之前中断了。",
     "retryAfter": "服务要求 {{seconds}} 秒后重试。"
   }
 }

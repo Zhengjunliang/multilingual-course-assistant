@@ -14,17 +14,24 @@ interface CitationListProps {
    */
   cited: ReadonlySet<string> | null;
   highlighted: string | null;
+  onSelect: (marker: string) => void;
 }
 
 function badgeNumber(badges: readonly Badge[], marker: string): number | null {
   return badges.find((badge) => badge.marker === marker)?.number ?? null;
 }
 
-export function CitationList({ citations, badges, cited, highlighted }: CitationListProps) {
+export function CitationList({
+  citations,
+  badges,
+  cited,
+  highlighted,
+  onSelect,
+}: CitationListProps) {
   const { t } = useTranslation();
 
   if (citations.length === 0) {
-    return <p className="text-slate-500 text-sm">{t("citations.empty")}</p>;
+    return <p className="text-muted text-sm">{t("citations.empty")}</p>;
   }
 
   return (
@@ -40,19 +47,23 @@ export function CitationList({ citations, badges, cited, highlighted }: Citation
               className={cn(
                 "transition-opacity",
                 unused && "opacity-50",
-                highlighted === citation.marker && "ring-2 ring-slate-900",
+                highlighted === citation.marker && "ring-2 ring-accent",
               )}
             >
               <CardHeader>
                 <CardTitle className="flex items-baseline gap-2">
                   {number !== null && (
-                    <span className="rounded bg-slate-200 px-1.5 py-0.5 text-slate-700 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => onSelect(citation.marker)}
+                      className="rounded bg-mark px-1.5 py-0.5 text-mark-ink text-xs hover:opacity-80"
+                    >
                       {number}
-                    </span>
+                    </button>
                   )}
                   <span className="break-all font-mono text-xs">{citation.marker}</span>
                 </CardTitle>
-                <p className="text-slate-500 text-xs">
+                <p className="text-muted text-xs">
                   {citation.kind === "web" && citation.fetch_date !== null
                     ? t("citations.fetched", { date: citation.fetch_date })
                     : t("citations.page", { page: citation.page })}
@@ -65,7 +76,7 @@ export function CitationList({ citations, badges, cited, highlighted }: Citation
                     href={citation.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="mb-1 block break-all text-slate-600 text-xs underline"
+                    className="mb-1 block break-all text-muted text-xs underline"
                   >
                     {citation.url}
                   </a>

@@ -1,7 +1,32 @@
 {
   "app": {
     "title": "Course assistant",
-    "subtitle": "Ask about the course material or about campus information."
+    "subtitle": "Ask about the course material or about the university."
+  },
+  "auth": {
+    "logInTitle": "Sign in to ask a question",
+    "registerTitle": "Create an account",
+    "username": "Username",
+    "password": "Password",
+    "logIn": "Sign in",
+    "register": "Register",
+    "logOut": "Sign out ({{username}})",
+    "failed": "Sign-in failed.",
+    "noAccount": "No account yet?",
+    "haveAccount": "Already have an account?"
+  },
+  "sidebar": {
+    "title": "Your conversations",
+    "new": "New conversation",
+    "empty": "No conversations yet.",
+    "untitled": "Untitled",
+    "open": "Open conversations",
+    "unreadable": "That conversation is not available."
+  },
+  "theme": {
+    "system": "Theme: system",
+    "light": "Theme: light",
+    "dark": "Theme: dark"
   },
   "ask": {
     "label": "Your question",
@@ -11,23 +36,25 @@
   },
   "status": {
     "queued": "Waiting for the answering service…",
-    "streaming": "Writing the answer…"
+    "streaming": "Writing the answer…",
+    "retrying": "Another question is being answered. Retrying in {{seconds}} seconds ({{attempt}} of {{total}})."
   },
   "route": {
-    "label": "Searched",
+    "label": "Searched in",
     "slides": "course material",
-    "unifi_web": "campus pages",
+    "unifi_web": "university pages",
     "both": "both sources"
   },
   "citations": {
     "title": "Sources",
-    "empty": "Nothing was retrieved for this question.",
+    "empty": "No excerpts were retrieved for this question.",
     "uncited": "retrieved, not cited",
     "page": "page {{page}}",
-    "fetched": "fetched {{date}}"
+    "fetched": "fetched on {{date}}"
   },
   "error": {
-    "title": "The answer could not be completed",
-    "retryAfter": "The service asked to retry in {{seconds}} seconds."
+    "title": "The answer was not completed",
+    "incomplete": "The answer stopped before it was finished.",
+    "retryAfter": "The service asked us to retry in {{seconds}} seconds."
   }
 }

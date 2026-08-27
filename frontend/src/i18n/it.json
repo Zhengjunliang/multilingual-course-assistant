@@ -3,6 +3,31 @@
     "title": "Assistente del corso",
     "subtitle": "Chiedi del materiale del corso o delle informazioni di ateneo."
   },
+  "auth": {
+    "logInTitle": "Accedi per fare una domanda",
+    "registerTitle": "Crea un account",
+    "username": "Nome utente",
+    "password": "Password",
+    "logIn": "Accedi",
+    "register": "Registrati",
+    "logOut": "Esci ({{username}})",
+    "failed": "Accesso non riuscito.",
+    "noAccount": "Non hai un account?",
+    "haveAccount": "Hai già un account?"
+  },
+  "sidebar": {
+    "title": "Le tue conversazioni",
+    "new": "Nuova conversazione",
+    "empty": "Nessuna conversazione.",
+    "untitled": "Senza titolo",
+    "open": "Apri le conversazioni",
+    "unreadable": "Questa conversazione non è disponibile."
+  },
+  "theme": {
+    "system": "Tema: di sistema",
+    "light": "Tema: chiaro",
+    "dark": "Tema: scuro"
+  },
   "ask": {
     "label": "La tua domanda",
     "placeholder": "Che cos'è un ORM?",
@@ -11,7 +36,8 @@
   },
   "status": {
     "queued": "In attesa del servizio di risposta…",
-    "streaming": "Sto scrivendo la risposta…"
+    "streaming": "Sto scrivendo la risposta…",
+    "retrying": "C'è un'altra domanda in corso. Riprovo tra {{seconds}} secondi ({{attempt}} di {{total}})."
   },
   "route": {
     "label": "Cercato in",
@@ -28,6 +54,7 @@
   },
   "error": {
     "title": "La risposta non è stata completata",
+    "incomplete": "La risposta si è interrotta prima della fine.",
     "retryAfter": "Il servizio ha chiesto di riprovare tra {{seconds}} secondi."
   }
 }

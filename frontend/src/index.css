@@ -1,5 +1,68 @@
 @import "tailwindcss";
 
+/*
+ * Semantic colours, not raw palette steps.
+ *
+ * Every component below names what a colour is *for* — surface, muted text, a
+ * border — and never `slate-700`. That indirection is what makes the dark
+ * theme thirty lines instead of a pass over every file, and it is also what
+ * keeps two components that mean "a card" from drifting to two different
+ * greys.
+ *
+ * There is deliberately no `dark:` variant to register. The theme swaps the
+ * variables below and nothing else, so no component carries a second set of
+ * classes for the second theme — which is also why a component cannot be
+ * correct in one theme and wrong in the other.
+ *
+ * `@theme` is Tailwind v4's own directive and not CSS any specification knows
+ * about, which is why biome.json turns `tailwindDirectives` on: without it this
+ * file is a parse error rather than a file the linter has an opinion about.
+ */
+@theme {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-mark: var(--mark);
+  --color-mark-ink: var(--mark-ink);
+  --color-warn: var(--warn);
+  --color-warn-line: var(--warn-line);
+  --color-warn-ink: var(--warn-ink);
+}
+
+:root {
+  --canvas: oklch(98.4% 0.003 247.86);
+  --surface: oklch(100% 0 0);
+  --ink: oklch(20.8% 0.042 265.75);
+  --muted: oklch(55.4% 0.046 257.42);
+  --line: oklch(92.9% 0.013 255.51);
+  --accent: oklch(20.8% 0.042 265.75);
+  --accent-ink: oklch(98.4% 0.003 247.86);
+  --mark: oklch(92.9% 0.013 255.51);
+  --mark-ink: oklch(37.2% 0.044 257.29);
+  --warn: oklch(98.7% 0.022 95.28);
+  --warn-line: oklch(82.8% 0.111 82);
+  --warn-ink: oklch(41.4% 0.112 45.9);
+}
+
+[data-theme="dark"] {
+  --canvas: oklch(20.8% 0.042 265.75);
+  --surface: oklch(27.9% 0.041 260.03);
+  --ink: oklch(96.8% 0.007 247.9);
+  --muted: oklch(70.4% 0.04 256.79);
+  --line: oklch(37.2% 0.044 257.29);
+  --accent: oklch(92.9% 0.013 255.51);
+  --accent-ink: oklch(20.8% 0.042 265.75);
+  --mark: oklch(37.2% 0.044 257.29);
+  --mark-ink: oklch(96.8% 0.007 247.9);
+  --warn: oklch(27.9% 0.041 260.03);
+  --warn-line: oklch(55.5% 0.115 65);
+  --warn-ink: oklch(90.1% 0.076 70.7);
+}
+
 html,
 body,
 #root {
@@ -8,8 +71,8 @@ body,
 
 body {
   margin: 0;
-  background-color: var(--color-slate-50);
-  color: var(--color-slate-900);
+  background-color: var(--canvas);
+  color: var(--ink);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }

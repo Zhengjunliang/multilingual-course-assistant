@@ -12,25 +12,29 @@ interface AnswerStreamProps {
    * answer reports one missing and then wrong.
    */
   complete: boolean;
+  /** True while tokens are still arriving, so the caret is shown only then. */
+  live: boolean;
   onBadgeClick: (marker: string) => void;
 }
 
-export function AnswerStream({ text, badges, complete, onBadgeClick }: AnswerStreamProps) {
+export function AnswerStream({ text, badges, complete, live, onBadgeClick }: AnswerStreamProps) {
   const { t } = useTranslation();
 
   if (!complete) {
     return (
-      <p className="whitespace-pre-wrap text-slate-900 leading-relaxed">
+      <p className="whitespace-pre-wrap text-ink leading-relaxed">
         {text}
-        <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-slate-400 align-text-bottom">
-          <span className="sr-only">{t("status.streaming")}</span>
-        </span>
+        {live && (
+          <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-muted align-text-bottom">
+            <span className="sr-only">{t("status.streaming")}</span>
+          </span>
+        )}
       </p>
     );
   }
 
   return (
-    <p className="whitespace-pre-wrap text-slate-900 leading-relaxed">
+    <p className="whitespace-pre-wrap text-ink leading-relaxed">
       {segmentAnswer(text, badges).map((segment) =>
         segment.kind === "text" ? (
           <span key={segment.at}>{segment.text}</span>
@@ -39,7 +43,8 @@ export function AnswerStream({ text, badges, complete, onBadgeClick }: AnswerStr
             key={segment.at}
             type="button"
             onClick={() => onBadgeClick(segment.badge.marker)}
-            className="mx-0.5 rounded bg-slate-200 px-1.5 py-0.5 align-baseline font-medium text-slate-700 text-xs hover:bg-slate-300"
+            title={segment.badge.marker}
+            className="mx-0.5 rounded bg-mark px-1.5 py-0.5 align-baseline font-medium text-mark-ink text-xs hover:opacity-80"
           >
             {segment.badge.number}
           </button>
