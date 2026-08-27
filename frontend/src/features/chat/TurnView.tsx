@@ -8,6 +8,7 @@
  */
 
 import { useTranslation } from "react-i18next";
+
 import { badgesOf, citedMarkers } from "@/lib/markers";
 import { AnswerStream } from "./AnswerStream";
 import { CitationList } from "./CitationList";
@@ -17,14 +18,35 @@ interface TurnViewProps {
   turn: Turn;
   /** True only for a turn whose tokens are arriving right now. */
   live: boolean;
+  /**
+   * True while the server is working and nothing is on screen yet. That gap is
+   * real work, not latency: routing asks the model where to look and retrieval
+   * runs before a single event is sent (apps/qa/engine.py).
+   */
+  thinking: boolean;
   highlighted: string | null;
   onHighlight: (marker: string) => void;
 }
 
-export function TurnView({ turn, live, highlighted, onHighlight }: TurnViewProps) {
+function Thinking() {
+  const { t } = useTranslation();
+  return (
+    <p className="flex items-center gap-2 text-muted text-sm">
+      <span aria-hidden className="flex gap-1">
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" />
+      </span>
+      {t("status.thinking")}
+    </p>
+  );
+}
+
+export function TurnView({ turn, live, thinking, highlighted, onHighlight }: TurnViewProps) {
   const { t } = useTranslation();
   const badges = badgesOf(turn.citations);
   const cited = turn.complete ? citedMarkers(turn.answer, badges) : null;
+  const working = thinking || live;
 
   return (
     <article className="flex flex-col gap-4">
@@ -32,13 +54,16 @@ export function TurnView({ turn, live, highlighted, onHighlight }: TurnViewProps
         {turn.question}
       </p>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <section className="flex min-w-0 flex-col gap-2">
-          {turn.route !== null && (
-            <p className="text-muted text-xs">
-              {t("route.label")}: {t(`route.${turn.route.target}`)} · {turn.route.reason}
-            </p>
-          )}
+      <div className="flex min-w-0 flex-col gap-3">
+        {turn.route !== null && (
+          <p className="text-muted text-xs">
+            {t("route.label")}: {t(`route.${turn.route.target}`)} · {turn.route.reason}
+          </p>
+        )}
+
+        {working && turn.answer === "" ? (
+          <Thinking />
+        ) : (
           <AnswerStream
             text={turn.answer}
             badges={badges}
@@ -46,26 +71,22 @@ export function TurnView({ turn, live, highlighted, onHighlight }: TurnViewProps
             live={live}
             onBadgeClick={onHighlight}
           />
-          {turn.failure !== null && (
-            <p className="rounded-md border border-warn-line bg-warn px-3 py-2 text-sm text-warn-ink">
-              {turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete")}
-            </p>
-          )}
-        </section>
+        )}
+
+        {turn.failure !== null && (
+          <p className="rounded-md border border-warn-line bg-warn px-3 py-2 text-sm text-warn-ink">
+            {turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete")}
+          </p>
+        )}
 
         {turn.citations.length > 0 && (
-          <aside className="flex min-w-0 flex-col gap-2">
-            <h2 className="font-medium text-muted text-xs uppercase tracking-wide">
-              {t("citations.title")}
-            </h2>
-            <CitationList
-              citations={turn.citations}
-              badges={badges}
-              cited={cited}
-              highlighted={highlighted}
-              onSelect={onHighlight}
-            />
-          </aside>
+          <CitationList
+            citations={turn.citations}
+            badges={badges}
+            cited={cited}
+            highlighted={highlighted}
+            onSelect={onHighlight}
+          />
         )}
       </div>
     </article>

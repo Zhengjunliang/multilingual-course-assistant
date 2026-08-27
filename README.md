@@ -106,9 +106,9 @@ Vite dev server 把 `/api`、`/admin`、`/static` 代理到 `127.0.0.1:8000`，�
 
 **不用 `EventSource`**：它只发 GET，而 `/api/ask` 是带 JSON 体的 POST。[frontend/src/api/sse.ts](frontend/src/api/sse.ts) 手写 `fetch` + `ReadableStream` 解析器，换来 `AbortController`（离开页面立刻掐断生成、归还后端的引擎锁）与流式 `TextDecoder`（一个中文字符会被劈在两个网络分片里）。
 
-引用角标**只在 `end` 到达之后**才算：marker 常被劈在两个 `token` 事件里，边流边匹配会先报缺失再报错位。未被引用的来源卡片置灰，那是「检索到但答案没引」的信号。**实时轮次和从数据库读回的旧轮次走同一个组件**（[frontend/src/features/chat/TurnView.tsx](frontend/src/features/chat/TurnView.tsx)）—— 这正是 `citations` 与 `route` 要落库的原因，另建一条历史渲染路径就是给角标和置灰第二个出错的地方。
+引用角标**只在 `end` 到达之后**才算：marker 常被劈在两个 `token` 事件里，边流边匹配会先报缺失再报错位。未被引用的来源卡片置灰，那是「检索到但答案没引」的信号。来源卡片**横向排一条、可横划**（竖着堆会把下一个问题挤出屏幕），默认最多 6 张、其余折叠成 `+N`；点答案里的角标会展开并把对应那张滚到眼前。**实时轮次和从数据库读回的旧轮次走同一个组件**（[frontend/src/features/chat/TurnView.tsx](frontend/src/features/chat/TurnView.tsx)）—— 这正是 `citations` 与 `route` 要落库的原因，另建一条历史渲染路径就是给角标和置灰第二个出错的地方。
 
-**排队诚实**：POST 发出那一刻就进「排队中」，因为读者真正感受的等待从那时开始（服务端一次只答一题，最多让下一题等 90 秒才拒绝）。`reason: "busy"` 才自动重试，**最多 2 次**然后停下来让人点；`reason: "unavailable"` 一次都不重试 —— 模型服务没在跑，再问也不会自己起来。
+**等待分两种，报在两个地方**。「正在检索和思考」跟着那条提问显示 —— 第一个事件发出之前，服务端真的在路由（问模型该查哪个库）和检索，那不是网络延迟。而「前面还有人在问」是别人的问题占着队列，跟这一问无关，所以它在输入框旁边。`reason: "busy"` 才自动重试，**最多 2 次**然后停下来让人点；`reason: "unavailable"` 一次都不重试 —— 模型服务没在跑，再问也不会自己起来。
 
 **主题（浅色/深色/跟随系统）存 `localStorage`，不存账号**：主题是「此刻这块屏幕」的属性，白天笔记本晚上手机的人在两边要的答案不一样。界面语言相反，它存在 `User.locale` 上，所以切语言是 `PATCH /api/auth/me`。整套配色是 [frontend/src/index.css](frontend/src/index.css) 里的一组语义变量（`--ink` `--surface` `--muted` …），**没有任何组件写 `dark:` 前缀** —— 换主题只换变量，一个组件因此不可能在一个主题下对、另一个主题下错。
 

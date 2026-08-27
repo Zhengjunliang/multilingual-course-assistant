@@ -65,6 +65,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [adopt]);
 
+  // Stable across renders on purpose: consumers put it in `useCallback`
+  // dependency lists, and one that changed with every session update would
+  // rebuild those callbacks — and re-run the effects that depend on them — each
+  // time anything about the account changed. Switching language refetched the
+  // sidebar five times before this was pulled out of the memo below.
+  const forget = useCallback(() => setAccount(null), []);
+
   const value = useMemo<SessionValue>(
     () => ({
       account,
@@ -73,7 +80,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         adopt((await register(username, password, locale)).user),
       logOut: async () => {
         await logOut();
-        setAccount(null);
+        forget();
       },
       chooseLocale: async (locale) => {
         // Applied locally first: the request is a round trip, and a language
@@ -82,9 +89,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         void i18n.changeLanguage(locale);
         adopt((await setAccountLocale(locale)).user);
       },
-      forget: () => setAccount(null),
+      forget,
     }),
-    [account, adopt, i18n],
+    [account, adopt, forget, i18n],
   );
 
   if (!asked) return null;

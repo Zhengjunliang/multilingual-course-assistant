@@ -15,18 +15,17 @@ interface ComposerProps {
 }
 
 /**
- * What the reader is told while nothing is on screen.
+ * The two waits that need explaining, and only those.
  *
- * "Queued" is not a euphemism here: one question is answered at a time, so the
- * silence before the first token is a real queue and saying so beats a spinner
- * that implies work is happening for them specifically.
+ * Ordinary work — routing, retrieval, generation — is reported in the thread
+ * itself, next to the question it belongs to (`TurnView`). What is left here is
+ * the queue behind somebody else's question and the stop after it, neither of
+ * which is about this question at all.
  */
 function WaitingLine({ waiting }: { waiting: Waiting }) {
   const { t } = useTranslation();
 
   switch (waiting.phase) {
-    case "queued":
-      return <span className="text-muted text-sm">{t("status.queued")}</span>;
     case "retrying":
       return (
         <span className="text-muted text-sm">

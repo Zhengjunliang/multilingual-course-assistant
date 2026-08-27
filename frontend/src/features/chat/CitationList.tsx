@@ -1,9 +1,20 @@
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Citation } from "@/api/contract";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Badge } from "@/lib/markers";
 import { cn } from "@/lib/utils";
+
+/**
+ * How many source cards stand in the strip before the rest are folded away.
+ *
+ * A `both` route retrieves from two collections, so a turn can carry ten
+ * excerpts; ten cards in a row is a scrollbar nobody drags to the end of. What
+ * is folded is never lost — the count is on the button, and clicking a badge in
+ * the answer unfolds the strip on its way to the card it points at.
+ */
+const VISIBLE_CITATIONS = 6;
 
 interface CitationListProps {
   citations: readonly Citation[];
@@ -29,66 +40,109 @@ export function CitationList({
   onSelect,
 }: CitationListProps) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const strip = useRef<HTMLOListElement | null>(null);
+
+  // Clicking a badge in the prose should land on the card it names, and the
+  // card is usually off-screen sideways. When it is behind the fold instead,
+  // unfolding re-runs this effect and the second pass does the scrolling.
+  useEffect(() => {
+    if (highlighted === null) return;
+    const card = strip.current?.querySelector(`[data-marker="${CSS.escape(highlighted)}"]`);
+    if (card == null) {
+      if (!expanded) setExpanded(true);
+      return;
+    }
+    card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [highlighted, expanded]);
 
   if (citations.length === 0) {
     return <p className="text-muted text-sm">{t("citations.empty")}</p>;
   }
 
+  const shown = expanded ? citations : citations.slice(0, VISIBLE_CITATIONS);
+  const folded = citations.length - shown.length;
+
   return (
-    <ol className="flex flex-col gap-2">
-      {citations.map((citation) => {
-        const number = badgeNumber(badges, citation.marker);
-        // Greyed out is a signal, not a style: retrieved and then not cited is
-        // exactly what the error taxonomy wants to see.
-        const unused = cited !== null && !cited.has(citation.marker);
-        return (
-          <li key={`${citation.marker}-${citation.text.slice(0, 24)}`}>
-            <Card
-              className={cn(
-                "transition-opacity",
-                unused && "opacity-50",
-                highlighted === citation.marker && "ring-2 ring-accent",
-              )}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-baseline gap-2">
-                  {number !== null && (
-                    <button
-                      type="button"
-                      onClick={() => onSelect(citation.marker)}
-                      className="rounded bg-mark px-1.5 py-0.5 text-mark-ink text-xs hover:opacity-80"
-                    >
-                      {number}
-                    </button>
+    <div className="flex flex-col gap-2">
+      <h2 className="font-medium text-muted text-xs uppercase tracking-wide">
+        {t("citations.title")}
+      </h2>
+      <div className="flex items-stretch gap-2">
+        {/* A row rather than a column: sources belong beside each other, and
+            stacked they push the next question off the bottom of the screen. */}
+        <ol ref={strip} className="flex min-w-0 flex-1 gap-3 overflow-x-auto pb-2">
+          {shown.map((citation) => {
+            const number = badgeNumber(badges, citation.marker);
+            // Greyed out is a signal, not a style: retrieved and then not cited
+            // is exactly what the error taxonomy wants to see.
+            const unused = cited !== null && !cited.has(citation.marker);
+            return (
+              <li
+                key={`${citation.marker}-${citation.text.slice(0, 24)}`}
+                data-marker={citation.marker}
+                className="w-72 shrink-0"
+              >
+                <Card
+                  className={cn(
+                    "h-full transition-opacity",
+                    unused && "opacity-50",
+                    highlighted === citation.marker && "ring-2 ring-accent",
                   )}
-                  <span className="break-all font-mono text-xs">{citation.marker}</span>
-                </CardTitle>
-                <p className="text-muted text-xs">
-                  {citation.kind === "web" && citation.fetch_date !== null
-                    ? t("citations.fetched", { date: citation.fetch_date })
-                    : t("citations.page", { page: citation.page })}
-                  {unused ? ` · ${t("citations.uncited")}` : null}
-                </p>
-              </CardHeader>
-              <CardContent>
-                {citation.url !== null && (
-                  <a
-                    href={citation.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mb-1 block break-all text-muted text-xs underline"
-                  >
-                    {citation.url}
-                  </a>
-                )}
-                <p lang={citation.locale} className="line-clamp-6 whitespace-pre-wrap">
-                  {citation.text}
-                </p>
-              </CardContent>
-            </Card>
-          </li>
-        );
-      })}
-    </ol>
+                >
+                  <CardHeader>
+                    <CardTitle className="flex items-baseline gap-2">
+                      {number !== null && (
+                        <button
+                          type="button"
+                          onClick={() => onSelect(citation.marker)}
+                          className="rounded bg-mark px-1.5 py-0.5 text-mark-ink text-xs hover:opacity-80"
+                        >
+                          {number}
+                        </button>
+                      )}
+                      <span className="truncate font-mono text-xs" title={citation.marker}>
+                        {citation.marker}
+                      </span>
+                    </CardTitle>
+                    <p className="text-muted text-xs">
+                      {citation.kind === "web" && citation.fetch_date !== null
+                        ? t("citations.fetched", { date: citation.fetch_date })
+                        : t("citations.page", { page: citation.page })}
+                      {unused ? ` · ${t("citations.uncited")}` : null}
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {citation.url !== null && (
+                      <a
+                        href={citation.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mb-1 block truncate text-muted text-xs underline"
+                      >
+                        {citation.url}
+                      </a>
+                    )}
+                    <p lang={citation.locale} className="line-clamp-5 whitespace-pre-wrap">
+                      {citation.text}
+                    </p>
+                  </CardContent>
+                </Card>
+              </li>
+            );
+          })}
+        </ol>
+
+        {folded > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="shrink-0 self-stretch rounded-lg border border-line border-dashed px-3 text-muted text-xs hover:bg-mark hover:text-ink"
+          >
+            {t("citations.more", { count: folded })}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

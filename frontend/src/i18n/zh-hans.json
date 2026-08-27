@@ -35,7 +35,7 @@
     "cancel": "停止"
   },
   "status": {
-    "queued": "正在等待回答服务…",
+    "thinking": "正在检索和思考…",
     "streaming": "正在写回答…",
     "retrying": "前面还有人在问。{{seconds}} 秒后重试（第 {{attempt}} 次，共 {{total}} 次）。"
   },
@@ -50,7 +50,8 @@
     "empty": "这个问题没有检索到任何片段。",
     "uncited": "检索到，但答案没有引用",
     "page": "第 {{page}} 页",
-    "fetched": "抓取于 {{date}}"
+    "fetched": "抓取于 {{date}}",
+    "more": "+{{count}}"
   },
   "error": {
     "title": "回答没有完成",

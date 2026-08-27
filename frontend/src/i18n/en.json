@@ -35,7 +35,7 @@
     "cancel": "Stop"
   },
   "status": {
-    "queued": "Waiting for the answering service…",
+    "thinking": "Searching and thinking…",
     "streaming": "Writing the answer…",
     "retrying": "Another question is being answered. Retrying in {{seconds}} seconds ({{attempt}} of {{total}})."
   },
@@ -50,7 +50,8 @@
     "empty": "No excerpts were retrieved for this question.",
     "uncited": "retrieved, not cited",
     "page": "page {{page}}",
-    "fetched": "fetched on {{date}}"
+    "fetched": "fetched on {{date}}",
+    "more": "+{{count}}"
   },
   "error": {
     "title": "The answer was not completed",

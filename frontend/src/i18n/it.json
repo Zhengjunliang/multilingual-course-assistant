@@ -35,7 +35,7 @@
     "cancel": "Ferma"
   },
   "status": {
-    "queued": "In attesa del servizio di risposta…",
+    "thinking": "Sto cercando e ragionando…",
     "streaming": "Sto scrivendo la risposta…",
     "retrying": "C'è un'altra domanda in corso. Riprovo tra {{seconds}} secondi ({{attempt}} di {{total}})."
   },
@@ -50,7 +50,8 @@
     "empty": "Nessun estratto recuperato per questa domanda.",
     "uncited": "recuperata, non citata",
     "page": "pagina {{page}}",
-    "fetched": "recuperata il {{date}}"
+    "fetched": "recuperata il {{date}}",
+    "more": "+{{count}}"
   },
   "error": {
     "title": "La risposta non è stata completata",

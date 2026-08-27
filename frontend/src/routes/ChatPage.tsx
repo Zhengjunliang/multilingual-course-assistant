@@ -127,15 +127,21 @@ export default function ChatPage() {
             {turns.length === 0 && !unreadable && (
               <p className="text-muted text-sm">{t("app.subtitle")}</p>
             )}
-            {turns.map((turn, position) => (
-              <TurnView
-                key={turn.key}
-                turn={turn}
-                live={position === turns.length - 1 && waiting.phase === "streaming"}
-                highlighted={highlighted}
-                onHighlight={setHighlighted}
-              />
-            ))}
+            {turns.map((turn, position) => {
+              // Only the last turn can be the one being answered; every earlier
+              // one is settled, whether it settled a second ago or last week.
+              const current = position === turns.length - 1;
+              return (
+                <TurnView
+                  key={turn.key}
+                  turn={turn}
+                  live={current && waiting.phase === "streaming"}
+                  thinking={current && (waiting.phase === "queued" || waiting.phase === "retrying")}
+                  highlighted={highlighted}
+                  onHighlight={setHighlighted}
+                />
+              );
+            })}
             <div ref={bottom} />
           </div>
         </main>
