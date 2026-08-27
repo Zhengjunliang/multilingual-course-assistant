@@ -6,7 +6,7 @@ Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore 
 
 ## 状态
 
-✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节）；React SPA 脚手架已建，开发期在 Vite dev server 上消费同一条流（见「前端」一节）；账号已接上（session 登录 + 开放注册），**全站需登录**（见「账号」一节）；多轮会话已可用（history + query rewriting + 落库，见「多轮会话」一节），SPA 已是成品界面（登录/注册页、会话侧栏、三语、暗亮主题，见「前端」一节）。同源部署与异步 ingest 🔜 后续 Stage。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节）；React SPA 脚手架已建，开发期在 Vite dev server 上消费同一条流（见「前端」一节）；账号已接上（session 登录 + 开放注册），**全站需登录**（见「账号」一节）；多轮会话已可用（history + query rewriting + 落库，见「多轮会话」一节），SPA 已是成品界面（登录/注册页、会话侧栏、三语、暗亮主题，见「前端」一节）且由 Django 自己发在根路径上（`just fe` + `just serve` → <http://127.0.0.1:8000/>，一个地址一个进程，见「前端」一节）。异步 ingest 与容器化部署 🔜 后续里程碑。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
@@ -32,7 +32,7 @@ just serve       # 开发服务器
 ```
 
 - 管理后台在 <http://127.0.0.1:8000/admin/>；账号 API 在 `/api/auth/`、问答 API 在 `/api/ask`（都需要登录，见下面两节）
-- Django 的根路径 `/` 仍无内容：[config/urls.py](config/urls.py) 只挂了 admin 与 api。问答界面在开发期由 Vite dev server 自己发（`just fe-dev` → <http://localhost:5173/>，见「前端」一节）；由 Django 发编译产物是 🔜 部署 Stage 的事
+- 问答界面在根路径 <http://127.0.0.1:8000/>，**前提是先跑过 `just fe`**（Django 发的是构建产物；没构建过会回 503 并说这句话）。写前端时改用 `just fe-dev` 的 5173 拿热更新 —— 两条路径的差别见「前端」一节
 
 **`just serve` 跑着的时候，终端里的 `just index` / `just search` / `just ask` 会失败**：本地 Qdrant 是嵌入式的，独占 `data/qdrant` 目录锁，网站进程先开就轮不到 CLI（反过来也一样，那时端点返回 503 并说明冲突）。要两边同时用，先 `Ctrl+C` 停掉网站。这条随「Qdrant 改服务进程」🔜 解除，见 [ROADMAP.md](ROADMAP.md) 自主拍板项一节。
 
@@ -86,23 +86,34 @@ just webparse data\webcorpus\<run_id>   # 快照解析 -> 可切块工件对
 
 CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 push 与 PR 上跑同一条链外加 pip-audit 与 `npm audit --omit=dev` 两道依赖审计，用 `uv sync --locked` 与 `npm ci`，所以 `uv.lock` 与 `frontend/package-lock.json` 都必须跟着 commit。依赖更新手动管理（`uv lock --upgrade` / `npm update --prefix frontend` 后跑 `just check`）。
 
-前端链在 CI 里**排在所有 Django 步骤之前**，不是随手排的：部署 Stage 起 `STATICFILES_DIRS` 会指向 `frontend/dist`，而那是不进 git 的构建产物，`check --deploy --fail-level WARNING` 会把「目录不存在」变成失败。`just check` 用 `check: fe` 依赖复现同一顺序。
+前端链在 CI 里**排在所有 Django 步骤之前**，不是随手排的：`STATICFILES_DIRS` 指向 `frontend/dist`，而那是不进 git 的构建产物，`check --deploy --fail-level WARNING` 会把「目录不存在」（`staticfiles.W004`）变成失败。`just check` 用 `check: fe` 依赖复现同一顺序。
 
 ## 前端
 
 React + TypeScript SPA，Vite 构建，Tailwind + shadcn 风格组件（组件源码在仓库里，不是 npm 包），界面文案三语走 react-i18next。
 
+**两条路径，看清楚在跑哪条**：
+
+| 想干什么 | 怎么跑 | 打开哪个地址 |
+| -------- | ------ | ------------ |
+| 写前端 | `just up; just serve` + 另开一个终端 `just fe-dev` | <http://localhost:5173/> —— 存盘即刷新 |
+| 看整体 / 演示 | `just fe` 一次，然后 `just up; just serve` | <http://127.0.0.1:8000/> —— 同源，一个进程 |
+
 ```powershell
 just fe-install   # 一次性
-just up; just serve    # 终端 A：PostgreSQL + Django
-just fe-dev            # 终端 B：http://localhost:5173/
 ```
+
+第二条是这个网站真正的样子：Django 在根路径上发 `frontend/dist/index.html`，`/static/…` 发同一个目录里的 bundle，Vite dev server 完全不参与。**代价是改了前端要重跑 `just fe`**，否则 8000 上看到的还是上一次构建。没构建过时那个地址回 503 并告诉你跑什么。
+
+`/c/7` 这类地址由前端路由自己解析，但用户按 F5 时浏览器会**真的**向服务器要它 —— [config/urls.py](config/urls.py) 的兜底路由把所有它不认识的路径都回成同一个 `index.html`。那条正则里的负向前瞻不是装饰：少了它，`/api/typo` 会拿到 200 加一整页 HTML，而调用方要在 `<!doctype html>` 上的 JSON 解析错误里反推出自己路径写错了。
+
+⚠ `DEBUG=False` 时 Django **拒绝发静态文件**（它假定前面站着 nginx 一类的东西）。所以上面第二条路径是开发形态，容器化部署要补一个静态文件服务（whitenoise 或 nginx），那是 M6 的事，[ROADMAP.md](ROADMAP.md) 里点了名。
 
 四条路由：`/login` · `/register` · `/`（新会话）· `/c/:id`（打开某个会话）。**URL 决定打开哪个会话** —— 会话是个「地方」，能收藏、能分享给自己、后退键有意义，而不是藏在组件里的一个状态。新会话拿到 id 的那一刻（`start` 事件里）就 `replace` 到 `/c/<id>`，此时答案还在流。
 
-Vite dev server 把 `/api`、`/admin`、`/static` 代理到 `127.0.0.1:8000`，且 **`changeOrigin: false`** —— 转发时保留 `Host: localhost:5173`，Django 的 CSRF origin 校验因此自然通过，不需要 `CSRF_TRUSTED_ORIGINS`。`/admin` 与 `/static` 两条代理留着是为了在 SPA 的 origin 上直接用管理后台。
+走 5173 那条路径时，Vite dev server 把 `/api`、`/admin`、`/static` 代理到 `127.0.0.1:8000`，且 **`changeOrigin: false`** —— 转发时保留 `Host: localhost:5173`，Django 的 CSRF origin 校验因此自然通过，不需要 `CSRF_TRUSTED_ORIGINS`。`/admin` 与 `/static` 两条代理留着是为了在 SPA 的 origin 上直接用管理后台。
 
-**登录走 session cookie，不用 token**：SPA 与 Django 同源（开发期靠上面这条代理，部署后由 Django 直接发页面），浏览器自己的 cookie 罐就是全部机制。启动第一件事是 `GET /api/auth/me` —— 它同时回答「有没有人登录」和下发 CSRF cookie，之后每个非 GET 请求从 cookie 读 token 发 `X-CSRFToken`（[frontend/src/api/http.ts](frontend/src/api/http.ts)）。任何请求回 403 就丢掉会话、跳登录页：别处退登或服务端重启都是这个表现。
+**登录走 session cookie，不用 token**：SPA 与 Django 同源（8000 上本来就是，5173 上靠上面这条代理），浏览器自己的 cookie 罐就是全部机制。启动第一件事是 `GET /api/auth/me` —— 它同时回答「有没有人登录」和下发 CSRF cookie，之后每个非 GET 请求从 cookie 读 token 发 `X-CSRFToken`（[frontend/src/api/http.ts](frontend/src/api/http.ts)）。任何请求回 403 就丢掉会话、跳登录页：别处退登或服务端重启都是这个表现。
 
 **不用 `EventSource`**：它只发 GET，而 `/api/ask` 是带 JSON 体的 POST。[frontend/src/api/sse.ts](frontend/src/api/sse.ts) 手写 `fetch` + `ReadableStream` 解析器，换来 `AbortController`（离开页面立刻掐断生成、归还后端的引擎锁）与流式 `TextDecoder`（一个中文字符会被劈在两个网络分片里）。
 
@@ -248,7 +259,7 @@ data: {}
 
 `citations` 与 `route` 跟着答案一起落库。侧栏点开旧会话时 `start` 事件早就没了，不存这两列的话历史轮次只剩纯文本 —— 来源卡片、引用角标、可见的路由决策三样全没。
 
-错误按类型分：400 校验失败 · **403 没登录或 CSRF token 不对** · 429 限流 · 503 依赖不可用（路由端点没响应、索引被别的进程占着、还没索引过、前面的问题还没答完）。403 的两种含义靠 `GET /api/auth/me` 区分（见「账号」一节）。请求带 `Accept: text/event-stream` 时这些错误体也框成一条 `error` 事件；不带（curl 默认 `*/*`）就是普通 JSON。DRF 自带的校验消息跟随 `Accept-Language`（`LANGUAGE_CODE` 是 `it`，默认意大利语）；本项目自己的 503 与 `error` 文案已标记待译，但仓库还没有 `locale/` 目录，所以目前是英文。
+错误按类型分：400 校验失败 · **403 没登录或 CSRF token 不对** · 429 限流 · 503 依赖不可用（路由端点没响应、索引被别的进程占着、还没索引过、前面的问题还没答完）。403 的两种含义靠 `GET /api/auth/me` 区分（见「账号」一节）。请求带 `Accept: text/event-stream` 时这些错误体也框成一条 `error` 事件；不带（curl 默认 `*/*`）就是普通 JSON。**这里的文案是英文，是决定不是欠账**：这个项目里三种语言各有属主 —— 界面归前端的三份 catalogue，回答语言归 [rag/answer.py](rag/answer.py) 的 prompt，而 503 与 `error` 这一层的读者是看服务端日志的人。给它再建一套 catalogue 是没有读者的活。字符串仍标着 `gettext_lazy`（标记零成本，删了要重新逐个猎捕）。**可见的后果，先说免得当 bug 查**：DRF 自带的校验消息是有意大利语翻译的且跟随 `Accept-Language`（`LANGUAGE_CODE` 是 `it`），所以一个 400 响应体里可能同时出现意语的 `"Questo campo è obbligatorio."` 和英文的 `"No such conversation."`。
 
 **深挖循环（`deepen`）不在这个端点里**：它会联网抓页并写入共享索引，最多 3 次抓取。演示自增长仍用 CLI 的 `just ask`。它进 web 的路径是「账号 + Celery 异步」，见 [ROADMAP.md](ROADMAP.md)。
 
@@ -256,12 +267,12 @@ data: {}
 
 | 路径              | 内容                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------ |
-| `config/`         | Django project：settings（单一模块，安全响应头按 `DEBUG` 与 `DJANGO_BEHIND_TLS` 条件生效）· urls · asgi/wsgi · env（`.env` 经 pydantic-settings 读入，`rag/` 与 Django 两侧共用） |
+| `config/`         | Django project：settings（单一模块，安全响应头按 `DEBUG` 与 `DJANGO_BEHIND_TLS` 条件生效）· urls（含 SPA 兜底路由）· `views.py` 发 SPA 外壳的唯一非 API 视图 · asgi/wsgi · env（`.env` 经 pydantic-settings 读入，`rag/` 与 Django 两侧共用） |
 | `apps/accounts/`  | 账号。自定义 User（`AUTH_USER_MODEL`）= `AbstractUser` + `locale`（偏好语言，取值域对齐 `settings.LANGUAGES`），admin 里可见可筛；`serializers.py` 注册/登录/账号表示 · `views.py` session 登录与 CSRF cookie 发放点 |
 | `apps/qa/`        | 问答 API。`contract.py` SSE 事件契约（唯一源，SPA 消费它）· `serializers.py` 请求校验与会话读取形状 · `models.py` `Conversation` / `Message` + 历史窗口常量 · `conversations.py` 这条链路**唯一**的 ORM 落点（开会话 / 切历史 / 落库 / 收尾）· `engine.py` 进程级模型资源 + 串行的 `stream_answer()`（路由→检索→生成，复用 `rag/`，不重写逻辑；锁随流的关闭释放，**零查询**）· `views.py` HTTP 翻译、SSE 分帧、答案落库时机 · `conversation_views.py` 会话读取端点 |
 | `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`crawl.py` 抓校园 web 源快照 + registry，`webparse.py` 快照转可切块工件，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`llm.py` OpenAI 兼容客户端（Streamer/Completer + pydantic JSON 校验助手），`answer.py` 生成带引用回答，`agent.py` 路由问题到课程库/校园库（只读控制流），`gold.py` 检索冒烟跑分与 `--routing` 路由报告，`golddraft.py` 起草 gold 题（人工把关后才进 `gold/`） |
 | `frontend/`       | React + TypeScript SPA（Vite）。`src/api/` 契约镜像 · SSE 解析器 · CSRF 与 JSON 请求 · 账号与会话调用 · `src/auth/` 会话上下文与路由守卫 · `src/routes/` 登录 / 注册 / 聊天页 · `src/features/chat/` 提问状态机（排队、重试、中止）与轮次渲染 · `src/lib/markers.ts` 引用角标与置灰判定 · `src/theme/` 主题 · `src/i18n/` 三份 catalogue · `src/components/ui/` shadcn 风格组件（源码在仓库里）。自带 biome + tsc + catalogue 检查，`just fe` 一条跑完 |
-| `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性，`test_qa_contract.py` 守着 SSE 契约与它的 TS 镜像不漂移，`test_qa_engine.py` **不带 `django_db`**，用「没有 marker 的测试碰数据库就报错」这条 pytest-django 规则守着引擎层零查询 |
+| `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性，`test_qa_contract.py` 守着 SSE 契约与它的 TS 镜像不漂移，`test_qa_engine.py` 与 `test_spa.py` **不带 `django_db`**，用「没有 marker 的测试碰数据库就报错」这条 pytest-django 规则守着引擎层与发页面这条路径的零查询 |
 | `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
 
 ## MICC 服务器日常使用

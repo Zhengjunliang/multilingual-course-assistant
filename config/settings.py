@@ -14,6 +14,15 @@ from config.env import env
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# What `just fe` builds. Two things read it — the static finders below and
+# config/views.py, which serves the SPA's shell — so it is named once here.
+#
+# It is a build artefact and not in git, which is why the frontend build runs
+# ahead of every Django step in CI and in `just check`: `staticfiles.W004`
+# reports a STATICFILES_DIRS entry that does not exist, and `check --deploy
+# --fail-level WARNING` turns that report into a failure.
+SPA_DIST = BASE_DIR / "frontend" / "dist"
+
 # Unwrapped here and only here: Django needs the string, and a settings name
 # containing SECRET is one Django's own debug page cleanses.
 SECRET_KEY = env.django_secret_key.get_secret_value()
@@ -201,7 +210,21 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+# Matches `base: "/static/"` in frontend/vite.config.ts: the built index.html
+# asks for its bundle at /static/assets/<name>-<hash>.js, so this prefix and
+# that one are the same decision written in two places.
 STATIC_URL = "static/"
+
+# The SPA's bundle, served next to Django's own admin assets.
+STATICFILES_DIRS = [SPA_DIST]
+
+# Deliberately absent: STATIC_ROOT, STORAGES and a `collectstatic` recipe.
+# `runserver` serves the directories above while DEBUG is on, which is every
+# way this project is run today. With DEBUG off Django refuses to serve static
+# files at all — by design; it expects something in front of it — so the
+# deployed form needs whitenoise or nginx. That belongs to the milestone that
+# containerises the stack (ROADMAP.md, M6), not here: a dependency installed
+# before anything runs it is one nobody can check.
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

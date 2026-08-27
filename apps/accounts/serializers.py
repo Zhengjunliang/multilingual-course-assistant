@@ -4,10 +4,10 @@ DRF serializers in both directions here, unlike apps/qa: these bodies are small
 JSON objects that `Response` renders directly, and there is no streaming half
 needing a contract of its own.
 
-Every message is wrapped in `gettext_lazy`. Nothing translates them yet — the
-catalogues arrive with the deployment stage, the same state apps/qa/engine.py
-describes — but a string that was never marked is one that has to be hunted
-down later instead of collected by `makemessages`.
+Every message is wrapped in `gettext_lazy` and nothing translates them: these
+read as English, for the reason apps/qa/engine.py states at length. The markers
+stay because they cost nothing and a string that was never marked is one that
+has to be hunted down rather than collected.
 """
 
 from __future__ import annotations

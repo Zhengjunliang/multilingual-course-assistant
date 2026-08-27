@@ -91,10 +91,18 @@ class EngineUnavailableError(Exception):
     and a failure has to travel as `ErrorEvent` instead.
 
     Its messages are marked for translation like every other user-facing string
-    here. No catalogue exists yet, so they currently read as the English written
-    below while DRF's own validation errors — which ship with translations —
-    answer in the caller's language. Marking them now is what makes a later
-    `makemessages` complete rather than a rewrite.
+    here, and no catalogue translates them: for the thesis these read as the
+    English written below. Three languages meet in this project and each has an
+    owner — the interface belongs to the frontend's own catalogues, the answer's
+    language to the prompt in rag/answer.py, and this layer to whoever is
+    reading a server log next to it. A fourth translation layer would be work
+    with no reader.
+
+    The markers stay because they cost nothing and losing them costs a hunt
+    through every string. One visible consequence, worth knowing before it
+    looks like a bug: DRF ships its own translated validation messages and
+    LANGUAGE_CODE is Italian, so a single error body can mix its Italian with
+    this module's English.
     """
 
 
