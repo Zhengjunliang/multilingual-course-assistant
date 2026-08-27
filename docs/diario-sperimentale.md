@@ -2,6 +2,41 @@
 
 Registro degli esperimenti e dei problemi riscontrati durante lo sviluppo, in italiano (stile formale): il contenuto confluirà nei capitoli sperimentali della tesi (M6). Una voce per data; i dati citati sono riproducibili con i comandi indicati. Le decisioni architetturali restano di proprietà di [architettura.md](architettura.md).
 
+## 2026-08-27 — Collaudo dell'interfaccia web: conversazione multi-turno, risoluzione anaforica, trascrizione al posto della risposta
+
+### 1. Il collaudo manuale di M5
+
+L'interfaccia completa (`frontend/`, servita da Django sulla propria radice: `just fe` + `just serve` → `127.0.0.1:8000`) è stata percorsa a mano in una sessione unica. Registrazione, accesso, domanda sul corpus dei corsi, domanda di ateneo, cambio fra le tre lingue, cambio di tema, riapertura di una conversazione dalla barra laterale, larghezza ridotta, ricaricamento su `/c/<id>`: nessun difetto riscontrato sul lato dell'interfaccia. Le schede delle fonti e i richiami numerati ricompaiono anche sulle conversazioni rilette dal database, che è la ragione per cui `citations` e `route` vengono persistiti insieme al testo della risposta — l'evento `start` che li portava non esiste più al momento della rilettura.
+
+Restano fuori da questa voce, perché appartengono alla generazione e non all'interfaccia, i due difetti descritti sotto.
+
+### 2. La risoluzione anaforica multi-turno: una prima osservazione, favorevole
+
+Il turno di follow-up è stato risolto correttamente in un caso reale non progettato come prova:
+
+| Turno | Domanda | `RouteDecision.reason` |
+| --- | --- | --- |
+| 1 | «我九月就要毕业了，查看毕业时间» | «毕业时间是官方公布的固定信息，属于 unifi_web 范畴…» |
+| 2 | «我是 ingegneria informatica 的» | «学生是信息工程专业，**需要查询该专业毕业时间**，此信息属于大学官方行政信息…» |
+
+La seconda domanda non contiene alcun riferimento letterale alla data di laurea: dice soltanto a quale corso di laurea appartiene lo studente. L'antecedente è stato quindi recuperato dalla domanda precedente, che è esattamente ciò che l'iniezione della cronologia nel router deve produrre.
+
+Va sottolineato il valore probatorio limitato: **un caso non è una misurazione**. L'accuratezza dell'instradamento riportata finora (exact 22/32) è una cifra a turno singolo, mentre il sistema dimostrato è multi-turno; `gold/campus.jsonl` non contiene domande di follow-up e una misurazione dell'instradamento multi-turno richiederebbe prima di costruirne un insieme. Voce aperta in M3.
+
+Si conferma per contro la forma dell'iniezione scelta in fase di progetto: al router arrivano **soltanto le domande** dello studente, mai le risposte. Due ragioni, entrambe verificabili su questa sessione — l'antecedente di un pronome si trova nella domanda precedente e non nella risposta; e le risposte sono dense di marcatori web come `[https://ingegneria.unifi.it/… · 2026-08-22]`, che dopo tre turni trascinerebbero verso `unifi_web` qualunque domanda nuova, anche di corso.
+
+### 3. Trascrizione al posto della risposta: un bucket nuovo per la tassonomia
+
+Al secondo turno il modello non ha redatto una risposta: ha **ricopiato l'estratto recuperato**, aprendo il proprio output con `[Excerpt 1] Ingegneria Informatica (INM 270/04) (INF PO INS 509/99) …` e proseguendo con la trascrizione integrale della riga di calendario, comprese le sigle amministrative. Il contenuto è corretto e pertinente; ciò che manca è l'atto di rispondere — nessuna selezione della data che riguarda lo studente, nessuna frase.
+
+Il difetto è **distinto** da quello registrato il 2026-08-21 e il 2026-08-25 sotto «conformità dei marcatori di citazione», benché ne condivida il sintomo superficiale `[Excerpt N]`. Là il modello scriveva una risposta e sbagliava il marcatore; qui non scrive una risposta affatto. Si registra quindi come bucket autonomo della tassonomia degli errori di M3: **trascrizione al posto della risposta**, ipotesi da verificare che il fattore scatenante sia la combinazione fra turno di follow-up brevissimo (una constatazione, non una domanda) e contesto tabellare fittamente strutturato.
+
+L'interfaccia ne attutisce metà per costruzione: le schede delle fonti sono renderizzate dai metadati di recupero e non dal testo del modello, decisione presa il 2026-08-21 proprio a fronte dell'inaffidabilità dei marcatori. La metà restante — un turno che non risponde — resta visibile allo studente e appartiene alla generazione.
+
+### Riproducibilità
+
+Sessione condotta su `127.0.0.1:8000` con `DEBUG=True`; PostgreSQL 18 via `docker compose up -d` (senza profilo: soltanto i servizi con stato), Django e `rag/` sul sistema ospite sotto `uv run` per l'accesso alla GPU. Collezione `unifi_web` a 29098 punti, `slides` a 1234. Modelli: Qwen3-Embedding-0.6B e reranker Qwen3-0.6B su CUDA, LLM `qwen3:4b-instruct-2507-q4_K_M` via Ollama, `temperature=0.0`, `seed=0`. Le decisioni di instradamento citate provengono dal registro della console di `just serve`.
+
 ## 2026-08-25 — Interrogazione via HTTP, conformità delle citazioni, limite della macchina locale
 
 ### 1. Il percorso interlinguistico regge end-to-end sull'endpoint

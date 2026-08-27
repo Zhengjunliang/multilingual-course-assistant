@@ -8,8 +8,8 @@
 - **项目**：multilingual-course-assistant — 大学课程材料多语言问答 + 校园信息问答（RAG，开源权重 LLM，Qwen 系；**仅 QA，⛔ 出题/判卷**）+ 网站（PPM 部分），同一仓库。**Triennale 毕业论文**，UniFi，relatore Prof. Marco Bertini；单人开发（Junliang Zheng）。
 - **指针**：当前阶段、里程碑、阻塞项、暂缓项、Meet 议题 → `ROADMAP.md`；代码布局与模块职责 → `README.md`；技术栈决策表与 relatore 的约束 → `docs/architettura.md`；具体主题放 `docs/`，本文件只放指针。
 - **范围**：**禁用专有 LLM API**（OpenAI/Claude），只用开源权重模型。课程场景语料只用 slides/讲义 PDF；校园场景语料 = UniFi 网站爬取快照 + 学生提问触发的实时抓取（过 LLM 相关性门后持久入库，自增长；范围不锁 unifi.it 域）。
-- **依赖规则**：**🔒 项禁止引入依赖或配置文件**；🔶 项用 `uv add` 引入，且**只在真正要用它的里程碑加** — 装了不用的依赖是噪音，也让 `uv.lock` 里出现无法解释的东西。
-- **目录**：**`rag/` 禁止 import Django** — 论文核心要能脱离 web 单独跑评估，`tests/test_smoke.py` 守着这条。`data/`（课程材料与派生产物）gitignore，**永不**进 git。后续目录到里程碑再建，未定前不建"顺手"目录。
+- **依赖规则**：**🔒 项禁止引入依赖或配置文件**；🔶 项用 `uv add` 引入，且**只在真正要用它的里程碑加** — 装了不用的依赖是噪音，也让 `uv.lock` 里出现无法解释的东西。前端 npm 依赖同规同权：`npm install --prefix frontend`，`package-lock.json` 与 `uv.lock` 一样必须跟着 commit（CI 用 `npm ci`）。「真正要用」的判据是**有代码在跑它**，不是「部署时会需要」—— 后者装了没人能验。
+- **目录**：**`rag/` 禁止 import Django** — 论文核心要能脱离 web 单独跑评估，`tests/test_smoke.py` 守着这条。**`frontend/` 是另一侧的同一条边界**：它只认 `apps/qa/contract.py` 的 TS 镜像，不认 Django 模型；契约唯一源在 Python 侧，`tests/test_qa_contract.py` 守着两侧不漂移。`frontend/dist/` 是构建产物（gitignore），所以前端构建排在所有 Django 步骤之前。`data/`（课程材料与派生产物）gitignore，**永不**进 git。后续目录到里程碑再建，未定前不建"顺手"目录。
 - **语言域**：业务领域是多语言的；所有数据模型和面向用户的文本从一开始就带 `locale` 字段/参数，禁止硬编码语言字符串。
 
 ## 2. 代理执行规则
