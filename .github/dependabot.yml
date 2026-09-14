@@ -45,6 +45,19 @@ updates:
       # The OpenAI-compatible client every generation path uses. CI mocks it,
       # so CI covers exactly none of what a major bump would change.
       - dependency-name: "openai"
+      # Django is held back differently — majors only, so 5.2.x security
+      # patches keep arriving, which is the half that matters.
+      #
+      # The reason is not risk, it is that the upgrade is already refused. The
+      # `django>=5.2,<6` bound in pyproject.toml is not a cautious ceiling: it
+      # IS the decision written in docs/architettura.md, "已定技术栈" — LTS,
+      # supported until 2028-04, with the steadiest DRF support. A Dependabot
+      # pull request for Django 6 rewrites that bound to `<7`, which is to say
+      # it deletes the decision, and CI would quite possibly go green on it.
+      # A decision should be reversed by someone who knows they are reversing
+      # it. Remove this entry the day that one is revisited on purpose.
+      - dependency-name: "django"
+        update-types: ["version-update:semver-major"]
 
   # The SPA keeps its own lockfile in its own directory; the repository root has
   # no package.json at all, so "/" would find nothing here.
