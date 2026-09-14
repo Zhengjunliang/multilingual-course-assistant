@@ -1,42 +1,30 @@
 /**
- * The component layer has exactly one of each component.
+ * The component layer has one of each component, and spends distance through
+ * named tokens.
  *
- * These read the directory rather than a list written by hand, which is the
- * whole point: a primitive added and forgotten has to be caught by the check,
- * not by the person who would have had to remember to update it.
- *
- * `fileURLToPath` and not `new URL(...).pathname` for the reason vite.config.ts
- * already records: on Windows the latter yields "/D:/…", which no filesystem
- * call accepts.
+ * Both checks read the directory rather than a list written by hand, which is
+ * the point: a primitive added and forgotten has to be caught by the check, not
+ * by the person who would have had to remember to update it.
  */
 
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const HERE = fileURLToPath(new URL(".", import.meta.url));
-
-/** Source files of the component layer, tests excluded. */
-function componentFiles(): string[] {
-  return readdirSync(HERE).filter((name) => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name));
-}
-
-function sourceOf(name: string): string {
-  return readFileSync(join(HERE, name), "utf8");
-}
+import { componentFiles, sourceOf, typeExportsOf, valueExportsOf } from "@/test/componentLayer";
 
 /**
- * Names a file exports, values and types alike. A type sharing a name with a
- * component in another file is the same collision seen from the other side.
+ * Tailwind steps that say how far rather than what for.
+ *
+ * Width is deliberately absent. `w-72` on a source card and `max-w-[85vw]` on
+ * the drawer are one-off measurements of a layout, not steps on an interior
+ * rhythm two components could disagree about — naming them would invent a
+ * vocabulary with one word in it. Heights are here because a control's height
+ * is exactly the kind of thing three components have to agree on.
+ *
+ * The alternation is ordered longest-first so that `min-h-20` is consumed whole
+ * instead of being counted twice, once as itself and once as `h-20`.
  */
-function exportsOf(source: string): string[] {
-  const value = /^export\s+(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm;
-  const type = /^export\s+(?:type|interface)\s+([A-Za-z_$][\w$]*)/gm;
-  return [...source.matchAll(value), ...source.matchAll(type)]
-    .map((match) => match[1])
-    .filter((name): name is string => name !== undefined);
-}
+const RAW_STEP =
+  /\b(?:min-h-\d+|max-h-\d+|h-\d+|gap-[xy]?-?\d+|[pm][xytbrl]?-\d+|text-(?:xs|sm|base|lg|xl|[2-9]xl))\b/g;
 
 describe("the component layer", () => {
   it("has files to check", () => {
@@ -50,7 +38,8 @@ describe("the component layer", () => {
     const collisions: string[] = [];
 
     for (const file of componentFiles()) {
-      for (const name of exportsOf(sourceOf(file))) {
+      const source = sourceOf(file);
+      for (const name of [...valueExportsOf(source), ...typeExportsOf(source)]) {
         const first = owner.get(name);
         if (first === undefined) {
           owner.set(name, file);
@@ -61,6 +50,21 @@ describe("the component layer", () => {
     }
 
     expect(collisions).toEqual([]);
+  });
+
+  it("spends spacing and type through named tokens only", () => {
+    // There were 24 of these before the token layer existed: a component saying
+    // `px-4` states a distance, and two components meaning "a control's side
+    // padding" have no way to stay the same distance once one is edited alone.
+    const raw: string[] = [];
+
+    for (const file of componentFiles()) {
+      for (const [step] of sourceOf(file).matchAll(RAW_STEP)) {
+        raw.push(`${file}: ${step}`);
+      }
+    }
+
+    expect(raw).toEqual([]);
   });
 
   it("keeps no parallel version of a component", () => {
