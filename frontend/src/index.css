@@ -17,6 +17,23 @@
  * `@theme` is Tailwind v4's own directive and not CSS any specification knows
  * about, which is why biome.json turns `tailwindDirectives` on: without it this
  * file is a parse error rather than a file the linter has an opinion about.
+ *
+ * The accent is two variables, not one, and the reason is what each is asked to
+ * survive. `--accent` is a *surface*: a button's fill, a focus outline, the ring
+ * around a highlighted card — things a reader only has to see, which WCAG 1.4.11
+ * settles at 3:1. `--accent-text` is *ink*: the accent used as words on the page
+ * background, which needs 4.5:1. Held to one value, the surface has to give up
+ * its colour to meet the stricter rule, and the result is the defect this file
+ * used to have — an `--accent` that was simply `--ink`, a colour that never
+ * offends and never characterises. Split, each side is tuned against its own
+ * threshold, and `scripts/check-contrast.mjs` reads these very declarations to
+ * prove it, in both themes, on every commit.
+ *
+ * Spacing and type are named here for the same reason the colours are: `px-4`
+ * says how far, not what for, and two components meaning "a control's side
+ * padding" drift apart the moment one of them is edited alone. The values below
+ * are the Tailwind steps they replace, unchanged — this layer buys vocabulary,
+ * not a new look.
  */
 @theme {
   --color-canvas: var(--canvas);
@@ -26,11 +43,42 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
+  --color-accent-text: var(--accent-text);
   --color-mark: var(--mark);
   --color-mark-ink: var(--mark-ink);
   --color-warn: var(--warn);
   --color-warn-line: var(--warn-line);
   --color-warn-ink: var(--warn-ink);
+
+  /* Interior rhythm. Named by how close things are, not by a step number. */
+  --spacing-hair: 0.25rem;
+  --spacing-tight: 0.5rem;
+  --spacing-snug: 0.75rem;
+  --spacing-gutter: 1rem;
+  --spacing-room: 1.5rem;
+
+  /* Control sizes. A button, a field and an icon button are three heights, and
+     naming them is what stops a fourth from appearing. */
+  --spacing-control-sm: 2rem;
+  --spacing-control-icon: 2.25rem;
+  --spacing-control: 2.5rem;
+  --spacing-field: 5rem;
+
+  /* Glyph sizes. Two, because an icon beside body text and an icon standing
+     alone in a header button are the only two jobs icons have here. */
+  --spacing-icon: 1rem;
+  --spacing-icon-lg: 1.25rem;
+
+  /* Type. Two sizes carry the whole interface today; a third would need a
+     reason, and naming them is how that reason has to be argued. */
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-title: 1.125rem;
+  --text-title--line-height: 1.75rem;
+  --text-display: 1.875rem;
+  --text-display--line-height: 2.25rem;
 }
 
 :root {
@@ -39,8 +87,9 @@
   --ink: oklch(20.8% 0.042 265.75);
   --muted: oklch(55.4% 0.046 257.42);
   --line: oklch(92.9% 0.013 255.51);
-  --accent: oklch(20.8% 0.042 265.75);
-  --accent-ink: oklch(98.4% 0.003 247.86);
+  --accent: oklch(52% 0.11 196);
+  --accent-ink: oklch(99% 0.008 196);
+  --accent-text: oklch(44% 0.1 196);
   --mark: oklch(92.9% 0.013 255.51);
   --mark-ink: oklch(37.2% 0.044 257.29);
   --warn: oklch(98.7% 0.022 95.28);
@@ -54,8 +103,9 @@
   --ink: oklch(96.8% 0.007 247.9);
   --muted: oklch(70.4% 0.04 256.79);
   --line: oklch(37.2% 0.044 257.29);
-  --accent: oklch(92.9% 0.013 255.51);
+  --accent: oklch(72% 0.12 196);
   --accent-ink: oklch(20.8% 0.042 265.75);
+  --accent-text: oklch(82% 0.1 196);
   --mark: oklch(37.2% 0.044 257.29);
   --mark-ink: oklch(96.8% 0.007 247.9);
   --warn: oklch(27.9% 0.041 260.03);

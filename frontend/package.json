@@ -10,6 +10,7 @@
     "format": "biome format --write src scripts vite.config.ts biome.json package.json tsconfig.json",
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.mjs",
+    "check:contrast": "node scripts/check-contrast.mjs",
     "test": "vitest run"
   },
   "dependencies": {
