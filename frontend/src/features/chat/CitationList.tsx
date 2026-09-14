@@ -96,7 +96,7 @@ export function CitationList({
                   )}
                 >
                   <CardHeader>
-                    <CardTitle className="flex items-baseline gap-2">
+                    <CardTitle className="flex items-baseline gap-tight">
                       {number !== null && (
                         <button
                           type="button"

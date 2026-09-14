@@ -15,24 +15,24 @@ export function ConversationSidebar({ conversations, onNavigate }: ConversationS
   const { t } = useTranslation();
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-3">
+    <div className="flex h-full min-h-0 flex-col gap-snug p-snug">
       {/* A link and not a button: "new conversation" is a place, so it should
           be openable in a new tab like any other. */}
       <NavLink
         to="/"
         end
         onClick={onNavigate}
-        className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-line bg-surface font-medium text-ink text-sm transition-colors hover:bg-mark"
+        className="flex h-control w-full items-center justify-center gap-tight rounded-md border border-line bg-surface font-medium text-body text-ink transition-colors hover:bg-mark"
       >
-        <MessageSquarePlus aria-hidden className="h-4 w-4" />
+        <MessageSquarePlus aria-hidden className="size-icon" />
         {t("sidebar.new")}
       </NavLink>
 
       <nav className="min-h-0 flex-1 overflow-y-auto">
         {conversations.length === 0 ? (
-          <p className="px-2 py-4 text-muted text-sm">{t("sidebar.empty")}</p>
+          <p className="px-tight py-gutter text-body text-muted">{t("sidebar.empty")}</p>
         ) : (
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col gap-hair">
             {conversations.map((conversation) => (
               <li key={conversation.id}>
                 <NavLink
@@ -40,9 +40,12 @@ export function ConversationSidebar({ conversations, onNavigate }: ConversationS
                   onClick={onNavigate}
                   className={({ isActive }) =>
                     cn(
-                      "block truncate rounded-md px-2 py-2 text-sm transition-colors",
+                      "block truncate rounded-md px-tight py-tight text-body transition-colors",
+                      // The open conversation is where the reader *is*, not
+                      // something they are about to do: ink and a quiet fill,
+                      // the same rule the language switch follows.
                       isActive
-                        ? "bg-mark text-mark-ink"
+                        ? "bg-mark font-medium text-mark-ink"
                         : "text-muted hover:bg-mark hover:text-ink",
                     )
                   }

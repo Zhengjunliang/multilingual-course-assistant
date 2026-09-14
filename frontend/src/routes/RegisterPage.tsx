@@ -54,9 +54,9 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout title={t("auth.registerTitle")}>
-      <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
-        <div className="flex flex-col gap-1">
-          <label className="font-medium text-ink text-sm" htmlFor="username">
+      <form className="flex flex-col gap-gutter" onSubmit={(event) => void onSubmit(event)}>
+        <div className="flex flex-col gap-hair">
+          <label className="font-medium text-body text-ink" htmlFor="username">
             {t("auth.username")}
           </label>
           <Input
@@ -67,14 +67,14 @@ export default function RegisterPage() {
             onChange={(event) => setUsername(event.target.value)}
           />
           {messagesFor("username").map((message) => (
-            <p key={message} className="text-sm text-warn-ink">
+            <p key={message} className="text-body text-warn-ink">
               {message}
             </p>
           ))}
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="font-medium text-ink text-sm" htmlFor="password">
+        <div className="flex flex-col gap-hair">
+          <label className="font-medium text-body text-ink" htmlFor="password">
             {t("auth.password")}
           </label>
           <Input
@@ -86,14 +86,14 @@ export default function RegisterPage() {
             onChange={(event) => setPassword(event.target.value)}
           />
           {messagesFor("password").map((message) => (
-            <p key={message} className="text-sm text-warn-ink">
+            <p key={message} className="text-body text-warn-ink">
               {message}
             </p>
           ))}
         </div>
 
         {failure !== null && (
-          <p className="rounded-md border border-warn-line bg-warn px-3 py-2 text-sm text-warn-ink">
+          <p className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
             {failure}
           </p>
         )}
@@ -103,9 +103,9 @@ export default function RegisterPage() {
         </Button>
       </form>
 
-      <p className="text-center text-muted text-sm">
+      <p className="text-center text-body text-muted">
         {t("auth.haveAccount")}{" "}
-        <Link to="/login" className="text-ink underline">
+        <Link to="/login" className="text-accent-text underline">
           {t("auth.logIn")}
         </Link>
       </p>

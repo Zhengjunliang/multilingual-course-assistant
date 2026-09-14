@@ -39,9 +39,9 @@ export default function LoginPage() {
 
   return (
     <AuthLayout title={t("auth.logInTitle")}>
-      <form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
-        <div className="flex flex-col gap-1">
-          <label className="font-medium text-ink text-sm" htmlFor="username">
+      <form className="flex flex-col gap-gutter" onSubmit={(event) => void onSubmit(event)}>
+        <div className="flex flex-col gap-hair">
+          <label className="font-medium text-body text-ink" htmlFor="username">
             {t("auth.username")}
           </label>
           <Input
@@ -52,8 +52,8 @@ export default function LoginPage() {
             onChange={(event) => setUsername(event.target.value)}
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="font-medium text-ink text-sm" htmlFor="password">
+        <div className="flex flex-col gap-hair">
+          <label className="font-medium text-body text-ink" htmlFor="password">
             {t("auth.password")}
           </label>
           <Input
@@ -67,7 +67,7 @@ export default function LoginPage() {
         </div>
 
         {failure !== null && (
-          <p className="rounded-md border border-warn-line bg-warn px-3 py-2 text-sm text-warn-ink">
+          <p className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
             {failure}
           </p>
         )}
@@ -77,9 +77,9 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <p className="text-center text-muted text-sm">
+      <p className="text-center text-body text-muted">
         {t("auth.noAccount")}{" "}
-        <Link to="/register" className="text-ink underline">
+        <Link to="/register" className="text-accent-text underline">
           {t("auth.register")}
         </Link>
       </p>
