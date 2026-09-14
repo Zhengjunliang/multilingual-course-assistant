@@ -33,6 +33,28 @@ export function badgesOf(citations: readonly Citation[]): Badge[] {
 }
 
 /**
+ * The system prompt forbids writing "Excerpt N" and the small quantized model
+ * writes it anyway — bracketed, parenthesised, or bare. The reference is still
+ * exact: the generation prompt numbers excerpts from one in citation order
+ * (rag/answer.py `Excerpt {number} {marker}:`), so "Excerpt 3" names
+ * `citations[2]`. Rewriting the reference into that citation's literal marker
+ * BEFORE matching keeps every later step — segmentation, greying, badge
+ * tooltips — marker-only, exactly as if the model had complied.
+ *
+ * A number with no citation behind it is left as prose: inventing a badge for
+ * it would be the one thing worse than a grey card.
+ */
+export function resolveExcerptRefs(answer: string, citations: readonly Citation[]): string {
+  return answer.replace(
+    /\[Excerpt\s+(\d+)\]|\(Excerpt\s+(\d+)\)|\bExcerpt\s+(\d+)\b/g,
+    (match, bracketed?: string, parenthesised?: string, bare?: string) => {
+      const citation = citations[Number(bracketed ?? parenthesised ?? bare) - 1];
+      return citation === undefined ? match : citation.marker;
+    },
+  );
+}
+
+/**
  * `at` is the offset the segment starts at in the answer. It is carried rather
  * than derived because it is the only stable identity a segment has: the array
  * index shifts whenever a marker is found or missed, and React would reuse the

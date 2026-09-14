@@ -222,9 +222,10 @@ STATICFILES_DIRS = [SPA_DIST]
 # `runserver` serves the directories above while DEBUG is on, which is every
 # way this project is run today. With DEBUG off Django refuses to serve static
 # files at all — by design; it expects something in front of it — so the
-# deployed form needs whitenoise or nginx. That belongs to the milestone that
-# containerises the stack (ROADMAP.md, M6), not here: a dependency installed
-# before anything runs it is one nobody can check.
+# deployed form needs whitenoise or nginx. That is its own work item — "static
+# files with DEBUG=False", #40, a prerequisite
+# of the M6 containerisation — not here: a dependency installed before anything
+# runs it is one nobody can check.
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

@@ -1,6 +1,6 @@
 # Fonte web UniFi — 爬取、快照与自增长层
 
-校园信息源（UniFi 网站 → Qdrant `unifi_web` collection）的设计属主：scope 规则、快照与 registry 布局、深化循环。chunk 字段表的属主是 [docling-e-pipeline.md](docling-e-pipeline.md)（§3.6，含 web 侧取值规则与替换粒度）；里程碑清单在 [ROADMAP.md](../ROADMAP.md) M2.5；架构决策（自增长写入门 · eval 隔离 · agent 编排）在 [docs/architettura.md](architettura.md) 决策表。
+校园信息源（UniFi 网站 → Qdrant `unifi_web` collection）的设计属主：scope 规则、快照与 registry 布局、深化循环。chunk 字段表的属主是 [docling-e-pipeline.md](docling-e-pipeline.md)（§3.6，含 web 侧取值规则与替换粒度）；余下的 autogrow 分数门重测见 `#24`；架构决策（自增长写入门 · eval 隔离 · agent 编排）在 [docs/architettura.md](architettura.md) 决策表。
 
 各节状态随实现逐节标注；自增长验收的完整实测记录（门 18/20 · 双臂 0/7 · 逐题归因）归 [diario-sperimentale.md](diario-sperimentale.md)。
 

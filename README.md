@@ -1,12 +1,12 @@
 # multilingual-course-assistant
 
-大学课程材料多语言问答：提问语言可以和材料语言不同（如英文提问、意大利语讲义）。基于 RAG 与开源权重 LLM（Qwen 系）；网站为 Django/DRF + Celery/Redis 后端 + React SPA 前端。
+两个问答场景：**大学课程材料**（slides/讲义 PDF）与**校园信息**（UniFi 网站第二知识源 + agentic 路由）。**跨语言是这两个场景的核心能力，不是可选附加** —— 任意语言提问 → 同语言回答，提问语言可以和材料语言不同（如英文提问、意大利语讲义）。能力边界是检索问答（QA），出题与自动判卷 ⛔ 超出范围。基于 RAG 与开源权重 LLM（Qwen 系）；网站为 Django/DRF + Celery/Redis 后端 + React SPA 前端。
 
 Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore Prof. Marco Bertini。
 
 ## 状态
 
-✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节）；React SPA 脚手架已建，开发期在 Vite dev server 上消费同一条流（见「前端」一节）；账号已接上（session 登录 + 开放注册），**全站需登录**（见「账号」一节）；多轮会话已可用（history + query rewriting + 落库，见「多轮会话」一节），SPA 已是成品界面（登录/注册页、会话侧栏、三语、暗亮主题，见「前端」一节）且由 Django 自己发在根路径上（`just fe` + `just serve` → <http://127.0.0.1:8000/>，一个地址一个进程，见「前端」一节）。异步 ingest 与容器化部署 🔜 后续里程碑。里程碑与阻塞项见 [ROADMAP.md](ROADMAP.md)；约束、技术栈与决策见 [docs/architettura.md](docs/architettura.md)。
+✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节）；React SPA 脚手架已建，开发期在 Vite dev server 上消费同一条流（见「前端」一节）；账号已接上（session 登录 + 开放注册），**全站需登录**（见「账号」一节）；多轮会话已可用（history + query rewriting + 落库，见「多轮会话」一节），SPA 已是成品界面（登录/注册页、会话侧栏、三语、暗亮主题，见「前端」一节）且由 Django 自己发在根路径上（`just fe` + `just serve` → <http://127.0.0.1:8000/>，一个地址一个进程，见「前端」一节）。异步 ingest 与容器化部署 🔜 后续里程碑。推进状态、阻塞项与暂缓项在 GitHub issue（里程碑 M3 · M5 · M6 · M7），仓库里不再有清单文件；自主拍板记录见 [docs/decisioni.md](docs/decisioni.md)；relatore 约束、技术栈与决策状态见 [docs/architettura.md](docs/architettura.md)。
 
 ## Setup
 
@@ -34,7 +34,7 @@ just serve       # 开发服务器
 - 管理后台在 <http://127.0.0.1:8000/admin/>；账号 API 在 `/api/auth/`、问答 API 在 `/api/ask`（都需要登录，见下面两节）
 - 问答界面在根路径 <http://127.0.0.1:8000/>，**前提是先跑过 `just fe`**（Django 发的是构建产物；没构建过会回 503 并说这句话）。写前端时改用 `just fe-dev` 的 5173 拿热更新 —— 两条路径的差别见「前端」一节
 
-**`just serve` 跑着的时候，终端里的 `just index` / `just search` / `just ask` 会失败**：本地 Qdrant 是嵌入式的，独占 `data/qdrant` 目录锁，网站进程先开就轮不到 CLI（反过来也一样，那时端点返回 503 并说明冲突）。要两边同时用，先 `Ctrl+C` 停掉网站。这条随「Qdrant 改服务进程」🔜 解除，见 [ROADMAP.md](ROADMAP.md) 自主拍板项一节。
+**`just serve` 跑着的时候，终端里的 `just index` / `just search` / `just ask` 会失败**：本地 Qdrant 是嵌入式的，独占 `data/qdrant` 目录锁，网站进程先开就轮不到 CLI（反过来也一样，那时端点返回 503 并说明冲突）。要两边同时用，先 `Ctrl+C` 停掉网站。这条随「Qdrant 由嵌入式改为服务进程」🔜 解除（`#33`；决策与迁移路径见 [docs/decisioni.md](docs/decisioni.md) 2026-08-24 第 2 条）。
 
 收工 `just down`——容器停掉，数据留在命名卷里，下次 `just up` 原样还在。连数据一起清是 `docker compose down -v`（不可逆）。
 
@@ -107,7 +107,7 @@ just fe-install   # 一次性
 
 `/c/7` 这类地址由前端路由自己解析，但用户按 F5 时浏览器会**真的**向服务器要它 —— [config/urls.py](config/urls.py) 的兜底路由把所有它不认识的路径都回成同一个 `index.html`。那条正则里的负向前瞻不是装饰：少了它，`/api/typo` 会拿到 200 加一整页 HTML，而调用方要在 `<!doctype html>` 上的 JSON 解析错误里反推出自己路径写错了。
 
-⚠ `DEBUG=False` 时 Django **拒绝发静态文件**（它假定前面站着 nginx 一类的东西）。所以上面第二条路径是开发形态，容器化部署要补一个静态文件服务（whitenoise 或 nginx），那是 M6 的事，[ROADMAP.md](ROADMAP.md) 里点了名。
+⚠ `DEBUG=False` 时 Django **拒绝发静态文件**（它假定前面站着 nginx 一类的东西）。所以上面第二条路径是开发形态，容器化部署要补一个静态文件服务（whitenoise 或 nginx），那是 M6 的事（`#40`，并作为显式前置挂在 `#41` 下）。
 
 四条路由：`/login` · `/register` · `/`（新会话）· `/c/:id`（打开某个会话）。**URL 决定打开哪个会话** —— 会话是个「地方」，能收藏、能分享给自己、后退键有意义，而不是藏在组件里的一个状态。新会话拿到 id 的那一刻（`start` 事件里）就 `replace` 到 `/c/<id>`，此时答案还在流。
 
@@ -261,7 +261,7 @@ data: {}
 
 错误按类型分：400 校验失败 · **403 没登录或 CSRF token 不对** · 429 限流 · 503 依赖不可用（路由端点没响应、索引被别的进程占着、还没索引过、前面的问题还没答完）。403 的两种含义靠 `GET /api/auth/me` 区分（见「账号」一节）。请求带 `Accept: text/event-stream` 时这些错误体也框成一条 `error` 事件；不带（curl 默认 `*/*`）就是普通 JSON。**这里的文案是英文，是决定不是欠账**：这个项目里三种语言各有属主 —— 界面归前端的三份 catalogue，回答语言归 [rag/answer.py](rag/answer.py) 的 prompt，而 503 与 `error` 这一层的读者是看服务端日志的人。给它再建一套 catalogue 是没有读者的活。字符串仍标着 `gettext_lazy`（标记零成本，删了要重新逐个猎捕）。**可见的后果，先说免得当 bug 查**：DRF 自带的校验消息是有意大利语翻译的且跟随 `Accept-Language`（`LANGUAGE_CODE` 是 `it`），所以一个 400 响应体里可能同时出现意语的 `"Questo campo è obbligatorio."` 和英文的 `"No such conversation."`。
 
-**深挖循环（`deepen`）不在这个端点里**：它会联网抓页并写入共享索引，最多 3 次抓取。演示自增长仍用 CLI 的 `just ask`。它进 web 的路径是「账号 + Celery 异步」，见 [ROADMAP.md](ROADMAP.md)。
+**深挖循环（`deepen`）不在这个端点里**：它会联网抓页并写入共享索引，最多 3 次抓取。演示自增长仍用 CLI 的 `just ask`。它进 web 的路径是「账号 + Celery 异步」（账号 ✅，异步侧见 `#34`）。
 
 ## 代码布局
 

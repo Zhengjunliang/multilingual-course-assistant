@@ -30,7 +30,6 @@
   },
   "ask": {
     "label": "你的问题",
-    "placeholder": "什么是 ORM？",
     "submit": "提问",
     "cancel": "停止"
   },

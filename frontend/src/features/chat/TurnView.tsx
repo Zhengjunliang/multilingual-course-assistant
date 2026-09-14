@@ -9,7 +9,7 @@
 
 import { useTranslation } from "react-i18next";
 
-import { badgesOf, citedMarkers } from "@/lib/markers";
+import { badgesOf, citedMarkers, resolveExcerptRefs } from "@/lib/markers";
 import { AnswerStream } from "./AnswerStream";
 import { CitationList } from "./CitationList";
 import type { Turn } from "./useAsk";
@@ -45,7 +45,10 @@ function Thinking() {
 export function TurnView({ turn, live, thinking, highlighted, onHighlight }: TurnViewProps) {
   const { t } = useTranslation();
   const badges = badgesOf(turn.citations);
-  const cited = turn.complete ? citedMarkers(turn.answer, badges) : null;
+  // Resolution waits for `complete` for the same reason marker matching does:
+  // "[Excerpt 2]" is routinely split across two token events.
+  const answer = turn.complete ? resolveExcerptRefs(turn.answer, turn.citations) : turn.answer;
+  const cited = turn.complete ? citedMarkers(answer, badges) : null;
   const working = thinking || live;
 
   return (
@@ -65,7 +68,7 @@ export function TurnView({ turn, live, thinking, highlighted, onHighlight }: Tur
           <Thinking />
         ) : (
           <AnswerStream
-            text={turn.answer}
+            text={answer}
             badges={badges}
             complete={turn.complete}
             live={live}

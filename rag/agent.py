@@ -139,7 +139,9 @@ one JSON object, no prose:
 
 
 class RouteDecision(BaseModel):
-    """The router's reply (fields owned by the M2.5b ROADMAP checklist).
+    """The router's reply (field set fixed by the campus web source design,
+    docs/fonte-web-unifi.md; routing accuracy over several turns is still
+    unmeasured — work item #22).
 
     `target` ranges over the two real collection names plus the routing-only
     `both`; `query` is the rewritten retrieval query, while generation keeps the

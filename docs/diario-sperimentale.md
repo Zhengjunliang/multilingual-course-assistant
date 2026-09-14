@@ -80,7 +80,7 @@ Il batch anomalo da 1470 s registrato il 2026-08-24 come «probabile throttling 
 
 Nessuna scrittura ha raggiunto la base di conoscenza: `unifi_web` è rimasta a 29098 punti e i punti con `ingest_run_id='live-retest-main'` sono **0** (g001 non ha acquisito nulla; dei due fetch di g002 uno è risultato invariato dal crawl e l'altro è stato rifiutato dal gate). Nessun rollback necessario.
 
-**Conseguenza operativa**: le misurazioni che coinvolgono l'LLM passano al server MICC; la macchina locale resta destinata allo sviluppo e alle verifiche funzionali. La separazione è resa possibile dal vincolo architetturale per cui `rag/` non importa Django ed è eseguibile fuori dal web. Decisioni registrate in [ROADMAP.md](../ROADMAP.md), «自主拍板项（2026-08-25，测量场地划线）».
+**Conseguenza operativa**: le misurazioni che coinvolgono l'LLM passano al server MICC; la macchina locale resta destinata allo sviluppo e alle verifiche funzionali. La separazione è resa possibile dal vincolo architetturale per cui `rag/` non importa Django ed è eseguibile fuori dal web. Decisioni registrate in [decisioni.md](decisioni.md), voce del 2026-08-25 «测量场地划线».
 
 ### 4. Passaggio allo streaming SSE: due vincoli non evidenti
 

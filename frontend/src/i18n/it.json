@@ -30,7 +30,6 @@
   },
   "ask": {
     "label": "La tua domanda",
-    "placeholder": "Che cos'è un ORM?",
     "submit": "Chiedi",
     "cancel": "Ferma"
   },

@@ -87,7 +87,6 @@ export function Composer({ waiting, onSubmit, onStop }: ComposerProps) {
         id="question"
         value={question}
         maxLength={MAX_QUESTION_CHARS}
-        placeholder={t("ask.placeholder")}
         onChange={(event) => setQuestion(event.target.value)}
         onKeyDown={onKeyDown}
       />

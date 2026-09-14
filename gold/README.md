@@ -1,6 +1,6 @@
 # Gold set — 冒烟版（M2）+ campus（M2.5）
 
-`smoke.jsonl`：30–50 个 EN→EN 问答对，人工撰写，chunk 大小 / top-k / prompt 的调参依据。M3 扩为全量（决策与流程归 [ROADMAP.md](../ROADMAP.md)）。
+`smoke.jsonl`：30–50 个 EN→EN 问答对，人工撰写，chunk 大小 / top-k / prompt 的调参依据。M3 扩为全量（`#19`；抽样与校验方法归 [docs/architettura.md](../docs/architettura.md) 评估方法一行）。
 
 campus 集（M2.5，LLM 起草 → Claude 逐题核对 → 人工按 URL 抽查定稿）：
 

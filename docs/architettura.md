@@ -1,6 +1,6 @@
 # 架构与技术栈
 
-决策来源：relatore 的指示（2026-07-28 邮件）+ 此处记录的自主选择。文中里程碑见 [ROADMAP.md](../ROADMAP.md)。
+决策来源：relatore 的指示（2026-07-28 邮件）+ 此处记录的自主选择。本文件是**技术栈选型与决策状态**的属主；自主拍板项的完整理由（含被推翻的决策）在 [decisioni.md](decisioni.md)，文中里程碑（M3 · M5 · M6 · M7）与逐项工作状态在 GitHub issue。
 
 ## relatore 的约束
 
@@ -10,9 +10,9 @@
 - **文档解析**：考虑用 Granite-Docling 做材料转换。
 - **PPM 部分**：完整网站，Flask/Django + Celery/Redis 异步任务。
 - **算力**：先用 Google Colab（免费 T4）试验；后接入 relatore 提供的 GPU 机器；备选 Runpod / Lightning。**偏离（2026-07-31 自主拍板）**：跳过 Colab，直接用 MICC 机器 — 接入已完成且 ultron 有 24 GB，Colab 的 16 GB + 会话超时 + 每次重装环境不构成优势。理由见下方算力策略。
-- **新方向（2026-08-21 口头）**：agentic RAG（relatore 转的 Lightning «agentic RAG powered by Qwen3» 模板思路，分析见 [analisi-rag.md](analisi-rag.md)）+ UniFi 网站第二知识源 —— Erasmus/外国学生用自己的语言问校园信息（ingegneria、报名、学费、日历等）。落地清单在 [ROADMAP.md](../ROADMAP.md) M2.5。
+- **新方向（2026-08-21 口头）**：agentic RAG（relatore 转的 Lightning «agentic RAG powered by Qwen3» 模板思路，分析见 [analisi-rag.md](analisi-rag.md)）+ UniFi 网站第二知识源 —— Erasmus/外国学生用自己的语言问校园信息（ingegneria、报名、学费、日历等）。落地设计（scope 规则、快照与 registry 布局、深化循环）在 [fonte-web-unifi.md](fonte-web-unifi.md)，余下的 autogrow 分数门重测见 `#24`。
 
-relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/analisi-rag.md`，M1 交付物）。
+relatore 给的四个起步链接已精读并扩展成 [analisi-rag.md](analisi-rag.md)（M1 交付物），原链接与逐条分析都在那里。
 
 ## 已定技术栈
 
@@ -42,19 +42,19 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
 | 向量库     | Qdrant：原生 hybrid（dense Qwen3-Embedding + sparse fastembed BM25 + RRF）、locale/课程 payload 过滤（fusion 下必须放 prefetch 分支内，实测顶层 filter 被静默忽略）；M2 用 qdrant-client 本地模式（无服务器进程，[rag/index.py](../rag/index.py)、[rag/search.py](../rag/search.py)），M5 起 Docker；降级备选 pgvector | ✅   | 31 deck 全量（1234 chunk），gold 40 题 hit@5 38/40 |
 | 数据库     | M2 原型无 DB（文件 + Qdrant 本地）；M5 起 PostgreSQL（Docker）                                                 | ✅   | `docker compose up -d` 起 PostgreSQL 18；自定义 `User` 在首个 `migrate` 之前落地 |
 | 前端       | React 19 + TypeScript + Vite + Tailwind v4 + Biome；shadcn 风格组件源码进仓库（不是 npm 包）；界面文案 react-i18next 三语。SSE 解析器手写（⛔ `EventSource`：只发 GET）；契约 TS 镜像的唯一源在 `apps/qa/contract.py` | ✅   | `frontend/`，`just fe` 一条跑完 lint + 类型 + catalogue key + 构建 |
-| 访问模型   | **全站需登录**（2026-08-27 推翻此前两条免登录拍板，见 [ROADMAP.md](../ROADMAP.md) Meet 议题）：session cookie + CSRF，⛔ token/JWT（同源用不上）；开放自助注册；限流按端点分桶。做到的是**多账号、单并发** —— 一张 8GB 卡串行答题，per-caller 限流对全局队列无约束 | ✅   | `apps/accounts/`；匿名 `POST /api/ask` → 403，无 CSRF token → 403 |
+| 访问模型   | **全站需登录**（2026-08-27 拍板推翻此前两条免登录决定，理由见 [decisioni.md](decisioni.md) 2026-08-27 第 1 条）：session cookie + CSRF，⛔ token/JWT（同源用不上）；开放自助注册；限流按端点分桶。做到的是**多账号、单并发** —— 一张 8GB 卡串行答题，per-caller 限流对全局队列无约束 | ✅   | `apps/accounts/`；匿名 `POST /api/ask` → 403，无 CSRF token → 403 |
 | 界面/消息语言 | 三层各有属主：界面 = 前端三份 catalogue · 回答语言 = `rag/answer.py` 的 prompt · 后端 503/`error` = **英文，不做 catalogue**（2026-08-27 拍板，读者是看服务端日志的人） | ✅   | `npm run check:i18n` 守着三份 catalogue 的 key 集合逐字相等 |
-| 推理服务   | OpenAI 兼容端点是唯一契约：开发期本地 Ollama（Qwen3-4B q4），M3 正式实验 vLLM（MICC 服务器，流式；Turing 卡**无 bfloat16**，一律 fp16）—— 切换只改 `.env` 的 `LLM_BASE_URL`/`LLM_MODEL` | 🔶   | M3 模型尺寸对比           |
+| 推理服务   | OpenAI 兼容端点是唯一契约：开发期本地 Ollama（Qwen3-4B q4），M3 正式实验 vLLM（MICC 服务器，流式；Turing 卡**无 bfloat16**，一律 fp16）—— 切换只改 `.env` 的 `LLM_BASE_URL`/`LLM_MODEL` | 🔶   | 服务器起 vLLM `#18` → 尺寸对比 `#27` |
 | 校园信息源 | UniFi 网站第二知识源：爬取+索引为骨架（复用 ingest 管线，Qdrant `unifi_web` collection），实时抓取为**自增长层**（过相关性门后持久写入，registry 溯源可回滚）；发现 = sitemap + 范围规则（板块规则表，**不锁 unifi.it 域**——Santa Marta/DSU/CISIA 类学生刚需域走显式条目），种子板块 ≤500 页起步；页面直链 PDF 附件（≤20MB）复用 parse 管线；HTML 解析走 Docling HTML backend | ✅   | campus gold 28/32=88%（`uv run python -m rag.gold gold/campus.jsonl`，EN 92 · IT 85 ≥ 门 0.80） |
 | agent 编排 | 分期：路由器（选库 + query 改写 + 带理由拒答 + 兜底拒答指路「贴 URL 可教会系统」，校验失败 fallback `both`）→ **深化循环**（抓页 → 「够答？」判定即停止条件——原 self-assess 并入 → 出链/PDF 编号候选选一，≤3 步硬上限，`--no-deepen` 降级）；显式控制流 + 每步受 pydantic 校验的 JSON 决策，⛔ 原生 tool-calling（4B 量化协议遵从性不可靠）；决策日志 append-only 落 `data/webcorpus/decisions.jsonl`——agent 唯一的例外写路径（审计工件，非知识库；KB 写入仍只经 `rag/live.py`） | ✅   | `rag/agent.py`；路由 exact 22/32 · wide 26/32；autogrow 门未达（双臂 0/7，归因 [diario-sperimentale.md](diario-sperimentale.md)） |
 | 自增长写入门 | 实时抓到的页面经 LLM 相关性判定（JSON 二分，校验失败=不落库）后才持久写入共享库；registry（append-only）记 url · content_hash · fetch_date · ingest_run_id · ingest_source · trigger · outlinks，可按 run 整批回滚 | ✅   | `rag/live.py`；标注集真机 **18/20**（`--measure-gate`，金标冻结在先） |
 | eval 隔离  | live 写入带 `ingest_source="live"`，eval 默认只取 `"crawl"`（+ 可选 `--snapshot <run_id>`）；filter 只进 `unifi_web` 的 prefetch 分支（顶层 filter 在 fusion 下被忽略，已实测）；**写路径对偶**：删除谓词限定 (url, ingest_source)，crawl 快照与 live 增量互不覆盖 | ✅   | 33 live 点在库时 campus 仍 28/32；两次回滚精确归位 29098；回滚后 campus/smoke/control 恒等基线 |
-| 部署形态   | 答辩演示级：干净机器 `docker compose up` 一键起全套、浏览器演示——共享 web KB 的「服务器」即 compose 服务；MICC/公网常驻与 UniFi SSO = post-tesi 可选。**开发形态已到位**：`just fe` + `just serve` → Django 在 `127.0.0.1:8000` 根路径上自己发 SPA，一个地址一个进程 | 🔶   | M6 compose 演示；两条前置 = Qdrant 服务化 + 静态文件服务（`DEBUG=False` 时 Django 按设计拒发静态文件） |
-| 可观测性   | Langfuse 自托管（Docker），LLM tracing                                                                         | 🔶   | M3 接入                   |
-| 评估方法   | RAGAS（faithfulness · answer relevancy · context precision/recall，judge = 开源权重 Qwen3 大尺寸）+ 检索指标（hit@k、MRR）；gold set 自建（无现成数据集） | 🔶   | M3 跑通                   |
-| 目标语言   | EN→EN 基线（M2）；任意语言提问 → 同语言回答是双场景核心（2026-08-21 拍板，原 M4 并入，见 [ROADMAP.md](../ROADMAP.md)），评估语言 EN/IT/ZH。语料不按语言拆库：Qwen3-Embedding 本身是多语言的，chunk 带 `locale` payload 供过滤 | 🔶   | M3 双场景评估             |
+| 部署形态   | 答辩演示级：干净机器 `docker compose up` 一键起全套、浏览器演示——共享 web KB 的「服务器」即 compose 服务；MICC/公网常驻与 UniFi SSO = post-tesi 可选。**开发形态已到位**：`just fe` + `just serve` → Django 在 `127.0.0.1:8000` 根路径上自己发 SPA，一个地址一个进程 | 🔶   | compose 演示 `#41`；两条前置 = Qdrant 服务化 `#33` + 静态文件服务 `#40`（`DEBUG=False` 时 Django 按设计拒发静态文件） |
+| 可观测性   | Langfuse 自托管（Docker），LLM tracing                                                                         | 🔶   | 接入 `#26` |
+| 评估方法   | RAGAS（faithfulness · answer relevancy · context precision/recall，judge = 开源权重 Qwen3 大尺寸）+ 检索指标（hit@k、MRR）；gold set 自建（无现成数据集） | 🔶   | 跑通 `#20` |
+| 目标语言   | EN→EN 基线（M2）；任意语言提问 → 同语言回答是双场景核心（2026-08-21 拍板并入原 M4，见 [decisioni.md](decisioni.md) 2026-08-21 第 2 条），评估语言 EN/IT/ZH。语料不按语言拆库：Qwen3-Embedding 本身是多语言的，chunk 带 `locale` payload 供过滤 | 🔶   | 双场景 gold set `#19` |
 
-评估方法自主拍板（2026-07-30）：relatore 只要求"能评估回答质量"，未指定指标。gold set 无现成数据集，M2 建冒烟版、M3 扩全量（见 [ROADMAP.md](../ROADMAP.md)）。
+评估方法自主拍板（2026-07-30，见 [decisioni.md](decisioni.md)）：relatore 只要求"能评估回答质量"，未指定指标。gold set 无现成数据集，M2 建冒烟版、M3 扩全量（`#19`）。
 
 ## 实验可复现性 🔜 M3
 
@@ -72,15 +72,21 @@ relatore 给的起步链接在 ROADMAP.md 的 M1 一节（已扩展成 `docs/ana
   - **例外**：`3.5-HTML5-Part-2` 32 页里 16 页近乎为空，内容在图里 → 路由为其开 OCR（抽取量 10001 → 20032 字符）。仍余 19 个死 section，VLM 也救不回。
   - **两个已知坑，均已验收 ✅**：朴素抽取丢词间空格（`"Video isa sequenceof frames"`）→ Docling 还原成 `"Video is a sequence of frames"`；连字（U+FB01 等）出现在 17 份 PDF 的文字层里，单份多达 97 处（`non-proﬁt` · `conﬁgured` · `micc.uniﬁ.it`），不归一化 BM25 必漏召回 → `rag/parse.py` 的 NFKC 归一化后残留为 0。
   - **新发现的坑**：图片与公式在 Docling 默认配置下全部丢弃，抽样 9 份约 322 页里有 **63 个死 section**（只剩标题、正文全是图片占位）。这是本语料最大的检索缺口，也是自适应路由与 M3 图片描述消融实验的动机。明细见 [docling-e-pipeline.md](docling-e-pipeline.md)。
-  - 往年 scritto 真题暂缓 🔜（见 [ROADMAP.md](../ROADMAP.md) 暂缓项）。
+  - 往年 scritto 真题暂缓 🔜 M3 后（`#47`）。
 - **能力边界**：检索问答（QA）。出题 / 自动判卷 ⛔ 超出范围。
 - **交付**：React SPA + DRF API（SSE 流式问答）+ Django admin 材料后台，与 RAG 部分**同一仓库**。
-- **租户与认证（2026-08-22 定案）**：slides = 每账号私有上传互不可见（多租户隔离 🔜 M5）；campus web KB = 全局共享一份，**免登录**可问；触发自增长的写操作 M5 起收敛到账号 + rate limit。**UniFi SSO 可行性**：走意大利高校联邦身份 IDEM GARR（SAML/Shibboleth），Django 侧有现成 SP 库，技术上是标准协议——但把应用注册为学校认可的服务方需要 UniFi IT 审批，单人论文项目不等它：论文期免登录（演示环境非公网），M5 用自建 Django 账号，auth 做成可插拔，SSO 记为 post-tesi 可选（🔜 见 [ROADMAP.md](../ROADMAP.md) M5）。
-- **外部知识源**（MCP、Google Drive 等）🔜 M7（可选，post-M6，见 [ROADMAP.md](../ROADMAP.md)）。
+- **租户与认证**：slides = 每账号私有上传互不可见（多租户隔离 🔜 `#36`）；campus web KB = 全局共享一份，检索侧无 per-user 隔离，这是有意的（语料本就公开）—— 但深化循环接上 web 之后它会变成真问题，见 `#17`。触发自增长的写操作收敛到账号 + rate limit。**免登录已作废**：2026-08-22 定案里的「campus 免登录可问」与「论文期演示环境免登录」于 2026-08-27 被自己推翻，现为**全站需登录**（上方「访问模型」行；理由见 [decisioni.md](decisioni.md) 2026-08-27 第 1 条 —— 多轮会话本身就是每用户状态，而写下免登录时系统还是单轮的）。**UniFi SSO 可行性**：走意大利高校联邦身份 IDEM GARR（SAML/Shibboleth），Django 侧有现成 SP 库，技术上是标准协议——但把应用注册为学校认可的服务方需要 UniFi IT 审批，单人论文项目不等它：M5 用自建 Django 账号，auth 做成可插拔，SSO 记为 post-tesi 可选（🔜 `#44`）。
+- **外部知识源**（MCP、Google Drive 等）🔜 M7（可选，post-M6，`#45`）。
 
 ## 工程化 ✅
 
 ruff（lint + format）· pyright（`rag/` strict）· pytest + pytest-django + 覆盖率门禁（pytest-cov）· pre-commit（含泄密与 lockfile 守卫、commit 消息格式）· GitHub Actions CI（check 链 + pip-audit 依赖审计）；依赖更新手动（pip-audit 兜底安全漏洞）。工具配置集中在 [pyproject.toml](../pyproject.toml)，hook 在 [.pre-commit-config.yaml](../.pre-commit-config.yaml)，流水线在 [.github/workflows/ci.yml](../.github/workflows/ci.yml)（`uv sync --locked` → lint → format → 类型 → Django check → 测试+覆盖率）；日常命令见 [README.md](../README.md)。配置与密钥经 `.env` 由 pydantic-settings 读入（`config/env.py`，不 import Django，将来与 `rag/` 共用同一来源），`.env` 永不进 git。docker-compose 🔜 M5（PostgreSQL · Redis · Qdrant · Langfuse）。
+
+## 安全自查 ✅ 2026-09-14
+
+一轮全仓库自查，判据是 OWASP Top 10 与 OWASP Top 10 for LLM Applications（⛔ ISO 27001 / NIST 映射：没有真实审计可指回时映射只能自己编，理由见 [decisioni.md](decisioni.md) 2026-09-14 第 4 条）。本文件是**覆盖范围**的属主；开放鉴定不在这里，在带 `security-review` 标签的 issue 里。
+
+查过且**判定为健全**的面：仓库与 git 历史中的密钥（无，`.env` 从未被跟踪，pre-commit 带 `detect-private-key`）· `config/settings.py` 与 `check --deploy`（`--fail-level WARNING` 通过，HSTS · SSL redirect · cookie secure 齐备，`SecretStr` 用法有据）· CSRF 端到端（双向，`ensure_csrf_cookie` + 头，Vite 代理 `changeOrigin: false` 有据）· 授权与 IDOR（queryset 层 scoping，404 与「不存在」不可区分）· 认证与口令（`create_user`、Django 四个校验器、session key 轮换、单一失败消息）· DRF 限流（`ScopedRateThrottle` 配 `NUM_PROXIES = 0`）· SQL/NoSQL 注入（无裸查询，只走 ORM 与 `models.Filter`）· 前端 XSS（无 `dangerouslySetInnerHTML`，`URL_PATTERN` 只认 `https?://`，`rel="noreferrer"`，`CSS.escape()`）· 客户端 token 存储（`localStorage` 里没有 token，只有同源 cookie）· 不安全反序列化（无 `pickle` / `torch.load` / `yaml.load` / `eval`，JSONL 一律 `model_validate_json`；registry 与 manifest 的坏行跳过并告警）· 子进程执行（唯一一处 `subprocess.run`，固定 argv、不过 shell）· LLM 的 JSON 输出（单点校验，每个调用方都有确定性的安全兜底，30 s 超时）· 前端依赖（`npm audit` 为 0）· CI（`permissions: contents: read`、action 按 SHA 钉住、`uv sync --locked`、`npm ci`、`makemigrations --check`）· `docker-compose.yml`（无明文凭据，默认不暴露应用服务）· 爬虫的 robots 与限速（在代码里，不靠约定）· 教学材料上传（**代码里不存在**：无 `FileField`、无端点；将来要为它立的那几道闸别处已有先例 —— `LIVE_MAX_PDF_PAGES = 40`、`document_timeout` 120 s、`artifact_name()` 定盘上文件名）。
 
 ## 算力策略：分层（开发本地 · 实验服务器）
 
