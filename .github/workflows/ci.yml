@@ -79,12 +79,12 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - name: Frontend lint, types, catalogues, tests and build
-        # `test` after the three static gates and before `build`: the static
+      - name: Frontend lint, types, catalogues, contrast, tests and build
+        # `test` after the four static gates and before `build`: the static
         # gates are the cheapest to fail, and `build` has to stay last because
         # it writes frontend/dist — the directory `check --deploy` reads further
         # down. A failing test should not first wait for a bundle it invalidates.
-        run: npm run lint && npm run typecheck && npm run check:i18n && npm run test && npm run build
+        run: npm run lint && npm run typecheck && npm run check:i18n && npm run check:contrast && npm run test && npm run build
         working-directory: frontend
 
       - name: Lint
