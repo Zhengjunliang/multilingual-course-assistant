@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -24,6 +25,20 @@ export default defineConfig(({ command }) => ({
   // Built assets are served by Django under STATIC_URL; the dev server serves
   // them from the root. Only the build needs the prefix.
   base: command === "build" ? "/static/" : "/",
+
+  // No jsdom and no happy-dom in devDependencies: the default `node`
+  // environment is enough because nothing under test touches a document.
+  // markers.ts is string work, and sse.ts needs ReadableStream and TextDecoder,
+  // both Node globals long before the 24 in .nvmrc. The React hook in useAsk.ts
+  // is deliberately not covered here — rendering it would buy three
+  // dependencies and assert React's plumbing rather than this project's logic,
+  // and the stream parsing it is often credited with lives in sse.ts anyway.
+  test: {
+    // `globals` stays off, so every test imports describe/it/expect from
+    // "vitest" by name. That keeps tsconfig's `types` array as it is and leaves
+    // biome with no undeclared identifiers to shrug at.
+    include: ["src/**/*.test.ts"],
+  },
 
   server: {
     proxy: Object.fromEntries(

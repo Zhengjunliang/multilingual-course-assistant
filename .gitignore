@@ -32,6 +32,9 @@ yarn-error.log*
 !.env.example
 *.pem
 *.key
+# Un report di gitleaks contiene in chiaro i segreti che ha trovato: è
+# esattamente il file che non deve finire nel repository che stava esaminando.
+.gitleaks-report.json
 
 # OS / editor
 .DS_Store

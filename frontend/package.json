@@ -9,7 +9,8 @@
     "lint": "biome check src scripts vite.config.ts biome.json package.json tsconfig.json",
     "format": "biome format --write src scripts vite.config.ts biome.json package.json tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "check:i18n": "node scripts/check-i18n.mjs"
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -32,6 +33,7 @@
     "@vitejs/plugin-react": "^6.1.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
   }
 }
