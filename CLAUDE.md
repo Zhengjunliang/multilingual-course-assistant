@@ -38,9 +38,9 @@
 
 ## 5. 文档约定
 
-**开发期语言：中文。** 仓库文档用中文写（单人开发，理解优先），原地维护，**无平行翻译版本**。**最终 tesi 交付物在 M6 译成意大利语**（论文正文与随附最终文档）。代码标识符/注释/commit 用英文（见代理执行规则的语言条）。
+**文档语言：意大利语。** 仓库内的 markdown 文档与 GitHub issue 都用意大利语写，原地维护，**无平行翻译版本**（relatore 看得到仓库与 issue 列表，且 M6 交付物本就是意语——分两种语言写等于把同一份内容维护两遍）。代码标识符/注释/commit 消息用英文，**与用户对话用中文**（见代理执行规则的语言条）。
 
-**GitHub issue 用意大利语**（与 airjump/3M 一致；relatore 看得到 issue 列表，且 M6 交付物本就是意语）；仓库 markdown 文档仍用中文。
+🔶 **部分** — 规则对新写与改写的内容立即生效；存量中文文档尚未迁移。属主是 **issue #43**（`[M-TESI] i documenti di consegna finale sono in italiano`），那里有文件清单与逐条验收。待迁移：7 个文件、1072 行（`README.md` 304 · `docs/docling-e-pipeline.md` 294 · `docs/architettura.md` 146 · `docs/fonte-web-unifi.md` 103 · `docs/analisi-rag.md` 86 · `docs/decisioni.md` 75 · 本文件 64）。`docs/diario-sperimentale.md` 已是意语，不在清单内。
 
 **地图** — 根目录文件 + `docs/`。仓库内不散落其他计划/清单文件：
 
