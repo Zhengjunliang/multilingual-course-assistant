@@ -29,7 +29,7 @@
 
 1. **Commit 归用户**：AI 可以改文件、`git add`、`git diff`、`git status`；**永不执行 `git commit`** — 把完整命令打印出来，用户在自己终端执行。一个逻辑单元一个 commit，消息用英文，Conventional Commits 格式（`feat:` · `fix:` · `docs:` · `chore:` · `refactor:` · `test:`）。
 2. **禁止生成签名**：commit 消息和 PR 正文**不含** `Co-Authored-By: Claude …`、`🤖 Generated with …` 等任何 AI 工具签名。消息以最后一行内容结束。
-3. **远程与历史归用户**：AI **永不执行** `git push`，也不做远程/账号级操作（建删仓库、改 `git remote`、任何 `gh` 写操作、`git config --global`、`gh auth`）。**永不重写共享历史**：无明确要求不 `push --force`（含 `-f` / `--force-with-lease`）、不对未提交工作 `reset --hard`、不 rebase 或 `--amend` 已发布的 commit。其余场景**打印命令，用户在自己终端执行**。
+3. **远程与历史归用户**：AI **永不执行** `git push`，也不做远程/账号级操作（建删仓库、改 `git remote`、`git config --global`、`gh auth`）。**永不重写共享历史**：无明确要求不 `push --force`（含 `-f` / `--force-with-lease`）、不对未提交工作 `reset --hard`、不 rebase 或 `--amend` 已发布的 commit。其余场景**打印命令，用户在自己终端执行**。
 4. **分支**：在 `main` 上工作（个人仓库）。实验性修改先提议开分支。
 
 ## 4. 领域不变量
