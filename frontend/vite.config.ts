@@ -29,15 +29,24 @@ export default defineConfig(({ command }) => ({
   // No jsdom and no happy-dom in devDependencies: the default `node`
   // environment is enough because nothing under test touches a document.
   // markers.ts is string work, and sse.ts needs ReadableStream and TextDecoder,
-  // both Node globals long before the 24 in .nvmrc. The React hook in useAsk.ts
-  // is deliberately not covered here — rendering it would buy three
-  // dependencies and assert React's plumbing rather than this project's logic,
-  // and the stream parsing it is often credited with lives in sse.ts anyway.
+  // both Node globals long before the 24 in .nvmrc.
+  //
+  // Components are covered here too, and still without a document:
+  // `renderToStaticMarkup` walks the tree once and hands back markup as a
+  // string, so the assertions read HTML instead of a DOM. That is what makes
+  // `.tsx` worth collecting below at no cost in dependencies — the earlier note
+  // here, that rendering would buy three of them, was true only of the
+  // testing-library route.
+  //
+  // What a string render cannot show is behaviour: no effect runs, and Radix
+  // portals aim at a `document.body` that is not there. A check that needs
+  // either — a click, a drawer actually open — belongs to the manual list in
+  // the pull request, not to this file.
   test: {
     // `globals` stays off, so every test imports describe/it/expect from
     // "vitest" by name. That keeps tsconfig's `types` array as it is and leaves
     // biome with no undeclared identifiers to shrug at.
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 
   server: {
