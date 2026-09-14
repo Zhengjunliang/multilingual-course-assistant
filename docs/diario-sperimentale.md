@@ -38,11 +38,23 @@ Anche il recupero è invariato: `gold/smoke.jsonl` restituisce **38/40 (95%)** p
 
 Due numeri già registrati in [architettura.md](architettura.md), sezione «语料与交付范围», sono stati prodotti con `pypdf` 6.16.1: i **~650 000 caratteri** del corpus e il guadagno dell'OCR sul documento `3.5-HTML5` (**10001 → 20032 caratteri**). Non sono sbagliati, ma da oggi si sa che **dipendono dalla versione della libreria di estrazione**, esattamente come i risultati di generazione dipendono dalla revisione del modello. La versione dello stack di analisi entra quindi nell'elenco di riproducibilità.
 
-### 4. Un punto lasciato non verificato, dichiarato come tale
+### 4. Il gate di rilevanza: 17/20 — e la scoperta che quel numero non è confrontabile
 
-`rag/live.py` usa `pypdf` anche per un secondo scopo: leggere un campione del livello di testo di un PDF scaricato dal web, da passare al gate di rilevanza. Se l'estrazione restituisce più testo, il campione cambia, e il verdetto del gate **potrebbe** cambiare con esso. Il valore di riferimento è **18/20** sull'insieme annotato.
+`rag/live.py` usa `pypdf` anche per un secondo scopo: leggere un campione del livello di testo di un PDF scaricato dal web, da passare al gate di rilevanza. Poiché l'estrazione restituisce più testo, il campione cambia, e il verdetto poteva cambiare con esso. La misura è quindi stata ripetuta: `uv run python -m rag.live --measure-gate` restituisce **17/20**, contro il **18/20** registrato il 2026-08-24.
 
-Questa misura non è stata ripetuta in questa sessione: richiede Ollama in esecuzione, e il gate è comunque destinato a essere ripensato nella direzione registrata il 2026-09-14 in [decisioni.md](decisioni.md) (conferma manuale al posto della scrittura automatica, `#48`). Va però scritto che si tratta di un punto **non misurato**, e non di un punto misurato e risultato stabile.
+**Quel confronto però non è valido, e la ragione è più interessante del numero.** `run_gate_measurement()` riceve un *fetcher*, e `gold/relevance-gate.jsonl` contiene soltanto `{url, label, note}`: nessuna istantanea del contenuto, nessun hash. Ogni esecuzione **riscarica le venti pagine dal vivo** e giudica ciò che dicono quel giorno. Il 18/20 ha giudicato il web del 24 agosto, il 17/20 quello del 14 settembre. Fra le due misure è cambiato l'aggiornamento di `pypdf`, ma è cambiato anche l'input — e senza un input fisso non esiste un esperimento controllato. La differenza **non è attribuibile** all'aggiornamento.
+
+Le tre divergenze rendono la cosa concreta:
+
+| URL | Etichetta | Verdetto | Motivazione del modello |
+| --- | --- | --- | --- |
+| `testcisia.it/calendario.php?tolc=ingegneria` | relevant | irrelevant | «elenca date TOLC di atenei diversi da Firenze» |
+| `cercachi.unifi.it/cercachi-per-13.html` | relevant | irrelevant | «rubrica telefonica del personale, non un servizio agli studenti» |
+| `sol.unifi.it/tesionlinestudente/engine` | irrelevant | **relevant** | «servizio Tesi Online di ateneo, è un servizio allo studente» |
+
+La prima è una **pagina di calendario**: il suo contenuto cambia per definizione, e a tre settimane di distanza elenca sessioni diverse. Le altre due non sono errori del modello ma **etichette discutibili**: una rubrica del personale è un servizio dell'ateneo ma non dello studente, e la presentazione della tesi è senza dubbio un servizio allo studente — sul terzo caso la motivazione del modello regge meglio dell'etichetta.
+
+Ne segue una conclusione metodologica che vale oltre questa sessione. Su venti voci, di cui almeno due con etichetta opinabile, la differenza fra 18/20 e 17/20 è **più piccola dell'incertezza della misura**; e finché il contenuto non è congelato, questo strumento non può servire da prova di non regressione, che è esattamente l'uso che se ne stava facendo qui. Il corpus dei corsi ha già questa disciplina — istantanea congelata, `ingest_source="crawl"` separato da `"live"` — mentre l'insieme annotato del gate non ce l'ha. La lacuna è registrata come issue a sé.
 
 ### Riproducibilità
 
