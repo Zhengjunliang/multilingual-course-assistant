@@ -30,8 +30,17 @@
   },
   "ask": {
     "label": "你的问题",
+    "placeholder": "问课程材料或学校信息…",
     "submit": "提问",
     "cancel": "停止"
+  },
+  "empty": {
+    "title": "想知道什么？",
+    "chip": {
+      "enrolment": "注册的截止日期是什么时候？",
+      "calendar": "考试周从哪天开始？",
+      "material": "总结一下课程的第一讲。"
+    }
   },
   "status": {
     "thinking": "正在检索和思考…",
@@ -42,7 +51,9 @@
     "label": "检索范围",
     "slides": "课程材料",
     "unifi_web": "学校网页",
-    "both": "两个来源"
+    "both": "两个来源",
+    "sources_one": "{{count}} 个片段",
+    "sources_other": "{{count}} 个片段"
   },
   "citations": {
     "title": "来源",

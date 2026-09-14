@@ -30,8 +30,17 @@
   },
   "ask": {
     "label": "La tua domanda",
+    "placeholder": "Chiedi del corso o dell'ateneo…",
     "submit": "Chiedi",
     "cancel": "Ferma"
+  },
+  "empty": {
+    "title": "Cosa vuoi sapere?",
+    "chip": {
+      "enrolment": "Quali sono le scadenze per l'iscrizione?",
+      "calendar": "Quando inizia la sessione d'esame?",
+      "material": "Riassumi la prima lezione del corso."
+    }
   },
   "status": {
     "thinking": "Sto cercando e ragionando…",
@@ -42,7 +51,9 @@
     "label": "Cercato in",
     "slides": "materiale del corso",
     "unifi_web": "pagine di ateneo",
-    "both": "entrambe le fonti"
+    "both": "entrambe le fonti",
+    "sources_one": "{{count}} estratto",
+    "sources_other": "{{count}} estratti"
   },
   "citations": {
     "title": "Fonti",

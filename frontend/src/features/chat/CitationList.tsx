@@ -57,31 +57,36 @@ export function CitationList({
   }, [highlighted, expanded]);
 
   if (citations.length === 0) {
-    return <p className="text-muted text-sm">{t("citations.empty")}</p>;
+    return <p className="text-body text-muted">{t("citations.empty")}</p>;
   }
 
   const shown = expanded ? citations : citations.slice(0, VISIBLE_CITATIONS);
   const folded = citations.length - shown.length;
 
   return (
-    <div className="flex flex-col gap-2">
-      <h2 className="font-medium text-muted text-xs uppercase tracking-wide">
+    <div className="flex flex-col gap-tight">
+      <h2 className="font-medium text-caption text-muted uppercase tracking-wide">
         {t("citations.title")}
       </h2>
-      <div className="flex items-stretch gap-2">
+      <div className="flex items-stretch gap-tight">
         {/* A row rather than a column: sources belong beside each other, and
             stacked they push the next question off the bottom of the screen. */}
-        <ol ref={strip} className="flex min-w-0 flex-1 gap-3 overflow-x-auto pb-2">
+        <ol ref={strip} className="flex min-w-0 flex-1 gap-snug overflow-x-auto pb-tight">
           {shown.map((citation) => {
             const number = badgeNumber(badges, citation.marker);
             // Greyed out is a signal, not a style: retrieved and then not cited
             // is exactly what the error taxonomy wants to see.
             const unused = cited !== null && !cited.has(citation.marker);
             return (
+              // Narrower and shorter on a phone. The strip now sits above the
+              // answer, and a 288px card followed by a five-line excerpt would
+              // put the first line of the answer below the fold — the reader
+              // would see the sources instead of the reply, which is the
+              // opposite of what moving them up was for.
               <li
                 key={`${citation.marker}-${citation.text.slice(0, 24)}`}
                 data-marker={citation.marker}
-                className="w-72 shrink-0"
+                className="w-56 shrink-0 lg:w-72"
               >
                 <Card
                   className={cn(
@@ -96,16 +101,16 @@ export function CitationList({
                         <button
                           type="button"
                           onClick={() => onSelect(citation.marker)}
-                          className="rounded bg-mark px-1.5 py-0.5 text-mark-ink text-xs hover:opacity-80"
+                          className="rounded-full border border-line px-tight font-medium text-accent-text text-caption transition-colors hover:border-accent hover:bg-accent hover:text-accent-ink"
                         >
                           {number}
                         </button>
                       )}
-                      <span className="truncate font-mono text-xs" title={citation.marker}>
+                      <span className="truncate font-mono text-caption" title={citation.marker}>
                         {citation.marker}
                       </span>
                     </CardTitle>
-                    <p className="text-muted text-xs">
+                    <p className="text-caption text-muted">
                       {citation.kind === "web" && citation.fetch_date !== null
                         ? t("citations.fetched", { date: citation.fetch_date })
                         : t("citations.page", { page: citation.page })}
@@ -118,12 +123,15 @@ export function CitationList({
                         href={citation.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="mb-1 block truncate text-muted text-xs underline"
+                        className="mb-hair block truncate text-caption text-muted underline"
                       >
                         {citation.url}
                       </a>
                     )}
-                    <p lang={citation.locale} className="line-clamp-5 whitespace-pre-wrap">
+                    <p
+                      lang={citation.locale}
+                      className="line-clamp-2 whitespace-pre-wrap lg:line-clamp-5"
+                    >
                       {citation.text}
                     </p>
                   </CardContent>
@@ -137,7 +145,7 @@ export function CitationList({
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="shrink-0 self-stretch rounded-lg border border-line border-dashed px-3 text-muted text-xs hover:bg-mark hover:text-ink"
+            className="shrink-0 self-stretch rounded-lg border border-line border-dashed px-snug text-caption text-muted hover:bg-mark hover:text-ink"
           >
             {t("citations.more", { count: folded })}
           </button>
