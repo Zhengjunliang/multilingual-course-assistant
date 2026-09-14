@@ -30,8 +30,17 @@
   },
   "ask": {
     "label": "Your question",
+    "placeholder": "Ask about the course or the university…",
     "submit": "Ask",
     "cancel": "Stop"
+  },
+  "empty": {
+    "title": "What would you like to know?",
+    "chip": {
+      "enrolment": "What are the enrolment deadlines?",
+      "calendar": "When does the exam session start?",
+      "material": "Summarise the first lecture of the course."
+    }
   },
   "status": {
     "thinking": "Searching and thinking…",
@@ -42,7 +51,9 @@
     "label": "Searched in",
     "slides": "course material",
     "unifi_web": "university pages",
-    "both": "both sources"
+    "both": "both sources",
+    "sources_one": "{{count}} excerpt",
+    "sources_other": "{{count}} excerpts"
   },
   "citations": {
     "title": "Sources",

@@ -32,7 +32,7 @@ function linkified(text: string, base: number): ReactNode[] {
         href={url}
         target="_blank"
         rel="noreferrer"
-        className="break-all underline decoration-muted underline-offset-2 hover:text-accent"
+        className="break-all underline decoration-muted underline-offset-2 hover:text-accent-text"
       >
         {url}
       </a>,
@@ -79,12 +79,16 @@ export function AnswerStream({ text, badges, complete, live, onBadgeClick }: Ans
         segment.kind === "text" ? (
           <span key={segment.at}>{linkified(segment.text, segment.at)}</span>
         ) : (
+          // A pill, not a block: it sits inside a sentence, so it borrows the
+          // accent as an outline and only fills with it under the pointer.
+          // Filled by default, a dozen of them would read as a rash across the
+          // prose rather than as places to look.
           <button
             key={segment.at}
             type="button"
             onClick={() => onBadgeClick(segment.badge.marker)}
             title={segment.badge.marker}
-            className="mx-0.5 rounded bg-mark px-1.5 py-0.5 align-baseline font-medium text-mark-ink text-xs hover:opacity-80"
+            className="mx-0.5 rounded-full border border-line px-tight align-baseline font-medium text-accent-text text-caption transition-colors hover:border-accent hover:bg-accent hover:text-accent-ink"
           >
             {segment.badge.number}
           </button>
