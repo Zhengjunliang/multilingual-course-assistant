@@ -3,31 +3,20 @@
 # already runs on Windows daily on the dev machine (pre-commit + local pytest).
 name: CI
 
+# No `paths-ignore`, and its absence is the deliberate part. A documentation
+# commit does make this whole workflow run for nothing, which is a real waste
+# and was filtered out until the repository went public — at which point Actions
+# minutes stopped being the scarce thing they had been.
+#
+# What replaced that saving is worth more: a path filter is an event-level
+# switch, so a filtered-out commit starts no workflow and therefore reports no
+# status at all. With `check` required on main, a documentation-only pull
+# request would then wait forever for a status that never arrives. Filter and
+# required checks cannot both be had; this repository now has the checks.
 on:
   push:
     branches: [main]
-    # A documentation commit changes nothing THIS workflow can test: no Python,
-    # no TypeScript, no lockfile. docs/architettura.md, section 工程化, owns the
-    # reasoning; the part that has to be restated here is its limit. A path
-    # filter is an event-level switch that skips every job in the file, so it
-    # may only cover gates whose input really is source. Secret scanning is not
-    # one of them and lives in secrets.yml, which deliberately has no filter.
-    #
-    # '**.md' and not '*.md': in a path filter a single star does not cross a
-    # '/', so the short form would match README.md and miss docs/architettura.md.
-    # 'docs/**' is redundant today — every file under docs/ is a .md — and is
-    # kept for the first one that is not.
-    #
-    # The cost, should main ever get branch protection with `check` required: a
-    # docs-only pull request would wait forever for a status that never starts.
-    # There is no branch protection today (single-author private repository).
-    paths-ignore:
-      - "docs/**"
-      - "**.md"
   pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "**.md"
 
 permissions:
   contents: read
