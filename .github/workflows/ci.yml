@@ -80,7 +80,7 @@ jobs:
       # deployment stage on, STATICFILES_DIRS points at frontend/dist — a build
       # artifact that is not in git — and `check --deploy --fail-level WARNING`
       # turns the "directory does not exist" warning into a failed job.
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: frontend/.nvmrc
           cache: npm
@@ -173,7 +173,7 @@ jobs:
             --ignore-vuln PYSEC-2026-3929 \
             -r requirements.txt
 
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # No `cache: npm` here, unlike the check job: with the install gone,
           # nothing in this job reads npm's download cache. `npm audit` asks the
