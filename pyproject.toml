@@ -5,7 +5,7 @@ description = "Multilingual QA over university course materials (RAG, open-weigh
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "beautifulsoup4>=4.15.0",
-    "django>=5.2,<6",
+    "django>=5.2,<7",
     "djangorestframework>=3.18.0",
     "docling>=2.117.0",
     "fastembed>=0.8.0",
