@@ -15,6 +15,36 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Four packages are held back, and the reason is the same for all four: a
+    # green CI does not mean they are safe here. This pipeline's CI runs no
+    # ingest, touches no GPU, and mocks the LLM client away — so for anything
+    # that changes how documents are parsed, how text is embedded, or how the
+    # model is talked to, the build passing proves only that the code still
+    # imports. What would actually prove it is re-running the ingest and
+    # reproducing gold 38/40 and campus 28/32, and that is an M3 session on
+    # MICC, not a weekly pull request.
+    #
+    # This is not a security hole. `pip-audit` runs on every push and will turn
+    # the build red if an advisory lands on any of them, at which point the
+    # upgrade stops being routine and gets handled on its own terms.
+    #
+    # Delete the entries below when the M3 re-measurement happens; #55 is the
+    # issue that owns that moment for transformers, and the same session is
+    # where these belong.
+    ignore:
+      # Pulls docling-ibm-models across a major boundary even on a minor bump,
+      # and that package is layout, TableFormer and CodeFormula — the parsing.
+      - dependency-name: "docling"
+      # Embedding and reranker both come through it. New vectors mean a rebuilt
+      # index and every hit@k number measured again.
+      - dependency-name: "sentence-transformers"
+      # The floor the two above stand on, and the one dependency with a custom
+      # CUDA index: CI installs the Linux PyPI wheel, the laptop installs a
+      # cu126 one, so a green CI says nothing about the machine that develops.
+      - dependency-name: "torch"
+      # The OpenAI-compatible client every generation path uses. CI mocks it,
+      # so CI covers exactly none of what a major bump would change.
+      - dependency-name: "openai"
 
   # The SPA keeps its own lockfile in its own directory; the repository root has
   # no package.json at all, so "/" would find nothing here.
