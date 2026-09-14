@@ -23,6 +23,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { Sheet } from "@/components/ui/sheet";
 import { Suggestion, Suggestions } from "@/components/ui/suggestion";
 import { Textarea } from "@/components/ui/textarea";
@@ -82,6 +83,13 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
       <Specimen name="Textarea" note="Starts at the field height and grows downward only.">
         <Textarea placeholder="Textarea" />
+      </Specimen>
+
+      <Specimen
+        name="LocaleSwitch"
+        note="Rendered twice on screen — header and login frame — and written once. The language in use wears ink and a quiet fill, never the accent: the accent is for what a reader is about to do, not for a setting already true."
+      >
+        <LocaleSwitch locales={["it", "en", "zh-hans"]} value="it" onChange={() => {}} />
       </Specimen>
 
       <Specimen
