@@ -6,7 +6,28 @@ name: CI
 on:
   push:
     branches: [main]
+    # A documentation commit changes nothing THIS workflow can test: no Python,
+    # no TypeScript, no lockfile. docs/architettura.md, section 工程化, owns the
+    # reasoning; the part that has to be restated here is its limit. A path
+    # filter is an event-level switch that skips every job in the file, so it
+    # may only cover gates whose input really is source. Secret scanning is not
+    # one of them and lives in secrets.yml, which deliberately has no filter.
+    #
+    # '**.md' and not '*.md': in a path filter a single star does not cross a
+    # '/', so the short form would match README.md and miss docs/architettura.md.
+    # 'docs/**' is redundant today — every file under docs/ is a .md — and is
+    # kept for the first one that is not.
+    #
+    # The cost, should main ever get branch protection with `check` required: a
+    # docs-only pull request would wait forever for a status that never starts.
+    # There is no branch protection today (single-author private repository).
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
 
 permissions:
   contents: read
@@ -69,8 +90,12 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - name: Frontend lint, types, catalogues and build
-        run: npm run lint && npm run typecheck && npm run check:i18n && npm run build
+      - name: Frontend lint, types, catalogues, tests and build
+        # `test` after the three static gates and before `build`: the static
+        # gates are the cheapest to fail, and `build` has to stay last because
+        # it writes frontend/dist — the directory `check --deploy` reads further
+        # down. A failing test should not first wait for a bundle it invalidates.
+        run: npm run lint && npm run typecheck && npm run check:i18n && npm run test && npm run build
         working-directory: frontend
 
       - name: Lint
@@ -107,24 +132,63 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          # The check job caches the same store, but a cache is scoped per job:
+          # without this, every audit run re-downloads pip-audit and its whole
+          # tree through `uvx`. Nothing is installed into a venv here, so what
+          # gets saved stays small.
+          enable-cache: true
 
       - name: Audit locked dependencies
         # --no-deps --disable-pip: audit exactly what the lockfile pins, no resolving
         # and no virtualenv — the input is already a complete pin set, and resolving
         # would trip over the torch custom index.
+        #
+        # Two advisories are ignored rather than fixed, and they are ignored for
+        # different reasons. Delete each flag the day its reason stops holding.
+        #
+        # PYSEC-2026-3804 (accelerate) — there is nothing to upgrade to.
+        #   1. accelerate cannot be dropped. `uv tree --invert --package accelerate`
+        #      puts it under docling-ibm-models and under docling-slim[standard],
+        #      and docling is what rag/parse.py parses every PDF with.
+        #   2. No fixed version exists upstream, so Dependabot cannot open a pull
+        #      request for this one either.
+        #   3. The trigger is loading an untrusted sharded checkpoint. This project
+        #      loads weights it names itself; a user never supplies one.
+        #   4. The control that actually covers it is issue #10, pinning the
+        #      HuggingFace revision. Anything done here would be second best.
+        #
+        # PYSEC-2026-3929 (transformers) — a fix exists at 5.10.0 and this lockfile
+        # cannot reach it. docling-ibm-models and docling-core[chunking] cap
+        # transformers below 5.9.0 on darwin, and uv resolves one lockfile for every
+        # platform at once, so a macOS constraint that nothing here runs on holds
+        # the ceiling for Windows and Linux too. Issue #55 tracks the way out and
+        # its price. What makes the wait acceptable meanwhile is reachability: the
+        # flaw is in save_pretrained(), and this repository never calls it — the
+        # only calls are loads, in rag/chunk.py and rag/search.py.
         run: |
           uv export --locked --no-emit-project --no-hashes -o requirements.txt
-          uvx pip-audit --no-deps --disable-pip -r requirements.txt
+          uvx pip-audit --no-deps --disable-pip \
+            --ignore-vuln PYSEC-2026-3804 \
+            --ignore-vuln PYSEC-2026-3929 \
+            -r requirements.txt
 
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
+          # No `cache: npm` here, unlike the check job: with the install gone,
+          # nothing in this job reads npm's download cache. `npm audit` asks the
+          # registry's advisory endpoint directly, so restoring and then saving
+          # a cache would be pure overhead. setup-node itself stays — the job
+          # still needs a pinned npm binary to run `npm audit` with.
           node-version-file: frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Audit frontend dependencies
+        # No `npm ci`: `npm audit` builds its tree from package-lock.json alone,
+        # so installing first only bought an unused node_modules and the minute
+        # it took to write one. The check job is where an install is real.
+        #
         # --omit=dev: only what ships to a browser. The build toolchain's own
         # advisories are a steady drip that would turn this gate into noise
         # without ever describing something a visitor could reach.
-        run: npm ci && npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
         working-directory: frontend

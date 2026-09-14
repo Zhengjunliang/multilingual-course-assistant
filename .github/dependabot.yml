@@ -1,0 +1,32 @@
+# Not a gate: Dependabot opens pull requests, CI decides whether they land. It is
+# here for exactly the shape PYSEC-2026-3929 had — a fixed version sat upstream
+# and nothing in this repository said so until pip-audit turned the build red.
+#
+# Alerts are a separate switch, in the repository settings rather than in this
+# file. This file only schedules version updates.
+version: 2
+updates:
+  # `uv`, not `pip`. This project is locked with uv.lock, and the pip ecosystem
+  # edits pyproject.toml without touching the lockfile — the one file that
+  # `uv sync --locked` and `uv export --locked` actually read. A pip-ecosystem
+  # pull request would therefore arrive already failing CI. The uv ecosystem
+  # reads both, which is why it is the correct name here.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # The SPA keeps its own lockfile in its own directory; the repository root has
+  # no package.json at all, so "/" would find nothing here.
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+
+  # The action pins in ci.yml are SHAs, and a SHA says nothing about how old it
+  # is — the trailing `# vN` comment is the only readable part, and it is written
+  # by hand. This ecosystem is what moves both, together.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
