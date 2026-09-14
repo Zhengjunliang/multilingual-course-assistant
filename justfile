@@ -35,11 +35,12 @@ fe-install:
 fe-dev:
     npm run dev --prefix frontend
 
-# The SPA's own chain: lint, types, catalogue keys, production build.
+# The SPA's own chain: lint, types, catalogue keys, tests, production build.
 fe:
     npm run lint --prefix frontend
     npm run typecheck --prefix frontend
     npm run check:i18n --prefix frontend
+    npm run test --prefix frontend
     npm run build --prefix frontend
 
 # The full CI chain, locally. `fe` runs first for the same reason CI puts it
