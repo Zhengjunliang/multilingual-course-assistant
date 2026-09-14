@@ -14,7 +14,7 @@ updates:
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     # Four packages are held back, and the reason is the same for all four: a
     # green CI does not mean they are safe here. This pipeline's CI runs no
     # ingest, touches no GPU, and mocks the LLM client away — so for anything
@@ -22,7 +22,7 @@ updates:
     # model is talked to, the build passing proves only that the code still
     # imports. What would actually prove it is re-running the ingest and
     # reproducing gold 38/40 and campus 28/32, and that is an M3 session on
-    # MICC, not a weekly pull request.
+    # MICC, not a routine pull request.
     #
     # This is not a security hole. `pip-audit` runs on every push and will turn
     # the build red if an advisory lands on any of them, at which point the
@@ -64,7 +64,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
 
   # The action pins in ci.yml are SHAs, and a SHA says nothing about how old it
   # is — the trailing `# vN` comment is the only readable part, and it is written
@@ -72,4 +72,4 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
