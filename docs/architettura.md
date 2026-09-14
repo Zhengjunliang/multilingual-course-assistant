@@ -30,7 +30,7 @@ relatore 给的四个起步链接已精读并扩展成 [analisi-rag.md](analisi-
 | Embedding/Rerank | Qwen3-Embedding / Qwen3-Reranker  | 与 LLM 同源的一体化方案，relatore 链接指向的路线                          |
 | 文档解析       | Docling **经典 pipeline + 自适应路由**：逐份文件按画像决定是否开 OCR / 公式富化。**VLM 不进自动路由**，只留手动对照 | 2026-07-31 实测：经典 pipeline 修复词间空格粘连、还原表格与标题层级、重音正确；有文字层的 PDF 开 OCR 零产出却多耗 62% 时间。2026-08-02：富化开关全用 Docling 默认（关）会让公式与图片永久丢失 → 解析前先探测，31 份里 4 份开公式、1 份开 OCR，零误报。同日 VLM 对照实测**否决**了"缺文字层就上 VLM"的原设想：granite-docling 耗时翻倍（1059s vs 527s），唯一词汇反而更少（671 vs 729），丢掉 `avc1.42e01e` 这类检索命脉的字面量 —— 它在转述而非转录。规则、阈值与全部实测见 [docling-e-pipeline.md](docling-e-pipeline.md)，实现是 [rag/probe.py](../rag/probe.py) |
 
-选 Django 不选 Flask 的理由：对单人开发 Django **减少**代码量（admin、auth、ORM、i18n 内置）；Flask 需手动拼装。前端选 React SPA 弃 HTMX 的理由：PPM 展示性与流式交互。两项 2026-07-30 拍板确认（PPM 无 UI 评分要求，前端自主）。
+选 Django 不选 Flask 的理由：对单人开发 Django **减少**代码量（admin、auth、ORM、i18n 内置）；Flask 需手动拼装。前端选 React SPA 弃 HTMX 的理由：PPM 展示性与流式交互。两项 2026-07-30 拍板确认（前端技术选型自主）。同日拍板里的「PPM 无 UI 评分要求」一句**于 2026-09-14 推翻** —— 界面外观计入课程分数，理由见 [decisioni.md](decisioni.md) 2026-09-14「人工闸门与 UI 计分」第 2 条（被推翻的原话也存在那里）；现状盘点与未决点在 `#49`。
 
 ## 决策状态
 
@@ -80,13 +80,43 @@ relatore 给的四个起步链接已精读并扩展成 [analisi-rag.md](analisi-
 
 ## 工程化 ✅
 
-ruff（lint + format）· pyright（`rag/` strict）· pytest + pytest-django + 覆盖率门禁（pytest-cov）· pre-commit（含泄密与 lockfile 守卫、commit 消息格式）· GitHub Actions CI（check 链 + pip-audit 依赖审计）；依赖更新手动（pip-audit 兜底安全漏洞）。工具配置集中在 [pyproject.toml](../pyproject.toml)，hook 在 [.pre-commit-config.yaml](../.pre-commit-config.yaml)，流水线在 [.github/workflows/ci.yml](../.github/workflows/ci.yml)（`uv sync --locked` → lint → format → 类型 → Django check → 测试+覆盖率）；日常命令见 [README.md](../README.md)。配置与密钥经 `.env` 由 pydantic-settings 读入（`config/env.py`，不 import Django，将来与 `rag/` 共用同一来源），`.env` 永不进 git。docker-compose 🔜 M5（PostgreSQL · Redis · Qdrant · Langfuse）。
+ruff（lint + format）· pyright（`rag/` strict）· pytest + pytest-django + 覆盖率门禁（pytest-cov）· pre-commit（含泄密与 lockfile 守卫、commit 消息格式）· GitHub Actions **两个 workflow**：[ci.yml](../.github/workflows/ci.yml) 的两个并行 job（`check` 链 · `audit` 依赖审计）与独立的 [secrets.yml](../.github/workflows/secrets.yml)。前端质量门与后端对等：`npm run test`（vitest，覆盖 `sse.ts` 的帧解析与事件契约、`markers.ts` 的引用切分）接在 lint/类型/catalogue 之后、build 之前。依赖更新由 [dependabot.yml](../.github/dependabot.yml) 每周提 PR（`uv` · `npm@/frontend` · `github-actions` 三个生态）。**仓库级 Dependabot alerts 有意不开**（2026-09-14）：它是另一个开关，管的是 security updates —— advisory 一落地就即时通知并针对性提 PR。不开的代价只有「即时」二字，而发现漏洞这件事本就不靠它：`pip-audit` 与 `npm audit` 每次 push 都跑，`#7` 那两条 CVE 正是被它们抓到的，Dependabot 当时既没开也帮不上（其中一条根本没有修复版本）。每周的版本更新 PR 负责送来修复，审计闸门负责在修复到达前让构建红着。**纯文档 commit 不触发 `ci.yml`**（`paths-ignore`）：不是提速，是不让一个绿勾声称验过它从没读过的东西。密钥扫描双层，且第二层**不能**跟着上面那条走 —— pre-commit 的 `detect-private-key` 拦「别写进去」，gitleaks 答「以前有没有写进去过」，而后者的输入与语言无关：一个粘进 `.md` 的 token 正是 `paths-ignore` 会跳过的那类 commit。所以它独立成 workflow 且不带过滤器；它还必须带 `workflow_dispatch` 与 `schedule`，因为 gitleaks-action 只在这两种事件下扫全历史，`push`/`pull_request` 下只看该事件带的那几个 commit（每周一次的定时跑才是回答「以前」的那一次）。工具配置集中在 [pyproject.toml](../pyproject.toml)，hook 在 [.pre-commit-config.yaml](../.pre-commit-config.yaml)；日常命令见 [README.md](../README.md)。配置与密钥经 `.env` 由 pydantic-settings 读入（`config/env.py`，不 import Django，将来与 `rag/` 共用同一来源），`.env` 永不进 git。docker-compose 🔜 M5（PostgreSQL · Redis · Qdrant · Langfuse）。
 
 ## 安全自查 ✅ 2026-09-14
 
-一轮全仓库自查，判据是 OWASP Top 10 与 OWASP Top 10 for LLM Applications（⛔ ISO 27001 / NIST 映射：没有真实审计可指回时映射只能自己编，理由见 [decisioni.md](decisioni.md) 2026-09-14 第 4 条）。本文件是**覆盖范围**的属主；开放鉴定不在这里，在带 `security-review` 标签的 issue 里。
+一轮全仓库自查。判据是两份现行清单，版本写死以便日后判断是否过期：**OWASP Top 10:2025**（final；2021 版已被 OWASP 标为 superseded，SSRF 不再是独立类别而并入 A01）与 **OWASP Top 10 for Large Language Model Applications, versione 2026**（2026-08-04 发布，项目现名 OWASP GenAI Security Project；取代 2025 版）。⛔ ISO 27001 / NIST 映射：没有真实审计可指回时映射只能自己编，理由见 [decisioni.md](decisioni.md) 2026-09-14「推进状态搬进 GitHub issue」第 4 条。
 
-查过且**判定为健全**的面：仓库与 git 历史中的密钥（无，`.env` 从未被跟踪，pre-commit 带 `detect-private-key`）· `config/settings.py` 与 `check --deploy`（`--fail-level WARNING` 通过，HSTS · SSL redirect · cookie secure 齐备，`SecretStr` 用法有据）· CSRF 端到端（双向，`ensure_csrf_cookie` + 头，Vite 代理 `changeOrigin: false` 有据）· 授权与 IDOR（queryset 层 scoping，404 与「不存在」不可区分）· 认证与口令（`create_user`、Django 四个校验器、session key 轮换、单一失败消息）· DRF 限流（`ScopedRateThrottle` 配 `NUM_PROXIES = 0`）· SQL/NoSQL 注入（无裸查询，只走 ORM 与 `models.Filter`）· 前端 XSS（无 `dangerouslySetInnerHTML`，`URL_PATTERN` 只认 `https?://`，`rel="noreferrer"`，`CSS.escape()`）· 客户端 token 存储（`localStorage` 里没有 token，只有同源 cookie）· 不安全反序列化（无 `pickle` / `torch.load` / `yaml.load` / `eval`，JSONL 一律 `model_validate_json`；registry 与 manifest 的坏行跳过并告警）· 子进程执行（唯一一处 `subprocess.run`，固定 argv、不过 shell）· LLM 的 JSON 输出（单点校验，每个调用方都有确定性的安全兜底，30 s 超时）· 前端依赖（`npm audit` 为 0）· CI（`permissions: contents: read`、action 按 SHA 钉住、`uv sync --locked`、`npm ci`、`makemigrations --check`）· `docker-compose.yml`（无明文凭据，默认不暴露应用服务）· 爬虫的 robots 与限速（在代码里，不靠约定）· 教学材料上传（**代码里不存在**：无 `FileField`、无端点；将来要为它立的那几道闸别处已有先例 —— `LIVE_MAX_PDF_PAGES = 40`、`document_timeout` 120 s、`artifact_name()` 定盘上文件名）。
+本文件是**覆盖范围**的属主 —— 即「两份清单的每一项在本项目里判成了什么」。开放鉴定的正文不在这里，在带 `security-review` 标签的 issue 里。下面两张表的每一行必须落到三种归属之一：健全（写依据）、有开放鉴定（写 issue 号）、缺口（也写 issue 号）。没有第四种。
+
+**OWASP Top 10:2025 — 逐项**
+
+| 类别 | 判定 | 归属 |
+| --- | --- | --- |
+| A01:2025 Broken Access Control | 🔶 有开放鉴定 ×3 | `#4`（任意 URL fetch 无目的地 allowlist —— 2021 版的 A10 SSRF 并入本类后归这里）· `#15`（manifest 值未归一化即拼成路径）· `#17`（索引共享，无 per-user 归属）。三面判定健全：授权与 IDOR（queryset 层 scoping，404 与「不存在」不可区分）· CSRF 端到端（双向，`ensure_csrf_cookie` + 请求头，Vite 代理 `changeOrigin: false` 有据 —— 2021 版起 CSRF 并入本类）· 爬虫的出站姿态（robots 遵守与限速写在代码里，不靠约定） |
+| A02:2025 Security Misconfiguration | 🔶 有开放鉴定 ×2 | `#11`（无 CSP）· `#14`（错误消息把服务端命令与路径讲给调用方）。健全面：`check --deploy --fail-level WARNING` 通过 · `docker-compose.yml` 无明文凭据且默认不暴露应用服务 · CI 的 `permissions: contents: read` 已最小化且 `makemigrations --check` 守着迁移漂移 |
+| A03:2025 Software Supply Chain Failures | 🔶 有开放鉴定 ×2 | `#7`（lockfile 两条 CVE，两条都是**风险接受**不是修复，见 [decisioni.md](decisioni.md)「两个 CVE 的处置」）· `#55`（其中 `transformers` 那条有修复版但被全平台求解挡住，这是它的出口，挂 M3）· `#10`（HF 模型未钉 revision）。本类是 2021 版 A06「Vulnerable and Outdated Components」的扩展，所以未钉 revision 从 2021 的 A08 移到这里。健全面：`uv sync --locked` · `npm ci` · action 按 SHA 钉住 · `npm audit` 为 0 · [dependabot.yml](../.github/dependabot.yml) 每周提更新 PR |
+| A04:2025 Cryptographic Failures | ✅ 健全 | `check --deploy` 下 HSTS · SSL redirect · cookie secure 齐备；`SecretStr` 用法有据；客户端无 token 存储（`localStorage` 里没有 token，只有同源 cookie） |
+| A05:2025 Injection | ✅ 健全 | 无裸查询，只走 ORM 与 `models.Filter`；前端无 `dangerouslySetInnerHTML`，`URL_PATTERN` 只认 `https?://`，`rel="noreferrer"`，`CSS.escape()`；唯一一处 `subprocess.run` 固定 argv、不过 shell |
+| A06:2025 Insecure Design | 🔶 有开放鉴定 ×1 | `#5`（把一次永久写入托付给读着待判内容的 LLM 判定 —— 「LLM 当授权决策」）。2021 版编号为 A04 |
+| A07:2025 Authentication Failures | 🔶 有开放鉴定 ×2 | `#9`（`/admin/` 登录尝试无限）· `#16`（`DEBUG` 默认为真时 `BasicAuthentication` 仍在）。健全面：`create_user` · Django 四个校验器 · session key 轮换 · 单一失败消息 · DRF `ScopedRateThrottle` 配 `NUM_PROXIES = 0`。2021 版名为「Identification and Authentication Failures」 |
+| A08:2025 Software or Data Integrity Failures | ✅ 健全 | 无 `pickle` / `torch.load` / `yaml.load` / `eval`，JSONL 一律 `model_validate_json`，registry 与 manifest 的坏行跳过并告警；仓库与 git 历史中无密钥，`.env` 从未被跟踪，pre-commit 带 `detect-private-key`。模型 artifact 的完整性归 A03 的 `#10` |
+| A09:2025 Security Logging and Alerting Failures | 🔶 有开放鉴定 ×1 | `#13`（认证事件不留日志）。2021 版名为「Security Logging and Monitoring Failures」 |
+| A10:2025 Mishandling of Exceptional Conditions | 🔶 缺口（本轮新开） | **有什么**：多处有意设计的兜底 —— 相关性门失败即 `relevant=False`（失败朝关的方向）· LLM 的 JSON 输出单点校验 + 每个调用方确定性兜底 + 30 s 超时 · 契约里有显式的 `Unavailable` 区分「稍后重试」与「模型服务不在」· 路由器校验失败回落 `both`。**缺什么**：一个判定。本类是 2025 版新增（2021 版那个位置是 SSRF），本轮自查按旧清单做，因而从未按这一类别看过 —— 尤其是这些兜底**并非同一个方向**：门朝关的方向失败，而 registry/manifest 的坏行是跳过并告警，也就是带着残缺数据继续 → `#52` |
+
+**OWASP Top 10 for LLM Applications 2026 — 逐项**
+
+| 类别 | 判定 | 归属 |
+| --- | --- | --- |
+| LLM01:2026 Prompt Injection | 🔶 有开放鉴定 ×2 | `#5`（间接注入打向**写入决策**）· `#6`（间接注入打向**回答**：检索片段无分隔符进生成 prompt） |
+| LLM02:2026 Sensitive Information Disclosure | 🔶 有开放鉴定 ×1 | `#36`（每账号上传隔离）。**健全的部分**：今天索引里只有公开的校园页面，无跨账号可读的私密材料 —— 因为上传功能**代码里根本不存在**（无 `FileField`、无端点）。**缺的部分**：它一旦存在，本行的判定就要重做，而该判定正是 `#36` 的验收项。将来要为它立的那几道闸别处已有先例：`LIVE_MAX_PDF_PAGES = 40` · `document_timeout` 120 s · `artifact_name()` 定盘上文件名 |
+| LLM03:2026 Excessive Agency | 🔶 缺口（本轮新开） | `rag/agent.py` 的深化循环有实质约束（≤3 步硬上限 · 显式控制流 · 每步 pydantic 校验的 JSON 决策 · ⛔ 原生 tool-calling · 唯一例外写路径 `decisions.jsonl` 是审计工件），但**从未按这一类别系统评估过**；本类在 2026 版从第 6 升到第 3 → `#53` |
+| LLM04:2026 Supply Chain | 🔶 有开放鉴定 ×1 | `#10`（模型未钉 revision）。依赖侧见 A03:2025 的 `#7` |
+| LLM05:2026 Data and Model Poisoning | 🔶 有开放鉴定 ×1 | `#5` —— 自增长写入就是本项目的投毒面；2026-09-14 起的缓解方向是人工确认闸门（`#48`），见 [decisioni.md](decisioni.md) 2026-09-14「人工闸门与 UI 计分」第 1 条 |
+| LLM06:2026 Unbounded Consumption | 🔶 有开放鉴定 ×2 | `#8`（尺寸上限在整个响应体已进内存后才生效）· `#12`（注册开放且队列无全局上限）。2025 版编号为 LLM10 |
+| LLM07:2026 Misinformation | 🔶 缺口（本轮新开） | **有什么**：⛔ 出题与判卷超出范围（最危险的用法不存在）· 回答只从检索片段生成 · 引用卡来自 retrieval 而非模型散文（`frontend/src/features/chat/AnswerStream.tsx` 写明了这个区分）· 路由器会带理由拒答。**缺什么**：一个判定。原先这里写的是「控制在别处（`#20` 的 RAGAS faithfulness）」，但 `#20` 是评估 issue、只带 `enhancement` 标签，量的是平均质量，不是「答错一条截止日期会怎样」 → `#56`。2025 版编号为 LLM09 |
+| LLM08:2026 Hidden Context Exposure | 🔶 缺口（本轮新开） | 2026 版把 2025 的「System Prompt Leakage」扩展为「任何被组装进模型上下文的非用户可见内容，含检索到的文本、工具 schema、流程规则」。本项目的上下文里这三样都有 → `#54` |
+| LLM09:2026 Vector and Embedding Weaknesses | 🔶 有开放鉴定 ×1 | `#17`（索引共享，没有任何点带着「谁引发的」）。**本轮补上的归类**：该 issue 原本只标了「LLM04 Data and Model Poisoning」（2026 版为 LLM05）。那条不算错，但它标的是**后果**；多租户向量库的隔离与溯源本身有专门的类别，就是这一条，之前漏了 |
+| LLM10:2026 Improper Output Handling | ✅ 健全 | LLM 的 JSON 输出单点校验，每个调用方都有确定性的安全兜底，30 s 超时；前端渲染侧见 A05:2025 那一行。2025 版编号为 LLM05 |
 
 ## 算力策略：分层（开发本地 · 实验服务器）
 
