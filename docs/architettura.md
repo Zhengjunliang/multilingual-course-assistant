@@ -63,6 +63,7 @@ relatore 给的四个起步链接已精读并扩展成 [analisi-rag.md](analisi-
 - **模型身份**：HF 模型 revision（pin 到 commit，`Qwen3-8B` 这样的名字不是固定 artifact）+ 量化方案。量化 8B 与 fp16 8B 是**不同模型**：尺寸对比实验里两者不得跨机混比，否则尺寸轴与精度轴混杂。
 - **推理配置**：vLLM 版本、seed、采样参数（temperature / top_p / max_tokens）。
 - **数据身份**：语料快照哈希与解析配置随 chunk payload 携带（字段属主见 [docling-e-pipeline.md](docling-e-pipeline.md)）。
+- **解析栈版本**：`docling`（含 `docling-ibm-models`）与 `pypdf` 的版本必须与语料数字一起记录。这条不是推演出来的：2026-09-14 实测 `pypdf` 6.16.1 → 6.18.1 在**页数与图片数完全不变**的前提下，31 份里 12 份的 `chars/p` 全部上升（最大 +9.7%），而路由判定一个没变。也就是说下方「语料与交付范围」里的「约 65 万字符」与 `3.5-HTML5` 的「10001 → 20032」都是**版本相关**的数字 —— 与模型 revision 同类，换库即须重测。明细见 [diario-sperimentale.md](diario-sperimentale.md) 2026-09-14 那条。
 
 ## 语料与交付范围
 

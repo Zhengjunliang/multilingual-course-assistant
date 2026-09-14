@@ -2,6 +2,58 @@
 
 Registro degli esperimenti e dei problemi riscontrati durante lo sviluppo, in italiano (stile formale): il contenuto confluirà nei capitoli sperimentali della tesi (M6). Una voce per data; i dati citati sono riproducibili con i comandi indicati. Le decisioni architetturali restano di proprietà di [architettura.md](architettura.md).
 
+## 2026-09-14 — Un aggiornamento di pypdf cambia il testo estratto senza cambiare l'instradamento
+
+### 1. Il confronto
+
+L'aggiornamento di `pypdf` da **6.16.1** a **6.18.1** (pull request di Dependabot) è stato accettato solo dopo aver misurato `rag.probe` sull'intero corpus prima e dopo, perché la CI non esegue alcun ingest e quindi non avrebbe potuto dire nulla al riguardo.
+
+Il conteggio delle pagine e quello delle immagini sono **identici in tutti i 31 documenti**. Cambia soltanto la densità di testo estratto, e cambia **sempre nella stessa direzione**: 12 documenti su 31 restituiscono più caratteri per pagina, nessuno ne restituisce meno.
+
+| Documento | 6.16.1 | 6.18.1 | Δ |
+| --- | --- | --- | --- |
+| Progetti Esercitazione Back-end PPM 2026 | 3975 | **4362** | +9,7% |
+| javascript_info_set2 | 540 | **557** | +3,1% |
+| javascript_info_set1 | 461 | **474** | +2,8% |
+| jquery_basics | 465 | **478** | +2,8% |
+| javascript_browser_document_events_interfaces | 566 | **581** | +2,7% |
+| 1.1 Course intro 2025 (2) | 261 | **268** | +2,7% |
+| 2.3 IMAGES LOSSY COMPRESSION 2024 | 413 | **423** | +2,4% |
+| 3.2b VIDEO H261-H262 2024 | 410 | **418** | +2,0% |
+| 4.1 Docker | 350 | **357** | +2,0% |
+| 3.1b VIDEO GENERAL CONCEPTS 2024 | 537 | **547** | +1,9% |
+| 4.2 Docker | 342 | **348** | +1,8% |
+| 3.3b VIDEO H264-H265 2024 | 1009 | **1020** | +1,1% |
+| *(gli altri 19)* | — | *invariati* | 0 |
+
+La causa non è stata investigata: per accettare l'aggiornamento bastava sapere che il verdetto dell'instradamento non cambiava. Che il segno sia sempre positivo suggerisce una correzione a monte nell'estrazione del livello di testo, non una regressione.
+
+### 2. Cosa non è cambiato, ed è la ragione per cui l'aggiornamento è stato accettato
+
+L'instradamento adattivo è **identico**: gli stessi 4 documenti richiedono l'arricchimento delle formule (`2.1 IMAGES GENERAL`, `2.3 IMAGES LOSSY`, `3.2b VIDEO H261-H262`, `3.3b VIDEO H264-H265`, tutti per presenza di font matematici `SymbolMT`), lo stesso unico documento richiede OCR (`3.5-HTML5-Part-2`, 50% di pagine senza livello di testo), i restanti 26 restano `classic`. Zero falsi positivi, come alla misura originale.
+
+Anche il recupero è invariato: `gold/smoke.jsonl` restituisce **38/40 (95%)** prima e dopo, con gli stessi due errori (`q018`, `q028`). La misura è stata ripetuta anche dopo l'aggiornamento di `qdrant-client` da 1.18.0 a 1.19.0, accettato nella stessa sessione.
+
+### 3. La conseguenza sulla riproducibilità
+
+Due numeri già registrati in [architettura.md](architettura.md), sezione «语料与交付范围», sono stati prodotti con `pypdf` 6.16.1: i **~650 000 caratteri** del corpus e il guadagno dell'OCR sul documento `3.5-HTML5` (**10001 → 20032 caratteri**). Non sono sbagliati, ma da oggi si sa che **dipendono dalla versione della libreria di estrazione**, esattamente come i risultati di generazione dipendono dalla revisione del modello. La versione dello stack di analisi entra quindi nell'elenco di riproducibilità.
+
+### 4. Un punto lasciato non verificato, dichiarato come tale
+
+`rag/live.py` usa `pypdf` anche per un secondo scopo: leggere un campione del livello di testo di un PDF scaricato dal web, da passare al gate di rilevanza. Se l'estrazione restituisce più testo, il campione cambia, e il verdetto del gate **potrebbe** cambiare con esso. Il valore di riferimento è **18/20** sull'insieme annotato.
+
+Questa misura non è stata ripetuta in questa sessione: richiede Ollama in esecuzione, e il gate è comunque destinato a essere ripensato nella direzione registrata il 2026-09-14 in [decisioni.md](decisioni.md) (conferma manuale al posto della scrittura automatica, `#48`). Va però scritto che si tratta di un punto **non misurato**, e non di un punto misurato e risultato stabile.
+
+### Riproducibilità
+
+```bash
+uv run python -m rag.probe data/corpus/PPM      # instradamento su tutti i 31 documenti
+uv run python -m rag.gold gold/smoke.jsonl      # hit@5 sul gold set di fumo
+uv run python -m rag.live --measure-gate        # NON eseguito in questa sessione; richiede Ollama
+```
+
+Versioni a confronto: `pypdf` 6.16.1 → 6.18.1, `qdrant-client` 1.18.0 → 1.19.0. Corpus invariato in `data/corpus/PPM` (31 PDF); indice invariato in `data/qdrant/` (collection `slides`; `unifi_web` a 29098 punti). Nessun reindicizzamento è stato eseguito: `rag.probe` non scrive, e il confronto riguarda l'estrazione, non i vettori.
+
 ## 2026-08-27 — Collaudo dell'interfaccia web: conversazione multi-turno, risoluzione anaforica, trascrizione al posto della risposta
 
 ### 1. Il collaudo manuale di M5
