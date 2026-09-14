@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { MAX_BUSY_RETRIES, type Waiting } from "./useAsk";
 
 /** The server's own cap (apps/qa/serializers.py); enforced here so the reader sees it coming. */
@@ -12,6 +13,14 @@ interface ComposerProps {
   waiting: Waiting;
   onSubmit: (question: string) => void;
   onStop: () => void;
+  /**
+   * Centred under the empty state, or parked at the foot of a thread.
+   *
+   * The same component either way. Two composers — one for the first question
+   * and one for the rest — would be two places for Enter, the character cap and
+   * the stop button to be got right.
+   */
+  placement?: "hero" | "foot";
 }
 
 /**
@@ -28,7 +37,7 @@ function WaitingLine({ waiting }: { waiting: Waiting }) {
   switch (waiting.phase) {
     case "retrying":
       return (
-        <span className="text-muted text-sm">
+        <span className="text-body text-muted">
           {t("status.retrying", {
             seconds: waiting.seconds,
             attempt: waiting.attempt,
@@ -38,7 +47,7 @@ function WaitingLine({ waiting }: { waiting: Waiting }) {
       );
     case "stopped":
       return (
-        <span className="text-warn-ink text-sm">
+        <span className="text-body text-warn-ink">
           {waiting.failure.kind === "reported" ? waiting.failure.detail : t("error.incomplete")}
         </span>
       );
@@ -47,7 +56,7 @@ function WaitingLine({ waiting }: { waiting: Waiting }) {
   }
 }
 
-export function Composer({ waiting, onSubmit, onStop }: ComposerProps) {
+export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: ComposerProps) {
   const { t } = useTranslation();
   const [question, setQuestion] = useState("");
 
@@ -77,29 +86,45 @@ export function Composer({ waiting, onSubmit, onStop }: ComposerProps) {
 
   return (
     <form
-      className="flex flex-col gap-3 border-line border-t bg-canvas px-4 py-4"
+      className={cn(
+        "w-full px-gutter",
+        placement === "foot" ? "border-line border-t bg-canvas py-gutter" : "py-0",
+      )}
       onSubmit={onFormSubmit}
     >
-      <label className="sr-only" htmlFor="question">
-        {t("ask.label")}
-      </label>
-      <Textarea
-        id="question"
-        value={question}
-        maxLength={MAX_QUESTION_CHARS}
-        onChange={(event) => setQuestion(event.target.value)}
-        onKeyDown={onKeyDown}
-      />
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={!ready}>
-          {t("ask.submit")}
-        </Button>
-        {busy && (
-          <Button type="button" variant="outline" onClick={onStop}>
-            {t("ask.cancel")}
-          </Button>
+      {/* One rounded shell holding the field and its controls, rather than a
+          bare textarea with buttons loose underneath it. The border is the
+          accent once there is something to send: the only moving colour on an
+          otherwise still screen, and it lands exactly where the next action is. */}
+      <div
+        className={cn(
+          "mx-auto flex max-w-4xl flex-col gap-tight rounded-2xl border bg-surface p-snug transition-colors",
+          ready ? "border-accent" : "border-line",
         )}
-        <WaitingLine waiting={waiting} />
+      >
+        <label className="sr-only" htmlFor="question">
+          {t("ask.label")}
+        </label>
+        <Textarea
+          id="question"
+          value={question}
+          maxLength={MAX_QUESTION_CHARS}
+          placeholder={t("ask.placeholder")}
+          onChange={(event) => setQuestion(event.target.value)}
+          onKeyDown={onKeyDown}
+          className="min-h-control resize-none border-0 bg-transparent px-hair focus-visible:outline-none"
+        />
+        <div className="flex flex-wrap items-center gap-snug">
+          <Button type="submit" size="sm" disabled={!ready}>
+            {t("ask.submit")}
+          </Button>
+          {busy && (
+            <Button type="button" size="sm" variant="outline" onClick={onStop}>
+              {t("ask.cancel")}
+            </Button>
+          )}
+          <WaitingLine waiting={waiting} />
+        </div>
       </div>
     </form>
   );

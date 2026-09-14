@@ -24,6 +24,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Sheet } from "@/components/ui/sheet";
 import { Composer } from "@/features/chat/Composer";
 import { ConversationSidebar } from "@/features/chat/ConversationSidebar";
+import { EmptyState } from "@/features/chat/EmptyState";
 import { TurnView } from "@/features/chat/TurnView";
 import { useAsk } from "@/features/chat/useAsk";
 
@@ -109,6 +110,21 @@ export default function ChatPage() {
     <ConversationSidebar conversations={conversations} onNavigate={() => setDrawerOpen(false)} />
   );
 
+  // Before the first question the page is a front door: heading, suggestions
+  // and the composer together in the middle of the screen. After it, the
+  // composer parks at the foot and the thread owns the space. The composer is
+  // the same component in both — it moves, it is not duplicated.
+  const empty = turns.length === 0 && !unreadable;
+
+  const composer = (
+    <Composer
+      waiting={waiting}
+      onSubmit={onSubmit}
+      onStop={stop}
+      placement={empty ? "hero" : "foot"}
+    />
+  );
+
   return (
     <div className="flex h-full">
       <aside className="hidden w-64 shrink-0 border-line border-r bg-surface lg:block">
@@ -121,32 +137,40 @@ export default function ChatPage() {
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader onOpenSidebar={() => setDrawerOpen(true)} />
 
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
-          <div className="mx-auto flex max-w-4xl flex-col gap-10">
-            {unreadable && <p className="text-muted text-sm">{t("sidebar.unreadable")}</p>}
-            {turns.length === 0 && !unreadable && (
-              <p className="text-muted text-sm">{t("app.subtitle")}</p>
-            )}
-            {turns.map((turn, position) => {
-              // Only the last turn can be the one being answered; every earlier
-              // one is settled, whether it settled a second ago or last week.
-              const current = position === turns.length - 1;
-              return (
-                <TurnView
-                  key={turn.key}
-                  turn={turn}
-                  live={current && waiting.phase === "streaming"}
-                  thinking={current && (waiting.phase === "queued" || waiting.phase === "retrying")}
-                  highlighted={highlighted}
-                  onHighlight={setHighlighted}
-                />
-              );
-            })}
-            <div ref={bottom} />
-          </div>
-        </main>
-
-        <Composer waiting={waiting} onSubmit={onSubmit} onStop={stop} />
+        {empty ? (
+          <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room">
+            <EmptyState onPick={onSubmit} />
+            {composer}
+          </main>
+        ) : (
+          <>
+            <main className="min-h-0 flex-1 overflow-y-auto px-gutter py-room">
+              <div className="mx-auto flex max-w-4xl flex-col gap-room">
+                {unreadable && <p className="text-body text-muted">{t("sidebar.unreadable")}</p>}
+                {turns.map((turn, position) => {
+                  // Only the last turn can be the one being answered; every
+                  // earlier one is settled, whether it settled a second ago or
+                  // last week.
+                  const current = position === turns.length - 1;
+                  return (
+                    <TurnView
+                      key={turn.key}
+                      turn={turn}
+                      live={current && waiting.phase === "streaming"}
+                      thinking={
+                        current && (waiting.phase === "queued" || waiting.phase === "retrying")
+                      }
+                      highlighted={highlighted}
+                      onHighlight={setHighlighted}
+                    />
+                  );
+                })}
+                <div ref={bottom} />
+              </div>
+            </main>
+            {composer}
+          </>
+        )}
       </div>
     </div>
   );
