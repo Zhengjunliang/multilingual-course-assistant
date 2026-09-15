@@ -1,6 +1,39 @@
 @import "tailwindcss";
 
 /*
+ * Geist Sans, served from this repository.
+ *
+ * Not a CDN. The demo has to work on a machine with no network, and a webfont
+ * fetched from a third party also tells that third party who opened the page —
+ * a poor trade for a university tool. The file is 69,652 bytes: one variable
+ * face covering every weight from 100 to 900, against 138,212 bytes and three
+ * requests for the three static weights this interface actually uses. A weight
+ * added later costs nothing.
+ *
+ * The leading slash is load-bearing. Vite only recognises a `url()` as a public
+ * file when it starts with `/`; without it the build emits a warning rather
+ * than an error, development looks fine, and production 404s. With it, `base`
+ * rewrites the path to `/static/fonts/…` at build time, which is where
+ * STATICFILES_DIRS has Django serve it from.
+ *
+ * `format("woff2")`, not `format("woff2-variations")` — the latter is the older
+ * spelling and Safari rejects it. The range on `font-weight` is what makes the
+ * single file answer for all of them.
+ *
+ * No Chinese is packaged. Every grotesque here covers Latin only, and a CJK
+ * face is megabytes; `zh-hans` falls through to whatever the machine has. The
+ * two CJK names below sit *before* `sans-serif` because a stack stops at the
+ * first family that resolves, and `sans-serif` always resolves.
+ */
+@font-face {
+  font-family: "Geist Sans";
+  src: url("/fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
  * Semantic colours, not raw palette steps.
  *
  * Every component below names what a colour is *for* — surface, muted text, a
@@ -50,6 +83,7 @@
 @theme {
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
+  --color-sidebar: var(--sidebar);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
@@ -101,6 +135,7 @@
 :root {
   --canvas: oklch(99% 0 0);
   --surface: oklch(100% 0 0);
+  --sidebar: oklch(97% 0 0);
   --ink: oklch(0% 0 0);
   --muted: oklch(44% 0 0);
   --line: oklch(92% 0 0);
@@ -115,6 +150,7 @@
 [data-theme="dark"] {
   --canvas: oklch(0% 0 0);
   --surface: oklch(14% 0 0);
+  --sidebar: oklch(23% 0 0);
   --ink: oklch(100% 0 0);
   --muted: oklch(72% 0 0);
   --line: oklch(26% 0 0);
@@ -136,6 +172,8 @@ body {
   margin: 0;
   background-color: var(--canvas);
   color: var(--ink);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family:
+    "Geist Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
