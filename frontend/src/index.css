@@ -18,16 +18,28 @@
  * about, which is why biome.json turns `tailwindDirectives` on: without it this
  * file is a parse error rather than a file the linter has an opinion about.
  *
- * The accent is two variables, not one, and the reason is what each is asked to
- * survive. `--accent` is a *surface*: a button's fill, a focus outline, the ring
- * around a highlighted card — things a reader only has to see, which WCAG 1.4.11
- * settles at 3:1. `--accent-text` is *ink*: the accent used as words on the page
- * background, which needs 4.5:1. Held to one value, the surface has to give up
- * its colour to meet the stricter rule, and the result is the defect this file
- * used to have — an `--accent` that was simply `--ink`, a colour that never
- * offends and never characterises. Split, each side is tuned against its own
- * threshold, and `scripts/check-contrast.mjs` reads these very declarations to
- * prove it, in both themes, on every commit.
+ * The palette is achromatic on purpose. Every token below has zero chroma
+ * except the three `--warn*`, which are the one colour left in the interface —
+ * spent on a failure, never on a preference. `scripts/check-contrast.mjs` reads
+ * these very declarations and holds the neutral tokens to a chroma *ceiling*,
+ * so a tint cannot creep back in unnoticed.
+ *
+ * Be clear about what that ceiling is worth: with every neutral token at
+ * exactly zero, no legitimate edit can trip it. It is a guard against
+ * inattention, not a measurement under tension. The assertion it replaced —
+ * that the accent is not simply the ink — is no longer defensible with a
+ * number, because here the accent *is* the ink by choice: `--accent` is the
+ * black a button fills with, `--ink` the black a sentence is written in, and
+ * they agree. What used to be carried by colour, the link between a citation
+ * in the answer and its source card, is carried by fill instead: a pill wears
+ * `--mark` and the highlighted card wears `--mark` with an ink ring. Those are
+ * asserted in CitationList.test.tsx, because no colour gate can see them.
+ *
+ * `--accent` and `--accent-ink` are still two variables rather than one,
+ * because a surface and the ink that sits on it are inverses: black fill with
+ * white lettering in the light theme, white fill with black lettering in the
+ * dark one. There is no third accent variable. One that only ever equalled
+ * `--ink` would be a second name for a colour that already has one.
  *
  * Spacing and type are named here for the same reason the colours are: `px-4`
  * says how far, not what for, and two components meaning "a control's side
@@ -43,9 +55,7 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
-  --color-accent-text: var(--accent-text);
   --color-mark: var(--mark);
-  --color-mark-ink: var(--mark-ink);
   --color-warn: var(--warn);
   --color-warn-line: var(--warn-line);
   --color-warn-ink: var(--warn-ink);
@@ -81,36 +91,39 @@
   --text-display--line-height: 2.25rem;
 }
 
+/*
+ * Lightness is written in whole percentage points, and the gate compares it
+ * that way. Two fills that touch without a border between them have to stand a
+ * step apart, and `0.25 - 0.23` in binary floating point is 0.0199999999999999
+ * — a correct palette failing its own rule on the last bit. Integers have no
+ * such edge.
+ */
 :root {
-  --canvas: oklch(98.4% 0.003 247.86);
+  --canvas: oklch(99% 0 0);
   --surface: oklch(100% 0 0);
-  --ink: oklch(20.8% 0.042 265.75);
-  --muted: oklch(55.4% 0.046 257.42);
-  --line: oklch(92.9% 0.013 255.51);
-  --accent: oklch(52% 0.11 196);
-  --accent-ink: oklch(99% 0.008 196);
-  --accent-text: oklch(44% 0.1 196);
-  --mark: oklch(92.9% 0.013 255.51);
-  --mark-ink: oklch(37.2% 0.044 257.29);
-  --warn: oklch(98.7% 0.022 95.28);
-  --warn-line: oklch(82.8% 0.111 82);
-  --warn-ink: oklch(41.4% 0.112 45.9);
+  --ink: oklch(0% 0 0);
+  --muted: oklch(44% 0 0);
+  --line: oklch(92% 0 0);
+  --accent: oklch(0% 0 0);
+  --accent-ink: oklch(100% 0 0);
+  --mark: oklch(94% 0 0);
+  --warn: oklch(96% 0.02 23);
+  --warn-line: oklch(63% 0.19 23);
+  --warn-ink: oklch(45% 0.18 23);
 }
 
 [data-theme="dark"] {
-  --canvas: oklch(20.8% 0.042 265.75);
-  --surface: oklch(27.9% 0.041 260.03);
-  --ink: oklch(96.8% 0.007 247.9);
-  --muted: oklch(70.4% 0.04 256.79);
-  --line: oklch(37.2% 0.044 257.29);
-  --accent: oklch(72% 0.12 196);
-  --accent-ink: oklch(20.8% 0.042 265.75);
-  --accent-text: oklch(82% 0.1 196);
-  --mark: oklch(37.2% 0.044 257.29);
-  --mark-ink: oklch(96.8% 0.007 247.9);
-  --warn: oklch(27.9% 0.041 260.03);
-  --warn-line: oklch(55.5% 0.115 65);
-  --warn-ink: oklch(90.1% 0.076 70.7);
+  --canvas: oklch(0% 0 0);
+  --surface: oklch(14% 0 0);
+  --ink: oklch(100% 0 0);
+  --muted: oklch(72% 0 0);
+  --line: oklch(26% 0 0);
+  --accent: oklch(100% 0 0);
+  --accent-ink: oklch(0% 0 0);
+  --mark: oklch(25% 0 0);
+  --warn: oklch(22% 0.03 23);
+  --warn-line: oklch(69% 0.2 24);
+  --warn-ink: oklch(85% 0.09 23);
 }
 
 html,

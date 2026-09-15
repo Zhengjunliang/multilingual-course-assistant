@@ -39,7 +39,7 @@ function Specimen({
 }) {
   return (
     <section className="flex flex-col gap-tight border-line border-t pt-snug first:border-t-0 first:pt-0">
-      <h3 className="font-mono text-accent-text text-caption">{name}</h3>
+      <h3 className="font-mono font-medium text-caption text-ink">{name}</h3>
       <p className="text-caption text-muted">{note}</p>
       {children !== undefined && (
         <div className="flex flex-wrap items-end gap-tight">{children}</div>
@@ -110,15 +110,12 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
       <Specimen
         name="Accent"
-        note="The one colour: surface, ink on it, and the same accent as text."
+        note="Not a colour: black on light, white on dark. --mark is the quiet fill that says a thing can be clicked or is where you are, now that no hue can say it."
       >
         <span className="rounded-md bg-accent px-snug py-hair text-accent-ink text-caption">
           --accent
         </span>
-        <span className="text-accent-text text-caption">--accent-text</span>
-        <span className="rounded-md bg-mark px-snug py-hair text-caption text-mark-ink">
-          --mark
-        </span>
+        <span className="rounded-md bg-mark px-snug py-hair text-caption text-ink">--mark</span>
         <span className="rounded-md border border-warn-line bg-warn px-snug py-hair text-caption text-warn-ink">
           --warn
         </span>

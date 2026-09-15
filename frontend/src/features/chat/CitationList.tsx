@@ -92,7 +92,12 @@ export function CitationList({
                   className={cn(
                     "h-full transition-opacity",
                     unused && "opacity-50",
-                    highlighted === citation.marker && "ring-2 ring-accent",
+                    // Ring *and* fill. An ink ring alone is pure white on
+                    // near-black in the dark theme — the loudest thing on the
+                    // screen would be the border of a source card, louder than
+                    // the answer it is meant to accompany. Moving half the
+                    // signal onto the surface puts the hierarchy back.
+                    highlighted === citation.marker && "bg-mark ring-2 ring-ink",
                   )}
                 >
                   <CardHeader>
@@ -101,7 +106,7 @@ export function CitationList({
                         <button
                           type="button"
                           onClick={() => onSelect(citation.marker)}
-                          className="rounded-full border border-line px-tight font-medium text-accent-text text-caption transition-colors hover:border-accent hover:bg-accent hover:text-accent-ink"
+                          className="rounded-full bg-mark px-tight font-medium text-caption text-ink transition-colors hover:bg-accent hover:text-accent-ink"
                         >
                           {number}
                         </button>
