@@ -105,7 +105,7 @@ export default function RegisterPage() {
 
       <p className="text-center text-body text-muted">
         {t("auth.haveAccount")}{" "}
-        <Link to="/login" className="text-accent-text underline">
+        <Link to="/login" className="font-medium text-ink underline">
           {t("auth.logIn")}
         </Link>
       </p>

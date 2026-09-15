@@ -57,13 +57,22 @@ describe("the source strip", () => {
 
   it("rings the highlighted card and only that one", () => {
     const html = strip("[Excerpt 2]");
-    const rings = [...html.matchAll(/ring-accent/g)];
+    const rings = [...html.matchAll(/ring-ink/g)];
 
     expect(rings).toHaveLength(1);
   });
 
-  it("wears the accent on the badge that opens a source", () => {
-    expect(strip()).toContain("text-accent-text");
+  // These two stand in for a gate that cannot exist. The palette is achromatic,
+  // so the link between a citation and its source is carried by fill rather
+  // than by colour, and check-contrast.mjs has nothing left to measure about it:
+  // it can prove --mark is a step away from the page, not that anything wears
+  // it. That is what these assert.
+  it("fills the highlighted card as well as ringing it", () => {
+    expect(strip("[Excerpt 2]")).toContain("bg-mark ring-2 ring-ink");
+  });
+
+  it("fills the badge that opens a source", () => {
+    expect(strip()).toContain("bg-mark");
   });
 
   it("greys a source the answer retrieved but never cited", () => {

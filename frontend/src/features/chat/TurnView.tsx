@@ -39,10 +39,15 @@ function Thinking() {
   const { t } = useTranslation();
   return (
     <p className="flex items-center gap-tight text-body text-muted">
+      {/* Muted, not the accent. On this palette the accent is pure black on
+          near-white, so three bouncing accent dots would be the loudest thing
+          on the screen at the one moment there is nothing yet to read. And
+          `motion-reduce` because a reader who has asked the system to stop
+          moving things has asked this too. */}
       <span aria-hidden className="flex gap-hair">
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent [animation-delay:-0.3s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent [animation-delay:-0.15s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s] motion-reduce:animate-none" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s] motion-reduce:animate-none" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted motion-reduce:animate-none" />
       </span>
       {t("status.thinking")}
     </p>
@@ -60,7 +65,7 @@ export function TurnView({ turn, live, thinking, highlighted, onHighlight }: Tur
 
   return (
     <article className="flex flex-col gap-gutter">
-      <p className="ml-auto max-w-prose whitespace-pre-wrap rounded-2xl rounded-br-sm bg-mark px-gutter py-tight text-mark-ink">
+      <p className="ml-auto max-w-prose whitespace-pre-wrap rounded-2xl rounded-br-sm bg-mark px-gutter py-tight text-ink">
         {turn.question}
       </p>
 
@@ -71,7 +76,7 @@ export function TurnView({ turn, live, thinking, highlighted, onHighlight }: Tur
                 only place a reader is told where the answer came from, and it
                 used to say so in the quietest voice available. */}
             <p className="flex flex-wrap items-center gap-tight text-body">
-              <Search aria-hidden className="size-icon shrink-0 text-accent-text" />
+              <Search aria-hidden className="size-icon shrink-0 text-ink" />
               <span className="font-medium text-ink">{t(`route.${turn.route.target}`)}</span>
               <span aria-hidden className="text-line">
                 •

@@ -45,7 +45,7 @@ export function ConversationSidebar({ conversations, onNavigate }: ConversationS
                       // something they are about to do: ink and a quiet fill,
                       // the same rule the language switch follows.
                       isActive
-                        ? "bg-mark font-medium text-mark-ink"
+                        ? "bg-mark font-medium text-ink"
                         : "text-muted hover:bg-mark hover:text-ink",
                     )
                   }

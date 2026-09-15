@@ -32,21 +32,48 @@ const STYLESHEET = fileURLToPath(new URL("../src/index.css", import.meta.url));
 const TEXT = 4.5;
 const SHAPE = 3;
 
-/** Below this the "accent" is a grey, whatever else it is. */
-const MIN_CHROMA = 0.08;
+/**
+ * Above this a "neutral" token has a tint, whatever it is called.
+ *
+ * This is a ceiling, and it used to be a floor. The palette it guarded had an
+ * accent that was simply the ink, so the floor asked a question that could fail.
+ * The palette is deliberately achromatic now, every neutral token sits at
+ * exactly zero, and no legitimate edit can trip this. It catches inattention,
+ * not error, and the honest way to run it is knowing that.
+ */
+const MAX_CHROMA = 0.02;
+
+/** The neutral tokens. `--warn*` is the one colour left and is exempt. */
+const NEUTRAL = ["canvas", "surface", "ink", "muted", "line", "accent", "accent-ink", "mark"];
 
 const PAIRS = [
   { front: "ink", back: "canvas", min: TEXT, where: "index.css body rule" },
-  { front: "ink", back: "surface", min: TEXT, where: "AppHeader.tsx:42, card.tsx:19" },
-  { front: "muted", back: "canvas", min: TEXT, where: "ChatPage.tsx empty state" },
-  { front: "muted", back: "surface", min: TEXT, where: "CitationList.tsx:108" },
+  { front: "ink", back: "surface", min: TEXT, where: "card.tsx:19 card body" },
+  { front: "muted", back: "canvas", min: TEXT, where: "EmptyState.tsx:39 subtitle" },
+  { front: "muted", back: "surface", min: TEXT, where: "CitationList.tsx:113 excerpt" },
+  { front: "ink", back: "mark", min: TEXT, where: "AnswerStream.tsx:91 citation pill" },
+  { front: "muted", back: "mark", min: TEXT, where: "CitationList.tsx:113 on a lit card" },
   { front: "accent-ink", back: "accent", min: TEXT, where: "button.tsx:11 default variant" },
-  { front: "accent-text", back: "canvas", min: TEXT, where: "AnswerStream.tsx:35 link hover" },
-  { front: "accent-text", back: "surface", min: TEXT, where: "AnswerStream.tsx:35 inside a card" },
   { front: "accent", back: "canvas", min: SHAPE, where: "button.tsx:7 focus outline" },
-  { front: "accent", back: "surface", min: SHAPE, where: "CitationList.tsx:90 highlight ring" },
-  { front: "mark-ink", back: "mark", min: TEXT, where: "TurnView.tsx:56 question bubble" },
-  { front: "warn-ink", back: "warn", min: TEXT, where: "TurnView.tsx:80 failure box" },
+  { front: "accent", back: "surface", min: SHAPE, where: "input.tsx:9 focus outline" },
+  { front: "warn-ink", back: "warn", min: TEXT, where: "TurnView.tsx:110 failure box" },
+];
+
+/**
+ * Two fills that meet with no border between them.
+ *
+ * Contrast ratio is the wrong instrument here: it asks whether a letter can be
+ * read, and these pairs are asking whether a region exists at all. A step of
+ * two points of OKLCH lightness is what separates "the row under the pointer"
+ * from "nothing happened". The pairs are only those the interface composes
+ * *without* a border — a card is told apart by its outline, not its fill, so
+ * `--surface` against `--canvas` is one point apart on purpose and is not here.
+ */
+const STEP = 2;
+
+const LADDER = [
+  { a: "mark", b: "surface", where: "locale-switch.tsx:36 track, button.tsx:13 ghost hover" },
+  { a: "mark", b: "canvas", where: "AnswerStream.tsx:91 citation pill in the answer" },
 ];
 
 const THEMES = [
@@ -61,13 +88,22 @@ const THEMES = [
  * These blocks are flat lists of declarations and nothing nests inside them, so
  * a real parser would buy nothing. If that ever stops being true, this throws
  * on the missing token rather than reading a wrong one.
+ *
+ * Comments go first, and that is not tidiness. The search below is a plain
+ * `indexOf` for the selector, so the *prose* above a theme block competes with
+ * the block itself: a sentence in index.css that happens to mention `:root`
+ * would send this function into the comment and out again at the comment's own
+ * closing brace, finding no declarations and reporting a missing token — or,
+ * worse, finding some. Stripping comments first makes that impossible instead
+ * of leaving it to whoever edits the file next to remember.
  */
 function declarations(css, selector) {
-  const start = css.indexOf(selector);
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const start = source.indexOf(selector);
   if (start === -1) throw new Error(`no ${selector} block in index.css`);
-  const open = css.indexOf("{", start);
-  const close = css.indexOf("}", open);
-  const block = css.slice(open + 1, close);
+  const open = source.indexOf("{", start);
+  const close = source.indexOf("}", open);
+  const block = source.slice(open + 1, close);
 
   const found = new Map();
   for (const [, name, value] of block.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) {
@@ -148,40 +184,51 @@ for (const theme of THEMES) {
     return parseOklch(value, name);
   };
 
+  // Every check records a row, so `--verbose` prints exactly as many lines as
+  // the tally claims. It used to print twenty-two and say twenty-six, because
+  // the chroma checks never reached `measured` — a gate that miscounts itself
+  // is hard to trust about anything else.
+  const record = (label, detail, margin) => {
+    checked += 1;
+    measured.push({ label: `${theme.name}: ${label}`, detail, margin });
+  };
+
   for (const pair of PAIRS) {
     const ratio = contrast(colour(pair.front), colour(pair.back));
-    checked += 1;
-    measured.push({
-      label: `${theme.name}: --${pair.front} on --${pair.back}`,
-      ratio,
-      min: pair.min,
-    });
+    const label = `--${pair.front} on --${pair.back}`;
+    record(label, `${ratio.toFixed(2)}:1 (needs ${pair.min})`, ratio / pair.min);
     if (ratio < pair.min) {
       failures.push(
-        `${theme.name}: --${pair.front} on --${pair.back} is ${ratio.toFixed(2)}:1, ` +
+        `${theme.name}: ${label} is ${ratio.toFixed(2)}:1, ` +
           `needs ${pair.min}:1 (${pair.where})`,
       );
     }
   }
 
-  // An accent with no chroma is the defect this palette started from: `--accent`
-  // held the same value as `--ink`, so the interface had no colour of its own.
-  // Distinctness alone would not catch it — in the dark theme the two were
-  // already different values, and both were grey.
-  for (const name of ["accent", "accent-text"]) {
+  for (const name of NEUTRAL) {
     const { c } = colour(name);
-    checked += 1;
-    if (c < MIN_CHROMA) {
-      failures.push(`${theme.name}: --${name} has chroma ${c}, needs at least ${MIN_CHROMA}`);
+    record(`--${name} chroma`, `${c} (at most ${MAX_CHROMA})`, c === 0 ? Infinity : MAX_CHROMA / c);
+    if (c > MAX_CHROMA) {
+      failures.push(`${theme.name}: --${name} has chroma ${c}, at most ${MAX_CHROMA} is neutral`);
+    }
+  }
+
+  for (const rung of LADDER) {
+    // Whole points, not floats: see the note above the palette in index.css.
+    const delta = Math.abs(Math.round(colour(rung.a).l * 100) - Math.round(colour(rung.b).l * 100));
+    const label = `--${rung.a} against --${rung.b}`;
+    record(label, `${delta} points (needs ${STEP})`, delta / STEP);
+    if (delta < STEP) {
+      failures.push(
+        `${theme.name}: ${label} is ${delta} point(s) apart, ` + `needs ${STEP} (${rung.where})`,
+      );
     }
   }
 }
 
 if (verbose) {
-  for (const { label, ratio, min } of [...measured].sort(
-    (a, b) => a.ratio / a.min - b.ratio / b.min,
-  )) {
-    console.log(`  ${ratio.toFixed(2)}:1 (needs ${min}) — ${label}`);
+  for (const { label, detail } of [...measured].sort((a, b) => a.margin - b.margin)) {
+    console.log(`  ${detail} — ${label}`);
   }
 }
 

@@ -32,7 +32,7 @@ function linkified(text: string, base: number): ReactNode[] {
         href={url}
         target="_blank"
         rel="noreferrer"
-        className="break-all underline decoration-muted underline-offset-2 hover:text-accent-text"
+        className="break-all underline decoration-muted underline-offset-2 hover:decoration-ink"
       >
         {url}
       </a>,
@@ -65,7 +65,7 @@ export function AnswerStream({ text, badges, complete, live, onBadgeClick }: Ans
       <p className="whitespace-pre-wrap text-ink leading-relaxed">
         {text}
         {live && (
-          <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-muted align-text-bottom">
+          <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-muted align-text-bottom motion-reduce:animate-none">
             <span className="sr-only">{t("status.streaming")}</span>
           </span>
         )}
@@ -79,16 +79,22 @@ export function AnswerStream({ text, badges, complete, live, onBadgeClick }: Ans
         segment.kind === "text" ? (
           <span key={segment.at}>{linkified(segment.text, segment.at)}</span>
         ) : (
-          // A pill, not a block: it sits inside a sentence, so it borrows the
-          // accent as an outline and only fills with it under the pointer.
-          // Filled by default, a dozen of them would read as a rash across the
-          // prose rather than as places to look.
+          // A pill, not a block: it sits inside a sentence, so it is quiet by
+          // default and only fills with the accent under the pointer. Filled
+          // with the accent from the start, a dozen of them would read as a
+          // rash across the prose rather than as places to look.
+          //
+          // The fill is what says "clickable" — not a colour and not a border.
+          // On an achromatic palette a tinted word is impossible, and a hairline
+          // is too weak to carry the job (check-contrast.mjs says so in its own
+          // header). `--mark` against `--canvas` is a gated pair for this
+          // reason, so the pill cannot quietly dissolve into the paragraph.
           <button
             key={segment.at}
             type="button"
             onClick={() => onBadgeClick(segment.badge.marker)}
             title={segment.badge.marker}
-            className="mx-0.5 rounded-full border border-line px-tight align-baseline font-medium text-accent-text text-caption transition-colors hover:border-accent hover:bg-accent hover:text-accent-ink"
+            className="mx-0.5 rounded-full bg-mark px-tight align-baseline font-medium text-caption text-ink transition-colors hover:bg-accent hover:text-accent-ink"
           >
             {segment.badge.number}
           </button>
