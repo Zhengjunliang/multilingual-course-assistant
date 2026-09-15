@@ -26,23 +26,43 @@ export default defineConfig(({ command }) => ({
   // them from the root. Only the build needs the prefix.
   base: command === "build" ? "/static/" : "/",
 
-  // No jsdom and no happy-dom in devDependencies: the default `node`
-  // environment is enough because nothing under test touches a document.
-  // markers.ts is string work, and sse.ts needs ReadableStream and TextDecoder,
-  // both Node globals long before the 24 in .nvmrc.
+  // jsdom, and one dependency rather than the three an earlier note here
+  // predicted — that count was true of the testing-library route, not of this
+  // one. React 19 exports `act` itself and `react-dom/client` exports
+  // `createRoot`, so `src/test/mount.tsx` needs no library beyond a document.
   //
-  // Components are covered here too, and still without a document:
-  // `renderToStaticMarkup` walks the tree once and hands back markup as a
-  // string, so the assertions read HTML instead of a DOM. That is what makes
-  // `.tsx` worth collecting below at no cost in dependencies — the earlier note
-  // here, that rendering would buy three of them, was true only of the
-  // testing-library route.
+  // What the document buys is the half of the interface a string render cannot
+  // reach: Radix aims its portals at `document.body`, so the account dialog
+  // renders as an empty string without one, and `renderToStaticMarkup` runs no
+  // effects and dispatches no events, so nothing that happens on a click was
+  // testable at all. Those are the newest and least-proven parts of this
+  // interface, which is a poor thing to leave to a manual list.
   //
-  // What a string render cannot show is behaviour: no effect runs, and Radix
-  // portals aim at a `document.body` that is not there. A check that needs
-  // either — a click, a drawer actually open — belongs to the manual list in
-  // the pull request, not to this file.
+  // `src/test/render.tsx` stays and is not a leftover: markup assertions want a
+  // tree rendered once with no effects, behaviour assertions want a live
+  // document, and asking one helper to be both would make every test pay for
+  // the heavier one. The file headers say which is which.
+  //
+  // The document is asked for per file, with a `@vitest-environment jsdom`
+  // docblock, and the default stays `node`. Switching it globally was tried and
+  // reverted, for a reason worth keeping: under jsdom, Vite resolves modules
+  // with its client conditions and `import.meta.url` becomes the http URL the
+  // dev server would serve, so `fileURLToPath(new URL(…, import.meta.url))`
+  // fails with "The URL must be of scheme file". Four tests here read their
+  // subject off the disk that way — the component catalogue, the token aliases,
+  // the chat page's source — and none of them wants a document at all. Making
+  // every test pay for a synthetic realm so that two of them can have one also
+  // cost five times the wall clock, almost all of it spent building environments.
+  //
+  // Leave `pool` alone. On the default forks pool a jsdom file still sees
+  // Node's `ReadableStream`, `TextDecoder` and `TextEncoder`, which is what
+  // `api/sse.test.ts` is built on; `pool: "vmThreads"` copies `ReadableStream`
+  // neither into the VM context nor back out, and all ten of those cases die
+  // with a ReferenceError.
   test: {
+    // Runs in both environments, and checks before it touches a window: jsdom
+    // is not a browser and lacks three APIs this repository already calls.
+    setupFiles: ["src/test/setup.ts"],
     // `globals` stays off, so every test imports describe/it/expect from
     // "vitest" by name. That keeps tsconfig's `types` array as it is and leaves
     // biome with no undeclared identifiers to shrug at.

@@ -10,6 +10,13 @@
  * `fileURLToPath` and not `new URL(...).pathname` for the reason vite.config.ts
  * already records: on Windows the latter yields "/D:/…", which no filesystem
  * call accepts.
+ *
+ * This only works under the `node` environment, which is the default and which
+ * every caller of this module uses. Ask for jsdom in one of them and
+ * `import.meta.url` becomes an http URL served by Vite's client transform, at
+ * which point `fileURLToPath` refuses it outright. vite.config.ts records why
+ * the document is opt-in per file rather than global; this is one of the
+ * reasons.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
