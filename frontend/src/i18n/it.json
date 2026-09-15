@@ -10,7 +10,6 @@
     "password": "Password",
     "logIn": "Accedi",
     "register": "Registrati",
-    "logOut": "Esci ({{username}})",
     "failed": "Accesso non riuscito.",
     "noAccount": "Non hai un account?",
     "haveAccount": "Hai già un account?"
@@ -21,12 +20,24 @@
     "empty": "Nessuna conversazione.",
     "untitled": "Senza titolo",
     "open": "Apri le conversazioni",
+    "collapse": "Chiudi la barra laterale",
+    "expand": "Apri la barra laterale",
     "unreadable": "Questa conversazione non è disponibile."
   },
+  "account": {
+    "title": "Account",
+    "menu": "Apri il menu dell'account",
+    "profile": "Profilo",
+    "theme": "Tema",
+    "themeCaption": "Vale su questo dispositivo, non sull'account.",
+    "language": "Lingua",
+    "logOut": "Esci",
+    "close": "Chiudi"
+  },
   "theme": {
-    "system": "Tema: di sistema",
-    "light": "Tema: chiaro",
-    "dark": "Tema: scuro"
+    "system": "Di sistema",
+    "light": "Chiaro",
+    "dark": "Scuro"
   },
   "ask": {
     "label": "La tua domanda",

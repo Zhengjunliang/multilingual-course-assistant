@@ -20,8 +20,8 @@ import { isRefusal } from "@/api/client";
 import type { ConversationSummary } from "@/api/conversations";
 import { listConversations, readConversation } from "@/api/conversations";
 import { useSession } from "@/auth/useSession";
-import { AppHeader } from "@/components/AppHeader";
-import { Sheet } from "@/components/ui/sheet";
+import { AccountMenu } from "@/components/AccountMenu";
+import { ChatShell, type SidebarControls } from "@/features/chat/ChatShell";
 import { Composer } from "@/features/chat/Composer";
 import { ConversationSidebar } from "@/features/chat/ConversationSidebar";
 import { EmptyState } from "@/features/chat/EmptyState";
@@ -35,7 +35,6 @@ export default function ChatPage() {
   const { forget } = useSession();
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [unreadable, setUnreadable] = useState(false);
 
@@ -106,8 +105,12 @@ export default function ChatPage() {
     void submit(question).then(refreshSidebar);
   };
 
-  const sidebar = (
-    <ConversationSidebar conversations={conversations} onNavigate={() => setDrawerOpen(false)} />
+  const sidebar = ({ onNavigate, onCollapse }: SidebarControls) => (
+    <ConversationSidebar
+      conversations={conversations}
+      onNavigate={onNavigate}
+      onCollapse={onCollapse}
+    />
   );
 
   // Before the first question the page is a front door: heading, suggestions
@@ -126,52 +129,41 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="flex h-full">
-      <aside className="hidden w-64 shrink-0 border-line border-r bg-surface lg:block">
-        {sidebar}
-      </aside>
-      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen} title={t("sidebar.title")}>
-        {sidebar}
-      </Sheet>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AppHeader onOpenSidebar={() => setDrawerOpen(true)} />
-
-        {empty ? (
-          <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room">
-            <EmptyState onPick={onSubmit} />
-            {composer}
+    <ChatShell sidebar={sidebar} controls={<AccountMenu />}>
+      {empty ? (
+        <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room">
+          <EmptyState onPick={onSubmit} />
+          {composer}
+        </main>
+      ) : (
+        <>
+          <main className="min-h-0 flex-1 overflow-y-auto px-gutter py-room">
+            <div className="mx-auto flex max-w-4xl flex-col gap-room">
+              {unreadable && <p className="text-body text-muted">{t("sidebar.unreadable")}</p>}
+              {turns.map((turn, position) => {
+                // Only the last turn can be the one being answered; every
+                // earlier one is settled, whether it settled a second ago or
+                // last week.
+                const current = position === turns.length - 1;
+                return (
+                  <TurnView
+                    key={turn.key}
+                    turn={turn}
+                    live={current && waiting.phase === "streaming"}
+                    thinking={
+                      current && (waiting.phase === "queued" || waiting.phase === "retrying")
+                    }
+                    highlighted={highlighted}
+                    onHighlight={setHighlighted}
+                  />
+                );
+              })}
+              <div ref={bottom} />
+            </div>
           </main>
-        ) : (
-          <>
-            <main className="min-h-0 flex-1 overflow-y-auto px-gutter py-room">
-              <div className="mx-auto flex max-w-4xl flex-col gap-room">
-                {unreadable && <p className="text-body text-muted">{t("sidebar.unreadable")}</p>}
-                {turns.map((turn, position) => {
-                  // Only the last turn can be the one being answered; every
-                  // earlier one is settled, whether it settled a second ago or
-                  // last week.
-                  const current = position === turns.length - 1;
-                  return (
-                    <TurnView
-                      key={turn.key}
-                      turn={turn}
-                      live={current && waiting.phase === "streaming"}
-                      thinking={
-                        current && (waiting.phase === "queued" || waiting.phase === "retrying")
-                      }
-                      highlighted={highlighted}
-                      onHighlight={setHighlighted}
-                    />
-                  );
-                })}
-                <div ref={bottom} />
-              </div>
-            </main>
-            {composer}
-          </>
-        )}
-      </div>
-    </div>
+          {composer}
+        </>
+      )}
+    </ChatShell>
   );
 }

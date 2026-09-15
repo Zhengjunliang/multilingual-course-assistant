@@ -32,7 +32,10 @@ export function EmptyState({ onPick }: EmptyStateProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="flex w-full flex-col items-center gap-room text-center">
+    // `max-w-4xl` is the composer's own width (Composer.tsx). Without it the
+    // heading centres on the screen while the chips stretch the whole column,
+    // and the three things a reader looks at first sit on three different axes.
+    <div className="flex w-full max-w-4xl flex-col items-center gap-room text-center">
       <div className="flex flex-col gap-tight">
         <h2 className="font-semibold text-display text-ink">{t("empty.title")}</h2>
         <p className="text-body text-muted">{t("app.subtitle")}</p>
