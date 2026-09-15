@@ -24,7 +24,13 @@ export type SuggestionsProps = ComponentProps<"div">;
 
 export function Suggestions({ className, children, ...props }: SuggestionsProps) {
   return (
-    <div className={cn("w-full overflow-x-auto", className)} {...props}>
+    // `justify-center-safe`, not `justify-center`: the row sits under a centred
+    // heading and above a centred composer, and left-aligned in that company it
+    // reads as a mistake. The `safe` half is the part that matters — centring a
+    // child inside a scroll container normally puts its start *before* the
+    // scrollable area, so the first chip becomes unreachable as soon as three
+    // long translations stop fitting. `safe` falls back to start exactly then.
+    <div className={cn("flex w-full justify-center-safe overflow-x-auto", className)} {...props}>
       {/* `w-max` so the row keeps its natural width and scrolls, rather than
           wrapping the chips onto a second line that pushes the composer down. */}
       <div className="flex w-max flex-nowrap items-center gap-tight pb-hair">{children}</div>

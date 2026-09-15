@@ -18,10 +18,14 @@
  * theme in variables and nowhere else.
  */
 
+import { LogOut, UserRound } from "lucide-react";
 import { useState } from "react";
 
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
+import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { Sheet } from "@/components/ui/sheet";
@@ -103,9 +107,36 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
         </Suggestions>
       </Specimen>
 
+      <Specimen name="Avatar" note="A letter in a circle. There is no picture of anyone to load.">
+        <Avatar name="junliang" />
+        <Avatar name="Émile" />
+        <Avatar name="" />
+      </Specimen>
+
+      <Specimen
+        name="DropdownMenu"
+        note="Only the trigger is here: the menu itself opens in a portal at the end of the document, so it follows the page theme rather than this panel."
+      >
+        <DropdownMenu
+          ariaLabel="Account"
+          trigger={<Avatar name="junliang" />}
+          label="junliang"
+          caption="Studente"
+          entries={[
+            { key: "account", icon: UserRound, label: "Account", onSelect: () => {} },
+            { key: "logout", icon: LogOut, label: "Esci", onSelect: () => {} },
+          ]}
+        />
+      </Specimen>
+
       <Specimen
         name="Sheet"
         note="A drawer over the whole page, so it cannot be shown inside this panel. It is open in the specimen below, outside the two themes."
+      />
+
+      <Specimen
+        name="Dialog"
+        note="A window in the middle of the page. Portalled like the drawer, and shown below for the same reason."
       />
 
       <Specimen
@@ -126,6 +157,7 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
 export default function StyleguidePage() {
   const [drawer, setDrawer] = useState(false);
+  const [dialog, setDialog] = useState(false);
 
   return (
     <div className="min-h-full bg-canvas p-gutter">
@@ -158,6 +190,22 @@ export default function StyleguidePage() {
               </Button>
             </div>
           </Sheet>
+
+          <Button className="self-start" onClick={() => setDialog(true)}>
+            Open the Dialog
+          </Button>
+          <Dialog
+            open={dialog}
+            onOpenChange={setDialog}
+            title="Dialog specimen"
+            description="A centred window, not a drawer."
+            closeLabel="Close"
+          >
+            <p className="text-body text-ink">
+              Wide enough for a form on a phone and no wider on a desk, with its own scroll so a
+              long body cannot push the close button off a short screen.
+            </p>
+          </Dialog>
         </div>
       </div>
     </div>
