@@ -2,6 +2,20 @@
 
 本文件是**自主拍板项**的属主：哪一天、拍了什么板、依据是什么，含**后来被自己推翻的那些** —— 反转本身是记录的一部分，删掉就看不出为什么会反转，答辩上也答不出来。⛔ 不在这里：技术栈选型与决策状态表归 [architettura.md](architettura.md)（「选了什么、验证条件是什么」）；推进状态、阻塞项与暂缓项归 GitHub issue（里程碑 M3 · M5 · M6 · M7），不在任何 markdown 文件里。
 
+## 2026-09-15 — La tavolozza diventa acromatica, e il cancello cambia verso
+
+1. **Revocato il commit `637f5cc`, «give the interface an accent colour of its own».** Quel commit, di sei giorni prima, aveva dato all'interfaccia un accento teal proprio perché `--accent` valeva carattere per carattere quanto `--ink` e l'interfaccia non aveva un colore suo. Dopo aver provato Morphic e Perplexity la decisione è stata di adottare la loro tavolozza, che è **interamente acromatica**: croma esattamente 0 su ogni token tranne la famiglia `--warn*`. L'accento torna a essere l'inchiostro, questa volta per scelta e non per difetto.
+   Il costo è reale e non va nascosto: il collegamento fra una citazione nella risposta e la sua scheda fonte era portato dal colore, ed è l'interazione più caratteristica di questa interfaccia. Passa al **riempimento** — la pillola porta `--mark`, la scheda accesa porta `--mark` più un anello d'inchiostro — e quelle sono asserzioni in `CitationList.test.tsx`, non un cancello.
+
+2. **`MIN_CHROMA` diventa `MAX_CHROMA`, e il rigore cala.** Il cancello chiedeva «dimostra di avere un colore» e ora chiede «dimostra di essere rimasta neutra». Va detto che **non è lo stesso rigore**: con ogni token neutro a croma zero il nuovo controllo non è falsificabile, e nessuna modifica legittima può farlo scattare. È una guardia contro la distrazione. Quello che il vecchio difendeva — «l'accento non è l'inchiostro» — non è più difendibile con un numero e passa a un'asserzione sul sorgente.
+   In compenso il cancello guadagna qualcosa che prima non aveva: una **scaletta delle superfici**, che misura la distanza di chiarezza fra due riempimenti che si toccano senza un bordo. Su una tavolozza di soli grigi è l'unico controllo in tensione — il margine più stretto è di due punti esatti, fra la conversazione aperta e la barra laterale che la contiene. Confronto in punti percentuali interi e non in virgola mobile: `0.25 - 0.23` vale `0.019999999999999990`, e scritto ingenuamente il controllo boccerebbe una tavolozza corretta.
+
+3. **Cancellati `--accent-text` e `--mark-ink`.** Sulla tavolozza nuova valgono entrambi quanto `--ink` in tutti e due i temi. La regola applicata è che superfici e inchiostri sono due spazi di nomi: un duplicato *dentro* uno dei due è rumore, una coincidenza *fra* i due è un fatto della tavolozza. È per questo che `--accent` resta pur valendo quanto `--ink`.
+
+4. **`AppHeader.tsx` eliminato, non svuotato.** Le sue cinque responsabilità hanno quattro case nuove: il titolo nella testata della barra laterale, il pulsante del cassetto in `ChatShell`, lingua e tema e uscita in `AccountDialog`, l'identità in `AccountMenu`. Nessuna barra attraversa più la colonna della conversazione, che è la differenza più visibile fra questo guscio e quello di prima.
+
+5. **Due dipendenze nuove**: `@radix-ui/react-dropdown-menu` in runtime e `jsdom` in sviluppo. La seconda merita una nota, perché è stata presa per un motivo e ne ha resi veri altri: serviva per poter asserire il contenuto del dialogo dell'account, che vive in un portale e che un render a stringa restituisce vuoto. Si è poi scoperto che jsdom 30 ha `PointerEvent`, quindi anche il menu a tendina si apre in un test senza `@testing-library/user-event`. **L'ambiente resta `node` per default** e il documento si chiede per file: sotto jsdom Vite risolve con le condizioni client e `import.meta.url` smette di essere un URL `file:`, che rompe i quattro test che leggono il proprio soggetto dal disco.
+
 ## 2026-09-14 — 仓库转公开，并撤销 `paths-ignore`
 
 1. **仓库由 private 改为 public。** 直接动机是 Actions 分钟数：三个 job × 每次 push，加上 Dependabot 批量开 PR，private 在 Free 计划下的每月额度撑不住；public 仓库的 Actions 无限免费。转之前查过一遍历史，**不是凭感觉**：git 全历史里从未出现过 PDF、语料或任何二进制（最大对象是 261 KB 的 `uv.lock`），`.env` 从未被跟踪，gitleaks 扫 47 个 commit 零命中。
