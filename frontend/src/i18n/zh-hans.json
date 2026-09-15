@@ -10,7 +10,6 @@
     "password": "密码",
     "logIn": "登录",
     "register": "注册",
-    "logOut": "退出登录（{{username}}）",
     "failed": "登录失败。",
     "noAccount": "还没有账号？",
     "haveAccount": "已经有账号了？"
@@ -21,12 +20,24 @@
     "empty": "还没有会话。",
     "untitled": "未命名",
     "open": "打开会话列表",
+    "collapse": "收起侧栏",
+    "expand": "展开侧栏",
     "unreadable": "这个会话不可用。"
   },
+  "account": {
+    "title": "账号",
+    "menu": "打开账号菜单",
+    "profile": "个人资料",
+    "theme": "主题",
+    "themeCaption": "只对这台设备生效，不跟随账号。",
+    "language": "语言",
+    "logOut": "退出登录",
+    "close": "关闭"
+  },
   "theme": {
-    "system": "主题：跟随系统",
-    "light": "主题：浅色",
-    "dark": "主题：深色"
+    "system": "跟随系统",
+    "light": "浅色",
+    "dark": "深色"
   },
   "ask": {
     "label": "你的问题",

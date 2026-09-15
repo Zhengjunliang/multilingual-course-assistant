@@ -10,7 +10,6 @@
     "password": "Password",
     "logIn": "Sign in",
     "register": "Register",
-    "logOut": "Sign out ({{username}})",
     "failed": "Sign-in failed.",
     "noAccount": "No account yet?",
     "haveAccount": "Already have an account?"
@@ -21,12 +20,24 @@
     "empty": "No conversations yet.",
     "untitled": "Untitled",
     "open": "Open conversations",
+    "collapse": "Close the sidebar",
+    "expand": "Open the sidebar",
     "unreadable": "That conversation is not available."
   },
+  "account": {
+    "title": "Account",
+    "menu": "Open the account menu",
+    "profile": "Profile",
+    "theme": "Theme",
+    "themeCaption": "Applies to this device, not to your account.",
+    "language": "Language",
+    "logOut": "Sign out",
+    "close": "Close"
+  },
   "theme": {
-    "system": "Theme: system",
-    "light": "Theme: light",
-    "dark": "Theme: dark"
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
   },
   "ask": {
     "label": "Your question",

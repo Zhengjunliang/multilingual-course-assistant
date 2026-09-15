@@ -44,13 +44,25 @@ const SHAPE = 3;
 const MAX_CHROMA = 0.02;
 
 /** The neutral tokens. `--warn*` is the one colour left and is exempt. */
-const NEUTRAL = ["canvas", "surface", "ink", "muted", "line", "accent", "accent-ink", "mark"];
+const NEUTRAL = [
+  "canvas",
+  "surface",
+  "sidebar",
+  "ink",
+  "muted",
+  "line",
+  "accent",
+  "accent-ink",
+  "mark",
+];
 
 const PAIRS = [
   { front: "ink", back: "canvas", min: TEXT, where: "index.css body rule" },
   { front: "ink", back: "surface", min: TEXT, where: "card.tsx:19 card body" },
   { front: "muted", back: "canvas", min: TEXT, where: "EmptyState.tsx:39 subtitle" },
   { front: "muted", back: "surface", min: TEXT, where: "CitationList.tsx:113 excerpt" },
+  { front: "ink", back: "sidebar", min: TEXT, where: "ConversationSidebar.tsx title and rows" },
+  { front: "muted", back: "sidebar", min: TEXT, where: "ConversationSidebar.tsx idle row" },
   { front: "ink", back: "mark", min: TEXT, where: "AnswerStream.tsx:91 citation pill" },
   { front: "muted", back: "mark", min: TEXT, where: "CitationList.tsx:113 on a lit card" },
   { front: "accent-ink", back: "accent", min: TEXT, where: "button.tsx:11 default variant" },
@@ -72,6 +84,7 @@ const PAIRS = [
 const STEP = 2;
 
 const LADDER = [
+  { a: "mark", b: "sidebar", where: "ConversationSidebar.tsx open conversation and hover" },
   { a: "mark", b: "surface", where: "locale-switch.tsx:36 track, button.tsx:13 ghost hover" },
   { a: "mark", b: "canvas", where: "AnswerStream.tsx:91 citation pill in the answer" },
 ];
