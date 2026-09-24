@@ -1,304 +1,191 @@
 # multilingual-course-assistant
 
-两个问答场景：**大学课程材料**（slides/讲义 PDF）与**校园信息**（UniFi 网站第二知识源 + agentic 路由）。**跨语言是这两个场景的核心能力，不是可选附加** —— 任意语言提问 → 同语言回答，提问语言可以和材料语言不同（如英文提问、意大利语讲义）。能力边界是检索问答（QA），出题与自动判卷 ⛔ 超出范围。基于 RAG 与开源权重 LLM（Qwen 系）；网站为 Django/DRF + Celery/Redis 后端 + React SPA 前端。
+Question answering over two sources: **university course material** (slides and lecture-note PDFs) and **campus information** (the UniFi website as a second knowledge source, with agentic routing between the two). **Cross-lingual retrieval is the core of both, not an add-on**: a question in any language is answered in that language, and the question need not share a language with the material (an English question over Italian slides). The scope is retrieval QA; generating or grading exercises is ⛔ out of scope. RAG over open-weights LLMs (the Qwen family); the website is a Django/DRF backend with a React SPA in front.
 
-Triennale 毕业论文，佛罗伦萨大学（UniFi）信息工程 — relatore Prof. Marco Bertini。
+Bachelor's thesis (*triennale*), University of Florence (UniFi), Information Engineering — supervisor Prof. Marco Bertini.
 
-## 状态
-
-✅ M2 完成：ingest 全链（探测 + Docling 解析 + chunking + Qdrant 索引）与 hybrid 检索 + rerank 在**全量语料**（31 deck · 1234 chunk）上跑通，gold 40 题 hit@5 95%（对照组 5/5）；生成侧经本地 Ollama 实测（引用、意语跟随、语料外拒答），记录在 [docs/diario-sperimentale.md](docs/diario-sperimentale.md)。🔶 M2.5（UniFi 校园信息源 + agentic 路由）：实现完成，autogrow 分数门重测待记账。🔶 M5 网站（提前到 M3 之前执行）：地基层 + SSE 流式问答 API `/api/ask` 已可用（见下面「问答 API」一节）；React SPA 脚手架已建，开发期在 Vite dev server 上消费同一条流（见「前端」一节）；账号已接上（session 登录 + 开放注册），**全站需登录**（见「账号」一节）；多轮会话已可用（history + query rewriting + 落库，见「多轮会话」一节），SPA 已是成品界面（登录/注册页、会话侧栏、三语、暗亮主题，见「前端」一节）且由 Django 自己发在根路径上（`just fe` + `just serve` → <http://127.0.0.1:8000/>，一个地址一个进程，见「前端」一节）。异步 ingest 与容器化部署 🔜 后续里程碑。推进状态、阻塞项与暂缓项在 GitHub issue（里程碑 M3 · M5 · M6 · M7），仓库里不再有清单文件；自主拍板记录见 [docs/decisioni.md](docs/decisioni.md)；relatore 约束、技术栈与决策状态见 [docs/architettura.md](docs/architettura.md)。
+Where the rest lives: progress, milestones and blockers in GitHub issues (milestones M3 · M5 · M6 · M7); decisions and their reversals in [docs/decisioni.md](docs/decisioni.md); supervisor constraints and the stack in [docs/architettura.md](docs/architettura.md); measured results in [docs/diario-sperimentale.md](docs/diario-sperimentale.md).
 
 ## Setup
 
 ```powershell
 git clone git@github.com:Zhengjunliang/multilingual-course-assistant.git
 cd multilingual-course-assistant
-uv sync                       # uv 自带 Python 3.12，不动系统的 3.10
-Copy-Item .env.example .env   # 填 DJANGO_SECRET_KEY 与 DJANGO_DB_PASSWORD，命令见文件内注释
+uv sync                          # uv brings its own Python 3.12; the system interpreter is untouched
+npm ci --prefix frontend         # Node version in frontend/.nvmrc
+Copy-Item .env.example .env      # fill DJANGO_SECRET_KEY and DJANGO_DB_PASSWORD; commands in the file
 uv run pre-commit install
-docker compose up -d          # PostgreSQL（需 Docker Desktop 引擎在跑）
+docker compose up -d             # PostgreSQL (the Docker Desktop engine has to be running)
+uv run python manage.py migrate
+uv run python manage.py createsuperuser
+```
+
+`docker-compose.yml` starts only the stateful services: Django runs on the host under `uv run`, because the embedding model and reranker in `rag/` use the local GPU. The fully containerised path is 🔜 `#41` (M6); the convention is described at the top of `docker-compose.yml`.
+
+## Development
+
+### Daily loop
+
+| To | Run |
+| -- | --- |
+| start / stop PostgreSQL | `docker compose up -d` / `docker compose down` (data stays in the named volume; `down -v` deletes it, irreversibly) |
+| serve the site | `uv run python manage.py runserver` → <http://127.0.0.1:8000/> (admin at `/admin/`) |
+| work on the frontend | the above, plus `npm run dev --prefix frontend` → <http://localhost:5173/> |
+| run the tests quickly | `uv run pytest` |
+| run everything CI runs | `uv run python scripts/check.py` |
+
+**While the site is running, the `rag` CLIs that touch the index fail** (`rag.index`, `rag.search`, `rag.agent`, …): local Qdrant is embedded and holds an exclusive lock on `data/qdrant`, so whichever process opens it first keeps it; the endpoints answer 503 with that explanation in the opposite case. Stop the server with `Ctrl+C` to use the CLI. 🔜 This goes away when Qdrant becomes a service (`#33`).
+
+**After changing a model**, generate and apply the migration, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`):
+
+```powershell
+uv run python manage.py makemigrations   # the migration file goes into git
 uv run python manage.py migrate
 ```
 
-`docker-compose.yml` 只起有状态服务；Django 与后续的 Celery worker 用 `uv run` 跑在宿主机上，因为 `rag/` 的 embedding 与 reranker 要用本机 GPU。整套进容器的部署路径走 `--profile app`（🔜 M5 末），文件顶部有约定说明。
+### The check chain
 
-## 开发
-
-### 日常开工
+[scripts/check.py](scripts/check.py) is the one definition of what "green" means, locally and in CI. Without arguments it runs every step in order; with names it runs only those, still in chain order:
 
 ```powershell
-just up          # 起 PostgreSQL 容器（Docker Desktop 引擎要先开着）
-just serve       # 开发服务器
+uv run python scripts/check.py              # all eight steps
+uv run python scripts/check.py lint types   # only these two
 ```
 
-- 管理后台在 <http://127.0.0.1:8000/admin/>；账号 API 在 `/api/auth/`、问答 API 在 `/api/ask`（都需要登录，见下面两节）
-- 问答界面在根路径 <http://127.0.0.1:8000/>，**前提是先跑过 `just fe`**（Django 发的是构建产物；没构建过会回 503 并说这句话）。写前端时改用 `just fe-dev` 的 5173 拿热更新 —— 两条路径的差别见「前端」一节
+| Step | Runs |
+| ---- | ---- |
+| `frontend` | biome, `tsc`, catalogue keys, colour contrast, vitest, production build |
+| `lint` · `format` · `types` | `ruff check` · `ruff format --check` · `pyright` |
+| `django` · `migrations` · `deploy` | `manage.py check` · `makemigrations --check` · `check --deploy --fail-level WARNING` |
+| `tests` | `pytest --cov`, with the coverage gate |
 
-**`just serve` 跑着的时候，终端里的 `just index` / `just search` / `just ask` 会失败**：本地 Qdrant 是嵌入式的，独占 `data/qdrant` 目录锁，网站进程先开就轮不到 CLI（反过来也一样，那时端点返回 503 并说明冲突）。要两边同时用，先 `Ctrl+C` 停掉网站。这条随「Qdrant 由嵌入式改为服务进程」🔜 解除（`#33`；决策与迁移路径见 [docs/decisioni.md](docs/decisioni.md) 2026-08-24 第 2 条）。
+The chain runs with `DJANGO_DEBUG=false` whatever `.env` says, because that is how CI tests. Why each step is where it is — `frontend` first, the TLS flag only on `deploy` — is written next to the step in the script. Interrupting the `frontend` step on Windows makes `cmd` ask `Terminate batch job (Y/N)?`: answer `Y`.
 
-收工 `just down`——容器停掉，数据留在命名卷里，下次 `just up` 原样还在。连数据一起清是 `docker compose down -v`（不可逆）。
+## Frontend
 
-**改过模型之后必须补两步**，漏掉会让 `just test` 变红（`tests/test_accounts.py` 的 `test_no_pending_migrations` 守着模型与迁移不漂移）：
+React + TypeScript SPA built with Vite, Tailwind and shadcn-style components (their source lives in the repository), UI text in three languages through react-i18next.
 
-```powershell
-just makemigrations   # 生成迁移文件，进 git
-just migrate          # 应用到数据库
-```
+| To | Run | Open |
+| -- | --- | ---- |
+| work on the frontend | `runserver`, plus `npm run dev --prefix frontend` in a second terminal | <http://localhost:5173/> — reloads on save |
+| see the site as it ships | `npm run build --prefix frontend` once, then `runserver` | <http://127.0.0.1:8000/> — same origin, one process |
 
-管理员账号用 `just superuser` 建（交互式）；改密码是 `uv run python manage.py changepassword <用户名>`。
+The second row is what the site really is: Django serves `frontend/dist/index.html` at the root and the bundle under `/static/`, with no Vite involved — so a frontend change needs a rebuild before port 8000 shows it. Without a build that address answers 503 and names the command. With `DEBUG=False` Django refuses to serve static files; the static file server for deployment is 🔜 `#40`.
 
-### 任务入口
+Five routes: `/login` · `/register` · `/` (new conversation) · `/c/:id` (a stored one) · `/styleguide` (the component layer against no data); anything else redirects to `/`. [config/urls.py](config/urls.py) answers every path it does not own with the same shell, so a reload on `/c/7` works.
 
-全部在 [justfile](justfile)（`scoop install just` 一次性安装）：
+On 5173 the Vite dev server proxies `/api`, `/admin` and `/static` to port 8000 with `changeOrigin: false`, which keeps Django's CSRF origin check passing without `CSRF_TRUSTED_ORIGINS`. The reasons behind the frontend's other choices sit next to the code that makes them: session cookie and CSRF in [frontend/src/api/http.ts](frontend/src/api/http.ts), no `EventSource` in [frontend/src/api/sse.ts](frontend/src/api/sse.ts), citation markers in [frontend/src/lib/markers.ts](frontend/src/lib/markers.ts), waiting and retries in [frontend/src/features/chat/](frontend/src/features/chat/), themes in [frontend/src/theme/](frontend/src/theme/) and [frontend/src/index.css](frontend/src/index.css). [frontend/src/api/contract.ts](frontend/src/api/contract.ts) mirrors [apps/qa/contract.py](apps/qa/contract.py), which is the single source; [tests/test_qa_contract.py](tests/test_qa_contract.py) fails when the two drift.
 
-```powershell
-just lint        # ruff check
-just format      # ruff format
-just typecheck   # pyright（含 django-stubs，与 IDE 看到的类型一致）
-just test        # pytest（快跑，无覆盖率开销）
-just cov         # pytest --cov，带覆盖率门禁，与 CI 相同
-just check       # 完整 CI 链：前端链 + lint + format + 类型 + Django check + 测试
+## Pipeline CLI
 
-just fe-install  # npm ci（按 frontend/package-lock.json 装依赖）
-just fe-dev      # SPA 开发服务器 http://localhost:5173/
-just fe          # 前端链：biome + tsc + catalogue key 检查 + 生产构建
+Course PDFs go in `data/corpus/<course>/` (gitignored). Every command below is `uv run python -m rag.<module> …`:
 
-just up          # 起后台服务（PostgreSQL）
-just down        # 停后台服务，数据留在命名卷里
-just serve       # 开发服务器
-just superuser   # 建管理员账号（交互式）
-just makemigrations  # 模型改动 -> 迁移文件
-just migrate     # 应用数据库迁移
+| Module | Does | Example arguments |
+| ------ | ---- | ----------------- |
+| `probe` | profile PDFs and show the per-file routing, without parsing | `data\corpus\PPM` |
+| `parse` | parse with Docling following that routing → `data\parsed\` | `data\corpus\PPM` · `"<file>.pdf" --profile manual --pipeline vlm` |
+| `chunk` | chunk parsed documents → `data\chunks\*.jsonl` | `data\parsed` |
+| `index` | encode into the local Qdrant collection → `data\qdrant\` | `data\chunks` |
+| `search` | hybrid retrieval (dense + BM25 + RRF) + Qwen3 reranker | `"What is an ORM?"` |
+| `answer` | retrieve + generate a cited answer | `"What is an ORM?"` |
+| `agent` | route to course or campus collection, retrieve, answer; deepens by fetching linked pages unless `--no-deepen` | `"Quando scadono le tasse?"` |
+| `gold` | retrieval hit@k over a gold set, or the router's report with `--routing` | `gold\smoke.jsonl` · `gold\campus.jsonl --routing` |
+| `crawl` | snapshot the campus website (robots honoured, 1 req/s, ≤ 500 pages; run by the user) | `--out data\webcorpus` |
+| `webparse` | parse a crawl snapshot into chunkable artefact pairs | `data\webcorpus\<run_id>` |
+| `live` | fetch one URL, gate it, grow the shared index; `--rollback <run_id>` undoes a run, `--measure-gate` scores the gate | `<url>` |
 
-just probe data\corpus\PPM
-just parse data\corpus\PPM
-just chunk data\parsed
-just index data\chunks
-just search "What is an ORM?"
-just answer "What is an ORM?"    # 需要本地 Ollama 在线
-just ask "Quando scadono le tasse?"     # 路由（课程库 / 校园库）+ 检索 + 回答
-just gold                        # gold 冒烟 hit@5
-just crawl                       # 校园 web 源爬取（用户执行；robots · 1 req/s · ≤500 页）
-just webparse data\webcorpus\<run_id>   # 快照解析 -> 可切块工件对
-```
+Parsing writes two files per PDF, `<name>.<profile>.json` (the lossless DoclingDocument) and `<name>.<profile>.meta.json` (provenance); routing rules, measurements and the chunk payload contract are in [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md).
 
-不装 just 也可以直接跑对应的 `uv run …` 命令（recipe 内容即命令本身）。
-
-CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 push 与 PR 上跑同一条链外加 pip-audit 与 `npm audit --omit=dev` 两道依赖审计，用 `uv sync --locked` 与 `npm ci`，所以 `uv.lock` 与 `frontend/package-lock.json` 都必须跟着 commit。依赖更新手动管理（`uv lock --upgrade` / `npm update --prefix frontend` 后跑 `just check`）。
-
-前端链在 CI 里**排在所有 Django 步骤之前**，不是随手排的：`STATICFILES_DIRS` 指向 `frontend/dist`，而那是不进 git 的构建产物，`check --deploy --fail-level WARNING` 会把「目录不存在」（`staticfiles.W004`）变成失败。`just check` 用 `check: fe` 依赖复现同一顺序。
-
-## 前端
-
-React + TypeScript SPA，Vite 构建，Tailwind + shadcn 风格组件（组件源码在仓库里，不是 npm 包），界面文案三语走 react-i18next。
-
-**两条路径，看清楚在跑哪条**：
-
-| 想干什么 | 怎么跑 | 打开哪个地址 |
-| -------- | ------ | ------------ |
-| 写前端 | `just up; just serve` + 另开一个终端 `just fe-dev` | <http://localhost:5173/> —— 存盘即刷新 |
-| 看整体 / 演示 | `just fe` 一次，然后 `just up; just serve` | <http://127.0.0.1:8000/> —— 同源，一个进程 |
+Embedding and reranking (0.6B each) run on the local GPU, fully offline. Generation calls an OpenAI-compatible endpoint, by default a local Ollama:
 
 ```powershell
-just fe-install   # 一次性
-```
-
-第二条是这个网站真正的样子：Django 在根路径上发 `frontend/dist/index.html`，`/static/…` 发同一个目录里的 bundle，Vite dev server 完全不参与。**代价是改了前端要重跑 `just fe`**，否则 8000 上看到的还是上一次构建。没构建过时那个地址回 503 并告诉你跑什么。
-
-`/c/7` 这类地址由前端路由自己解析，但用户按 F5 时浏览器会**真的**向服务器要它 —— [config/urls.py](config/urls.py) 的兜底路由把所有它不认识的路径都回成同一个 `index.html`。那条正则里的负向前瞻不是装饰：少了它，`/api/typo` 会拿到 200 加一整页 HTML，而调用方要在 `<!doctype html>` 上的 JSON 解析错误里反推出自己路径写错了。
-
-⚠ `DEBUG=False` 时 Django **拒绝发静态文件**（它假定前面站着 nginx 一类的东西）。所以上面第二条路径是开发形态，容器化部署要补一个静态文件服务（whitenoise 或 nginx），那是 M6 的事（`#40`，并作为显式前置挂在 `#41` 下）。
-
-四条路由：`/login` · `/register` · `/`（新会话）· `/c/:id`（打开某个会话）。**URL 决定打开哪个会话** —— 会话是个「地方」，能收藏、能分享给自己、后退键有意义，而不是藏在组件里的一个状态。新会话拿到 id 的那一刻（`start` 事件里）就 `replace` 到 `/c/<id>`，此时答案还在流。
-
-走 5173 那条路径时，Vite dev server 把 `/api`、`/admin`、`/static` 代理到 `127.0.0.1:8000`，且 **`changeOrigin: false`** —— 转发时保留 `Host: localhost:5173`，Django 的 CSRF origin 校验因此自然通过，不需要 `CSRF_TRUSTED_ORIGINS`。`/admin` 与 `/static` 两条代理留着是为了在 SPA 的 origin 上直接用管理后台。
-
-**登录走 session cookie，不用 token**：SPA 与 Django 同源（8000 上本来就是，5173 上靠上面这条代理），浏览器自己的 cookie 罐就是全部机制。启动第一件事是 `GET /api/auth/me` —— 它同时回答「有没有人登录」和下发 CSRF cookie，之后每个非 GET 请求从 cookie 读 token 发 `X-CSRFToken`（[frontend/src/api/http.ts](frontend/src/api/http.ts)）。任何请求回 403 就丢掉会话、跳登录页：别处退登或服务端重启都是这个表现。
-
-**不用 `EventSource`**：它只发 GET，而 `/api/ask` 是带 JSON 体的 POST。[frontend/src/api/sse.ts](frontend/src/api/sse.ts) 手写 `fetch` + `ReadableStream` 解析器，换来 `AbortController`（离开页面立刻掐断生成、归还后端的引擎锁）与流式 `TextDecoder`（一个中文字符会被劈在两个网络分片里）。
-
-引用角标**只在 `end` 到达之后**才算：marker 常被劈在两个 `token` 事件里，边流边匹配会先报缺失再报错位。未被引用的来源卡片置灰，那是「检索到但答案没引」的信号。来源卡片**横向排一条、可横划**（竖着堆会把下一个问题挤出屏幕），默认最多 6 张、其余折叠成 `+N`；点答案里的角标会展开并把对应那张滚到眼前。**实时轮次和从数据库读回的旧轮次走同一个组件**（[frontend/src/features/chat/TurnView.tsx](frontend/src/features/chat/TurnView.tsx)）—— 这正是 `citations` 与 `route` 要落库的原因，另建一条历史渲染路径就是给角标和置灰第二个出错的地方。
-
-**等待分两种，报在两个地方**。「正在检索和思考」跟着那条提问显示 —— 第一个事件发出之前，服务端真的在路由（问模型该查哪个库）和检索，那不是网络延迟。而「前面还有人在问」是别人的问题占着队列，跟这一问无关，所以它在输入框旁边。`reason: "busy"` 才自动重试，**最多 2 次**然后停下来让人点；`reason: "unavailable"` 一次都不重试 —— 模型服务没在跑，再问也不会自己起来。
-
-**主题（浅色/深色/跟随系统）存 `localStorage`，不存账号**：主题是「此刻这块屏幕」的属性，白天笔记本晚上手机的人在两边要的答案不一样。界面语言相反，它存在 `User.locale` 上，所以切语言是 `PATCH /api/auth/me`。整套配色是 [frontend/src/index.css](frontend/src/index.css) 里的一组语义变量（`--ink` `--surface` `--muted` …），**没有任何组件写 `dark:` 前缀** —— 换主题只换变量，一个组件因此不可能在一个主题下对、另一个主题下错。
-
-[frontend/src/api/contract.ts](frontend/src/api/contract.ts) 是 [apps/qa/contract.py](apps/qa/contract.py) 的镜像，唯一源在 Python 侧；[tests/test_qa_contract.py](tests/test_qa_contract.py) 把镜像当纯文本读，逐个模型逐个字段断言它没漏，两侧因此不会静默漂移。
-
-## Ingest（课程材料 → 可检索的块）
-
-课程 PDF 放 `data/corpus/<课程>/`（gitignore）。解析前先探测、逐份文件选配置，不需要手动指定：
-
-```powershell
-uv run python -m rag.probe data\corpus\PPM                       # 只看画像与路由结果，不解析
-uv run python -m rag.parse data\corpus\PPM                       # 按路由解析整个目录 -> data\parsed\
-uv run python -m rag.parse "data\corpus\PPM\<slides>.pdf" --profile manual --pipeline vlm
-uv run python -m rag.chunk data\parsed                           # 切块 -> data\chunks\*.jsonl
-```
-
-解析每份产出两个文件：`<名>.<配置>.json`（DoclingDocument，无损，chunking 的输入）与 `<名>.<配置>.meta.json`（溯源 sidecar）。配置名（`classic` · `classic-formula` · `vlm` …）进文件名，同一份 PDF 的不同配置不互相覆盖，便于对比。chunking 输出 `data/chunks/<名>.<配置>.jsonl`，每行一个带完整 payload 的 chunk。路由规则、实测与 payload 契约见 [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md)。
-
-## 检索与问答
-
-```powershell
-uv run python -m rag.index data\chunks              # 索引 -> data\qdrant\（本地嵌入式，无服务进程）
-uv run python -m rag.search "What is an ORM?"       # hybrid（dense+BM25+RRF）+ Qwen3-Reranker
-uv run python -m rag.answer "What is an ORM?"       # 检索 + Qwen3 生成带引用的回答
-uv run python -m rag.agent "Quando scadono le tasse?"   # 路由到课程库/校园库 -> 检索 -> 回答
-uv run python -m rag.gold gold\smoke.jsonl          # gold 冒烟：检索 hit@k
-uv run python -m rag.gold gold\campus.jsonl --routing   # 只跑路由 LLM 的报告，不检索
-```
-
-embedding 与 reranker（各 0.6B）在本机 GPU 跑，索引与检索完全离线；`rag.answer` 的生成一步调 OpenAI 兼容端点，默认**本地 Ollama**：
-
-```powershell
-winget install Ollama.Ollama                  # 或 https://ollama.com/download/windows
+winget install Ollama.Ollama
 ollama pull qwen3:4b-instruct-2507-q4_K_M
 ```
 
-M3 正式实验改 `.env` 指向服务器 vLLM 隧道（`ssh -L 8000:localhost:8000 <server>`）。端点与模型名在 `.env`（`LLM_BASE_URL` · `LLM_MODEL`）。分工依据见 [docs/architettura.md](docs/architettura.md) 算力策略一节。
+The endpoint and model are `LLM_BASE_URL` and `LLM_MODEL` in `.env`; the M3 experiments point them at vLLM on MICC through an SSH tunnel (the commented lines in `.env.example`). The reasons for this split are in [docs/architettura.md](docs/architettura.md), section on compute strategy.
 
-## 账号
+## Accounts
 
-**每个端点都要登录**，包括 `/api/ask`。理由不是保密（语料就是课程材料），是状态：会话属于某个人，匿名调用者没有身份可归属，而给他们发一个临时身份等于并排再造一套弱账号系统。
+Every endpoint needs a session except `GET /api/auth/me`, `login` and `register`, and that includes `POST /api/ask`. The reason is state, not secrecy (the corpus is course material): a conversation belongs to someone, an anonymous caller has no one to attribute it to, and handing out temporary identities would be a second, weaker account system built alongside the first.
 
-| 方法与路径 | 作用 |
-| ---------- | ---- |
-| `GET /api/auth/me` | 我是谁。**未登录也返回 200**，body 里 `{"authenticated": false}`；同时下发 CSRF cookie |
-| `PATCH /api/auth/me` | 改界面语言（只有 `locale` 可写） |
-| `POST /api/auth/login` | 用户名 + 密码 → session cookie |
-| `POST /api/auth/logout` | 结束会话（204） |
-| `POST /api/auth/register` | 开放自助注册，注册即登录（201） |
+| Method and path | Does |
+| --------------- | ---- |
+| `GET /api/auth/me` | who am I — **200 even when logged out**, with `{"authenticated": false}`; also sets the CSRF cookie |
+| `PATCH /api/auth/me` | change the interface language (`locale` is the only writable field) |
+| `POST /api/auth/login` | username + password → session cookie |
+| `POST /api/auth/logout` | end the session (204) |
+| `POST /api/auth/register` | open self-registration, logged in on success (201) |
 
-**`me` 未登录返回 200 而不是 403**：只配 `SessionAuthentication` 时 DRF 对未认证发的是 403 而非 401，而 CSRF 校验失败**也是** 403 —— 前端无法区分。把「没人登录」做成正常结果，403 就只剩一个意思：这个请求被拒了。
+`me` answers 200 rather than 403 when nobody is logged in because with `SessionAuthentication` alone DRF answers unauthenticated calls with 403 — and a failed CSRF check is also 403. Making "nobody is logged in" a normal result leaves 403 one meaning: this request was refused. Throttling is per endpoint (`ask` 4/min per account, `auth` 5/min per address) with no global cap; the reasons are next to the rates in [config/settings.py](config/settings.py).
 
-**CSRF token 只在 `GET /api/auth/me` 下发**，前端启动第一件事就调它：`ensure_csrf_cookie` 通常挂在渲染模板上，而开发期页面由 Vite 发、根本不经过 Django 模板。之后非 GET 请求从 `csrftoken` cookie 读值、发 `X-CSRFToken` 头。
+## Question-answering API
 
-**限流按端点分桶**（[config/settings.py](config/settings.py)）：`ask` 4 次/分钟（按账号）· `auth` 5 次/分钟（登录与注册共用一桶，按 IP —— 匿名调用者只有地址可记账）。⚠ **没有全局上限**：per-caller 限流管不住机器，5 个账号 × 4 次 = 20 次/分钟打进一个每分钟答约 2 题的引擎。真正的容量闸是 `QUEUE_TIMEOUT_SECONDS`。
-
-`just superuser` 建的管理员同样能用这些端点。
-
-## 问答 API
-
-同一条链路的 HTTP 形式：`POST /api/ask`，路由 → 检索 → 生成。**回的是 SSE 事件流**（`text/event-stream`），不是一整块 JSON——一次生成要几十秒，边写边发才看得出系统在工作。没有非流式版本。前置条件和 CLI 一样——Ollama 在跑、`data/qdrant` 已索引——外加 `just up`、`just serve` 和一个账号。
+`POST /api/ask` is the same chain as `rag.agent` over HTTP — route, retrieve, generate — and it answers with a **server-sent event stream**, not a JSON body: one answer takes tens of seconds, and streaming is how the reader sees the system working. It needs what the CLI needs (Ollama running, `data/qdrant` indexed) plus the server and an account.
 
 ```powershell
 $json = @{ question = "What is an ORM?" } | ConvertTo-Json
 [System.IO.File]::WriteAllText("$PWD\ask.json", $json, (New-Object System.Text.UTF8Encoding $false))
-curl.exe -N -u <用户名>:<密码> -X POST http://127.0.0.1:8000/api/ask `
+curl.exe -N -u <username>:<password> -X POST http://127.0.0.1:8000/api/ask `
   -H "Content-Type: application/json" -H "Accept: text/event-stream" `
   --data-binary "@ask.json"
 ```
 
-`-N` 不能省：不加的话 curl 自己缓冲，看起来仍是一次性返回。
+- `-N` stops curl from buffering the stream into one block.
+- `-u` is HTTP Basic, which is enabled only with `DJANGO_DEBUG=true` ([config/settings.py](config/settings.py)); the browser uses the session cookie.
+- **The question goes through a file, not `-d`**, even an English one: PowerShell converts arguments to the console code page on the way to a native program, and `学费` or `Università` arrive as `?`. `WriteAllText` with a BOM-less `UTF8Encoding` is the one form that holds — in a multilingual project, a form that works only for the example is a wrong form.
 
-**`-u` 走的是 HTTP Basic，而 Basic 只在 `DJANGO_DEBUG=true` 时启用**（[config/settings.py](config/settings.py) 里那行条件）。认证发生在限流之前（DRF 的 `APIView.initial`），所以密码猜错根本走不到限流那一步 —— 部署时留着它等于给每个端点开一个无限次的猜密码额度。浏览器不用它：SPA 走 session cookie。
+The stream is `start` (route and citations, once, before generation) → `token` (a fragment of the answer, many times) → `end` (the answer is complete), or `error` in place of `end`. The answer is the concatenation of every `token`'s `text`. Events, fields, and why "was this cited?" is the client's to compute are defined in [apps/qa/contract.py](apps/qa/contract.py), the single source.
 
-**问题走文件而不是 `-d`**，哪怕是英文问题也照此写。PowerShell 把参数交给原生程序时按控制台编码转换，`学费` 与 `Università` 都会变成 `?`；`WriteAllText` + 无 BOM 的 `UTF8Encoding` 是唯一稳的写法。这是个多语言项目，只在示例里成立的写法等于错的写法。
+The first request takes about a minute while the models load into GPU memory. Answers are served one at a time — 8 GB cannot hold two concurrent rerank + generation passes — and a request that waits in the queue longer than 90 s gets a 503 with `Retry-After`. Closing the stream cancels the generation and frees the queue. A 503 carries `reason`: `busy` (worth retrying) or `unavailable` (the model server is down). Once the first event has gone out the status is 200 whatever happens, so a generation that dies midway is an `error` event.
 
-看到的是：
+## Multi-turn conversations
 
-```text
-event: start
-data: {"question":"What is an ORM?","conversation_id":7,"locale":"en","route":{...},"citations":[...]}
+`POST /api/ask` takes an optional `conversation_id` to continue a conversation; without it a new one starts, and its id arrives in the `start` event.
 
-event: token
-data: {"text":"An ORM "}
+| Method and path | Does |
+| --------------- | ---- |
+| `GET /api/conversations` | the sidebar list; titles derive from the first question, and conversations with no messages are not listed |
+| `GET /api/conversations/<id>` | one conversation with its messages; someone else's is **404, not 403** — a 403 would confirm the id exists |
 
-event: end
-data: {}
-```
+- The last 3 turns (`HISTORY_WINDOW_TURNS`, [apps/qa/models.py](apps/qa/models.py)) go into the prompt with the next question. The window is capped because the 4B model's context is the same space the retrieved excerpts need.
+- **The router sees only the student's past questions**; the generator sees whole turns, with answers cut to 400 characters and stripped of citation markers (they point at excerpts this turn does not have). History is always one `user` message, never alternating roles: the router is asked to output one JSON object, and a real `assistant` prose turn demonstrates the opposite. The sha256 of both prompts is pinned in `tests/test_agent.py` and `tests/test_answer.py`.
+- Answers are **stored as they stream**: question and empty answer are written just before `start`, the text when the stream stops. `complete` is true only when `end` arrived; a half answer is kept, because it is what the student saw and a sample for the M3 error taxonomy. `citations` and `route` are stored with it, so a stored turn renders exactly like a live one.
+- Errors: 400 validation · 403 not logged in or wrong CSRF token (told apart by `GET /api/auth/me`) · 429 throttled · 503 a dependency is unavailable. With `Accept: text/event-stream` they arrive as an `error` event, otherwise as JSON.
+- **These messages are in English by decision, not by omission**: the interface belongs to the frontend catalogues, the answer language to the prompt in [rag/answer.py](rag/answer.py), and the readers of a 503 or an `error` are whoever reads the server log — a catalogue for them would have no reader. The strings stay marked with `gettext_lazy`. **A visible consequence, so it is not chased as a bug**: DRF's own validation messages do have Italian translations and follow `Accept-Language` (`LANGUAGE_CODE` is `it`), so one 400 body can hold both `"Questo campo è obbligatorio."` and `"No such conversation."`.
 
-可选 `locale`（BCP-47 primary subtag，如 `it`；省略则从问题里检测）与 `conversation_id`（见下面「多轮会话」）。事件契约在 [apps/qa/contract.py](apps/qa/contract.py)，它是唯一源：
+The deepening loop is not in this endpoint: it fetches pages and writes to the shared index, up to 3 fetches, so it runs only from `rag.agent` on the command line. Its web path is an asynchronous task (🔜 `#34`).
 
-| 事件 | 何时 | 内容 |
-| ---- | ---- | ---- |
-| `start` | 路由与检索之后、生成之前，一次 | `question` · `conversation_id`（这一答归档到哪个会话）· `locale`（实际生成语言）· `route`（复用 `rag.agent.RouteDecision`：`target` · `query` · `fresh` · `reason`）· `citations` |
-| `token` | 生成期间，每片一次 | `text`，模型吐出来的原样片段 |
-| `end` | 结尾，一次 | 空。**它到了才算答案完整** |
-| `error` | 代替 `end` | `detail`，生成中途失败 |
+## Code layout
 
-**答案 = 所有 `token` 的 `text` 拼接**，别无其他：切分点由 tokenizer 决定，一个引用 marker 经常被劈成两半。
+| Path | Contents |
+| ---- | -------- |
+| `config/` | Django project: `settings.py` (security headers conditional on `DEBUG` and `DJANGO_BEHIND_TLS`) · `urls.py` (with the SPA fallback) · `views.py` (the one non-API view, the SPA shell) · `env.py` (`.env` through pydantic-settings, shared by `rag/` and Django) · asgi/wsgi |
+| `apps/accounts/` | Accounts: custom `User` = `AbstractUser` + `locale` · serializers for register, login and the account · session login and the CSRF cookie in `views.py` · `urls.py` · `admin.py` |
+| `apps/qa/` | QA API: `contract.py` (SSE contract, single source) · `serializers.py` · `models.py` (`Conversation`, `Message`, history window) · `conversations.py` (the chain's only ORM access) · `engine.py` (process-wide models + serial `stream_answer()`, reusing `rag/`, zero queries) · `views.py` (HTTP, SSE framing, when the answer is stored) · `conversation_views.py` · `urls.py` · `admin.py` |
+| `rag/` | The RAG pipeline — **must never import Django**, so the thesis core runs and is evaluated without the web. `probe` · `parse` · `crawl` · `webparse` · `chunk` · `index` · `search` · `llm` (OpenAI-compatible client, pydantic JSON validation) · `answer` · `agent` (routing, read-only control flow) · `live` (query-time fetch, relevance gate, writes to the shared index, rollback) · `gold` · `golddraft` (drafts gold questions for human review) |
+| `frontend/` | React SPA: `src/api/` (contract mirror, SSE parser, CSRF-aware requests, account and conversation calls) · `src/auth/` (session context, route guard) · `src/routes/` (login, register, chat, styleguide) · `src/features/chat/` (question state machine, turn rendering) · `src/components/` (account dialog and menu; `ui/` shadcn-style primitives) · `src/lib/markers.ts` · `src/theme/` · `src/i18n/` (three catalogues) · `src/test/` · `scripts/` (catalogue and contrast gates) · `public/fonts/` |
+| `scripts/` | `check.py`, the check chain |
+| `tests/` | pytest. `test_smoke.py` guards the `rag/` boundary and the Django configuration; `test_qa_contract.py` the contract and its mirror; `test_check_script.py` the chain and the workflow that calls it; `test_qa_engine.py` and `test_spa.py` carry no `django_db`, so pytest-django fails them if they touch the database |
+| `gold/` | Gold question sets; schema in [gold/README.md](gold/README.md) |
+| `docs/` | One topic per file: decisions, architecture, the Docling pipeline, the web source, RAG analysis, the experiment log |
+| `.github/` | `workflows/ci.yml` (the check chain + dependency audit), `workflows/secrets.yml` (gitleaks), `dependabot.yml` |
+| `data/` | Course material and everything derived from it (parsed output, the local Qdrant index): gitignored, **never** in git |
 
-`citations` 是生成所依据的检索集，按检索顺序逐条，**不去重**（同一页的两个 chunk marker 相同但正文与分数不同；要合并由前端按 `marker` 分组）。每条：`marker`（模型被要求逐字复制的那个标记）· `text`（模型看到的原文）· `kind`（`slides` / `web`）· `score` · `heading_path` · `course` · `locale`，以及 slides 的 `source_file`+`page` 或 web 的 `url`+`fetch_date`。
+## Working on the MICC servers
 
-**「这条被引用了吗」由客户端算**（`marker in answer`），服务端不提供这个字段：marker 常被劈在两个 `token` 事件里，只有拿到拼完的答案才判得准，而客户端本来就同时握着答案和 marker。4B 模型时常把 marker 缩写成 `[Excerpt 1]`，那就是没引用。
+Access and hardware are in [docs/architettura.md](docs/architettura.md). SSH aliases live in the local `~/.ssh/config` (`ssh targaryen` and so on).
 
-**首次请求慢**（约一分钟）：embedding 与 reranker 要加载进显存。之后常驻。**答案串行**：8GB 显存装不下两路并发的 rerank + 生成，所以端点一次只答一个问题。两道闸：`ask` 桶 4 次/分钟（按账号，见「账号」一节），以及排队上限 90 秒——超过就 503 带 `Retry-After`，而不是把连接吊到超时。**中途 Ctrl+C 掐断流会连带取消生成**，队列立刻让给下一个。
+**Starting.** Check the GPU dashboard (Grafana / Discord `#gpu-monitoring-dream-`) and pick a machine with **free VRAM and low CPU**; day to day that is a 2080 Ti machine, and ultron (24 GB) only when an experiment needs the memory. Confirm with `nvidia-smi` after logging in and pin a free card with `CUDA_VISIBLE_DEVICES=<id>`. Long jobs go in tmux: `tmux new -s tesi`, reattach with `tmux attach -t tesi`.
 
-**状态码只在第一个字节之前有效。** 响应头随第一个事件一起发走，所以「生成端点半路死了」只能是 200 里的一条 `error` 事件；路由或检索阶段的失败仍是 503。
+**Storage.** Model caches and datasets go on the NAS home, **not the server's local `/home`** (small, and shared by everyone). The NAS volumes `/andromeda` `/equilibrium` `/fishtank` `/oblivion` are mounted on every server, and personal directories differ per volume: `/oblivion/users/<user>` has `users/`, `/equilibrium/<user>` does not, andromeda and fishtank have none (ask the sysadmin). Check free space before choosing a volume; this project uses `/oblivion/users/jzheng`, with `export HF_HOME=/oblivion/users/jzheng/hf_cache` in the server's `~/.bashrc`. Shared datasets are under `/<volume>/DATASETS`, `/<volume>/datasets` or `/home/DATASETS` (naming differs per machine); datasets in a personal directory get cleaned up by the NAS rules.
 
-503 的 body 带 `reason`：`busy`（前面还有人在问，队列会自己空出来，值得重试）或 `unavailable`（模型服务没在跑，再问也不会自己起来）。没有这个字段客户端会对着一次宕机无限倒计时重试。
+**Finishing.** Check `nvidia-smi` for leftover processes of yours and `kill <PID>` them; Jupyter kernels hold GPU memory too. Close idle tmux sessions (`tmux kill-session -t tesi`). Release GPU memory as soon as a run ends.
 
-## 多轮会话
+## CI
 
-`POST /api/ask` 可带 `conversation_id` 把这一问接到上一问后面；不带就开一个新会话，新会话的 id 从 `start` 事件里回来。
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs on pushes to `main` and on pull requests. The `check` job installs with `uv sync --locked` and `npm ci` — so `uv.lock` and `frontend/package-lock.json` are committed with every dependency change — and then calls each step of `scripts/check.py` by name; [tests/test_check_script.py](tests/test_check_script.py) fails if the job runs anything else. The `audit` job runs pip-audit over the lockfile and `npm audit --omit=dev`, and [.github/workflows/secrets.yml](.github/workflows/secrets.yml) scans the whole history with gitleaks weekly. Dependency updates arrive as monthly Dependabot pull requests ([.github/dependabot.yml](.github/dependabot.yml)).
 
-```powershell
-# 第一问不带 id -> start 事件里拿到 conversation_id
-# 第二问带上它："How does it differ from Active Record?"
-```
+## Language
 
-**最近 3 轮**（`HISTORY_WINDOW_TURNS`，[apps/qa/models.py](apps/qa/models.py)）随下一问一起进 prompt。窗口有上限不是省钱：4B 模型的上下文和「这一答赖以成立的检索片段」是同一块，历史挤掉片段就是把答案的根据挤掉。
-
-两侧看到的历史**不一样**，这是刻意的：
-
-- **路由器只看学生的历史提问**，不看答案。代词的先行词在学生自己上一句里；而答案里塞满 `[https://www.unifi.it/… · 2026-08-01]` 这类 marker，三轮下来会把任何新问题都往校园库拖。
-- **生成侧看完整轮次**，但答案会截断到 400 字符并**去掉所有 marker** —— 那些 marker 指向的是上一轮的片段，这一轮模型手上没有，留着就是在教它编一个指不到东西的引用。
-
-历史**永远拼成同一条 `user` 消息**，不做 role 交替的多轮消息。原因是同一个 4B 模型在路由时被要求「只输出一个 JSON 对象」，真实的 `assistant` 散文轮就是在示范相反的行为 —— 代价是 M2.5b 实测的 fallback 从 0 起飞，而且没有任何现成测试会发现。`tests/test_agent.py` 与 `tests/test_answer.py` 用两个 prompt 的 sha256 把这条钉死。
-
-会话读取（都要登录，只能读自己的）：
-
-| 方法与路径 | 作用 |
-| ---------- | ---- |
-| `GET /api/conversations` | 侧栏列表。标题由第一条提问派生，不落库；**没有任何消息的会话不列出**（503 会留下一个空会话，见下） |
-| `GET /api/conversations/<id>` | 一个会话连同它的消息。别人的会话是 **404 而不是 403** —— 403 等于承认这个 id 指向真实存在的东西 |
-
-**答案边流边存**：提问与空答案在第一个事件之后、`start` 发出之前写入（此前失败还能是 503，那时应该什么都不留下）；答案文本在流停下时补齐。流怎么停的决定 `complete` 是 true 还是 false —— 收到 `end` 为 true，`error` 或读者关掉页面为 false，**半截答案照样留着**。那是学生真实看到的内容，也是 M3 错误分类法的样本。
-
-`citations` 与 `route` 跟着答案一起落库。侧栏点开旧会话时 `start` 事件早就没了，不存这两列的话历史轮次只剩纯文本 —— 来源卡片、引用角标、可见的路由决策三样全没。
-
-错误按类型分：400 校验失败 · **403 没登录或 CSRF token 不对** · 429 限流 · 503 依赖不可用（路由端点没响应、索引被别的进程占着、还没索引过、前面的问题还没答完）。403 的两种含义靠 `GET /api/auth/me` 区分（见「账号」一节）。请求带 `Accept: text/event-stream` 时这些错误体也框成一条 `error` 事件；不带（curl 默认 `*/*`）就是普通 JSON。**这里的文案是英文，是决定不是欠账**：这个项目里三种语言各有属主 —— 界面归前端的三份 catalogue，回答语言归 [rag/answer.py](rag/answer.py) 的 prompt，而 503 与 `error` 这一层的读者是看服务端日志的人。给它再建一套 catalogue 是没有读者的活。字符串仍标着 `gettext_lazy`（标记零成本，删了要重新逐个猎捕）。**可见的后果，先说免得当 bug 查**：DRF 自带的校验消息是有意大利语翻译的且跟随 `Accept-Language`（`LANGUAGE_CODE` 是 `it`），所以一个 400 响应体里可能同时出现意语的 `"Questo campo è obbligatorio."` 和英文的 `"No such conversation."`。
-
-**深挖循环（`deepen`）不在这个端点里**：它会联网抓页并写入共享索引，最多 3 次抓取。演示自增长仍用 CLI 的 `just ask`。它进 web 的路径是「账号 + Celery 异步」（账号 ✅，异步侧见 `#34`）。
-
-## 代码布局
-
-| 路径              | 内容                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------ |
-| `config/`         | Django project：settings（单一模块，安全响应头按 `DEBUG` 与 `DJANGO_BEHIND_TLS` 条件生效）· urls（含 SPA 兜底路由）· `views.py` 发 SPA 外壳的唯一非 API 视图 · asgi/wsgi · env（`.env` 经 pydantic-settings 读入，`rag/` 与 Django 两侧共用） |
-| `apps/accounts/`  | 账号。自定义 User（`AUTH_USER_MODEL`）= `AbstractUser` + `locale`（偏好语言，取值域对齐 `settings.LANGUAGES`），admin 里可见可筛；`serializers.py` 注册/登录/账号表示 · `views.py` session 登录与 CSRF cookie 发放点 |
-| `apps/qa/`        | 问答 API。`contract.py` SSE 事件契约（唯一源，SPA 消费它）· `serializers.py` 请求校验与会话读取形状 · `models.py` `Conversation` / `Message` + 历史窗口常量 · `conversations.py` 这条链路**唯一**的 ORM 落点（开会话 / 切历史 / 落库 / 收尾）· `engine.py` 进程级模型资源 + 串行的 `stream_answer()`（路由→检索→生成，复用 `rag/`，不重写逻辑；锁随流的关闭释放，**零查询**）· `views.py` HTTP 翻译、SSE 分帧、答案落库时机 · `conversation_views.py` 会话读取端点 |
-| `rag/`            | RAG pipeline — **禁止 import Django**，论文核心要能脱离 web 单独跑评估。`probe.py` 探测并路由，`parse.py` 调 Docling，`crawl.py` 抓校园 web 源快照 + registry，`webparse.py` 快照转可切块工件，`chunk.py` 切块并挂 payload，`index.py` 编码入 Qdrant，`search.py` hybrid 检索 + rerank，`llm.py` OpenAI 兼容客户端（Streamer/Completer + pydantic JSON 校验助手），`answer.py` 生成带引用回答，`agent.py` 路由问题到课程库/校园库（只读控制流），`gold.py` 检索冒烟跑分与 `--routing` 路由报告，`golddraft.py` 起草 gold 题（人工把关后才进 `gold/`） |
-| `frontend/`       | React + TypeScript SPA（Vite）。`src/api/` 契约镜像 · SSE 解析器 · CSRF 与 JSON 请求 · 账号与会话调用 · `src/auth/` 会话上下文与路由守卫 · `src/routes/` 登录 / 注册 / 聊天页 · `src/features/chat/` 提问状态机（排队、重试、中止）与轮次渲染 · `src/lib/markers.ts` 引用角标与置灰判定 · `src/theme/` 主题 · `src/i18n/` 三份 catalogue · `src/components/ui/` shadcn 风格组件（源码在仓库里）。自带 biome + tsc + catalogue 检查，`just fe` 一条跑完 |
-| `tests/`          | pytest；`test_smoke.py` 守着上面那条约束和 Django 配置的完整性，`test_qa_contract.py` 守着 SSE 契约与它的 TS 镜像不漂移，`test_qa_engine.py` 与 `test_spa.py` **不带 `django_db`**，用「没有 marker 的测试碰数据库就报错」这条 pytest-django 规则守着引擎层与发页面这条路径的零查询 |
-| `data/`           | 课程材料与派生产物（解析输出、Qdrant 本地索引），gitignore，**永不进 git**                    |
-
-## MICC 服务器日常使用
-
-接入方式与硬件规格见 [docs/architettura.md](docs/architettura.md)。SSH 别名在本机 `~/.ssh/config`（`ssh targaryen` 等）。
-
-### 开工
-
-1. 看 GPU 面板（Grafana / Discord `#gpu-monitoring-dream-`）：挑 **VRAM 柱空 + CPU 低**的机器。日常用 2080 Ti 机器；ultron（24 GB）只在实验需要大显存时用，不日常占用。
-2. 登录后 `nvidia-smi` 二次确认；避开有人的卡，用 `CUDA_VISIBLE_DEVICES=<id>` 指定空卡。
-3. 长任务放 tmux（断线不死）：`tmux new -s tesi`；重连 `tmux attach -t tesi`。
-
-### 存储
-
-- **模型缓存与数据集放 NAS home，不放服务器本地 `/home`**（本地盘小且全员共享 — targaryen 首测 94.9%）。
-- NAS 卷 `/andromeda` `/equilibrium` `/fishtank` `/oblivion` 挂在每台服务器上。个人目录路径**各卷不统一**：`/oblivion/users/<user>` 带 `users/`，`/equilibrium/<user>` 不带；andromeda 与 fishtank 下没有，需要时找 sysadmin。
-- 挑卷看剩余容量（2026-07-30 实测：oblivion 已用 60%、剩 2.87 TB 最空；equilibrium 94%；andromeda 满）。本项目用 `/oblivion/users/jzheng`。
-- HF 缓存重定向：服务器 `~/.bashrc` 加 `export HF_HOME=/oblivion/users/jzheng/hf_cache`。
-- 共享数据集在 `/<卷>/DATASETS`、`/<卷>/datasets` 或 `/home/DATASETS`（各机命名不统一，`ls` 确认）；数据集放个人目录会被清理（NAS 规则）。
-
-### 收工
-
-- `nvidia-smi` 确认无自己的残留进程；有就 `kill <PID>`。Jupyter kernel 也占显存，用完关。
-- 不跑东西的 tmux session 关掉：`tmux kill-session -t tesi`。
-- 显存跑完即释放，不挂着占。
-
-## 语言约定
-
-开发期文档为中文；最终 tesi 交付物在 M6 译为意大利语。详见 [CLAUDE.md](CLAUDE.md) 文档约定一节。
+Which language each part of the repository is written in: [CLAUDE.md](CLAUDE.md), section on documentation conventions.
