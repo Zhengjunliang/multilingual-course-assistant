@@ -1,64 +1,64 @@
 # CLAUDE.md — multilingual-course-assistant
 
-> 每次会话自动加载。保持精简（<150 行）：只写 Claude 无法从代码推断的内容。
-> 规则用祈使句；项目概览随项目演进更新，删除过时内容。
+> Loaded at the start of every session. Keep it short (<150 lines): only what Claude cannot infer from the code.
+> Rules in the imperative; the project overview follows the project, and whatever goes stale is deleted.
 
-## 1. 项目概览
+## 1. Project overview
 
-- **项目**：multilingual-course-assistant — 大学课程材料多语言问答 + 校园信息问答（RAG，开源权重 LLM，Qwen 系；**仅 QA，⛔ 出题/判卷**）+ 网站（PPM 部分），同一仓库。**Triennale 毕业论文**，UniFi，relatore Prof. Marco Bertini；单人开发（Junliang Zheng）。
-- **指针**：推进状态、里程碑、阻塞项、暂缓项 → **GitHub issue**（里程碑 M3 · M5 · M6 · M7），仓库里不留清单文件；自主拍板项（含被推翻的）→ `docs/decisioni.md`；代码布局与模块职责 → `README.md`；技术栈决策表与 relatore 的约束 → `docs/architettura.md`；具体主题放 `docs/`，本文件只放指针。
-- **范围**：**禁用专有 LLM API**（OpenAI/Claude），只用开源权重模型。课程场景语料只用 slides/讲义 PDF；校园场景语料 = UniFi 网站爬取快照 + 学生提问触发的实时抓取（过 LLM 相关性门后持久入库，自增长；范围不锁 unifi.it 域）。
-- **依赖规则**：**🔒 项禁止引入依赖或配置文件**；🔶 项用 `uv add` 引入，且**只在真正要用它的里程碑加** — 装了不用的依赖是噪音，也让 `uv.lock` 里出现无法解释的东西。前端 npm 依赖同规同权：`npm install --prefix frontend`，`package-lock.json` 与 `uv.lock` 一样必须跟着 commit（CI 用 `npm ci`）。「真正要用」的判据是**有代码在跑它**，不是「部署时会需要」—— 后者装了没人能验。
-- **目录**：**`rag/` 禁止 import Django** — 论文核心要能脱离 web 单独跑评估，`tests/test_smoke.py` 守着这条。**`frontend/` 是另一侧的同一条边界**：它只认 `apps/qa/contract.py` 的 TS 镜像，不认 Django 模型；契约唯一源在 Python 侧，`tests/test_qa_contract.py` 守着两侧不漂移。`frontend/dist/` 是构建产物（gitignore），所以前端构建排在所有 Django 步骤之前。`data/`（课程材料与派生产物）gitignore，**永不**进 git。后续目录到里程碑再建，未定前不建"顺手"目录。
-- **语言域**：业务领域是多语言的；所有数据模型和面向用户的文本从一开始就带 `locale` 字段/参数，禁止硬编码语言字符串。
+- **Project**: multilingual-course-assistant — multilingual question answering over university course material, plus campus-information QA (RAG over open-weights LLMs, the Qwen family; **QA only, ⛔ generating or grading exercises**) and a website (the PPM part), in one repository. **Bachelor's thesis (*triennale*)**, UniFi, supervisor (*relatore*) Prof. Marco Bertini; one developer (Junliang Zheng).
+- **Pointers**: progress, milestones, blockers and deferred work → **GitHub issues** (milestones M3 · M5 · M6 · M7), never a checklist file in the repository; decisions taken without the supervisor, reversals included → `docs/decisioni.md`; code layout and module responsibilities → `README.md`; the stack decision table and the supervisor's constraints → `docs/architettura.md`; the check chain, identical locally and in CI → `scripts/check.py`; one topic per file under `docs/`. This file holds pointers only.
+- **Scope**: **no proprietary LLM APIs** (OpenAI, Claude) — open-weights models only. The course scenario's corpus is slides and lecture-note PDFs only; the campus scenario's corpus is a crawl snapshot of the UniFi website plus pages fetched live when a student's question calls for them (stored permanently once the LLM relevance gate passes them, so the corpus grows by itself; not locked to the unifi.it domain).
+- **Dependencies**: **🔒 items must not bring in a dependency or a config file**; 🔶 items add theirs with `uv add`, and **only in the milestone that really uses it** — an installed dependency nothing uses is noise, and it puts something unexplainable in `uv.lock`. Frontend npm dependencies follow the same rule: `npm install --prefix frontend`, and `package-lock.json` is committed like `uv.lock` (CI runs `npm ci`). "Really uses" means **code runs it**, not "deployment will need it" — nobody can verify the latter.
+- **Boundaries**: **`rag/` never imports Django** — the thesis core must run and be evaluated without the web; `tests/test_smoke.py` guards this. **`frontend/` is the same boundary from the other side**: it knows only the TypeScript mirror of `apps/qa/contract.py`, never the Django models; the contract's single source is the Python side, and `tests/test_qa_contract.py` keeps the two from drifting. `frontend/dist/` is a build artefact (gitignored), which is why the frontend build runs before every Django step of `scripts/check.py`. `data/` (course material and everything derived from it) is gitignored and **never** enters git. Further directories are created in the milestone that needs them; no "while I'm here" directories before that.
+- **Language as a domain**: the business domain is multilingual; every data model and every user-facing text carries a `locale` field or parameter from the start. No hard-coded language strings.
 
-## 2. 代理执行规则
+## 2. Agent rules
 
-1. **写代码前**：先读相关现有文件理解代码风格再动手，禁止凭直觉写。
-2. **Contract-first**：存在共享契约（类型、数据 schema、API）时，契约是**唯一源**；先改契约，再改消费方，同一次修改内保持两侧同步。
-3. **大任务分阶段**：跨多层（数据 / 服务 / 界面）的修改拆成独立 Stage，禁止单次会话覆盖所有层。
-4. **大文件拆分**：单文件超 250 行时，先改逻辑层再改视图层，禁止一次改两层。
-5. **语言**：变量/函数英文；代码注释英文；commit 消息英文；仓库文档中文（见文档约定）。**与用户对话始终用中文**，无论提问用什么语言。
-6. **唯一正确实现，消除噪音**：只保留一份正确实现。refactor **原地替换**，禁止平行/备选版本，禁止保留"备用"旧代码（历史在 git 里）。死代码 = 噪音，彻底删除。
-7. **输出格式遵官方，禁止造字段**：API 响应 / config / manifest / SDK 参数严格按官方 schema，禁止发明字段。有疑问先查官方文档再实现。
-8. **风格规则交给 linter**：格式/命名由 linter/formatter 强制，本文件不重复。
-9. **危险操作交用户，写操作限项目内**：不可逆或越界操作**打印命令，用户在自己终端执行**。AI **永不执行**：递归/批量删除、注册表与系统配置修改、系统级安装卸载、对任何托管服务（云 DB、存储、auth 服务、付费 API）的**写入或连接线上环境**的命令（迁移 / seed / reset / DDL / DML / admin API / 部署）。项目目录**外**只读；项目**内**单文件删除（refactor / 死代码）允许，但删前列出文件 + 理由。AI 仅限**完全离线**操作：从本地文件生成客户端 / 类型、编辑迁移文件、读取 schema。
-10. **问而不猜**：缺决策（范围、栈、领域命名）且不同理解会导致不同工作时，问**一个**带 2-4 个选项的靶向问题；不默默替用户选。
+1. **Before writing code**: read the related existing files and match their style. Never write from intuition.
+2. **Contract-first**: where a shared contract exists (types, data schema, API), it is the **single source**; change the contract first, then its consumers, keeping both sides in step within the same change.
+3. **Stage large tasks**: a change across layers (data / service / interface) is split into separate stages; never cover every layer in one session.
+4. **Split large files**: when a file exceeds 250 lines, change the logic layer first and the view layer after; never both at once.
+5. **Language**: identifiers, code comments, commit messages, repository documents and GitHub issues are in English (see the documentation conventions). **Talk to the user in Chinese**, whatever language they write in.
+6. **One correct implementation, no noise**: keep exactly one correct implementation. Refactors **replace in place** — no parallel or alternative versions, no "backup" of old code (history lives in git). Dead code is noise and is deleted outright.
+7. **Follow the official format, invent no fields**: API responses, config, manifests and SDK parameters follow the official schema exactly. When in doubt, read the official documentation before implementing.
+8. **Style belongs to the linters**: formatting and naming are enforced by linters and formatters; this file does not repeat them.
+9. **Dangerous operations go to the user; writes stay inside the project**: for anything irreversible or outside the project, **print the command and let the user run it in their own terminal**. The AI **never runs**: recursive or bulk deletion, registry or system configuration changes, system-wide installs or uninstalls, any command that **writes to or connects to a live environment** of a hosted service (cloud DB, storage, auth service, paid API — migrations, seeds, resets, DDL, DML, admin APIs, deployments). Outside the project directory, read only. Inside it, deleting a single file (refactor, dead code) is allowed after listing the file and the reason. The AI is limited to **fully offline** operations: generating clients or types from local files, editing migration files, reading schemas.
+10. **Ask, don't guess**: when a decision is missing (scope, stack, domain naming) and different readings lead to different work, ask **one** targeted question with 2–4 options; never choose silently for the user.
 
 ## 3. Git
 
-1. **Commit 归用户**：AI 可以改文件、`git add`、`git diff`、`git status`；**永不执行 `git commit`** — 把完整命令打印出来，用户在自己终端执行。一个逻辑单元一个 commit，消息用英文，Conventional Commits 格式（`feat:` · `fix:` · `docs:` · `chore:` · `refactor:` · `test:`）。
-2. **禁止生成签名**：commit 消息和 PR 正文**不含** `Co-Authored-By: Claude …`、`🤖 Generated with …` 等任何 AI 工具签名。消息以最后一行内容结束。
-3. **远程与历史归用户**：AI **永不执行** `git push`，也不做远程/账号级操作（建删仓库、改 `git remote`、`git config --global`、`gh auth`）。**永不重写共享历史**：无明确要求不 `push --force`（含 `-f` / `--force-with-lease`）、不对未提交工作 `reset --hard`、不 rebase 或 `--amend` 已发布的 commit。其余场景**打印命令，用户在自己终端执行**。
-4. **分支**：在 `main` 上工作（个人仓库）。实验性修改先提议开分支。
+1. **Commits belong to the user**: the AI may edit files and run `git add`, `git diff`, `git status`; it **never runs `git commit`** — it prints the full command for the user to run. One logical unit per commit, messages in English, Conventional Commits (`feat:` · `fix:` · `docs:` · `chore:` · `refactor:` · `test:`).
+2. **No signatures**: commit messages and pull request bodies carry **no** AI tool signature (`Co-Authored-By: Claude …`, `🤖 Generated with …` or the like). A message ends with its last line of content.
+3. **Remotes and history belong to the user**: the AI **never runs** `git push` and does no remote or account-level operation (creating or deleting repositories, changing `git remote`, `git config --global`, `gh auth`). **Shared history is never rewritten**: no `push --force` (including `-f` and `--force-with-lease`) without an explicit request, no `reset --hard` over uncommitted work, no rebase or `--amend` of a published commit. Everything else: **print the command, the user runs it**.
+4. **Branches**: work on `main` (personal repository). Propose a branch for experimental changes.
 
-## 4. 领域不变量
+## 4. Domain invariants
 
-🔜 论文范围细化后填写。只放违反即 bug 的业务规则，不放偏好。本节为空时，不发明不变量。
+🔜 To be written once the thesis scope is refined. Only business rules whose violation is a bug, not preferences. While this section is empty, invent no invariants.
 
-## 5. 文档约定
+## 5. Documentation conventions
 
-**文档语言：意大利语。** 仓库内的 markdown 文档与 GitHub issue 都用意大利语写，原地维护，**无平行翻译版本**（relatore 看得到仓库与 issue 列表，且 M6 交付物本就是意语——分两种语言写等于把同一份内容维护两遍）。代码标识符/注释/commit 消息用英文，**与用户对话用中文**（见代理执行规则的语言条）。
+**Documents are in English.** The repository's markdown and its GitHub issues are written in English and maintained in place, **with no parallel translations** — two languages would mean keeping the same content twice. The thesis body and its delivery attachments are written in Italian outside the repository. Talk to the user in Chinese (agent rule 5). Decision and reasons: `docs/decisioni.md`, 2026-09-23.
 
-🔶 **部分** — 规则对新写与改写的内容立即生效；存量中文文档尚未迁移。属主是 **issue #43**（`[M-TESI] i documenti di consegna finale sono in italiano`），那里有文件清单与逐条验收。待迁移：7 个文件、1072 行（`README.md` 304 · `docs/docling-e-pipeline.md` 294 · `docs/architettura.md` 146 · `docs/fonte-web-unifi.md` 103 · `docs/analisi-rag.md` 86 · `docs/decisioni.md` 75 · 本文件 64）。`docs/diario-sperimentale.md` 已是意语，不在清单内。
+🔶 **Partial** — the rule applies at once to everything new or rewritten; existing documents are migrated under **issue #43**, which owns the list of files and their state.
 
-**地图** — 根目录文件 + `docs/`。仓库内不散落其他计划/清单文件：
+**Map** — the root files plus `docs/`. No other plan or checklist files anywhere in the repository:
 
-| 文件         | 内容                                       |
-| ------------ | ------------------------------------------ |
-| `README.md`  | 入口：是什么、怎么跑、怎么开发、CI          |
-| `CLAUDE.md`  | 代理规则、项目概览、文档约定                |
-| `docs/decisioni.md` | 自主拍板项：日期、拍了什么、依据，含被推翻的 |
-| `docs/*.md`  | 一主题一文件，主题存在才建                  |
+| File | Contents |
+| ---- | -------- |
+| `README.md` | Entry point: what it is, how to run it, how to develop, CI |
+| `CLAUDE.md` | Agent rules, project overview, documentation conventions |
+| `docs/decisioni.md` | Decisions: the date, what was decided, why — reversals included |
+| `docs/*.md` | One topic per file, created only when the topic exists |
 
-**推进状态的属主是 GitHub issue，不是任何 markdown 文件**：里程碑清单、阻塞项、暂缓项只在 issue 里；文档写「是什么、为什么」，不写「还没做」。
+**Progress is owned by GitHub issues, never by a markdown file**: milestone checklists, blockers and deferred work live only in issues; documents say *what* and *why*, never *not yet*.
 
-**一条信息一个属主。** 属主写全文，其他文件一行 + 链接，永不复制。不知道属主是谁时，定属主也是本次修改的一部分。
+**One piece of information, one owner.** The owner holds the full text; any other file gets one line and a link, never a copy. When the owner is unclear, settling it is part of the change.
 
-**图**：mermaid（GitHub 原生渲染）；ASCII 仅限内联微型图（如目录树）。状态标记放在图上方的正文里，永不放进 mermaid 语法内。
+**Diagrams**: mermaid (GitHub renders it); ASCII only for tiny inline diagrams such as a directory tree. Status markers go in the prose above a diagram, never inside the mermaid syntax.
 
-**状态标记**（全仓库统一）：✅ 已实现 — **必须**引用真实路径或可执行命令 · 🔜 计划中 — **必须**注明里程碑 · 🔶 部分 — 说明有什么、缺什么 · 🔒 阻塞 — 说明谁解锁 · ⛔ 超出范围。`[ ] [~] [x]` 勾选框**只**存在于 GitHub issue 的正文里。禁止时间性表述（"已经做了""目前""即将"）：状态只用标记表达。
+**Status markers** (the same everywhere): ✅ implemented — **must** cite a real path or a runnable command · 🔜 planned — **must** name the milestone · 🔶 partial — say what exists and what is missing · 🔒 blocked — say who unblocks it · ⛔ out of scope. `[ ] [~] [x]` checkboxes exist **only** in GitHub issue bodies. No temporal wording ("already", "currently", "soon"): status is expressed with markers only.
 
-**计划中的设计 ≠ 错误的设计。** 🔜 块可以描述尚不存在的东西，**不能**描述代码已否决的东西。与代码或真实契约矛盾的内容，先按真实模型重写再打标记。
+**A planned design is not a wrong design.** A 🔜 block may describe what does not exist yet; it **must not** describe what the code has rejected. Content that contradicts the code or the real contract is first rewritten to the real model, then marked.
 
-**链接**：文件之间只链**文件，永不链 `#anchor`**（标题会变，锚点静默失效）；章节用文字点名。锚点仅限同文件内部。**仓库外**引用用纯文本 + 备注（仓库外），不做链接。
+**Links**: between files, link **files, never `#anchor`s** (headings change and anchors break silently); name sections in words. Anchors only within the same file. References **outside the repository** are plain text with a note (outside the repository), not links.
