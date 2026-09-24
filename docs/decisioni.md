@@ -2,6 +2,12 @@
 
 本文件是**自主拍板项**的属主：哪一天、拍了什么板、依据是什么，含**后来被自己推翻的那些** —— 反转本身是记录的一部分，删掉就看不出为什么会反转，答辩上也答不出来。⛔ 不在这里：技术栈选型与决策状态表归 [architettura.md](architettura.md)（「选了什么、验证条件是什么」）；推进状态、阻塞项与暂缓项归 GitHub issue（里程碑 M3 · M5 · M6 · M7），不在任何 markdown 文件里。
 
+## 2026-09-24 — `just` is retired; scripts/check.py is the one chain
+
+1. **The justfile is gone, and nothing replaces it as a tool.** It had 28 recipes, and CI called none of them: `.github/workflows/ci.yml` spelled every command out a second time, so the two copies drifted. CI ran `check --deploy --fail-level WARNING` and `just check` did not, and CI tested with `DJANGO_DEBUG=false` while a local run inherited `true` from `.env` — "green locally" and "green in CI" were different statements. The chain is now [scripts/check.py](../scripts/check.py): eight named steps plus the mode variables they run under, and CI calls each step by name. `tests/test_check_script.py` reads the workflow and fails when it runs anything else, drops or reorders a step, or sets a mode variable itself.
+   The survey behind it (outside the repository): the projects where local and CI agree by construction — `encode/httpx` with its `scripts/` directory, `pypa/pip` with nox, `pallets/flask` with tox, `getsentry/sentry` with make — have in common that CI calls the aggregate by name; those whose CI runs raw commands next to an aggregate (`django/django` with tox, `wagtail/wagtail`, `home-assistant/core`) are in the state this repository was in. Which tool holds the aggregate is secondary, and none of the projects surveyed uses `just`. A Python script needs nothing that `uv sync` does not already install, and runs natively under PowerShell.
+   **The price:** the one-line wrappers over `rag/` are gone, so a pipeline command is typed in full (`uv run python -m rag.agent "…"`); README lists them. Two steps of the chain (`django`, `migrations`) repeat checks that `tests/test_smoke.py` and `tests/test_accounts.py` already make — kept, because the chain mirrors what CI ran, and whether to drop them is a question for the test-suite epic `#89`.
+
 ## 2026-09-15 — La tavolozza diventa acromatica, e il cancello cambia verso
 
 1. **Revocato il commit `637f5cc`, «give the interface an accent colour of its own».** Quel commit, di sei giorni prima, aveva dato all'interfaccia un accento teal proprio perché `--accent` valeva carattere per carattere quanto `--ink` e l'interfaccia non aveva un colore suo. Dopo aver provato Morphic e Perplexity la decisione è stata di adottare la loro tavolozza, che è **interamente acromatica**: croma esattamente 0 su ogni token tranne la famiglia `--warn*`. L'accento torna a essere l'inchiostro, questa volta per scelta e non per difetto.
@@ -52,7 +58,7 @@ CI 的 `audit` job 红了两次（两次都是纯文档 commit），根因是 `p
 
 报备即可：
 
-1. **推翻两条自己的免登录拍板**：2026-08-22 第 5 条末句「论文期演示环境免登录」与 2026-08-24 第 3 条「campus QA 免登录」。**全站需登录**，匿名路径已从代码里删除。理由见 [README.md](../README.md)「账号」一节 —— 简言之，多轮会话就是每用户状态，而当初写下免登录时系统还是单轮的。这两条同时改，只改一条会让记录自相矛盾。
+1. **推翻两条自己的免登录拍板**：2026-08-22 第 5 条末句「论文期演示环境免登录」与 2026-08-24 第 3 条「campus QA 免登录」。**全站需登录**，匿名路径已从代码里删除。理由见 [README.md](../README.md)「Accounts」一节 —— 简言之，多轮会话就是每用户状态，而当初写下免登录时系统还是单轮的。这两条同时改，只改一条会让记录自相矛盾。
 2. **后端消息不做 gettext catalogue，论文期保持英文**。这个项目里三种语言各有属主：界面归前端的三份 catalogue（it/en/zh-hans，已全译），回答语言归 `rag/answer.py` 的 prompt（M2 起就在跑），而 503 与 `error` 这一层的读者是看服务端日志的人。给它再建一套 catalogue 是没有读者的活。可见后果：一个 400 响应体里可能同时出现 DRF 自带的意语校验消息和本项目的英文消息。
 3. **同源发页面只做开发形态，静态文件服务推 M6**。`DEBUG=False` 下 Django 按设计拒绝发静态文件，需要 whitenoise 或 nginx；而今天仓库里没有任何地方跑 `DEBUG=False` 起服务，现在装等于装一个没人能验的依赖。已作为显式前置写进 `#41`。
 4. **本机不跑整套容器化**：`docker compose up` 无 profile 只起 PostgreSQL，Django 仍在宿主机 `uv run` 下以直接用 GPU；`--profile app` 的整套容器化是 Linux 宿主 / 答辩机路径。这条是 2026-08-24 第 2 条的既有设定，此处只是重申，因为 M5 交付后「一条命令起全套」容易被误读成本机也该这么跑。

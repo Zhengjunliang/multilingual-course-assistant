@@ -14,11 +14,11 @@ from config.env import env
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# What `just fe` builds. Two things read it — the static finders below and
+# What the frontend build writes. Two things read it — the static finders below and
 # config/views.py, which serves the SPA's shell — so it is named once here.
 #
 # It is a build artefact and not in git, which is why the frontend build runs
-# ahead of every Django step in CI and in `just check`: `staticfiles.W004`
+# ahead of every Django step in scripts/check.py: `staticfiles.W004`
 # reports a STATICFILES_DIRS entry that does not exist, and `check --deploy
 # --fail-level WARNING` turns that report into a failure.
 SPA_DIST = BASE_DIR / "frontend" / "dist"
