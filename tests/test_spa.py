@@ -7,7 +7,7 @@ It is the cheapest page this project serves and should stay that way.
 
 Every test overrides `SPA_DIST` at a temporary directory instead of reading the
 real build. Both outcomes then belong to the test rather than to whether
-somebody ran `just fe` first, and the missing-build branch becomes reachable at
+somebody built the frontend first, and the missing-build branch becomes reachable at
 all — on a checked-out repo that has been built, it never is.
 """
 
@@ -40,7 +40,7 @@ def built(tmp_path: Path) -> Iterator[Path]:
 
 @pytest.fixture
 def unbuilt(tmp_path: Path) -> Iterator[Path]:
-    """A checkout where `just fe` has never run: the directory is empty."""
+    """A checkout whose frontend was never built: the directory is empty."""
     with override_settings(SPA_DIST=tmp_path):
         yield tmp_path
 
@@ -75,7 +75,7 @@ def test_a_missing_build_names_the_command_that_fixes_it(client: Client) -> None
     response = client.get("/")
 
     assert response.status_code == 503
-    assert b"just fe" in response.content
+    assert b"npm run build --prefix frontend" in response.content
 
 
 @pytest.mark.usefixtures("built")

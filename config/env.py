@@ -40,8 +40,8 @@ class Settings(BaseSettings):
     # break the site — when nothing terminates TLS, and a demo on the MICC
     # intranet or on the defence machine may well have nothing. One flag gates
     # all of them rather than DEBUG, because "not debugging" and "behind TLS"
-    # are different questions. CI sets it so `check --deploy` verifies the
-    # configuration that would actually be deployed.
+    # are different questions. The `deploy` step of scripts/check.py sets it,
+    # so `check --deploy` verifies the configuration that would be deployed.
     django_behind_tls: bool = False
 
     # Generation endpoint: any OpenAI-compatible server. Dev default is local

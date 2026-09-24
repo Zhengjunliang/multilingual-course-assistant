@@ -10,8 +10,8 @@ decisions rather than one:
 
 `TemplateView` returns a `TemplateResponse`, and a `TemplateResponse` resolves
 its template after the view has returned — so `TemplateDoesNotExist` surfaces
-somewhere the view cannot catch it, and a checkout that has not run `just fe`
-would answer with a stack trace instead of the sentence that fixes it.
+somewhere the view cannot catch it, and a checkout whose frontend was never
+built would answer with a stack trace instead of the sentence that fixes it.
 
 And frontend/index.html contains no Django template syntax at all. Handing it
 to the template engine adds a way for it to fail — the day some Vite plugin
@@ -33,7 +33,9 @@ if TYPE_CHECKING:
 # who can act on it: the shell is missing exactly when the frontend has never
 # been built. Same shape as the engine's unavailability messages — name the
 # command, not the condition.
-MISSING_BUILD = _("The interface has not been built yet. Run `just fe`, then reload.")
+MISSING_BUILD = _(
+    "The interface has not been built yet. Run `npm run build --prefix frontend`, then reload."
+)
 
 
 def spa(request: HttpRequest) -> HttpResponse:
