@@ -34,7 +34,7 @@ uv run python manage.py createsuperuser
 | run the tests quickly | `uv run pytest` |
 | run everything CI runs | `uv run python scripts/check.py` |
 
-**While the site is running, the `rag` CLIs that touch the index fail** (`rag.index`, `rag.search`, `rag.agent`, …): local Qdrant is embedded and holds an exclusive lock on `data/qdrant`, so whichever process opens it first keeps it; the endpoints answer 503 with that explanation in the opposite case. Stop the server with `Ctrl+C` to use the CLI. 🔜 This goes away when Qdrant becomes a service (`#33`).
+**While the site is running, the `rag` CLIs that touch the index fail** (`rag.index`, `rag.search`, `rag.agent`, …): local Qdrant is embedded and holds an exclusive lock on `data/qdrant`, so whichever process opens it first keeps it; the endpoints answer 503 with that explanation in the opposite case. Stop the server with `Ctrl+C` to use the CLI. 🔜 This goes away when Qdrant becomes a service (`#33`, M5).
 
 **After changing a model**, generate and apply the migration, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`):
 
@@ -70,7 +70,7 @@ React + TypeScript SPA built with Vite, Tailwind and shadcn-style components (th
 | work on the frontend | `runserver`, plus `npm run dev --prefix frontend` in a second terminal | <http://localhost:5173/> — reloads on save |
 | see the site as it ships | `npm run build --prefix frontend` once, then `runserver` | <http://127.0.0.1:8000/> — same origin, one process |
 
-The second row is what the site really is: Django serves `frontend/dist/index.html` at the root and the bundle under `/static/`, with no Vite involved — so a frontend change needs a rebuild before port 8000 shows it. Without a build that address answers 503 and names the command. With `DEBUG=False` Django refuses to serve static files; the static file server for deployment is 🔜 `#40`.
+The second row is what the site really is: Django serves `frontend/dist/index.html` at the root and the bundle under `/static/`, with no Vite involved — so a frontend change needs a rebuild before port 8000 shows it. Without a build that address answers 503 and names the command. With `DEBUG=False` Django refuses to serve static files; the static file server for deployment is 🔜 `#40` (M6).
 
 Five routes: `/login` · `/register` · `/` (new conversation) · `/c/:id` (a stored one) · `/styleguide` (the component layer against no data); anything else redirects to `/`. [config/urls.py](config/urls.py) answers every path it does not own with the same shell, so a reload on `/c/7` works.
 
@@ -154,7 +154,7 @@ The first request takes about a minute while the models load into GPU memory. An
 - Errors: 400 validation · 403 not logged in or wrong CSRF token (told apart by `GET /api/auth/me`) · 429 throttled · 503 a dependency is unavailable. With `Accept: text/event-stream` they arrive as an `error` event, otherwise as JSON.
 - **These messages are in English by decision, not by omission**: the interface belongs to the frontend catalogues, the answer language to the prompt in [rag/answer.py](rag/answer.py), and the readers of a 503 or an `error` are whoever reads the server log — a catalogue for them would have no reader. The strings stay marked with `gettext_lazy`. **A visible consequence, so it is not chased as a bug**: DRF's own validation messages do have Italian translations and follow `Accept-Language` (`LANGUAGE_CODE` is `it`), so one 400 body can hold both `"Questo campo è obbligatorio."` and `"No such conversation."`.
 
-The deepening loop is not in this endpoint: it fetches pages and writes to the shared index, up to 3 fetches, so it runs only from `rag.agent` on the command line. Its web path is an asynchronous task (🔜 `#34`).
+The deepening loop is not in this endpoint: it fetches pages and writes to the shared index, up to 3 fetches, so it runs only from `rag.agent` on the command line. Its web path is an asynchronous task (🔜 `#34`, M5).
 
 ## Code layout
 
