@@ -23,7 +23,7 @@ from apps.qa import engine as engine_module
 from rag.chunk import normalize_locale
 
 if TYPE_CHECKING:
-    from pytest_django.fixtures import SettingsWrapper
+    from pytest_django import Settings
 
 pytestmark = pytest.mark.django_db
 
@@ -38,7 +38,7 @@ PASSWORD = "correct-horse-battery"
 
 
 @pytest.fixture(autouse=True)
-def _fast_password_hashing(settings: SettingsWrapper) -> None:
+def _fast_password_hashing(settings: Settings) -> None:
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 
