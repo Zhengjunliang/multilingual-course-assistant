@@ -10,7 +10,7 @@
  *
  * `import * as RadixDialog`, not `as Dialog`: this file exports a function of
  * that name, and the shadowing is a type error rather than a subtle bug — but
- * it is one `tsc` would report from typecheck instead of from here.
+ * it is one `npm run typecheck` reports rather than something found here.
  */
 
 import * as RadixDialog from "@radix-ui/react-dialog";

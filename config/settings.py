@@ -255,8 +255,9 @@ LOGGING = {
 # Security headers
 # https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# `manage.py check --deploy --fail-level WARNING` runs in CI against DEBUG=false
-# and DJANGO_BEHIND_TLS=true, so this block is what that gate verifies. Django's
+# The `deploy` step of scripts/check.py runs `manage.py check --deploy
+# --fail-level WARNING` against DEBUG=false and DJANGO_BEHIND_TLS=true, so
+# this block is what that gate verifies. Django's
 # own defaults already cover X_FRAME_OPTIONS, SECURE_CONTENT_TYPE_NOSNIFF and
 # SECURE_REFERRER_POLICY; restating them here would be a second copy to drift.
 if not DEBUG and env.django_behind_tls:

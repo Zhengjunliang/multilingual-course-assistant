@@ -13,10 +13,10 @@ DEBUG off, so this chain does too, whatever the local .env says. Credentials
 and connection settings do not travel — CI sets them in the workflow, a
 checkout reads them from .env.
 
-Standard library only, and nothing newer than 3.10 in this file (ruff holds it
-to that): the first thing it does is refuse to run outside the project venv,
-and that refusal has to parse under the system interpreter it is refusing.
-Why a script and not a task runner: docs/decisioni.md, 2026-09-24.
+Standard library only: the first thing it does is refuse to run outside the
+project venv, and that refusal has to work under an interpreter that has none
+of the project's packages. Why a script and not a task runner:
+docs/decisioni.md, 2026-09-24.
 """
 
 from __future__ import annotations
@@ -28,6 +28,10 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
@@ -45,7 +49,7 @@ class Step:
     name: str
     commands: tuple[tuple[str, ...], ...]
     cwd: Path = ROOT
-    env: dict[str, str] = field(default_factory=dict)
+    env: Mapping[str, str] = field(default_factory=dict)
     # A path that has to exist before the step can mean anything, and what to
     # run when it does not — so the failure names its fix instead of surfacing
     # as some tool's error three layers down.
@@ -102,6 +106,10 @@ def environment(step: Step) -> dict[str, str]:
     return {**os.environ, **MODE, **step.env}
 
 
+def in_project_venv() -> bool:
+    return Path(sys.prefix).resolve() == (ROOT / ".venv").resolve()
+
+
 def _display(command: tuple[str, ...]) -> str:
     return " ".join("python" if part == PYTHON else part for part in command)
 
@@ -110,7 +118,7 @@ def run(step: Step) -> int:
     """Run one step's commands in order; the first non-zero exit code ends it."""
     if step.requires is not None and not step.requires[0].exists():
         missing, fix = step.requires
-        print(f"FAILED: {step.name}: {missing} is missing; run `{fix}` first")
+        print(f"FAILED: {step.name}: {missing} is missing; run `{fix}` first", file=sys.stderr)
         return 1
     env = environment(step)
     for command in step.commands:
@@ -119,15 +127,15 @@ def run(step: Step) -> int:
         # shell; resolving it here keeps shell=True, and its quoting, out of it.
         program = shutil.which(command[0])
         if program is None:
-            print(f"FAILED: {step.name}: `{command[0]}` is not on PATH")
+            print(f"FAILED: {step.name}: `{command[0]}` is not on PATH", file=sys.stderr)
             return 127
         code = subprocess.run(
             (program, *command[1:]), cwd=step.cwd, env=env, check=False
         ).returncode
         if code != 0:
-            print(f"FAILED: {step.name}: `{_display(command)}` exited {code}")
+            print(f"FAILED: {step.name}: `{_display(command)}` exited {code}", file=sys.stderr)
             if step.hint:
-                print(step.hint)
+                print(step.hint, file=sys.stderr)
             return code
     return 0
 
@@ -144,8 +152,12 @@ def main(argv: list[str] | None = None, steps: tuple[Step, ...] = STEPS) -> int:
     )
     args = parser.parse_args(argv)
 
-    if Path(sys.prefix).resolve() != (ROOT / ".venv").resolve():
-        print("Run it inside the project venv: uv run python scripts/check.py", file=sys.stderr)
+    if not in_project_venv():
+        print(
+            f"Running under {sys.prefix}, not {ROOT / '.venv'}: "
+            "run it as `uv run python scripts/check.py`",
+            file=sys.stderr,
+        )
         return 2
     unknown = sorted(set(args.steps) - {step.name for step in steps})
     if unknown:
