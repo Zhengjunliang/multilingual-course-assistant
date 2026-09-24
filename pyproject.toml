@@ -25,7 +25,7 @@ dependencies = [
 dev = [
     # Type-check only. Pylance ships its own Django stubs, so without this the
     # editor and the CI type check disagree about the same file — the editor
-    # flags things `just typecheck` never sees. Pinning it here makes both read
+    # flags things the `types` step never sees. Pinning it here makes both read
     # the same declarations.
     "django-stubs>=6.1.0",
     "djangorestframework-stubs>=3.18.0",
@@ -58,6 +58,10 @@ target-version = "py312"
 line-length = 100
 # Snippets in docs/ are illustrative prose, aligned for reading, not compiled code.
 extend-exclude = ["*.md"]
+# The check chain refuses to run outside the project venv, and that refusal has
+# to parse under the system interpreter it refuses (3.10 on the dev machine). At
+# py312, UP would rewrite it into syntax that fails before the check can speak.
+per-file-target-version = { "scripts/**" = "py310" }
 
 [tool.ruff.lint]
 select = [
@@ -94,6 +98,8 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 # test that logs in has to write the password down somewhere (S105) — reading it
 # from the environment would only mean a credential that CI has to be given.
 "tests/**" = ["S101", "S105", "S603"]
+# The check chain exists to run subprocesses, from a fixed table in its own source.
+"scripts/**" = ["S603"]
 # Written by makemigrations, not by hand. E501: the long lines are Django's own
 # help_text strings copied verbatim from the parent model, and rewrapping them
 # would make the migration disagree with the model it was generated from.
@@ -109,7 +115,7 @@ typeCheckingMode = "standard"
 strict = ["rag"]
 venvPath = "."
 venv = ".venv"
-include = ["apps", "config", "rag", "tests"]
+include = ["apps", "config", "rag", "scripts", "tests"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"

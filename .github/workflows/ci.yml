@@ -1,6 +1,6 @@
 # No Windows job on purpose: the pytorch-cu126 marker in pyproject.toml would make a
 # windows runner download a ~2.5 GB CUDA torch wheel on every run, and the full chain
-# already runs on Windows daily on the dev machine (pre-commit + local pytest).
+# already runs on Windows daily on the dev machine (`uv run python scripts/check.py`).
 name: CI
 
 # No `paths-ignore`, and its absence is the deliberate part. A documentation
@@ -33,7 +33,6 @@ jobs:
       # Not a secret: this key only ever signs throwaway CI sessions. Its length
       # is not arbitrary — `check --deploy` rejects anything under 50 characters.
       DJANGO_SECRET_KEY: ci-only-key-never-used-outside-this-runner-and-not-a-secret
-      DJANGO_DEBUG: "false"
       DJANGO_DB_NAME: mca
       DJANGO_DB_USER: mca
       DJANGO_DB_PASSWORD: ci-only-password
@@ -65,10 +64,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      # The frontend chain runs before every Django step on purpose. From the
-      # deployment stage on, STATICFILES_DIRS points at frontend/dist — a build
-      # artifact that is not in git — and `check --deploy --fail-level WARNING`
-      # turns the "directory does not exist" warning into a failed job.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: frontend/.nvmrc
@@ -79,40 +74,34 @@ jobs:
         run: npm ci
         working-directory: frontend
 
+      # Every check below is a step of scripts/check.py, called by name: what
+      # each one runs, in which order and why, is written there once. DEBUG off
+      # and the TLS flag travel with the steps too; this job sets only the
+      # credentials and the database. tests/test_check_script.py fails if a
+      # step here runs anything else, goes missing or changes places.
       - name: Frontend lint, types, catalogues, contrast, tests and build
-        # `test` after the four static gates and before `build`: the static
-        # gates are the cheapest to fail, and `build` has to stay last because
-        # it writes frontend/dist — the directory `check --deploy` reads further
-        # down. A failing test should not first wait for a bundle it invalidates.
-        run: npm run lint && npm run typecheck && npm run check:i18n && npm run check:contrast && npm run test && npm run build
-        working-directory: frontend
+        run: uv run python scripts/check.py frontend
 
       - name: Lint
-        run: uv run ruff check .
+        run: uv run python scripts/check.py lint
 
       - name: Format
-        run: uv run ruff format --check .
+        run: uv run python scripts/check.py format
 
       - name: Types
-        run: uv run pyright
+        run: uv run python scripts/check.py types
 
       - name: Django system checks
-        run: uv run python manage.py check
+        run: uv run python scripts/check.py django
 
       - name: Migration drift
-        run: uv run python manage.py makemigrations --check --dry-run
+        run: uv run python scripts/check.py migrations
 
       - name: Deployment checks
-        # --fail-level WARNING is what makes this a gate: without it the command
-        # prints its findings and exits 0. BEHIND_TLS only here, not job-wide —
-        # it turns on SECURE_SSL_REDIRECT, which would make the test client
-        # follow a 301 out of every request.
-        env:
-          DJANGO_BEHIND_TLS: "true"
-        run: uv run python manage.py check --deploy --fail-level WARNING
+        run: uv run python scripts/check.py deploy
 
       - name: Tests
-        run: uv run pytest --cov
+        run: uv run python scripts/check.py tests
 
   audit:
     runs-on: ubuntu-latest
