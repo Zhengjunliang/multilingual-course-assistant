@@ -168,7 +168,7 @@ The deepening loop is not in this endpoint: it fetches pages and writes to the s
 | `scripts/` | `check.py`, the check chain |
 | `tests/` | pytest. `test_smoke.py` guards the `rag/` boundary and the Django configuration; `test_qa_contract.py` the contract and its mirror; `test_check_script.py` the chain and the workflow that calls it; `test_qa_engine.py` and `test_spa.py` carry no `django_db`, so pytest-django fails them if they touch the database |
 | `gold/` | Gold question sets; schema in [gold/README.md](gold/README.md) |
-| `docs/` | One topic per file: decisions, architecture, the Docling pipeline, the web source, RAG analysis, the experiment log |
+| `docs/` | One topic per file: decisions, architecture, the data model, the Docling pipeline, the web source, RAG analysis, the experiment log |
 | `.github/` | `workflows/ci.yml` (the check chain + dependency audit), `workflows/secrets.yml` (gitleaks), `dependabot.yml` |
 | `data/` | Course material and everything derived from it (parsed output, the local Qdrant index): gitignored, **never** in git |
 

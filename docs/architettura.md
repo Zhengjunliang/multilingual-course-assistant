@@ -42,7 +42,7 @@ relatore 给的四个起步链接已精读并扩展成 [analisi-rag.md](analisi-
 | 向量库     | Qdrant：原生 hybrid（dense Qwen3-Embedding + sparse fastembed BM25 + RRF）、locale/课程 payload 过滤（fusion 下必须放 prefetch 分支内，实测顶层 filter 被静默忽略）；M2 用 qdrant-client 本地模式（无服务器进程，[rag/index.py](../rag/index.py)、[rag/search.py](../rag/search.py)），M5 起 Docker；降级备选 pgvector | ✅   | 31 deck 全量（1234 chunk），gold 40 题 hit@5 38/40 |
 | 数据库     | M2 原型无 DB（文件 + Qdrant 本地）；M5 起 PostgreSQL（Docker）                                                 | ✅   | `docker compose up -d` 起 PostgreSQL 18；自定义 `User` 在首个 `migrate` 之前落地 |
 | 前端       | React 19 + TypeScript + Vite + Tailwind v4 + Biome；shadcn 风格组件源码进仓库（不是 npm 包）；界面文案 react-i18next 三语。SSE 解析器手写（⛔ `EventSource`：只发 GET）；契约 TS 镜像的唯一源在 `apps/qa/contract.py` | ✅   | `frontend/`，`uv run python scripts/check.py frontend` 一条跑完 lint + 类型 + catalogue key + 对比度 + 测试 + 构建 |
-| 访问模型   | **全站需登录**（2026-08-27 拍板推翻此前两条免登录决定，理由见 [decisioni.md](decisioni.md) 2026-08-27 第 1 条）：session cookie + CSRF，⛔ token/JWT（同源用不上）；开放自助注册；限流按端点分桶。做到的是**多账号、单并发** —— 一张 8GB 卡串行答题，per-caller 限流对全局队列无约束 | ✅   | `apps/accounts/`；匿名 `POST /api/ask` → 403，无 CSRF token → 403 |
+| 访问模型   | **全站需登录**（2026-08-27 拍板推翻此前两条免登录决定，理由见 [decisioni.md](decisioni.md) 2026-08-27 第 1 条）：session cookie + CSRF，⛔ token/JWT（同源用不上）；开放自助注册；限流按端点分桶。做到的是**多账号、单并发** —— 一张 8GB 卡串行答题，per-caller 限流对全局队列无约束。🔜 M5 `#93`: anonymous campus-only questions — [decisioni.md](decisioni.md), 2026-09-25 point 3 | ✅   | `apps/accounts/`；匿名 `POST /api/ask` → 403，无 CSRF token → 403 |
 | 界面/消息语言 | 三层各有属主：界面 = 前端三份 catalogue · 回答语言 = `rag/answer.py` 的 prompt · 后端 503/`error` = **英文，不做 catalogue**（2026-08-27 拍板，读者是看服务端日志的人） | ✅   | `npm run check:i18n` 守着三份 catalogue 的 key 集合逐字相等 |
 | 推理服务   | OpenAI 兼容端点是唯一契约：开发期本地 Ollama（Qwen3-4B q4），M3 正式实验 vLLM（MICC 服务器，流式；Turing 卡**无 bfloat16**，一律 fp16）—— 切换只改 `.env` 的 `LLM_BASE_URL`/`LLM_MODEL` | 🔶   | 服务器起 vLLM `#18` → 尺寸对比 `#27` |
 | 校园信息源 | UniFi 网站第二知识源：爬取+索引为骨架（复用 ingest 管线，Qdrant `unifi_web` collection），实时抓取为**自增长层**（过相关性门后持久写入，registry 溯源可回滚）；发现 = sitemap + 范围规则（板块规则表，**不锁 unifi.it 域**——Santa Marta/DSU/CISIA 类学生刚需域走显式条目），种子板块 ≤500 页起步；页面直链 PDF 附件（≤20MB）复用 parse 管线；HTML 解析走 Docling HTML backend | ✅   | campus gold 28/32=88%（`uv run python -m rag.gold gold/campus.jsonl`，EN 92 · IT 85 ≥ 门 0.80） |
@@ -76,7 +76,8 @@ relatore 给的四个起步链接已精读并扩展成 [analisi-rag.md](analisi-
   - 往年 scritto 真题暂缓 🔜 M3 后（`#47`）。
 - **能力边界**：检索问答（QA）。出题 / 自动判卷 ⛔ 超出范围。
 - **交付**：React SPA + DRF API（SSE 流式问答）+ Django admin 材料后台，与 RAG 部分**同一仓库**。
-- **租户与认证**：slides = 每账号私有上传互不可见（多租户隔离 🔜 `#36`）；campus web KB = 全局共享一份，检索侧无 per-user 隔离，这是有意的（语料本就公开）—— 但深化循环接上 web 之后它会变成真问题，见 `#17`。触发自增长的写操作收敛到账号 + rate limit。**免登录已作废**：2026-08-22 定案里的「campus 免登录可问」与「论文期演示环境免登录」于 2026-08-27 被自己推翻，现为**全站需登录**（上方「访问模型」行；理由见 [decisioni.md](decisioni.md) 2026-08-27 第 1 条 —— 多轮会话本身就是每用户状态，而写下免登录时系统还是单轮的）。**UniFi SSO 可行性**：走意大利高校联邦身份 IDEM GARR（SAML/Shibboleth），Django 侧有现成 SP 库，技术上是标准协议——但把应用注册为学校认可的服务方需要 UniFi IT 审批，单人论文项目不等它：M5 用自建 Django 账号，auth 做成可插拔，SSO 记为 post-tesi 可选（🔜 `#44`）。
+- **Data model** 🔜 M5: programmes, courses and yearly editions, role scopes, content ownership — [data-model.md](data-model.md).
+- **租户与认证**：campus web KB = 全局共享一份，检索侧无 per-user 隔离，这是有意的（语料本就公开）—— 但深化循环接上 web 之后它会变成真问题，见 `#17`。触发自增长的写操作收敛到账号 + rate limit。**免登录已作废**：2026-08-22 定案里的「campus 免登录可问」与「论文期演示环境免登录」于 2026-08-27 被自己推翻，现为**全站需登录**（上方「访问模型」行；理由见 [decisioni.md](decisioni.md) 2026-08-27 第 1 条 —— 多轮会话本身就是每用户状态，而写下免登录时系统还是单轮的）。🔜 M5 `#93`: anonymous campus-only questions — [decisioni.md](decisioni.md), 2026-09-25 point 3.**UniFi SSO 可行性**：走意大利高校联邦身份 IDEM GARR（SAML/Shibboleth），Django 侧有现成 SP 库，技术上是标准协议——但把应用注册为学校认可的服务方需要 UniFi IT 审批，单人论文项目不等它：M5 用自建 Django 账号，auth 做成可插拔，SSO 记为 post-tesi 可选（🔜 `#44`）。
 - **外部知识源**（MCP、Google Drive 等）🔜 M7（可选，post-M6，`#45`）。
 
 ## 工程化 ✅
@@ -109,7 +110,7 @@ ruff（lint + format）· pyright（`rag/` strict）· pytest + pytest-django + 
 | 类别 | 判定 | 归属 |
 | --- | --- | --- |
 | LLM01:2026 Prompt Injection | 🔶 有开放鉴定 ×2 | `#5`（间接注入打向**写入决策**）· `#6`（间接注入打向**回答**：检索片段无分隔符进生成 prompt） |
-| LLM02:2026 Sensitive Information Disclosure | 🔶 有开放鉴定 ×1 | `#36`（每账号上传隔离）。**健全的部分**：今天索引里只有公开的校园页面，无跨账号可读的私密材料 —— 因为上传功能**代码里根本不存在**（无 `FileField`、无端点）。**缺的部分**：它一旦存在，本行的判定就要重做，而该判定正是 `#36` 的验收项。将来要为它立的那几道闸别处已有先例：`LIVE_MAX_PDF_PAGES = 40` · `document_timeout` 120 s · `artifact_name()` 定盘上文件名 |
+| LLM02:2026 Sensitive Information Disclosure | 🔶 有开放鉴定 ×1 | `#36`。**健全的部分**：今天索引里只有公开的校园页面，无跨账号可读的私密材料 —— 因为上传功能**代码里根本不存在**（无 `FileField`、无端点）。**缺的部分**：它一旦存在，本行的判定就要重做，而该判定正是 `#36` 的验收项。将来要为它立的那几道闸别处已有先例：`LIVE_MAX_PDF_PAGES = 40` · `document_timeout` 120 s · `artifact_name()` 定盘上文件名 |
 | LLM03:2026 Excessive Agency | 🔶 缺口（本轮新开） | `rag/agent.py` 的深化循环有实质约束（≤3 步硬上限 · 显式控制流 · 每步 pydantic 校验的 JSON 决策 · ⛔ 原生 tool-calling · 唯一例外写路径 `decisions.jsonl` 是审计工件），但**从未按这一类别系统评估过**；本类在 2026 版从第 6 升到第 3 → `#53` |
 | LLM04:2026 Supply Chain | 🔶 有开放鉴定 ×1 | `#10`（模型未钉 revision）。依赖侧见 A03:2025 的 `#7` |
 | LLM05:2026 Data and Model Poisoning | 🔶 有开放鉴定 ×1 | `#5` —— 自增长写入就是本项目的投毒面；2026-09-14 起的缓解方向是人工确认闸门（`#48`），见 [decisioni.md](decisioni.md) 2026-09-14「人工闸门与 UI 计分」第 1 条 |
