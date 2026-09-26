@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "apps.accounts",
     "apps.qa",
+    "apps.catalog",
 ]
 
 # One entry that must never be added here: `GZipMiddleware`. It compresses a
