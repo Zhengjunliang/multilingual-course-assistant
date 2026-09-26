@@ -1,8 +1,8 @@
 # Fonte web UniFi — 爬取、快照与自增长层
 
-校园信息源（UniFi 网站 → Qdrant `unifi_web` collection）的设计属主：scope 规则、快照与 registry 布局、深化循环。chunk 字段表的属主是 [docling-e-pipeline.md](docling-e-pipeline.md)（§3.6，含 web 侧取值规则与替换粒度）；余下的 autogrow 分数门重测见 `#24`；架构决策（自增长写入门 · eval 隔离 · agent 编排）在 [docs/architettura.md](architettura.md) 决策表。
+校园信息源（UniFi 网站 → Qdrant `unifi_web` collection）的设计属主：scope 规则、快照与 registry 布局、深化循环。chunk 字段表的属主是 [docling-pipeline.md](docling-pipeline.md)（§3.6，含 web 侧取值规则与替换粒度）；余下的 autogrow 分数门重测见 `#24`；架构决策（自增长写入门 · eval 隔离 · agent 编排）在 [docs/architecture.md](architecture.md) 决策表。
 
-各节状态随实现逐节标注；自增长验收的完整实测记录（门 18/20 · 双臂 0/7 · 逐题归因）归 [diario-sperimentale.md](diario-sperimentale.md)。
+各节状态随实现逐节标注；自增长验收的完整实测记录（门 18/20 · 双臂 0/7 · 逐题归因）归 [experiment-log.md](experiment-log.md)。
 
 ## Scope 规则表
 
@@ -24,7 +24,7 @@
 
 - **rerank 路径**：每库各出一个 fusion 候选池（每池 20）→ 合并成一个池 → 统一 rerank 取 top-k。跨库可比性由 reranker 保证（它只看 query×文本）。
 - **`--no-rerank` 路径**：RRF 分数**跨库不可比**，不合并——每库各取 top-k，按名次 round-robin 交错后截断到 k（是定义不是融合；长池的余名次补满剩余名额）。
-- **ADR-1 作用域**（决策属主 [architettura.md](architettura.md)）：`ingest_source`/`ingest_run_id` 过滤条件只进 `unifi_web` 的两个 prefetch 分支，slides 分支永不携带——slides 非回归门的语义因此不可能漂移。
+- **ADR-1 作用域**（决策属主 [architecture.md](architecture.md)）：`ingest_source`/`ingest_run_id` 过滤条件只进 `unifi_web` 的两个 prefetch 分支，slides 分支永不携带——slides 非回归门的语义因此不可能漂移。
 - 多库合并只发生在 agent 路由 `both`（✅ `rag/agent.py` `collections_for()`）；两个非回归门（slides · campus）恒单库。
 
 快照总量（两轮爬取合计）：**998 页 · 4 板块 · `unifi_web` 29098 点**——这是 eval 隔离与回滚验证反复对照的基线点数。
@@ -52,7 +52,7 @@ data/webcorpus/
 
 ## 深化循环
 
-状态机与预算落代码（下方逐项标注真实路径）。自增长验收实测：**双臂（主臂 · `--no-deepen`）均 0/7**，等分证明瓶颈不在跳链而在上游（判定饱和 · 强制选择 · 路由误送 · 门判据范围）；步预算分解墙钟（解析 ≤46.6s · encode 77–117s/页 · 显存峰值 7923 MiB）与逐题归因见 [diario-sperimentale.md](diario-sperimentale.md)。
+状态机与预算落代码（下方逐项标注真实路径）。自增长验收实测：**双臂（主臂 · `--no-deepen`）均 0/7**，等分证明瓶颈不在跳链而在上游（判定饱和 · 强制选择 · 路由误送 · 门判据范围）；步预算分解墙钟（解析 ≤46.6s · encode 77–117s/页 · 显存峰值 7923 MiB）与逐题归因见 [experiment-log.md](experiment-log.md)。
 
 以「有可以回答的信息」为停止条件的 agent 迭代抓取（原 self-assess 并入「够答？」判定）：
 
@@ -93,7 +93,7 @@ stateDiagram-v2
 - 名额：非 PDF top-10 与 PDF top-5 **两个独立配额**，PDF 不挤占非 PDF 名额。理由两侧对称：g001/g002 的唯一 referrer 页各挂 32/40 个法令式 PDF，无条件保留 = 洪水口从出链搬到 PDF；合并配额则让导航链把唯一含答案的附件挤出去。输出为两组合并后按余弦降序的单一编号列表。
 - 候选来源：命中页 registry 行的 `outlinks`（本轮现抓的页由 `LiveResult.outlinks` 当场交出，不回头重抓）；命中行**无出链**时（只有 HTML 页记出链，PDF 附件行不记）回落到该行 `referrer_url` 指向的**承载页**行，用承载页的出链当候选，候选的 referrer 记承载页 URL——否则 top 命中全是 PDF 的问题（验收跑 g007/g008 双臂 · g002 降级臂）永远无候选可跳。✅ 实现于 `rag/agent.py` `graph_outlinks()` + `_carrier_row()`；既无出链又无 `referrer_url`（或 referrer 行不在账本里）的命中不贡献候选，静默跳过；候选按 URL 去重，承载页本身也是命中时不会重复出候选。
 - **检索已命中的页不作候选**：承载页必然把它挂的附件也列在出链里（爬虫就是从那儿发现它的——首爬 132 个附件行 132/132 如此），不排除就等于把本轮命中原样递回候选列表，白耗三步预算之一去重读一份文本已在上下文里的页；而增量判定会把这次抓取记成 `already indexed`，那个取值的定义恰恰是「库里有、**检索没捞出来**」，于是往 M3 归因原料里系统性写入语义相反的行。✅ `rag/agent.py` `graph_outlinks()` 按本步全部命中 URL 过滤（不只过滤读图的那一行——承载页自身也是命中时，附件会从承载页那一行漏回来）。
-- 候选带 referrer：每个候选连同**挂它的那一页 URL** 一起排序、一起交给 `fetch_and_ingest`（`rag/agent.py` `Candidate`），registry 行与 chunk payload 的 `referrer_url` 由此而来——字段属主 [docling-e-pipeline.md](docling-e-pipeline.md) §3.6：web chunk 必须记住附件挂在哪一页，只有 slides 可为空。
+- 候选带 referrer：每个候选连同**挂它的那一页 URL** 一起排序、一起交给 `fetch_and_ingest`（`rag/agent.py` `Candidate`），registry 行与 chunk payload 的 `referrer_url` 由此而来——字段属主 [docling-pipeline.md](docling-pipeline.md) §3.6：web chunk 必须记住附件挂在哪一页，只有 slides 可为空。
 - 离线排序质量实测（gold 问题 × 真实 referrer 页）：g001 正解 PDF 名次 **2/32**，top-5 边界分差 **+0.267**；g002 名次 **3/40**，分差 **+0.056**。两题均在 top-5 内，具名 fallback（词法预筛 / GPU 编码窗口 / anchor 向量缓存）无需启用。g002 分差薄 = 已知脆弱点（同页有逐字相同 anchor 的兄弟 PDF，区分信号只在 DOM 分节标题里，`extract_links` 不采集），记为 M3 错误分类法改进候选。
 
 逐题决策日志（M3 错误分类法原料）schema：`run_id · question_id · step · candidates[] · choice · reason · outcome`。✅ `rag/agent.py` `Decision` 模型，append-only 落 `data/webcorpus/decisions.jsonl`（`--decision-log` 可改）。`candidates[]` 落 anchor 原文，否则无法区分「候选没给对」与「模型选错」；`outcome` 取值 `answered · persisted · already indexed · ephemeral · not retrieved · timeout · no candidates · unsuitable · steps exhausted`（`already indexed` = 增量判定认出该页未变、库未增长，与 `persisted` 分开记以便 M3 归因；`unsuitable` = 候选列表给了、模型判定全部不可能含答案而拒绝选择，与 `no candidates` 的「图里本就没有候选」是两种不同失败）。

@@ -1,7 +1,7 @@
 """Question routing and the deepening fetch loop.
 
 The agent is pure control flow and reads only (the module boundary rule,
-docs/architettura.md): it routes, retrieves and hands the hits to generation.
+docs/architecture.md): it routes, retrieves and hands the hits to generation.
 The one write it may reach is `rag.live.fetch_and_ingest`, which owns every
 decision about what enters the shared knowledge base — nothing here touches an
 index write path directly.
@@ -15,7 +15,7 @@ When the stored corpus cannot answer, `deepen()` follows links instead of
 refusing: assess what was retrieved, narrow the outlink graph to a numbered
 shortlist, let the model pick one — or say none of them can hold the answer —
 fetch it through `rag.live`, retrieve again.
-Three steps at most, and the state machine (docs/fonte-web-unifi.md owns it)
+Three steps at most, and the state machine (docs/unifi-web-source.md owns it)
 ends by answering from whatever was gathered — an honest refusal is the last
 resort, not the default. A refusal still carries the one thing a student can
 act on: paste the URL of the page that holds the answer.
@@ -75,7 +75,7 @@ ASSESS_FALLBACK_REASON = "fallback: unparseable assessment"
 PICK_FALLBACK_REASON = "fallback: unparseable pick, took the top-ranked candidate"
 
 # Hard caps, all of them code constants rather than convention
-# (docs/fonte-web-unifi.md): three fetches per question, and a shortlist a 4B
+# (docs/unifi-web-source.md): three fetches per question, and a shortlist a 4B
 # model can actually read. The two candidate quotas are independent — PDF
 # attachments never spend a page slot, because one referrer page can carry
 # forty decree PDFs and would otherwise flood the list on its own.
@@ -140,7 +140,7 @@ one JSON object, no prose:
 
 class RouteDecision(BaseModel):
     """The router's reply (field set fixed by the campus web source design,
-    docs/fonte-web-unifi.md; routing accuracy over several turns is still
+    docs/unifi-web-source.md; routing accuracy over several turns is still
     unmeasured — work item #22).
 
     `target` ranges over the two real collection names plus the routing-only
@@ -189,7 +189,7 @@ class CandidateChoice(BaseModel):
 
 class Decision(BaseModel):
     """One row of the per-question decision log (schema owned by
-    docs/fonte-web-unifi.md), the raw material for M3's error taxonomy.
+    docs/unifi-web-source.md), the raw material for M3's error taxonomy.
 
     `candidates` keeps the anchor text verbatim: without it a wrong answer
     cannot be split into "the shortlist never offered the right link" and "the
@@ -219,7 +219,7 @@ class Candidate:
 
     The referrer travels with the link rather than beside it because it is part
     of the payload contract, not bookkeeping: a web chunk names the page an
-    attachment hung on (docs/docling-e-pipeline.md 3.6), and only slides chunks
+    attachment hung on (docs/docling-pipeline.md 3.6), and only slides chunks
     may leave it empty. A candidate that lost its source page would produce a
     stored PDF nobody can trace back to where it was linked from.
     """
@@ -525,7 +525,7 @@ def _timed_fetch(
     which is exactly where `fetch_and_ingest` calls back to unload the LLM:
     before that callback the step is waiting on the network and on the model,
     after it the parse and the encode run under budgets of their own
-    (docs/fonte-web-unifi.md). A fetch that never reached the gate — robots, a
+    (docs/unifi-web-source.md). A fetch that never reached the gate — robots, a
     dead URL, an unusable content type — leaves the callback unfired and is
     counted whole, which is right: all of it was network wait.
     """
@@ -557,7 +557,7 @@ def deepen(
     max_steps: int = DEEPEN_MAX_STEPS,
     step_timeout: float = STEP_TIMEOUT_SECONDS,
 ) -> DeepenResult:
-    """The deepening state machine (docs/fonte-web-unifi.md owns it).
+    """The deepening state machine (docs/unifi-web-source.md owns it).
 
     Retrieve, ask whether that answers the question, and if it does not, narrow
     the outlink graph to a shortlist, pick one, fetch it through `rag.live` and

@@ -1,12 +1,12 @@
 """Query-time ingest: fetch one URL, gate it, and grow the shared knowledge base.
 
 The only module allowed to write to the shared index at query time (the module
-boundary rule, docs/architettura.md): `rag/agent.py` routes and reads, this is
+boundary rule, docs/architecture.md): `rag/agent.py` routes and reads, this is
 where a page the student pasted — or the deepening loop picked — becomes
 indexed chunks.
 
 Two branches, and both of them must be able to answer the current turn
-(the state machine in docs/fonte-web-unifi.md):
+(the state machine in docs/unifi-web-source.md):
 
 - the gate says relevant -> gate-then-persist: parse, chunk, replace exactly
   this URL's previous *live* version, upsert, and append one registry row
@@ -118,7 +118,7 @@ logger = logging.getLogger(__name__)
 # whole document and rejects a longer one outright (ConversionStatus.FAILURE),
 # which would lose exactly the long decrees this cap exists to make usable.
 # The two timeouts split on a measurement (semantics owned by
-# docs/fonte-web-unifi.md): the corpus's largest PDF (18.4 MB, capped at 40
+# docs/unifi-web-source.md): the corpus's largest PDF (18.4 MB, capped at 40
 # pages) takes 66-69s through the classic pipeline on CPU, so a parse held to
 # the 60s step clock would come back PARTIAL_SUCCESS — readable this turn,
 # never storable — for exactly the long documents worth fetching. The parse
@@ -338,7 +338,7 @@ def maybe_unload_llm(base_url: str, model: str) -> None:
 
     Any other endpoint (the MICC vLLM server in M3) is a no-op: `rag/` stays
     decoupled from the Ollama CLI, and switching backends stays a `.env` edit
-    (docs/architettura.md). A failed unload is a warning, never a stop: the
+    (docs/architecture.md). A failed unload is a warning, never a stop: the
     worst case is the step running with less headroom than planned.
     """
     parts = urlsplit(base_url)
@@ -535,7 +535,7 @@ def fetch_and_ingest(
         section=rule.section if rule else None,
     )
 
-    # Incremental refresh, the ledger's second duty (docs/fonte-web-unifi.md):
+    # Incremental refresh, the ledger's second duty (docs/unifi-web-source.md):
     # the same bytes as this URL's last fetch mean the parse and the index write
     # would only reproduce what is already stored, and the parse is the
     # expensive half of the step. The ledger's outlinks stand in for the ones

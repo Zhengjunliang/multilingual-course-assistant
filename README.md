@@ -4,7 +4,7 @@ Question answering over two sources: **university course material** (slides and 
 
 Bachelor's thesis (*triennale*), University of Florence (UniFi), Information Engineering — supervisor Prof. Marco Bertini.
 
-Where the rest lives: progress, milestones and blockers in GitHub issues (milestones M3 · M5 · M6 · M7); decisions and their reversals in [docs/decisioni.md](docs/decisioni.md); supervisor constraints and the stack in [docs/architettura.md](docs/architettura.md); measured results in [docs/diario-sperimentale.md](docs/diario-sperimentale.md).
+Where the rest lives: progress, milestones and blockers in GitHub issues (milestones M3 · M5 · M6 · M7); decisions and their reversals in [docs/decisions.md](docs/decisions.md); supervisor constraints and the stack in [docs/architecture.md](docs/architecture.md); measured results in [docs/experiment-log.md](docs/experiment-log.md).
 
 ## Setup
 
@@ -36,7 +36,7 @@ uv run python manage.py createsuperuser
 
 **While the site is running, the `rag` CLIs that touch the index fail** (`rag.index`, `rag.search`, `rag.agent`, …): local Qdrant is embedded and holds an exclusive lock on `data/qdrant`, so whichever process opens it first keeps it; the endpoints answer 503 with that explanation in the opposite case. Stop the server with `Ctrl+C` to use the CLI. 🔜 This goes away when Qdrant becomes a service (`#33`, M5).
 
-**Changing a model** means regenerating the app's migration and rebuilding the local database, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`). Until a database has to keep its data, each app has one migration, `0001_initial.py`, rewritten on every change rather than followed by a `0002` ([docs/decisioni.md](docs/decisioni.md), 2026-09-26). Save the data **before** editing the model — `dumpdata` reads every column the model declares, so it fails once the model is ahead of the database — then run the rest one line at a time, stopping at the first that fails: the third line deletes the local database.
+**Changing a model** means regenerating the app's migration and rebuilding the local database, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`). Until a database has to keep its data, each app has one migration, `0001_initial.py`, rewritten on every change rather than followed by a `0002` ([docs/decisions.md](docs/decisions.md), 2026-09-26). Save the data **before** editing the model — `dumpdata` reads every column the model declares, so it fails once the model is ahead of the database — then run the rest one line at a time, stopping at the first that fails: the third line deletes the local database.
 
 ```powershell
 # before editing models.py; -X utf8 because Windows would write the file in cp1252
@@ -103,7 +103,7 @@ Course PDFs go in `data/corpus/<course>/` (gitignored). Every command below is `
 | `webparse` | parse a crawl snapshot into chunkable artefact pairs | `data\webcorpus\<run_id>` |
 | `live` | fetch one URL, gate it, grow the shared index; `--rollback <run_id>` undoes a run, `--measure-gate` scores the gate | `<url>` |
 
-Parsing writes two files per PDF, `<name>.<profile>.json` (the lossless DoclingDocument) and `<name>.<profile>.meta.json` (provenance); routing rules, measurements and the chunk payload contract are in [docs/docling-e-pipeline.md](docs/docling-e-pipeline.md).
+Parsing writes two files per PDF, `<name>.<profile>.json` (the lossless DoclingDocument) and `<name>.<profile>.meta.json` (provenance); routing rules, measurements and the chunk payload contract are in [docs/docling-pipeline.md](docs/docling-pipeline.md).
 
 Embedding and reranking (0.6B each) run on the local GPU, fully offline. Generation calls an OpenAI-compatible endpoint, by default a local Ollama:
 
@@ -112,7 +112,7 @@ winget install Ollama.Ollama
 ollama pull qwen3:4b-instruct-2507-q4_K_M
 ```
 
-The endpoint and model are `LLM_BASE_URL` and `LLM_MODEL` in `.env`; the M3 experiments point them at vLLM on MICC through an SSH tunnel (the commented lines in `.env.example`). The reasons for this split are in [docs/architettura.md](docs/architettura.md), section on compute strategy.
+The endpoint and model are `LLM_BASE_URL` and `LLM_MODEL` in `.env`; the M3 experiments point them at vLLM on MICC through an SSH tunnel (the commented lines in `.env.example`). The reasons for this split are in [docs/architecture.md](docs/architecture.md), section on compute strategy.
 
 ## Accounts
 
@@ -184,7 +184,7 @@ The deepening loop is not in this endpoint: it fetches pages and writes to the s
 
 ## Working on the MICC servers
 
-Access and hardware are in [docs/architettura.md](docs/architettura.md). SSH aliases live in the local `~/.ssh/config` (`ssh targaryen` and so on).
+Access and hardware are in [docs/architecture.md](docs/architecture.md). SSH aliases live in the local `~/.ssh/config` (`ssh targaryen` and so on).
 
 **Starting.** Check the GPU dashboard (Grafana / Discord `#gpu-monitoring-dream-`) and pick a machine with **free VRAM and low CPU**; day to day that is a 2080 Ti machine, and ultron (24 GB) only when an experiment needs the memory. Confirm with `nvidia-smi` after logging in and pin a free card with `CUDA_VISIBLE_DEVICES=<id>`. Long jobs go in tmux: `tmux new -s tesi`, reattach with `tmux attach -t tesi`.
 

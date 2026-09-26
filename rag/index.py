@@ -115,7 +115,7 @@ def build_dense_encoder(
 # ingest path and the agent's candidate narrowing both want the CPU encoder,
 # and a second instance would cost another ~2.4GB of host RAM and a second
 # first load. Modules that need a shared encoder ask for it, they never cache
-# one of their own (the module boundary rule, docs/architettura.md).
+# one of their own (the module boundary rule, docs/architecture.md).
 _DENSE_CACHE: dict[tuple[str, str | None], DenseEncoder] = {}
 
 
@@ -193,7 +193,7 @@ def delete_web_versions(
     page's content, so upsert alone would leave the previous version alive;
     and an unscoped delete-by-url would let a live fetch destroy the crawl
     snapshot version — crawl and live never overwrite each other
-    (docs/docling-e-pipeline.md 3.6)."""
+    (docs/docling-pipeline.md 3.6)."""
     from qdrant_client import models
 
     for url, source in pairs:

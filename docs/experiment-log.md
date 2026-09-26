@@ -1,6 +1,6 @@
 # Diario sperimentale
 
-Registro degli esperimenti e dei problemi riscontrati durante lo sviluppo, in italiano (stile formale): il contenuto confluirà nei capitoli sperimentali della tesi (M6). Una voce per data; i dati citati sono riproducibili con i comandi indicati. Le decisioni architetturali restano di proprietà di [architettura.md](architettura.md).
+Registro degli esperimenti e dei problemi riscontrati durante lo sviluppo, in italiano (stile formale): il contenuto confluirà nei capitoli sperimentali della tesi (M6). Una voce per data; i dati citati sono riproducibili con i comandi indicati. Le decisioni architetturali restano di proprietà di [architecture.md](architecture.md).
 
 ## 2026-09-14 — Un aggiornamento di pypdf cambia il testo estratto senza cambiare l'instradamento
 
@@ -36,7 +36,7 @@ Anche il recupero è invariato: `gold/smoke.jsonl` restituisce **38/40 (95%)** p
 
 ### 3. La conseguenza sulla riproducibilità
 
-Due numeri già registrati in [architettura.md](architettura.md), sezione «语料与交付范围», sono stati prodotti con `pypdf` 6.16.1: i **~650 000 caratteri** del corpus e il guadagno dell'OCR sul documento `3.5-HTML5` (**10001 → 20032 caratteri**). Non sono sbagliati, ma da oggi si sa che **dipendono dalla versione della libreria di estrazione**, esattamente come i risultati di generazione dipendono dalla revisione del modello. La versione dello stack di analisi entra quindi nell'elenco di riproducibilità.
+Due numeri già registrati in [architecture.md](architecture.md), sezione «语料与交付范围», sono stati prodotti con `pypdf` 6.16.1: i **~650 000 caratteri** del corpus e il guadagno dell'OCR sul documento `3.5-HTML5` (**10001 → 20032 caratteri**). Non sono sbagliati, ma da oggi si sa che **dipendono dalla versione della libreria di estrazione**, esattamente come i risultati di generazione dipendono dalla revisione del modello. La versione dello stack di analisi entra quindi nell'elenco di riproducibilità.
 
 ### 4. Il gate di rilevanza: 17/20 — e la scoperta che quel numero non è confrontabile
 
@@ -144,7 +144,7 @@ Il batch anomalo da 1470 s registrato il 2026-08-24 come «probabile throttling 
 
 Nessuna scrittura ha raggiunto la base di conoscenza: `unifi_web` è rimasta a 29098 punti e i punti con `ingest_run_id='live-retest-main'` sono **0** (g001 non ha acquisito nulla; dei due fetch di g002 uno è risultato invariato dal crawl e l'altro è stato rifiutato dal gate). Nessun rollback necessario.
 
-**Conseguenza operativa**: le misurazioni che coinvolgono l'LLM passano al server MICC; la macchina locale resta destinata allo sviluppo e alle verifiche funzionali. La separazione è resa possibile dal vincolo architetturale per cui `rag/` non importa Django ed è eseguibile fuori dal web. Decisioni registrate in [decisioni.md](decisioni.md), voce del 2026-08-25 «测量场地划线».
+**Conseguenza operativa**: le misurazioni che coinvolgono l'LLM passano al server MICC; la macchina locale resta destinata allo sviluppo e alle verifiche funzionali. La separazione è resa possibile dal vincolo architetturale per cui `rag/` non importa Django ed è eseguibile fuori dal web. Decisioni registrate in [decisions.md](decisions.md), voce del 2026-08-25 «测量场地划线».
 
 ### 4. Passaggio allo streaming SSE: due vincoli non evidenti
 

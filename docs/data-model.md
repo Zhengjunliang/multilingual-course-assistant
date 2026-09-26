@@ -2,7 +2,7 @@
 
 ## Purpose and owner
 
-This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisioni.md](decisioni.md), entries of 2026-09-25 and 2026-09-26; the chunk field table by [docling-e-pipeline.md](docling-e-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
+This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisions.md](decisions.md), entries of 2026-09-25 and 2026-09-26; the chunk field table by [docling-pipeline.md](docling-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
 
 ## Entities and relationships
 
@@ -40,20 +40,20 @@ erDiagram
 - The search functions take `scope: Sequence[EditionKey] | None` in place of the single `course` string, keyword-only and with no default; the command line takes `--scope CODE:YEAR`.
 - `scope=None` means unrestricted. The command line and the evaluation pass it, and so does `apps/qa/engine.py` for logged-in requests until `#36` computes a scope. The gold runs pin PPM's own pair, never `is_current`.
 - `scope=[]` means the slides collection is skipped; an anonymous request passes it.
-- The scope applies to the slides branch only, written inside each prefetch branch for the reason given in [docling-e-pipeline.md](docling-e-pipeline.md), section 4.1, under the fusion trap.
-- In the web collection, `course` is a site-section slug such as `ingegneria` (values listed in [docling-e-pipeline.md](docling-e-pipeline.md), section 3.6), not a course key; a scope never matches it.
+- The scope applies to the slides branch only, written inside each prefetch branch for the reason given in [docling-pipeline.md](docling-pipeline.md), section 4.1, under the fusion trap.
+- In the web collection, `course` is a site-section slug such as `ingegneria` (values listed in [docling-pipeline.md](docling-pipeline.md), section 3.6), not a course key; a scope never matches it.
 
 ## `WebSource` and the registry
 
-✅ `data/webcorpus/registry.jsonl`, written by `rag/crawl.py` and `rag/live.py`, is the append-only record of what was fetched; its layout is in [fonte-web-unifi.md](fonte-web-unifi.md), in the snapshot and registry layout section. 🔜 M5: `WebSource` is what should be fetched, edited by people — no edition for a campus page (the secretariat's), an edition for a course reference page (the teacher's). A task in `apps/` reads it and hands `rag.crawl` plain data derived from it; `rag/` never reads the table.
+✅ `data/webcorpus/registry.jsonl`, written by `rag/crawl.py` and `rag/live.py`, is the append-only record of what was fetched; its layout is in [unifi-web-source.md](unifi-web-source.md), in the snapshot and registry layout section. 🔜 M5: `WebSource` is what should be fetched, edited by people — no edition for a campus page (the secretariat's), an edition for a course reference page (the teacher's). A task in `apps/` reads it and hands `rag.crawl` plain data derived from it; `rag/` never reads the table.
 
 ## Chunk payload mapping
 
-✅ The field table and the web-side values are owned by [docling-e-pipeline.md](docling-e-pipeline.md), section 3.6, with the model in `rag/chunk.py`. 🔜 M5: in the slides collection, `course` holds a UniFi course code (`B028451` for PPM) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default. A slides `chunk_id` carries both, so one PDF in two editions yields two identities.
+✅ The field table and the web-side values are owned by [docling-pipeline.md](docling-pipeline.md), section 3.6, with the model in `rag/chunk.py`. 🔜 M5: in the slides collection, `course` holds a UniFi course code (`B028451` for PPM) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default. A slides `chunk_id` carries both, so one PDF in two editions yields two identities.
 
 ## Migration order
 
-🔶 ① is in `apps/catalog/migrations/0001_initial.py`; 🔜 M5: ② to ④. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisioni.md](decisioni.md), 2026-09-26.
+🔶 ① is in `apps/catalog/migrations/0001_initial.py`; 🔜 M5: ② to ④. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisions.md](decisions.md), 2026-09-26.
 
 - ① Catalogue tables: `DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`.
 - ② `RoleAssignment`, with the roles of `#93`.

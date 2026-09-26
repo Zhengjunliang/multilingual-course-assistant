@@ -5,7 +5,7 @@ PostgreSQL reports, not merely by the exception class: an `IntegrityError`
 raised by some other constraint would otherwise pass for the one under test.
 The rules kept in validators — consecutive years, the year of study, the
 language — are asserted through `full_clean`, on the field they belong to. The
-rows are shaped on PPM as UniFi lists it (docs/decisioni.md, 2026-09-25, *PPM
+rows are shaped on PPM as UniFi lists it (docs/decisions.md, 2026-09-25, *PPM
 read from Moodle and Cineca*).
 """
 

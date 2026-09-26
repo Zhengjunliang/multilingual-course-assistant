@@ -1,6 +1,6 @@
 # 决策记录
 
-本文件是**自主拍板项**的属主：哪一天、拍了什么板、依据是什么，含**后来被自己推翻的那些** —— 反转本身是记录的一部分，删掉就看不出为什么会反转，答辩上也答不出来。⛔ 不在这里：技术栈选型与决策状态表归 [architettura.md](architettura.md)（「选了什么、验证条件是什么」）；推进状态、阻塞项与暂缓项归 GitHub issue（里程碑 M3 · M5 · M6 · M7），不在任何 markdown 文件里。
+本文件是**自主拍板项**的属主：哪一天、拍了什么板、依据是什么，含**后来被自己推翻的那些** —— 反转本身是记录的一部分，删掉就看不出为什么会反转，答辩上也答不出来。⛔ 不在这里：技术栈选型与决策状态表归 [architecture.md](architecture.md)（「选了什么、验证条件是什么」）；推进状态、阻塞项与暂缓项归 GitHub issue（里程碑 M3 · M5 · M6 · M7），不在任何 markdown 文件里。
 
 ## 2026-09-26 — Until a database has to keep its data, each app has one migration
 
@@ -43,7 +43,7 @@
 5. **Migrations only add.** No table or column is dropped or renamed, and each table lands with the issue that first uses it, not ahead of it — the rule dependencies follow. The concrete order is owned by [data-model.md](data-model.md).
    **Why:** Django's "Writing migrations" guide adds a nullable field, backfills it and tightens it afterwards, and expand/contract is the general name for the pattern (outside the repository); when nothing is removed, the code of each step runs against the schema of the next.
 6. **Four refinements follow from the points above.** A slides point's identity carries the course code and `academic_year`, since the same PDF in two editions would otherwise collide on `chunk_id`. Putting a student's own year first is ordering in the interface list only, never a filter. `locale` goes only on rows with user-visible text — programme and course names, `Syllabus`, `ReadingItem` — and not on `CourseMaterial`, whose language is carried by each chunk's `locale`. `year_of_study` on the student lands with the student course list of `#36`, the first code that reads it.
-   **Why:** each keeps one fact in one place: an identity blind to the edition cannot tell editions apart, a year used as a filter would contradict the scope of point 2, and a file-level language would be a second copy of the chunk-level field that the corpus notes in [architettura.md](architettura.md) ask for.
+   **Why:** each keeps one fact in one place: an identity blind to the edition cannot tell editions apart, a year used as a filter would contradict the scope of point 2, and a file-level language would be a second copy of the chunk-level field that the corpus notes in [architecture.md](architecture.md) ask for.
 7. **Two things are deferred, each with an owner.** Global settings — which model answers, and similar site-wide choices — wait in `#51` until the model runs on the MICC servers under `#18`; the direction noted there, a singleton row choosing from a profile list in `.env`, is a suggestion, not a decision. Student uploads visible only to their author wait in `#36`; the additive change they need is described in [data-model.md](data-model.md).
    **Why:** vLLM serves one model per process (outside the repository), so a model name an administrator could type would name a model the server does not serve; the settings are worth designing only against the server that runs them.
 
@@ -88,7 +88,7 @@
 1. **推翻「相关性门判定后**直接**持久入库」**（2026-08-21 第 5 条，2026-08-22 定案）。改为：门只产出**候选**，admin 人工确认后才进索引。依据是那条决策的证据本身撑不住它想撑的结论 —— 门在标注集上 18/20，但那 20 条里没有一条是**想通过**的；`#5`（`severity: alto`）描述的正是「门读着能指挥它的内容，却据此决定一次永久写入」。人工闸门**不提高门的准确率**，它换掉的是「判错即永久」这个后果，这是两件不同的事。门本身保留，降级为排序与降噪。方向记在 `#48`（只记方向，无验收无里程碑），`#5` 正文已加 2026-09-14 更新块，原「Esito atteso」行保留不删。
    **新代价一并记下**：自动门的错误可测（`--measure-gate`），人的疲劳不可测。一个每天批五十条候选的人会以本仓库今天**没有任何指标在观察**的方式犯错。换掉一种失败模式不等于消除失败模式，这条在答辩上会被问。
 
-2. **推翻「PPM 无 UI 评分要求」**（2026-07-30 拍板）。原文是 [architettura.md](architettura.md)「已定技术栈」节末尾那句拍板确认的括号内容，今日已改写 —— 所以那个括号里现在**找不到**被推翻的原话了，这里是它唯一的存档：括号原文为「PPM 无 UI 评分要求，前端自主」。界面外观计入课程分数，当初那句读错了。方向记在 `#49`。
+2. **推翻「PPM 无 UI 评分要求」**（2026-07-30 拍板）。原文是 [architecture.md](architecture.md)「已定技术栈」节末尾那句拍板确认的括号内容，今日已改写 —— 所以那个括号里现在**找不到**被推翻的原话了，这里是它唯一的存档：括号原文为「PPM 无 UI 评分要求，前端自主」。界面外观计入课程分数，当初那句读错了。方向记在 `#49`。
    写 issue 前先去核实，省掉了一条假前提：颜色 token 层**已经存在**且没有漂移，缺的是别的三样。盘点与依据归 `#49` 正文，不在这里复写。
 
 ## 2026-09-14 — 两个 CVE 的处置：都不是修复，是风险接受
@@ -104,7 +104,7 @@ CI 的 `audit` job 红了两次（两次都是纯文档 commit），根因是 `p
 1. **`ROADMAP.md` 删除**。里程碑清单、阻塞项、暂缓项全部变成 GitHub issue；本文件接手决策记录。理由：勾选框与文档的属主职责不匹配 —— 文档记「是什么、为什么」，issue 记「还没做、谁挡着」，两者混在一个文件里，每次推进都要改文档。
 2. **Issue 用意大利语，仓库 markdown 仍用中文**。issue 列表页 relatore 看得到；M6 的最终交付物本来就要译成意语，提前写就是在攒素材。
 3. **标签与里程碑照搬 `airjump-booking`**：`chore` · `blocked` · `security-review` + 四档 `severity:`。里程碑四个：M3 · M5 · M6 · M7，描述里写验收目标。**M4 是空号**：它原是「跨语言」里程碑，2026-08-21 并入核心后解散（见下），编号留空是为了不让 M5–M7 的既有引用整体重排。
-4. **安全自查按 OWASP，不按 ISO 27001**。3M 那套 ISO/NIST 引用成立是因为背后有真实审计报告可指回；本仓库没有审计，映射只能自己编。OWASP Top 10 与 OWASP Top 10 for LLM Applications 不预设审计存在，自查本就是它们的用法，答辩也引得动。覆盖面（查过且判定为健全的部分）归 [architettura.md](architettura.md)，未关闭的鉴定项归带 `security-review` 标签的 issue。
+4. **安全自查按 OWASP，不按 ISO 27001**。3M 那套 ISO/NIST 引用成立是因为背后有真实审计报告可指回；本仓库没有审计，映射只能自己编。OWASP Top 10 与 OWASP Top 10 for LLM Applications 不预设审计存在，自查本就是它们的用法，答辩也引得动。覆盖面（查过且判定为健全的部分）归 [architecture.md](architecture.md)，未关闭的鉴定项归带 `security-review` 标签的 issue。
 
 ## 2026-08-27 — M5 网站交付
 

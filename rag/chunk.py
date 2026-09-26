@@ -164,7 +164,7 @@ def detect_locale(text: str) -> Locale:
 
 
 class Chunk(BaseModel):
-    """The index payload contract (docs/docling-e-pipeline.md owns the field table).
+    """The index payload contract (docs/docling-pipeline.md owns the field table).
 
     `text` is the raw chunk body — the BM25/sparse side and what the user is shown.
     `embed_text` is the heading-contextualized version — the dense side only, so a
