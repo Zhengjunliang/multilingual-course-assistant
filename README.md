@@ -4,7 +4,7 @@ Question answering over two sources: **university course material** (slides and 
 
 Bachelor's thesis (*triennale*), University of Florence (UniFi), Information Engineering — supervisor Prof. Marco Bertini.
 
-Where the rest lives: progress, milestones and blockers in GitHub issues (milestones M3 · M5 · M6 · M7); decisions and their reversals in [docs/decisions.md](docs/decisions.md); supervisor constraints and the stack in [docs/architecture.md](docs/architecture.md); measured results in [docs/experiment-log.md](docs/experiment-log.md).
+Where the rest lives: progress, milestones and blockers in GitHub issues (milestones M3 · M4 · M5 · M6 · M7); decisions in force in [docs/decisions.md](docs/decisions.md); supervisor constraints and the stack in [docs/architecture.md](docs/architecture.md); measured results in [docs/experiment-log.md](docs/experiment-log.md).
 
 ## Setup
 
