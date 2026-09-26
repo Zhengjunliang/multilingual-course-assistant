@@ -6,7 +6,7 @@ This file owns the website's relational schema: its entities and relationships, 
 
 ## Entities and relationships
 
-✅ `User` exists in `apps/accounts/models.py`, `Conversation` and `Message` in `apps/qa/models.py`; they change only by addition. 🔜 M5: every other entity below. `CourseEdition` is the centre: it owns the content, scopes a teacher, and is what a slides chunk's `course` and `academic_year` name. Rows with user-visible text carry `locale` — programme and course names, `Syllabus`, `ReadingItem`; relation tables and `CourseMaterial` do not, since a file's language is recorded per chunk.
+✅ `User` exists in `apps/accounts/models.py`, `Conversation` and `Message` in `apps/qa/models.py`, and `DegreeProgramme`, `Course`, `CourseEdition` and `CurriculumEntry` in `apps/catalog/models.py`. 🔜 M5: every other entity below. `CourseEdition` is the centre: it owns the content, scopes a teacher, and is what a slides chunk's `course` and `academic_year` name. Rows with user-visible text carry `locale` — programme and course names, `Syllabus`, `ReadingItem`; relation tables and `CourseMaterial` do not, since a file's language is recorded per chunk.
 
 ```mermaid
 erDiagram
@@ -27,7 +27,7 @@ erDiagram
 
 ## Scope invariants
 
-🔜 M5, enforced by database constraints where a constraint can express them:
+🔶 Enforced by database constraints where a constraint can express them. ✅ The catalogue keys of invariant 1 and the constraint of invariant 2, in `apps/catalog/models.py`. 🔜 M5: the switch of invariant 2, the `WebSource` and `CourseMaterial` keys, and invariant 3.
 
 1. **Keys.** `DegreeProgramme.code` and `Course.code` are unique. A `CourseEdition` is unique per (`course`, `academic_year`), and `academic_year` matches `^\d{4}-\d{4}$`. A `CurriculumEntry` is unique per (`programme`, `curriculum`, `ad_code`) and per (`programme`, `curriculum`, `course`), with an empty string, never NULL, for "no curriculum". A `WebSource` is unique per (`url`, `edition`) with NULLs not distinct; a `CourseMaterial` per (`edition`, `sha256`). What the keys hold: `Course.code` is the AD code of the Moodle course that holds the material, fixed once entered, and any other AD code of the course is a `CurriculumEntry.ad_code`; when one curriculum lists two AD codes for a course, its entry takes the one listed only in that curriculum; `curriculum` is the name the Cineca catalogue prints, such as `TECNICO APPLICATIVO`.
 2. **One current edition per course.** A named conditional unique constraint on `course` where `is_current` is true. It cannot be deferred, so a switch runs in one transaction: lock the course's editions with `select_for_update`, clear the old flag, then set the new one.
@@ -53,7 +53,7 @@ erDiagram
 
 ## Migration order
 
-🔜 M5. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisioni.md](decisioni.md), 2026-09-26.
+🔶 ① is in `apps/catalog/migrations/0001_initial.py`; 🔜 M5: ② to ④. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisioni.md](decisioni.md), 2026-09-26.
 
 - ① Catalogue tables: `DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`.
 - ② `RoleAssignment`, with the roles of `#93`.

@@ -76,7 +76,7 @@ relatore 给的四个起步链接已精读并扩展成 [analisi-rag.md](analisi-
   - 往年 scritto 真题暂缓 🔜 M3 后（`#47`）。
 - **能力边界**：检索问答（QA）。出题 / 自动判卷 ⛔ 超出范围。
 - **交付**：React SPA + DRF API（SSE 流式问答）+ Django admin 材料后台，与 RAG 部分**同一仓库**。
-- **Data model** 🔜 M5: programmes, courses and yearly editions, role scopes, content ownership — [data-model.md](data-model.md).
+- **Data model** 🔶 programmes, courses and yearly editions are tables in `apps/catalog/`; 🔜 M5: role scopes and content ownership — [data-model.md](data-model.md).
 - **租户与认证**：campus web KB = 全局共享一份，检索侧无 per-user 隔离，这是有意的（语料本就公开）—— 但深化循环接上 web 之后它会变成真问题，见 `#17`。触发自增长的写操作收敛到账号 + rate limit。**免登录已作废**：2026-08-22 定案里的「campus 免登录可问」与「论文期演示环境免登录」于 2026-08-27 被自己推翻，现为**全站需登录**（上方「访问模型」行；理由见 [decisioni.md](decisioni.md) 2026-08-27 第 1 条 —— 多轮会话本身就是每用户状态，而写下免登录时系统还是单轮的）。🔜 M5 `#93`: anonymous campus-only questions — [decisioni.md](decisioni.md), 2026-09-25, *The data model is decided on paper*, point 3.**UniFi SSO 可行性**：走意大利高校联邦身份 IDEM GARR（SAML/Shibboleth），Django 侧有现成 SP 库，技术上是标准协议——但把应用注册为学校认可的服务方需要 UniFi IT 审批，单人论文项目不等它：M5 用自建 Django 账号，auth 做成可插拔，SSO 记为 post-tesi 可选（🔜 `#44`）。
 - **外部知识源**（MCP、Google Drive 等）🔜 M7（可选，post-M6，`#45`）。
 
