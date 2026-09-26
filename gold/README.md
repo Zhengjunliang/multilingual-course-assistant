@@ -23,7 +23,7 @@ campus 集（M2.5，LLM 起草 → Claude 逐题核对 → 人工按 URL 抽查�
 
 | 字段 | 说明 |
 | --- | --- |
-| `id` | `q` + 三位序号，唯一 |
+| `id` | A prefix and three digits. One prefix per set: `q` smoke, `k` control, `c` campus, `g` campus-autogrow; ids are unique across all sets, because answers are named by id in one directory (`tests/test_gold.py`) |
 | `locale` | 提问语言；冒烟版全部 `en`，跨语言题（`it`/`zh`）🔜 M2.5/M3 |
 | `question` | 学生视角的自然提问，不抄课件原句 |
 | `source_file` | 答案所在 PDF 文件名（`data/corpus/PPM/` 下的原名）；campus 题省略（默认 `""`） |
