@@ -88,7 +88,7 @@ This file owns the decisions taken without the supervisor that are in force: the
 1. **The relevance gate proposes, and a person confirms before a fetched page enters the index.** It replaces the rule of 2026-08-21 that kept a page the moment the gate passed it. The evidence behind that rule could not carry it: the gate scored 18/20 on its labelled set, but none of those 20 pages was trying to pass, and `#5` describes a gate that reads content able to instruct it and decides a permanent write on it. A person does not raise the gate's accuracy; the person replaces "a wrong verdict is permanent" as the consequence. The gate stays, for ranking and noise reduction.
    **The price:** the automatic gate's errors are measurable (`--measure-gate`); a person's fatigue is not, and someone approving fifty candidates a day fails in a way no metric in this repository observes. Replacing a failure mode does not remove one.
    **Status:** 🔶 the code keeps what the gate passes (`rag/live.py`); the confirmation step is `#48`, which has no milestone.
-2. **The interface is graded.** The reading of 2026-07-30 that PPM set no requirement on the interface was wrong: its appearance counts toward the course grade. The interface work has its own milestone, M4 (`#49`, `#85`), reusing the number left free when cross-language work joined the core on 2026-08-21.
+2. **The interface is graded.** The reading of 2026-07-30 that PPM set no requirement on the interface was wrong: its appearance counts toward the course grade. The interface work has its own milestone, M4 — Interface (`#49`, `#85`), reusing the number left free when cross-language work joined the core on 2026-08-21.
 
 ## 2026-09-14 — Two CVEs are accepted risks, not fixes
 
@@ -101,7 +101,6 @@ This file owns the decisions taken without the supervisor that are in force: the
 
 1. **`ROADMAP.md` is deleted.** Milestones, blockers and deferred work are GitHub issues, and this file keeps the decisions. Checkboxes and documents own different things: a document says what and why, an issue says what is left and what blocks it, and in one file every step forward edits a document.
 2. **Labels and milestones follow `airjump-booking`** (outside the repository: `Zhengjunliang/airjump-booking`): `chore`, `blocked`, `security-review` and four `severity:` levels, `critical`, `high`, `medium` and `low`. The milestones are five, M3 · M4 · M5 · M6 · M7, and each description states its acceptance goal.
-   **Status:** 🔶 the labels and milestones exist; their English names and descriptions are `#43` (M6).
 3. **The security self-review follows OWASP, not ISO 27001.** An ISO or NIST mapping holds where a real audit report stands behind it; this repository has none, so the mapping would be invented. The OWASP Top 10 and the OWASP Top 10 for LLM Applications (outside the repository) assume no audit, and a self-review is their intended use. The coverage — what was checked and judged sound — is owned by [architecture.md](architecture.md); open findings are issues labelled `security-review`.
 
 ## 2026-08-27 — Website delivery (M5)
