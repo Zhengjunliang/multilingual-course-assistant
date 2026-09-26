@@ -2,7 +2,7 @@
 
 ## Purpose and owner
 
-This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisioni.md](decisioni.md), entry of 2026-09-25; the chunk field table by [docling-e-pipeline.md](docling-e-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
+This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisioni.md](decisioni.md), entries of 2026-09-25; the chunk field table by [docling-e-pipeline.md](docling-e-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
 
 ## Entities and relationships
 
@@ -29,7 +29,7 @@ erDiagram
 
 🔜 M5, enforced by database constraints where a constraint can express them:
 
-1. **Keys.** `DegreeProgramme.code` and `Course.code` are unique. A `CourseEdition` is unique per (`course`, `academic_year`), and `academic_year` matches `^\d{4}-\d{4}$`. A `CurriculumEntry` is unique per (`programme`, `curriculum`, `ad_code`) and per (`programme`, `curriculum`, `course`), with an empty string, never NULL, for "no curriculum". A `WebSource` is unique per (`url`, `edition`) with NULLs not distinct; a `CourseMaterial` per (`edition`, `sha256`).
+1. **Keys.** `DegreeProgramme.code` and `Course.code` are unique. A `CourseEdition` is unique per (`course`, `academic_year`), and `academic_year` matches `^\d{4}-\d{4}$`. A `CurriculumEntry` is unique per (`programme`, `curriculum`, `ad_code`) and per (`programme`, `curriculum`, `course`), with an empty string, never NULL, for "no curriculum". A `WebSource` is unique per (`url`, `edition`) with NULLs not distinct; a `CourseMaterial` per (`edition`, `sha256`). What the keys hold: `Course.code` is the AD code of the Moodle course that holds the material, fixed once entered, and any other AD code of the course is a `CurriculumEntry.ad_code`; when one curriculum lists two AD codes for a course, its entry takes the one listed only in that curriculum; `curriculum` is the name the Cineca catalogue prints, such as `TECNICO APPLICATIVO`.
 2. **One current edition per course.** A named conditional unique constraint on `course` where `is_current` is true. It cannot be deferred, so a switch runs in one transaction: lock the course's editions with `select_for_update`, clear the old flag, then set the new one.
 3. **Role scopes.** A check constraint on `RoleAssignment`: a teacher row has an `edition` and no `programme`, a secretariat row the reverse; its unique constraint treats NULLs as not distinct. The administrator is Django's `is_superuser` and has no row. Whether students have rows is decided in `#93`. A student's programme is **a scope boundary, self-declared until `#44`**: it bounds the courses a student's search may cover, and it is not a security boundary.
 
@@ -49,7 +49,7 @@ erDiagram
 
 ## Chunk payload mapping
 
-✅ The field table and the web-side values are owned by [docling-e-pipeline.md](docling-e-pipeline.md), section 3.6, with the model in `rag/chunk.py`. 🔜 M5: in the slides collection, `course` holds a UniFi course code (such as `B003725`, an example and not PPM's code) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default. A slides `chunk_id` carries both, so one PDF in two editions yields two identities.
+✅ The field table and the web-side values are owned by [docling-e-pipeline.md](docling-e-pipeline.md), section 3.6, with the model in `rag/chunk.py`. 🔜 M5: in the slides collection, `course` holds a UniFi course code (`B028451` for PPM) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default. A slides `chunk_id` carries both, so one PDF in two editions yields two identities.
 
 ## Migration order
 

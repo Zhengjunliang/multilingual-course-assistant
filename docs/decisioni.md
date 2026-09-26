@@ -2,6 +2,24 @@
 
 本文件是**自主拍板项**的属主：哪一天、拍了什么板、依据是什么，含**后来被自己推翻的那些** —— 反转本身是记录的一部分，删掉就看不出为什么会反转，答辩上也答不出来。⛔ 不在这里：技术栈选型与决策状态表归 [architettura.md](architettura.md)（「选了什么、验证条件是什么」）；推进状态、阻塞项与暂缓项归 GitHub issue（里程碑 M3 · M5 · M6 · M7），不在任何 markdown 文件里。
 
+## 2026-09-25 — PPM read from Moodle and Cineca: one course, two AD codes, one edition
+
+1. **A course's code is the AD code of the Moodle course that holds its material, and it is fixed once entered.** UniFi's Moodle opens one course per AD code and academic year; the teacher keeps the material in one of them and declares the others *mutuati*. PPM's material has been in `B028451` every academic year since 2020-2021, with `B003712` declared as its *mutuato*, so PPM's `Course.code` is `B028451`. The code does not follow a teacher who later moves the material to another container.
+   **Why:** an edition names material, and the material lives in the container. Which code is the container is the teacher's choice, not a university rule: for Intelligenza Artificiale it is `B003725`, the code without a curriculum, the opposite of PPM (outside the repository: UniFi Moodle, `e-l.unifi.it`).
+   **The price:** the container is read from Moodle by a person. The Cineca course catalogue lists the two AD codes as two equal teachings and has no field saying which one is *mutuata da* the other.
+2. **A course appears once per curriculum; when a curriculum lists two AD codes for it, the entry takes the one listed only in that curriculum.** The Cineca study plan of `B047`, curriculum TECNICO APPLICATIVO, lists PPM under both `B003712` and `B028451`, while TECNICO SCIENTIFICO lists `B003712` alone, so PPM is two entries: TECNICO APPLICATIVO with `B028451`, TECNICO SCIENTIFICO with `B003712`. Any other case is decided by whoever enters the row. Only PPM has been checked; four more courses of the same plan come in pairs of AD codes (outside the repository: Cineca course catalogue, `unifi.coursecatalogue.cineca.it`).
+   **Why:** it keeps the (`programme`, `curriculum`, `course`) constraint of [data-model.md](data-model.md), so a course has one year of study in each curriculum. Relaxing the constraint later to one row per AD code only adds rows; tightening it after the fact would first have to remove some.
+   **The price:** the table does not record that a TECNICO APPLICATIVO student may also take PPM under `B003712`, a credit slot that no code reads.
+3. **The curriculum is stored by the name the Cineca catalogue prints**, such as `TECNICO APPLICATIVO`, and as an empty string when it prints none.
+   **Why:** Cineca owns the study plans and shows the name only; the code `E70` appears in Moodle course titles alone, and the code of TECNICO SCIENTIFICO was not found anywhere.
+   **The price:** a misspelt name is a new curriculum. The admin filter lists every stored value, which is where a typo shows.
+4. **Official fields no code reads are not stored**: the programme's level (Cineca *Tipo di corso*), CFU, teaching period, mandatory or optional, cohort. Each is an additive `AddField` when a reader appears.
+   **Why:** point 5 of *The data model is decided on paper*, the entry below: a column lands with the code that first uses it.
+   **The price:** a cohort, if one is ever needed, changes the (`programme`, `curriculum`, `course`) constraint as well as adding a column, since a curriculum's year of study is then per cohort.
+5. **The corpus is one edition.** All 31 PDFs in `data/corpus/PPM/` match, title by title, the 2025-2026 Moodle course of `B028451`. The years in their file names (2024, 2025, 2026) date the slides, not the teaching: the teacher reuses decks across academic years. This corrects `#96`, which read the file names as two academic years.
+   **Why:** a file name dates the deck; the Moodle course dates the teaching.
+   **The price:** the evaluation scope is a single pair, (`B028451`, `2025-2026`).
+
 ## 2026-09-25 — The data model is decided on paper before roles are built on it
 
 1. **A course has two levels and a yearly edition.** A `DegreeProgramme` (such as `B047`) lists `Course` rows (such as `B003725`) through `CurriculumEntry`, which carries `year_of_study`, the `ad_code` and the curriculum, so a course shared between programmes (*mutuazione*) is one more entry pointing at the same course, never a copy of its material. Material, syllabus, reading list and reference pages hang on a `CourseEdition` (`course`, `academic_year` such as `2025-2026`); past editions are kept and can be chosen. Which edition is current is a manual switch, `is_current`, flipped by a teacher or the secretariat, at most one per course, and a search defaults to the current edition. This reverses the course label `"PPM"`, taken from the corpus directory name: the slides payload field `course` becomes the UniFi course code, and `academic_year` joins it.
