@@ -2,7 +2,7 @@
 
 ## Purpose and owner
 
-This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisioni.md](decisioni.md), entries of 2026-09-25; the chunk field table by [docling-e-pipeline.md](docling-e-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
+This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisioni.md](decisioni.md), entries of 2026-09-25 and 2026-09-26; the chunk field table by [docling-e-pipeline.md](docling-e-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
 
 ## Entities and relationships
 

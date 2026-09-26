@@ -7,10 +7,11 @@ entry pointing at the same course, never a copy of it. A `CourseEdition` is one
 academic year of a course, and it is the row the rest of the site will hang on:
 material, syllabus, reading list, teachers.
 
-`(course.code, academic_year)` is also the pair every slides chunk carries in
-`rag/`. It crosses that boundary as two plain strings — `rag/` never imports
-Django — so the strings themselves are the contract, which is why neither may
-change once the edition exists.
+`(course.code, academic_year)` is also the pair the slides chunks of `rag/` are
+to carry in place of the corpus directory name (docs/data-model.md, chunk
+payload mapping). It crosses that boundary as two plain strings — `rag/` never
+imports Django — so the strings themselves are the contract, which is why
+neither may change once the edition exists.
 
 Nothing here points at the user model. Roles, uploaded material and a student's
 programme will point at these tables; an arrow the other way would make the
@@ -54,7 +55,7 @@ class DegreeProgramme(models.Model):
     """A degree programme (*corso di laurea*), coded as the Cineca catalogue codes it.
 
     The programme's level, credits and cohorts are not stored: no code reads
-    them yet, and each is an added column the day one does.
+    them, and each is an added column the day one does.
     """
 
     code = models.CharField(
@@ -177,7 +178,7 @@ class CurriculumEntry(models.Model):
     A course appears once per curriculum. When the Cineca study plan lists two
     official codes for it in the same curriculum, `ad_code` is the one listed
     only there; that rule, and the one course it has been checked on, are in
-    docs/decisioni.md, 2026-09-25.
+    docs/decisioni.md, 2026-09-25, *PPM read from Moodle and Cineca*, point 2.
     """
 
     programme = models.ForeignKey(

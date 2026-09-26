@@ -36,16 +36,21 @@ uv run python manage.py createsuperuser
 
 **While the site is running, the `rag` CLIs that touch the index fail** (`rag.index`, `rag.search`, `rag.agent`, …): local Qdrant is embedded and holds an exclusive lock on `data/qdrant`, so whichever process opens it first keeps it; the endpoints answer 503 with that explanation in the opposite case. Stop the server with `Ctrl+C` to use the CLI. 🔜 This goes away when Qdrant becomes a service (`#33`, M5).
 
-**After changing a model**, regenerate the app's migration and rebuild the local database, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`). Until a database has to keep its data, each app has one migration, `0001_initial.py`, rewritten on every change rather than followed by a `0002` ([docs/decisioni.md](docs/decisioni.md), 2026-09-26):
+**Changing a model** means regenerating the app's migration and rebuilding the local database, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`). Until a database has to keep its data, each app has one migration, `0001_initial.py`, rewritten on every change rather than followed by a `0002` ([docs/decisioni.md](docs/decisioni.md), 2026-09-26). Save the data **before** editing the model — `dumpdata` reads every column the model declares, so it fails once the model is ahead of the database — then run the rest one line at a time, stopping at the first that fails: the third line deletes the local database.
 
 ```powershell
-uv run python manage.py dumpdata accounts catalog --natural-foreign --indent 2 --output data/dev.json  # what you want back
-Remove-Item apps/<app>/migrations/0001_initial.py
-docker compose down -v; docker compose up -d        # deletes the local database, irreversibly
-uv run python manage.py makemigrations              # the new 0001_initial.py goes into git
+# before editing models.py; -X utf8 because Windows would write the file in cp1252
+uv run python -X utf8 manage.py dumpdata auth.group accounts qa catalog --natural-foreign --indent 2 --output data/dev.json
+# after editing it
+$app = "catalog"                                      # the app whose model changed
+Remove-Item "apps/$app/migrations/0001_initial.py"
+docker compose down -v; docker compose up -d --wait   # deletes the local database, irreversibly
+uv run python manage.py makemigrations                # the new 0001_initial.py goes into git
 uv run python manage.py migrate
-uv run python manage.py loaddata data/dev.json
+uv run python manage.py loaddata data/dev.json --ignorenonexistent
 ```
+
+A field added as `NOT NULL` without a default has no value in `data/dev.json`; add it to the file before `loaddata`.
 
 ### The check chain
 
