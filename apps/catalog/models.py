@@ -17,7 +17,7 @@ Nothing here points at the user model. Roles, uploaded material and a student's
 programme will point at these tables; an arrow the other way would make the
 catalogue depend on who is reading it. The schema, its invariants and the
 contract with `rag/` are owned by docs/data-model.md; the reasons for each
-choice by docs/decisioni.md, the two entries of 2026-09-25.
+choice by docs/decisions.md, the two entries of 2026-09-25.
 """
 
 from __future__ import annotations
@@ -178,7 +178,7 @@ class CurriculumEntry(models.Model):
     A course appears once per curriculum. When the Cineca study plan lists two
     official codes for it in the same curriculum, `ad_code` is the one listed
     only there; that rule, and the one course it has been checked on, are in
-    docs/decisioni.md, 2026-09-25, *PPM read from Moodle and Cineca*, point 2.
+    docs/decisions.md, 2026-09-25, *PPM read from Moodle and Cineca*, point 2.
     """
 
     programme = models.ForeignKey(

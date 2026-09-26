@@ -3,7 +3,7 @@
 Discovery is sitemap-first (the site's own page inventory) with link-BFS as the
 fallback, filtered through a deterministic scope-rule table — the LLM relevance
 gate exists only on the live/autogrow path, never here (design owned by
-docs/fonte-web-unifi.md). Politeness is non-negotiable and lives in code, not
+docs/unifi-web-source.md). Politeness is non-negotiable and lives in code, not
 in a convention: robots.txt honored, one request per second, a hard page cap,
 an honest User-Agent, attachments size-capped.
 
@@ -59,7 +59,7 @@ SKIPPED_EXTENSIONS = (".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".rtf",
 
 
 class ScopeRule(BaseModel):
-    """One row of the scope table (docs/fonte-web-unifi.md owns the table).
+    """One row of the scope table (docs/unifi-web-source.md owns the table).
 
     Deliberately host+path based, not domain-locked: student-critical hosts
     outside unifi.it (DSU, CISIA...) enter as explicit rows.
@@ -72,7 +72,7 @@ class ScopeRule(BaseModel):
     path_prefix: str = "/"
 
 
-# Seed sections, kept in sync with the table in docs/fonte-web-unifi.md.
+# Seed sections, kept in sync with the table in docs/unifi-web-source.md.
 # Each path_prefix must be a real page: it doubles as the link-BFS seed URL
 # (calibrated against the live site at the Stage 3.5 handover).
 DEFAULT_SCOPE = (
@@ -104,7 +104,7 @@ class Outlink(BaseModel):
 
 class RegistryEntry(BaseModel):
     """One append-only ledger row; field semantics shared with the chunk
-    payload contract (docs/docling-e-pipeline.md 3.6)."""
+    payload contract (docs/docling-pipeline.md 3.6)."""
 
     model_config = ConfigDict(frozen=True)
 

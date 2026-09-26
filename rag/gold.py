@@ -162,7 +162,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
     # Eval reads the frozen crawl snapshot by default: a live increment written
     # between two runs would otherwise move a gate number, and the gates are the
-    # thesis' regression evidence (ADR-1, docs/architettura.md).
+    # thesis' regression evidence (ADR-1, docs/architecture.md).
     parser.add_argument("--ingest-source", choices=["crawl", "live"], default="crawl")
     parser.add_argument(
         "--snapshot",
@@ -279,7 +279,7 @@ def main(argv: list[str] | None = None) -> None:
     rate = scored / total if total else 0.0
     print(f"hit@{args.top_k}: {scored}/{total} ({rate:.0%})")
     # Per-locale rates carry the campus gate (EN/IT thresholded, ZH reported
-    # without one — docs/fonte-web-unifi.md); printed only when locales mix.
+    # without one — docs/unifi-web-source.md); printed only when locales mix.
     if len(per_locale) > 1:
         for locale in sorted(per_locale):
             outcomes = per_locale[locale]

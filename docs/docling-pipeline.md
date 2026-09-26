@@ -1,8 +1,8 @@
 # Docling 与 RAG Pipeline — 原理与进度
 
-面向开发的概念梳理 + ingest 进度。决策结论不在这里（属主是 [architettura.md](architettura.md)），路线对比不在这里（属主是 [analisi-rag.md](analisi-rag.md)）。本文回答：**每个环节在干什么、为什么需要它、本项目怎么落、进度在哪。**
+面向开发的概念梳理 + ingest 进度。决策结论不在这里（属主是 [architecture.md](architecture.md)），路线对比不在这里（属主是 [rag-analysis.md](rag-analysis.md)）。本文回答：**每个环节在干什么、为什么需要它、本项目怎么落、进度在哪。**
 
-进度一览：步骤 0 探测 ✅（[rag/probe.py](../rag/probe.py)）· 步骤 1 解析 ✅（[rag/parse.py](../rag/parse.py)）· 步骤 2 chunking ✅（[rag/chunk.py](../rag/chunk.py)）· 索引 ✅（[rag/index.py](../rag/index.py)）· hybrid 检索 + rerank ✅（[rag/search.py](../rag/search.py)）· 生成 ✅（[rag/answer.py](../rag/answer.py) 经本地 Ollama 实测，记录见 [diario-sperimentale.md](diario-sperimentale.md)；服务器 vLLM 只在 M3 正式实验）。
+进度一览：步骤 0 探测 ✅（[rag/probe.py](../rag/probe.py)）· 步骤 1 解析 ✅（[rag/parse.py](../rag/parse.py)）· 步骤 2 chunking ✅（[rag/chunk.py](../rag/chunk.py)）· 索引 ✅（[rag/index.py](../rag/index.py)）· hybrid 检索 + rerank ✅（[rag/search.py](../rag/search.py)）· 生成 ✅（[rag/answer.py](../rag/answer.py) 经本地 Ollama 实测，记录见 [experiment-log.md](experiment-log.md)；服务器 vLLM 只在 M3 正式实验）。
 
 ## 1. 全景：RAG 是两条 pipeline，不是一条
 
@@ -56,7 +56,7 @@ PDF 不是文档格式，是**打印指令格式**：文件里只有「在坐标
 
 ### 2.3 解析质量验收（实测结论）
 
-按语料实测（31 份 PPM slides，语料事实属主 [architettura.md](architettura.md)）：
+按语料实测（31 份 PPM slides，语料事实属主 [architecture.md](architecture.md)）：
 
 | 验证点 | 结果 |
 | --- | --- |
@@ -163,7 +163,7 @@ chunker 需要的是**带层级与页码的对象树**（标题链、provenance 
 | `ingest_run_id` · `ingest_source` · `trigger` | 快照身份：哪次 run、`"crawl"`（正式爬取）还是 `"live"`（学生触发实时抓取）、触发原因。eval 默认只取 `crawl`（filter 只进 `unifi_web` 的 prefetch 分支；slides 分支不带任何 ingest 条件） |
 | `content_hash` | 页面内容哈希，增量刷新判定（变了才重解析重索引） |
 
-**web chunk 的替换规则**：`chunk_id` 随 `content_hash` 变化（内容一变 id 全变），替换粒度是 **(url, ingest_source) 对**——入库前按该对限定删除再 upsert，crawl 快照与 live 增量**互不覆盖**（eval 隔离在写路径上的对偶）。快照/registry 布局与深化循环见 [fonte-web-unifi.md](fonte-web-unifi.md)。
+**web chunk 的替换规则**：`chunk_id` 随 `content_hash` 变化（内容一变 id 全变），替换粒度是 **(url, ingest_source) 对**——入库前按该对限定删除再 upsert，crawl 快照与 live 增量**互不覆盖**（eval 隔离在写路径上的对偶）。快照/registry 布局与深化循环见 [unifi-web-source.md](unifi-web-source.md)。
 
 NFKC 归一化（`rag/parse.py` 的 `normalize_text`）在**此步**应用于 `text` 与 `embed_text`：文档 JSON 保留原文，索引只见折叠后文本。
 
@@ -244,7 +244,7 @@ sequenceDiagram
 
 ## 5. LangChain / LangGraph / LlamaIndex：为什么不用
 
-三者都不提供新能力（解析还是 Docling、向量还是 Qwen3、库还是 Qdrant），提供的是**编排与统一接口**：LangChain 是适配器 + 胶水（LCEL 链），LangGraph 是有状态图编排（循环/分支/断点），LlamaIndex 是 RAG 一体化框架。决策已定（属主 [architettura.md](architettura.md)：自建），理由：
+三者都不提供新能力（解析还是 Docling、向量还是 Qwen3、库还是 Qdrant），提供的是**编排与统一接口**：LangChain 是适配器 + 胶水（LCEL 链），LangGraph 是有状态图编排（循环/分支/断点），LlamaIndex 是 RAG 一体化框架。决策已定（属主 [architecture.md](architecture.md)：自建），理由：
 
 1. **控制流不需要图**：本项目两条 pipeline 都是直线，LangGraph 用在直线流程上是纯抽象税。
 2. **论文要测的正是框架藏起来的**：实验网格（embedding × reranker × LLM 尺寸 × top-k × chunk 策略）在自己代码里是显式变量，在框架里散落在各层默认值里，且框架会悄悄改 prompt、加重试 → 不可复现。
@@ -252,7 +252,7 @@ sequenceDiagram
 4. **代码量没省多少**：自建量级几百行，每行都懂；框架省的是「接 20 种向量库」的适配成本，本项目只接一种。
 5. **依赖风险**：LangChain API 迭代激进，论文周期内的 breaking change 是纯损耗。
 
-框架真正划算的场景：接十几种数据源随时切换、真 agentic 工作流（LLM 决定是否再检索一轮 —— 带循环的状态机）。对应本项目是 M2.5 的 agent 编排（路由器 → 循环，显式控制流自建，见 [architettura.md](architettura.md) 决策表 agent 编排一行）；自建的线性 pipeline 整体变成其中一个节点，不锁死。**不用 ≠ 不懂** —— 读教程、写相关工作章节、答辩都需要这张对照表：
+框架真正划算的场景：接十几种数据源随时切换、真 agentic 工作流（LLM 决定是否再检索一轮 —— 带循环的状态机）。对应本项目是 M2.5 的 agent 编排（路由器 → 循环，显式控制流自建，见 [architecture.md](architecture.md) 决策表 agent 编排一行）；自建的线性 pipeline 整体变成其中一个节点，不锁死。**不用 ≠ 不懂** —— 读教程、写相关工作章节、答辩都需要这张对照表：
 
 | 框架术语 | 本项目对应 |
 | --- | --- |

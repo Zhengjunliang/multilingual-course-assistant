@@ -1,6 +1,6 @@
 # RAG 分析 — relatore 链接的扩展
 
-M1 交付物（relatore 明确要求，2026-07-28 邮件：«espanda l'analisi di RAG/risposte dai link»）。作为关闭 [architettura.md](architettura.md) 中 🔒 «RAG 路线»决策的输入。来源见文末。
+M1 交付物（relatore 明确要求，2026-07-28 邮件：«espanda l'analisi di RAG/risposte dai link»）。作为关闭 [architecture.md](architecture.md) 中 🔒 «RAG 路线»决策的输入。来源见文末。
 
 ## 1. Qwen-Agent 的 RAG 模块
 
@@ -41,7 +41,7 @@ Qwen3-Embedding 与 Qwen3-Reranker 系列：两者都有 **0.6B / 4B / 8B** 三�
 - `docling` 库还有经典非 VLM pipeline，对数字版 PDF 已经很稳；VLM 主要针对扫描件和复杂版面。
 - 对论文：材料多为 slide PDF → 解析质量决定下游一切。最小实验里要在同一份课程 PDF 上**两条 pipeline 都跑**。
 
-Docling 架构、DocTags、chunking 与两条 pipeline 的原理讲解见 [docling-e-pipeline.md](docling-e-pipeline.md)（本文件只做路线分析，不重复原理）。
+Docling 架构、DocTags、chunking 与两条 pipeline 的原理讲解见 [docling-pipeline.md](docling-pipeline.md)（本文件只做路线分析，不重复原理）。
 
 ## 架构启示
 
@@ -59,11 +59,11 @@ Docling 架构、DocTags、chunking 与两条 pipeline 的原理讲解见 [docli
 | 论文中的可解释性     | 高（每步都是自己的代码） | 中                  | 中低                |
 | 起步速度             | 中                       | 高                  | 高                  |
 
-带去 Meet 的提案：**轻量自建 pipeline**（docling → chunk → Qwen3-Embedding → rerank → Qwen3）为主系统，**Qwen-Agent/BM25 做实验基线**；LlamaIndex 仅当需要现成组件时考虑（LlamaIndex 有 Docling reader）。拍板结果与当前状态见 [architettura.md](architettura.md) 决策表（本文件是 M1 分析记录，不是决策属主）。
+带去 Meet 的提案：**轻量自建 pipeline**（docling → chunk → Qwen3-Embedding → rerank → Qwen3）为主系统，**Qwen-Agent/BM25 做实验基线**；LlamaIndex 仅当需要现成组件时考虑（LlamaIndex 有 Docling reader）。拍板结果与当前状态见 [architecture.md](architecture.md) 决策表（本文件是 M1 分析记录，不是决策属主）。
 
 ## 最小实验提案（M1）⛔ 已否决
 
-⛔ 2026-07-31 决定**不做**本节的一次性最小实验：Docling 的解析质量（重音字符、公式、表格、多栏阅读顺序）与 Qwen3 推理直接在 M2 的真实 ingest 管线里验证——同样的投入产出论文可引用的证据，而不是用完即弃的 notebook。M2 实测（[diario-sperimentale.md](diario-sperimentale.md)）证实该验证路径成立。提案原文保留如下，仅作 M1 分析记录：
+⛔ 2026-07-31 决定**不做**本节的一次性最小实验：Docling 的解析质量（重音字符、公式、表格、多栏阅读顺序）与 Qwen3 推理直接在 M2 的真实 ingest 管线里验证——同样的投入产出论文可引用的证据，而不是用完即弃的 notebook。M2 实测（[experiment-log.md](experiment-log.md)）证实该验证路径成立。提案原文保留如下，仅作 M1 分析记录：
 
 在 MICC 服务器上，一个 notebook：
 

@@ -6,7 +6,7 @@ nothing in this module writes to `gold/`. Two draft sets come out:
 
 - `campus-draft.jsonl` — questions answerable from pages already indexed,
   stratified over the scope-table sections and cycling EN/IT/ZH so the campus
-  gate can score EN/IT and report ZH (docs/fonte-web-unifi.md);
+  gate can score EN/IT and report ZH (docs/unifi-web-source.md);
 - `campus-autogrow-draft.jsonl` — questions whose answer pages are known from
   the outlink graph but deliberately NOT ingested (PDF moduli included): the
   Stage 9 autogrow exam starts from 0/N on these, so they are never scored in

@@ -50,7 +50,7 @@ updates:
       #
       # The reason is not risk, it is that the upgrade is already refused. The
       # `django>=5.2,<6` bound in pyproject.toml is not a cautious ceiling: it
-      # IS the decision written in docs/architettura.md, "已定技术栈" — LTS,
+      # IS the decision written in docs/architecture.md, "已定技术栈" — LTS,
       # supported until 2028-04, with the steadiest DRF support. A Dependabot
       # pull request for Django 6 rewrites that bound to `<7`, which is to say
       # it deletes the decision, and CI would quite possibly go green on it.

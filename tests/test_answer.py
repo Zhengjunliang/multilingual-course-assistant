@@ -56,7 +56,7 @@ def test_messages_carry_the_answer_language_and_the_question() -> None:
     assert messages[1]["content"].endswith("Question: What is an ORM?")
 
 
-# The prompt every generation-side result in docs/diario-sperimentale.md was
+# The prompt every generation-side result in docs/experiment-log.md was
 # produced with. Same reasoning as the router's pin in tests/test_agent.py: the
 # identity tests below compare new code against new code, so without this a
 # prompt edit retires those results while every test stays green.

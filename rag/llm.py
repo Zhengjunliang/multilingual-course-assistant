@@ -22,7 +22,7 @@ can be repeated. Ollama's OpenAI-compatible endpoint accepts both fields.
 Every request is also bounded in time. The SDK's own default is ten minutes,
 which turns any caller's wall-clock budget into a fiction the moment the
 endpoint stops answering — and the deepening loop has one (the step-budget ADR
-in docs/fonte-web-unifi.md). This module knows nothing about who is calling it,
+in docs/unifi-web-source.md). This module knows nothing about who is calling it,
 so the bound is a plain default here rather than an imported constant.
 """
 

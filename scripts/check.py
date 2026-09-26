@@ -16,7 +16,7 @@ checkout reads them from .env.
 Standard library only: the first thing it does is refuse to run outside the
 project venv, and that refusal has to work under an interpreter that has none
 of the project's packages. Why a script and not a task runner:
-docs/decisioni.md, 2026-09-24.
+docs/decisions.md, 2026-09-24.
 """
 
 from __future__ import annotations

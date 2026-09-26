@@ -199,7 +199,7 @@ def rerank_hits(query: str, hits: Sequence[Hit], reranker: Reranker, limit: int)
 
 
 def round_robin(pools: Sequence[Sequence[Hit]], limit: int) -> list[Hit]:
-    """The `--no-rerank` multi-collection order (docs/fonte-web-unifi.md):
+    """The `--no-rerank` multi-collection order (docs/unifi-web-source.md):
     fusion scores are not comparable across collections, so pools interleave
     rank by rank instead of merging by score; leftover ranks from longer pools
     fill the remainder."""
@@ -230,7 +230,7 @@ def search(
     pools merge into one candidate pool and the reranker picks the final
     `limit`; without one, fusion order interleaves round-robin (the M3
     no-rerank baseline). The web-source conditions apply only to the
-    `unifi_web` branch (ADR-1, docs/architettura.md): slides prefetches never
+    `unifi_web` branch (ADR-1, docs/architecture.md): slides prefetches never
     carry them, so slides retrieval semantics cannot drift with web features."""
     pools: list[list[Hit]] = []
     for collection in collections:

@@ -290,7 +290,7 @@ def test_reply_without_fresh_still_validates() -> None:
     assert decision.fresh is False
 
 
-# The prompt the 22/32 routing accuracy in docs/diario-sperimentale.md was
+# The prompt the 22/32 routing accuracy in docs/experiment-log.md was
 # measured against. Pinned rather than described, because every guard below is
 # otherwise circular: they compare new code to new code, so a prompt edit would
 # keep them all green while quietly retiring the number the thesis reports.
@@ -1051,7 +1051,7 @@ def test_a_two_hop_pdf_answer_is_reached_through_the_link_graph(
 
     # Provenance survives both hops: the ledger and the chunk payload name the
     # page each fetch was linked from, which is the payload contract for web
-    # chunks (docs/docling-e-pipeline.md 3.6) and the only record of the path
+    # chunks (docs/docling-pipeline.md 3.6) and the only record of the path
     # the loop actually walked.
     ledger = {row.url: row for row in read_registry(registry)}
     assert ledger[HUB].referrer_url == SEED

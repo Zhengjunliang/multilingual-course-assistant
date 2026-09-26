@@ -94,7 +94,7 @@ def convert_html(pruned_html: str, name: str, converter: DocumentConverter) -> C
 
 def meta_for(entry: RegistryEntry, *, artifact: Path, variant: str, lang: str | None) -> ParsedMeta:
     """The sidecar carries the whole web provenance so downstream steps read
-    one contract (docs/docling-e-pipeline.md 3.6): `source_file` reuses the
+    one contract (docs/docling-pipeline.md 3.6): `source_file` reuses the
     snapshot's url-hash artifact name (basenames collide site-wide, hashes
     don't; the URL itself lives in `url`), and `source_sha256` doubles as the
     raw-bytes content hash so chunk ids change with the page content."""
