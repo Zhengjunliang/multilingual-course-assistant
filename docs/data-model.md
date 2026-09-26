@@ -53,7 +53,7 @@ erDiagram
 
 ## Migration order
 
-🔜 M5. Every step adds and nothing is dropped; each lands with the issue that first uses it.
+🔜 M5. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisioni.md](decisioni.md), 2026-09-26.
 
 - ① Catalogue tables: `DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`.
 - ② `RoleAssignment`, with the roles of `#93`.

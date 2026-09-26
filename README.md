@@ -36,11 +36,15 @@ uv run python manage.py createsuperuser
 
 **While the site is running, the `rag` CLIs that touch the index fail** (`rag.index`, `rag.search`, `rag.agent`, …): local Qdrant is embedded and holds an exclusive lock on `data/qdrant`, so whichever process opens it first keeps it; the endpoints answer 503 with that explanation in the opposite case. Stop the server with `Ctrl+C` to use the CLI. 🔜 This goes away when Qdrant becomes a service (`#33`, M5).
 
-**After changing a model**, generate and apply the migration, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`):
+**After changing a model**, regenerate the app's migration and rebuild the local database, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`). Until a database has to keep its data, each app has one migration, `0001_initial.py`, rewritten on every change rather than followed by a `0002` ([docs/decisioni.md](docs/decisioni.md), 2026-09-26):
 
 ```powershell
-uv run python manage.py makemigrations   # the migration file goes into git
+uv run python manage.py dumpdata accounts catalog --natural-foreign --indent 2 --output data/dev.json  # what you want back
+Remove-Item apps/<app>/migrations/0001_initial.py
+docker compose down -v; docker compose up -d        # deletes the local database, irreversibly
+uv run python manage.py makemigrations              # the new 0001_initial.py goes into git
 uv run python manage.py migrate
+uv run python manage.py loaddata data/dev.json
 ```
 
 ### The check chain
