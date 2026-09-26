@@ -92,7 +92,7 @@ This file owns the decisions taken without the supervisor that are in force: the
 
 ## 2026-09-14 — Two CVEs are accepted risks, not fixes
 
-`pip-audit` in CI's `audit` job reports two advisories. Neither is fixed, for different reasons, and the thesis records both as identified, graded and explained — never as fixed: the first risk has no end date, the second ends when `#55` closes.
+`pip-audit` in CI's `audit` job reports two advisories. Neither is fixed, for different reasons, and the thesis records both as identified, graded and explained — never as fixed.
 
 1. **`accelerate` PYSEC-2026-3804 is accepted without an end date.** Upstream has no fixed version, and it is a required transitive dependency of `docling`. Why it cannot be removed, why it is unreachable and why the real control is `#10` is written next to `--ignore-vuln` in the `audit` step of [ci.yml](../.github/workflows/ci.yml); `#7` records it.
 2. **`transformers` PYSEC-2026-3929 is accepted until `#55` closes.** A fixed version exists (5.10.0) but is out of reach: a platform this project never runs (darwin) caps the resolution for Windows and Linux. The one decision recorded here is that the lockfile is not restricted by platform in passing: an `environments` line would unblock it, but it narrows what the lockfile promises and does not belong in a CVE fix. The other way, a major docling upgrade, re-runs ingest and re-verifies the gold sets (38/40 and 28/32), which belongs to an M3 remeasurement. Both ways and their costs are `#55` (M3).
@@ -122,7 +122,7 @@ This file owns the decisions taken without the supervisor that are in force: the
 
 ## 2026-08-24 — Order of work
 
-1. **M5 comes before M3**, up to M6's clean machine where one `docker compose up` starts everything and the browser demonstrates both knowledge bases, accounts included. Three reasons. The research results were terminal output only, and meetings and the defence need something visible. `migrate` had never run, so a custom user model and the switch to PostgreSQL cost nothing then and more with every migration after; a custom user model retrofitted later rewrites every migration. And the database and retrieval backend change once, so every M3 baseline is measured on one backend.
+1. **M5 comes before M3**, up to M6's clean machine where one `docker compose up` starts everything and the browser demonstrates both knowledge bases, accounts included. Three reasons. The research results were terminal output only, and meetings and the defence need something visible. `migrate` had never run, so a custom user model and the switch to PostgreSQL cost nothing then, while a custom user model retrofitted later rewrites every migration. And the database and retrieval backend change once, so every M3 baseline is measured on one backend.
 2. **Qdrant moves from embedded to a service in the compose file.** Once the website runs, the web process, the Celery worker and terminal evaluations all need the index, and embedded mode's single-process file lock keeps the website from starting. For the pages fetched live the move is not a reindex: they exist only in the index (`rag/live.py`: "Live keeps no snapshot file"), so they are read with `scroll(with_vectors=True, with_payload=True)` and upserted into the server, with no GPU.
    **Status:** 🔜 M5 `#33`.
 3. **The order is re-evaluated once the graduation session date is known.** M5 takes about 4–6 weeks and M3 about 3–4, and this order puts M3 after a timeline whose end is unknown (`#46`).
