@@ -2,6 +2,7 @@
 file AND the right page inside the chunk's span, and the CLI must report a
 rate that survives an empty index without dividing by zero."""
 
+import json
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -76,6 +77,41 @@ def test_gold_file_round_trips(tmp_path: Path) -> None:
     path = tmp_path / "smoke.jsonl"
     path.write_text(make_question().model_dump_json() + "\n\n", encoding="utf-8")
     assert load_gold(path) == [make_question()]
+
+
+GOLD_DIR = Path(__file__).resolve().parent.parent / "gold"
+# The two sets promoted from rag.golddraft, whose ids it numbers from 1 on every run.
+DRAFTED_PREFIXES = {"campus.jsonl": "c", "campus-autogrow.jsonl": "g"}
+
+
+def committed_question_sets() -> dict[str, list[dict[str, object]]]:
+    """Every committed gold file whose rows carry an `id`; the relevance-gate labels do not."""
+    sets = {}
+    for path in sorted(GOLD_DIR.glob("*.jsonl")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        rows = [json.loads(line) for line in lines if line.strip()]
+        if rows and "id" in rows[0]:
+            sets[path.name] = rows
+    return sets
+
+
+def test_each_gold_set_keeps_its_own_id_prefix_and_answer_files() -> None:
+    """Answers live in one directory, named by id: two sets sharing a prefix
+    overwrite each other's answers there, and nothing else notices."""
+    sets = committed_question_sets()
+    prefixes = {}
+    for name, rows in sets.items():
+        found = {str(row["id"])[0] for row in rows}
+        assert len(found) == 1, f"{name} mixes id prefixes {sorted(found)}"
+        prefixes[name] = found.pop()
+    assert len(set(prefixes.values())) == len(prefixes), prefixes
+    for name, prefix in prefixes.items():
+        if name not in DRAFTED_PREFIXES:
+            assert prefix not in DRAFTED_PREFIXES.values(), f"{name} uses a drafted prefix"
+    ids = [row["id"] for rows in sets.values() for row in rows]
+    refs = [row["answer_ref"] for rows in sets.values() for row in rows]
+    assert len(ids) == len(set(ids))
+    assert len(refs) == len(set(refs))
 
 
 def test_cli_reports_hits_and_rate(
