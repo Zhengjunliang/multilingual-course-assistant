@@ -31,7 +31,7 @@ erDiagram
 
 1. **Keys.** `DegreeProgramme.code` and `Course.code` are unique. A `CourseEdition` is unique per (`course`, `academic_year`), and `academic_year` matches `^\d{4}-\d{4}$`. A `CurriculumEntry` is unique per (`programme`, `curriculum`, `ad_code`) and per (`programme`, `curriculum`, `course`), with an empty string, never NULL, for "no curriculum". A `WebSource` is unique per (`url`, `edition`) with NULLs not distinct; a `CourseMaterial` per (`edition`, `sha256`). What the keys hold: `Course.code` is the AD code of the Moodle course that holds the material, fixed once entered, and any other AD code of the course is a `CurriculumEntry.ad_code`; when one curriculum lists two AD codes for a course, its entry takes the one listed only in that curriculum; `curriculum` is the name the Cineca catalogue prints, such as `TECNICO APPLICATIVO`.
 2. **One current edition per course.** A named conditional unique constraint on `course` where `is_current` is true. It cannot be deferred, so a switch runs in one transaction: lock the course's editions with `select_for_update`, clear the old flag, then set the new one.
-3. **Role scopes.** A check constraint on `RoleAssignment`: a teacher row has an `edition` and no `programme`, a secretariat row the reverse; its unique constraint treats NULLs as not distinct. The administrator is Django's `is_superuser` and has no row. Whether students have rows is decided in `#93`. A student's programme is **a scope boundary, self-declared until `#44`**: it bounds the courses a student's search may cover, and it is not a security boundary.
+3. **Role scopes.** A check constraint on `RoleAssignment`: a teacher row has an `edition` and no `programme`, a secretariat row the reverse; its unique constraint treats NULLs as not distinct. The administrator is Django's `is_superuser` and has no row. Whether students have rows is decided in `#93`. A student's programme limits which courses the student's search covers; it is declared by the student, so it scopes the search and protects nothing ([decisions.md](decisions.md), 2026-09-25, *The data model is decided on paper*, point 2).
 
 ## The contract between `apps/` and `rag/`
 
@@ -60,9 +60,6 @@ erDiagram
 - ③ Content tables — `CourseMaterial` (`#35`), `Syllabus`, `ReadingItem`, `WebSource` — and `User.year_of_study` with the student course list (`#36`).
 - ④ The Qdrant payload remap, zero GPU: `set_payload` writes the course code and `academic_year`, and each slides point moves to its new id (scroll the stored vectors, upsert under the new id, delete the old one). The `data/parsed/*.meta.json` and `data/chunks/*.jsonl` sidecars are rewritten in the same batch.
 
+Student uploads visible only to their author are deferred (`#36`): they would add one nullable `owner` column on `CourseMaterial`, an additive change.
+
 ④ is not a Django migration and reads no table: it needs only the course codes and years that ① records, not roles or content, so the issue that owns ① may run it before its own tables land. Stored history is not rewritten: `Message.citations[].course` keeps `"PPM"`.
-
-## Blocked
-
-- 🔒 **Global settings** (which model answers, and similar site-wide choices): unblocked by the model moving to the MICC servers, `#18`; owner `#51`.
-- 🔒 **Student uploads** visible only to their author: unblocked by the thesis author reopening the decision; owner `#36`. They need one nullable `owner` column on `CourseMaterial`, an additive change.

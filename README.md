@@ -54,7 +54,7 @@ A field added as `NOT NULL` without a default has no value in `data/dev.json`; a
 
 ### The check chain
 
-[scripts/check.py](scripts/check.py) is the one definition of what "green" means, locally and in CI. Without arguments it runs every step in order; with names it runs only those, still in chain order:
+[scripts/check.py](scripts/check.py) is the one definition of what "green" means, locally and in CI. Without arguments it runs every step in order; with names it runs only those, in chain order:
 
 ```powershell
 uv run python scripts/check.py              # all eight steps
@@ -65,7 +65,7 @@ uv run python scripts/check.py lint types   # only these two
 | ---- | ---- |
 | `frontend` | biome, `tsc`, catalogue keys, colour contrast, vitest, production build |
 | `lint` · `format` · `types` | `ruff check` · `ruff format --check` · `pyright` |
-| `django` · `migrations` · `deploy` | `manage.py check` · `makemigrations --check` · `check --deploy --fail-level WARNING` |
+| `django` · `migrations` · `deploy` | `manage.py check` · `makemigrations --check --dry-run` · `check --deploy --fail-level WARNING` |
 | `tests` | `pytest --cov`, with the coverage gate |
 
 The chain runs with `DJANGO_DEBUG=false` whatever `.env` says, because that is how CI tests. Why each step is where it is — `frontend` first, the TLS flag only on `deploy` — is written next to the step in the script. Interrupting the `frontend` step on Windows makes `cmd` ask `Terminate batch job (Y/N)?`: answer `Y`.
@@ -99,11 +99,12 @@ Course PDFs go in `data/corpus/<course>/` (gitignored). Every command below is `
 | `answer` | retrieve + generate a cited answer | `"What is an ORM?"` |
 | `agent` | route to course or campus collection, retrieve, answer; deepens by fetching linked pages unless `--no-deepen` | `"Quando scadono le tasse?"` |
 | `gold` | retrieval hit@k over a gold set, or the router's report with `--routing` | `gold\smoke.jsonl` · `gold\campus.jsonl --routing` |
+| `golddraft` | draft campus gold questions from the crawled pages, for review; see [gold/README.md](gold/README.md) before running it again | `data\webchunks --out data\golddraft` |
 | `crawl` | snapshot the campus website (robots honoured, 1 req/s, ≤ 500 pages; run by the user) | `--out data\webcorpus` |
 | `webparse` | parse a crawl snapshot into chunkable artefact pairs | `data\webcorpus\<run_id>` |
 | `live` | fetch one URL, gate it, grow the shared index; `--rollback <run_id>` undoes a run, `--measure-gate` scores the gate | `<url>` |
 
-Parsing writes two files per PDF, `<name>.<profile>.json` (the lossless DoclingDocument) and `<name>.<profile>.meta.json` (provenance); routing rules, measurements and the chunk payload contract are in [docs/docling-pipeline.md](docs/docling-pipeline.md).
+Parsing writes two files per PDF, `<name>.<variant>.json` (the lossless DoclingDocument) and `<name>.<variant>.meta.json` (provenance); routing rules, measurements and the chunk payload contract are in [docs/docling-pipeline.md](docs/docling-pipeline.md).
 
 Embedding and reranking (0.6B each) run on the local GPU, fully offline. Generation calls an OpenAI-compatible endpoint, by default a local Ollama:
 
@@ -116,7 +117,7 @@ The endpoint and model are `LLM_BASE_URL` and `LLM_MODEL` in `.env`; the M3 expe
 
 ## Accounts
 
-Every endpoint needs a session except `GET /api/auth/me`, `login` and `register`, and that includes `POST /api/ask`. The reason is state, not secrecy (the corpus is course material): a conversation belongs to someone, an anonymous caller has no one to attribute it to, and handing out temporary identities would be a second, weaker account system built alongside the first.
+Every endpoint needs a session except `GET /api/auth/me`, `login` and `register`, and that includes `POST /api/ask`: a stored conversation belongs to someone. 🔜 M5 `#93`: anonymous students ask campus questions only, with their history kept in the browser and nothing stored ([docs/decisions.md](docs/decisions.md), 2026-09-25, *The data model is decided on paper*, point 3).
 
 | Method and path | Does |
 | --------------- | ---- |
@@ -178,7 +179,7 @@ The deepening loop is not in this endpoint: it fetches pages and writes to the s
 | `scripts/` | `check.py`, the check chain |
 | `tests/` | pytest. `test_smoke.py` guards the `rag/` boundary and the Django configuration; `test_qa_contract.py` the contract and its mirror; `test_check_script.py` the chain and the workflow that calls it; `test_qa_engine.py` and `test_spa.py` carry no `django_db`, so pytest-django fails them if they touch the database |
 | `gold/` | Gold question sets; schema in [gold/README.md](gold/README.md) |
-| `docs/` | One topic per file: decisions, architecture, the data model, the Docling pipeline, the web source, RAG analysis, the experiment log |
+| `docs/` | One topic per file: decisions, architecture, the security review, the data model, the Docling pipeline, the web source, RAG analysis, the experiment log |
 | `.github/` | `workflows/ci.yml` (the check chain + dependency audit), `workflows/secrets.yml` (gitleaks), `dependabot.yml` |
 | `data/` | Course material and everything derived from it (parsed output, the local Qdrant index): gitignored, **never** in git |
 
@@ -190,7 +191,7 @@ Access and hardware are in [docs/architecture.md](docs/architecture.md). SSH ali
 
 **Storage.** Model caches and datasets go on the NAS home, **not the server's local `/home`** (small, and shared by everyone). The NAS volumes `/andromeda` `/equilibrium` `/fishtank` `/oblivion` are mounted on every server, and personal directories differ per volume: `/oblivion/users/<user>` has `users/`, `/equilibrium/<user>` does not, andromeda and fishtank have none (ask the sysadmin). Check free space before choosing a volume; this project uses `/oblivion/users/jzheng`, with `export HF_HOME=/oblivion/users/jzheng/hf_cache` in the server's `~/.bashrc`. Shared datasets are under `/<volume>/DATASETS`, `/<volume>/datasets` or `/home/DATASETS` (naming differs per machine); datasets in a personal directory get cleaned up by the NAS rules.
 
-**Finishing.** Check `nvidia-smi` for leftover processes of yours and `kill <PID>` them; Jupyter kernels hold GPU memory too. Close idle tmux sessions (`tmux kill-session -t tesi`). Release GPU memory as soon as a run ends.
+**Finishing.** Check `nvidia-smi` for leftover processes of yours and `kill <PID>` them; Jupyter kernels hold GPU memory too. Close idle tmux sessions (`tmux kill-session -t tesi`). Release GPU memory when a run ends.
 
 ## CI
 
