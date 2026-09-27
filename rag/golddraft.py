@@ -6,11 +6,11 @@ nothing in this module writes to `gold/`. Two draft sets come out:
 
 - `campus-draft.jsonl` — questions answerable from pages already indexed,
   stratified over the scope-table sections and cycling EN/IT/ZH so the campus
-  gate can score EN/IT and report ZH (docs/unifi-web-source.md);
+  gate can score EN/IT and report ZH (gold/README.md);
 - `campus-autogrow-draft.jsonl` — questions whose answer pages are known from
   the outlink graph but deliberately NOT ingested (PDF moduli included): the
-  Stage 9 autogrow exam starts from 0/N on these, so they are never scored in
-  PR1.
+  automatic-growth acceptance run starts from 0/N on these, so the campus gate
+  never scores them.
 
 Reference answers land next to the human-written ones in `data/gold/answers/`
 (gitignored — web page excerpts follow the same copyright posture as slides).

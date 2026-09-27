@@ -248,7 +248,7 @@ def main(argv: list[str] | None = None) -> None:
         # `target` names the collection to score against (gold/README.md):
         # slides questions stay single-collection slides, campus questions
         # single-collection unifi_web — the non-regression gates keep constant
-        # semantics; merged pools exist only behind the M2.5b agent router.
+        # semantics; merged pools exist only behind the agent router.
         hits = search(
             client,
             question.question,
@@ -280,7 +280,7 @@ def main(argv: list[str] | None = None) -> None:
     rate = scored / total if total else 0.0
     print(f"hit@{args.top_k}: {scored}/{total} ({rate:.0%})")
     # Per-locale rates carry the campus gate (EN/IT thresholded, ZH reported
-    # without one — docs/unifi-web-source.md); printed only when locales mix.
+    # without one — gold/README.md); printed only when locales mix.
     if len(per_locale) > 1:
         for locale in sorted(per_locale):
             outcomes = per_locale[locale]
