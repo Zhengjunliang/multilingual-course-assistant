@@ -218,7 +218,8 @@ def test_cli_pins_retrieval_to_the_crawl_snapshot_by_default(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Eval reads the frozen crawl snapshot unless told otherwise: a live
-    increment written between two runs must never move a gate number (ADR-1)."""
+    increment written between two runs must never move a gate number (the eval-isolation
+    rule, docs/architecture.md)."""
     calls = record_search_calls(monkeypatch)
     gold_file = tmp_path / "campus.jsonl"
     gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
@@ -317,8 +318,9 @@ def test_live_off_keeps_the_crawl_filter_and_never_touches_the_live_module(
 def test_live_on_opens_the_read_side_filter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """ADR-1's explicit release for the acceptance run: the condition is dropped
-    rather than pointed at "live", because a question may be answered by either
+    """The eval-isolation rule's explicit release (docs/architecture.md) for the
+    acceptance run: the condition is dropped rather than pointed at "live",
+    because a question may be answered by either
     version of a page and the exam scores what the assistant can actually
     retrieve. The filter still travels through `search()`'s prefetch branches —
     a top-level filter is silently ignored under fusion."""

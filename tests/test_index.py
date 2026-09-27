@@ -143,7 +143,8 @@ def test_web_reingest_leaves_no_stale_version_of_the_same_source(client: QdrantC
 
 def test_live_ingest_never_touches_the_crawl_snapshot_version(client: QdrantClient) -> None:
     """Same URL ingested as crawl then as live: both versions coexist and the
-    crawl hash is unchanged — the eval-isolation contract on the write path."""
+    crawl hash is unchanged — the eval-isolation rule (docs/architecture.md) on the
+    write path."""
     index_chunks(client, [make_web_chunk("aa" * 32, "crawl")], StubDense(), StubSparse())
     index_chunks(client, [make_web_chunk("cc" * 32, "live")], StubDense(), StubSparse())
     assert hashes_by_source(client) == {"crawl": {"aa" * 32}, "live": {"cc" * 32}}

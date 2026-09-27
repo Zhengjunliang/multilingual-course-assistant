@@ -36,7 +36,7 @@ Retrieval is unchanged as well: `gold/smoke.jsonl` returns **38/40 (95%)** befor
 
 ### 3. The consequence for reproducibility
 
-Two numbers recorded earlier in this log date from 2026-07-31, when `pypdf` was not a locked dependency and its version was not recorded: the corpus's **~650 000 characters** (entry of 2026-07-31) and the OCR gain on `3.5-HTML5` (**10001 → 20032 characters**, entry of 2026-08-02, section 2). This entry first said they were produced with 6.16.1, the version it upgraded from. They are not wrong, but they **depend on the version of the extraction library**, exactly as generation results depend on the model revision. The version of the parsing stack therefore joins the reproducibility list.
+Two numbers recorded earlier in this log date from 2026-07-31, when `pypdf` was not a locked dependency and its version was not recorded: the corpus's **~650 000 characters** (entry of 2026-07-31) and the OCR gain on `3.5-HTML5` (**10001 → 20032 characters**, entry of 2026-08-02, section 2). This entry first said they were produced with 6.16.1, the version it upgraded from. They are not wrong, but they **depend on the version of the extraction library**, exactly as generation results depend on the model revision. The version of the parsing stack therefore joins the reproducibility list of [architecture.md](architecture.md).
 
 ### 4. The relevance gate: 17/20 — and the finding that the number is not comparable
 

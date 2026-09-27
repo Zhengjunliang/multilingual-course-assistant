@@ -162,7 +162,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
     # Eval reads the frozen crawl snapshot by default: a live increment written
     # between two runs would otherwise move a gate number, and the gates are the
-    # thesis' regression evidence (ADR-1, docs/architecture.md).
+    # thesis' regression evidence (the eval-isolation rule, docs/architecture.md).
     parser.add_argument("--ingest-source", choices=["crawl", "live"], default="crawl")
     parser.add_argument(
         "--snapshot",
@@ -229,9 +229,10 @@ def main(argv: list[str] | None = None) -> None:
             print(f"{label}: {count}/{total} ({count / total if total else 0.0:.0%})")
         return
 
-    # ADR-1's explicit release: the autogrow acceptance has to see the pages the
-    # run just wrote, and the answer may sit in either version of a page, so
-    # `--live on` drops the condition rather than pointing it at "live".
+    # The eval-isolation rule's explicit release (docs/architecture.md): the autogrow
+    # acceptance has to see the pages the run just wrote, and the answer may sit in
+    # either version of a page, so `--live on` drops the condition rather than
+    # pointing it at "live".
     ingest_source = None if args.live == "on" else args.ingest_source
     if ingest_source is None and args.ingest_source != parser.get_default("ingest_source"):
         logger.warning("--live on opens the filter; --ingest-source %s ignored", args.ingest_source)

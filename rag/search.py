@@ -230,7 +230,7 @@ def search(
     pools merge into one candidate pool and the reranker picks the final
     `limit`; without one, fusion order interleaves round-robin (the M3
     no-rerank baseline). The web-source conditions apply only to the
-    `unifi_web` branch (ADR-1, docs/architecture.md): slides prefetches never
+    `unifi_web` branch (the eval-isolation rule, docs/architecture.md): slides prefetches never
     carry them, so slides retrieval semantics cannot drift with web features."""
     pools: list[list[Hit]] = []
     for collection in collections:

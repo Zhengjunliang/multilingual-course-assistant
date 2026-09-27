@@ -184,9 +184,9 @@ def condition_keys(prefetch: Any) -> list[str]:
 
 
 def test_web_source_conditions_reach_only_the_unifi_web_branches() -> None:
-    """ADR-1: `ingest_source` must land inside BOTH unifi_web prefetch
-    branches (a top-level filter is ignored under fusion) and inside NONE of
-    the slides branches."""
+    """The eval-isolation rule (docs/architecture.md): `ingest_source` must land
+    inside BOTH unifi_web prefetch branches (a top-level filter is ignored under
+    fusion) and inside NONE of the slides branches."""
     recorder = RecordingClient()
     search(
         cast("QdrantClient", recorder),
