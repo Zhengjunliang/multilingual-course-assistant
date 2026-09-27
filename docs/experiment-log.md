@@ -315,14 +315,15 @@ Index rebuilt from scratch in the collection `slides` (embedded Qdrant, `data/qd
 
 ### 2. OCR against a VLM on the image-based deck
 
-`3.5-HTML5-Part-2` parsed both ways: OCR **527 s** (measured on 2026-07-31), VLM **1059 s**. The VLM produces more characters (**22621** against **20032**) but fewer distinct words (**671** against **729**), losing technical literals such as `avc1.42e01e`, `autoplay` and `codecs` for narrative words: the VLM paraphrases, OCR transcribes, and BM25 depends on literal tokens. Dead sections: **20** with the VLM, **19** with OCR. OCR doubles what the text layer gives (**10001 → 20032** characters, also measured on 2026-07-31). An empty-page ratio above the threshold therefore routes to `classic + ocr`, not to the VLM.
+`3.5-HTML5-Part-2` parsed both ways: OCR **527 s** (measured on 2026-07-31), VLM **1059 s**. The VLM produces more characters (**22621** against **20032**) but fewer distinct words (**671** against **729**), losing technical literals such as `avc1.42e01e`, `autoplay` and `codecs` for narrative words: the VLM paraphrases, OCR transcribes, and BM25 depends on literal tokens. Dead sections: **20** with the VLM, **19** with OCR. The page header `HTML &amp; CSS` pollutes more with the VLM: it repeats on **21/32** pages with OCR and on **32/32** with the VLM. OCR doubles what the text layer gives (**10001 → 20032** characters, also measured on 2026-07-31). An empty-page ratio above the threshold therefore routes to `classic + ocr`, not to the VLM.
 
-VLM speed: more than **56 s** per page on CPU, **33 s** per page on the laptop GPU with the CUDA build of torch — only **1.7×** faster, because token-by-token decoding is bound by latency, not compute.
+VLM speed: more than **56 s** per page on CPU, **33 s** per page on the laptop GPU with the CUDA build of torch — only **1.7×** faster, because token-by-token decoding is bound by latency, not compute. The classic pipeline runs at about **0.8–0.9 s** per page on CPU.
 
 ### 3. What the default configuration drops
 
 - **Formulas**: `2.1 IMAGES GENERAL CONCEPTS` (**35** pages) shows **1** `formula-not-decoded` placeholder without enrichment and **4** LaTeX formulas with it — three were dropped without even a placeholder. Counting placeholders underestimates the loss.
 - **Images**: in **9** sampled decks (about **322** pages), **63** dead sections — a heading with nothing but `<!-- image -->` under it — and **401** image placeholders (counted on 2026-08-04). Extreme case `3.5`: **19/19** sections dead. This is the denominator of the picture-description ablation (`#28`).
+- **Page furniture**: a genuine section spans **2–4** consecutive slides, far below a repeated header's 21 of 32 pages (section 2; counted on 2026-08-04); this sets the furniture threshold (`furniture_threshold()` in `rag/chunk.py`).
 - **Ligatures**: present in the text layer of **17** PDFs, up to **97** in one (`non-proﬁt`, `conﬁgured`, `micc.uniﬁ.it`); NFKC normalisation in `rag/parse.py` leaves **0**.
 
 ### Reproducibility
