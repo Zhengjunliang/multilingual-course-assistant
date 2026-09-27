@@ -174,19 +174,6 @@ NFKC 归一化（`rag/parse.py` 的 `normalize_text`）在**此步**应用于 `t
 - **页面家具剔除**：标题在 ≥ `max(5, 20% 页数)` 个不同页出现即判为页眉（实测家具 21/32、32/32 页 vs 真章节 2-4 页，两侧余量都大），在 `contextualize()` 前从 chunk 元数据剔除 —— 同一步离开 `heading_path` 与 `embed_text`，文档结构不动。
 - **标题链只进 dense 侧**：`text`（裸正文，BM25 侧）与 `embed_text`（带标题链，dense 侧）分存，见 3.6。
 
-### 3.8 代码形状
-
-```python
-from docling.document_converter import DocumentConverter
-from docling.chunking import HybridChunker
-
-doc = DocumentConverter().convert("slides.pdf").document   # -> DoclingDocument
-chunker = HybridChunker(tokenizer=embedding_tokenizer)     # aligned with Qwen3-Embedding
-for chunk in chunker.chunk(doc):
-    text = chunker.contextualize(chunk)   # heading path + body -> embedding input
-    meta = chunk.meta                     # page / headings / provenance -> payload
-```
-
 ### 3.9 Ingest 全步骤总览
 
 | 步骤 | 状态 | 干什么 | 关键选择 | 出错的表现 |
@@ -242,53 +229,6 @@ sequenceDiagram
 - **RRF 参数与 dense/sparse 权重**：M3 实验变量，不预设（当前 Qdrant RRF 默认，prefetch 每路 20）。
 - **标题链污染缓解**：已定，见 3.7。
 
-## 5. LangChain / LangGraph / LlamaIndex：为什么不用
+## 5. LangChain / LangGraph / LlamaIndex
 
-三者都不提供新能力（解析还是 Docling、向量还是 Qwen3、库还是 Qdrant），提供的是**编排与统一接口**：LangChain 是适配器 + 胶水（LCEL 链），LangGraph 是有状态图编排（循环/分支/断点），LlamaIndex 是 RAG 一体化框架。决策已定（属主 [architecture.md](architecture.md)：自建），理由：
-
-1. **控制流不需要图**：本项目两条 pipeline 都是直线，LangGraph 用在直线流程上是纯抽象税。
-2. **论文要测的正是框架藏起来的**：实验网格（embedding × reranker × LLM 尺寸 × top-k × chunk 策略）在自己代码里是显式变量，在框架里散落在各层默认值里，且框架会悄悄改 prompt、加重试 → 不可复现。
-3. **可解释性 = 论文可写性**：「调了 `as_query_engine()`」不构成章节，「实现 RRF 并对比 k=10/30/50」才是。
-4. **代码量没省多少**：自建量级几百行，每行都懂；框架省的是「接 20 种向量库」的适配成本，本项目只接一种。
-5. **依赖风险**：LangChain API 迭代激进，论文周期内的 breaking change 是纯损耗。
-
-框架真正划算的场景：接十几种数据源随时切换、真 agentic 工作流（LLM 决定是否再检索一轮 —— 带循环的状态机）。对应本项目是 M2.5 的 agent 编排（路由器 → 循环，显式控制流自建，见 [architecture.md](architecture.md) 决策表 agent 编排一行）；自建的线性 pipeline 整体变成其中一个节点，不锁死。**不用 ≠ 不懂** —— 读教程、写相关工作章节、答辩都需要这张对照表：
-
-| 框架术语 | 本项目对应 |
-| --- | --- |
-| `DocumentLoader` | `DocumentConverter().convert()` |
-| `TextSplitter` | `HybridChunker` |
-| `Embeddings` | Qwen3-Embedding，sentence-transformers 本地推理（[rag/index.py](../rag/index.py)） |
-| `VectorStore` / `Retriever` | `qdrant-client`（本地模式 → Docker） |
-| `Chain` / LCEL | 一个普通 Python 函数 |
-| `Graph` / `StateGraph` | 用不上（无循环无分支） |
-| `Callbacks` / tracing | Langfuse 直接接 |
-
-## 6. 术语速查
-
-| 术语 | 一句话 |
-| --- | --- |
-| Chunk | 检索的最小单位；一段带元数据的文本 |
-| Embedding | 文本 → 定长向量，语义相近则向量相近 |
-| Dense / Sparse | 语义向量检索 / BM25 词频检索 |
-| Hybrid + RRF | 两路检索按排名融合 |
-| Bi-encoder | 分别编码，可预计算，快 → 用于检索 |
-| Cross-encoder | 拼一起编码，准但慢 → 用于重排 |
-| Top-k / top-n | 检索候选数 / 重排后进 prompt 的数量 |
-| DocTags | granite-docling 的无损版面标记语言 |
-| Provenance | chunk 在原文的位置（页码、bbox）→ 引用溯源 |
-| Grounding / Faithfulness | 回答是否真的由检索片段支撑，不是编的 |
-| Agentic RAG | LLM 自己编排检索（带循环 / 分支） |
-
-## 7. 落到 M2
-
-| Pipeline 步骤 | 模块 | 实验变量（M3 要调的） |
-| --- | --- | --- |
-| Probe ✅ | [rag/probe.py](../rag/probe.py) | 路由阈值；路由 vs 全经典 vs 全 VLM |
-| Parse ✅ | [rag/parse.py](../rag/parse.py) | 经典 vs VLM；是否开图片描述 |
-| Chunk ✅ | [rag/chunk.py](../rag/chunk.py) | `--max-tokens`（chunk 大小）、是否富化 |
-| Embed + Index 🔜 | 待建 | Qwen3-Embedding 尺寸；hybrid 融合、量化 |
-| Retrieve + Rerank 🔜 | 待建 | top-k、reranker 尺寸 |
-| Generate 🔜 | 待建 | LLM 尺寸、prompt 模板 |
-
-模块划分是职责示意，目录到实现时定（规则见 CLAUDE.md：未定前不建「顺手」目录）。顺序不能反：**先验证解析（✅，见 2.3），再 chunking，再谈检索。**
+Why the pipeline uses none of them, with the mapping from their terms to this project: [rag-analysis.md](rag-analysis.md).
