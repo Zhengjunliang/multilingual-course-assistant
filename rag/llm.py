@@ -1,7 +1,7 @@
 """The one OpenAI-compatible client surface shared by every LLM consumer.
 
-Stateless by design (the agent/live module boundary rule: agent reads, live
-writes, llm holds no state): this module only knows how to talk to the endpoint
+Stateless by design (the module boundary rule, docs/architecture.md: agent reads,
+live writes, llm holds no state): this module only knows how to talk to the endpoint
 configured in `config/env.py` and how to coerce a completion into a validated
 pydantic model. Routing, gating and generation logic live with their owners.
 

@@ -101,7 +101,7 @@ This file owns the decisions taken without the supervisor that are in force: the
 
 1. **`ROADMAP.md` is deleted.** Milestones, blockers and deferred work are GitHub issues, and this file keeps the decisions. Checkboxes and documents own different things: a document says what and why, an issue says what is left and what blocks it, and in one file every step forward edits a document.
 2. **Labels and milestones follow `airjump-booking`** (outside the repository: `Zhengjunliang/airjump-booking`): `chore`, `blocked`, `security-review` and four `severity:` levels, `critical`, `high`, `medium` and `low`. The milestones are five, M3 · M4 · M5 · M6 · M7, and each description states its acceptance goal.
-3. **The security self-review follows OWASP, not ISO 27001.** An ISO or NIST mapping holds where a real audit report stands behind it; this repository has none, so the mapping would be invented. The OWASP Top 10 and the OWASP Top 10 for LLM Applications (outside the repository) assume no audit, and a self-review is their intended use. The coverage — what was checked and judged sound — is owned by [architecture.md](architecture.md); open findings are issues labelled `security-review`.
+3. **The security self-review follows OWASP, not ISO 27001.** An ISO or NIST mapping holds where a real audit report stands behind it; this repository has none, so the mapping would be invented. The OWASP Top 10 and the OWASP Top 10 for LLM Applications (outside the repository) assume no audit, and a self-review is their intended use. The coverage — what was checked and judged sound — is owned by [security.md](security.md); open findings are issues labelled `security-review`.
 
 ## 2026-08-27 — Website delivery (M5)
 

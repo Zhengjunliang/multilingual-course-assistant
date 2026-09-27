@@ -12,7 +12,8 @@ Two branches, and both of them must be able to answer the current turn
   this URL's previous *live* version, upsert, and append one registry row
   naming the trigger and the run, so the whole run rolls back in one call
   (`delete_by_run`). The crawl snapshot version of the same URL is a different
-  (url, ingest_source) pair and is never touched (ADR-1). A page whose bytes
+  (url, ingest_source) pair and is never touched (the eval-isolation rule,
+  docs/architecture.md). A page whose bytes
   have not moved since its last fetch skips all of that: it is already stored;
 - the gate says no, or its reply does not validate -> ephemeral branch: parse
   and chunk exactly the same way, then return the chunks in memory and write
