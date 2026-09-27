@@ -40,8 +40,6 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 
 **Documents are in English.** The repository's markdown and its GitHub issues are written in English and maintained in place, **with no parallel translations** — two languages would mean keeping the same content twice. The thesis body and its delivery attachments are written in Italian outside the repository. Talk to the user in Chinese (agent rule 5). Decision and reasons: `docs/decisions.md`, 2026-09-23.
 
-🔶 **Partial** — the rule applies at once to everything new or rewritten; existing documents are migrated under **issue #43**, which owns the list of files and their state.
-
 **Map** — the root files, `docs/` and `gold/README.md`. No other plan or checklist files anywhere in the repository:
 
 | File | Contents |
