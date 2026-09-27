@@ -205,7 +205,7 @@ sequenceDiagram
     Q-->>API: top-k candidates
     API->>R: score (question, candidate) pairs
     R-->>API: top-n
-    Note over API: only rag.agent on the command line deepens here; /api/ask does not (🔜 M5 #34)
+    Note over API: only rag.agent on the command line deepens here; /api/ask does not
     API-->>U: SSE start: locale, route, sources
     API->>LLM: system + excerpts + question
     LLM-->>API: streamed tokens
