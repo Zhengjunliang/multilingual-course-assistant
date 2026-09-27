@@ -300,7 +300,7 @@ def test_a_question_is_answered_from_the_index(index: QdrantClient) -> None:
 
 
 def test_the_stream_names_its_events_in_order(index: QdrantClient) -> None:
-    """The shape Stage 4 is written against: context, then prose, then a
+    """The shape the frontend is written against: context, then prose, then a
     terminator that says the answer is whole."""
     install_engine(index, SLIDES_ROUTE, ["An ORM ", "maps objects."])
     assert names(events(ask())) == ["start", "token", "token", "end"]

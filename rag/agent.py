@@ -248,7 +248,7 @@ def route(question: str, completer: Completer, history: Sequence[Turn] = ()) -> 
     conversation turns. The system prompt above demands a bare JSON object, and
     an `assistant` message holding prose is a demonstration of the opposite; the
     measured cost of a mis-taught router is `route` falling back to `both` on
-    questions it used to place, which is the M2.5b fallback count moving off
+    questions it used to place, which is the router's fallback count moving off
     zero without a single test noticing.
 
     With no history the two messages below are byte for byte what they were when

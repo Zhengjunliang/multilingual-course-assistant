@@ -124,7 +124,7 @@ logger = logging.getLogger(__name__)
 # the 60s step clock would come back PARTIAL_SUCCESS — readable this turn,
 # never storable — for exactly the long documents worth fetching. The parse
 # step therefore gets its own budget with headroom over that worst case, while
-# the per-step wall clock the deepening loop enforces (Stage 8) stays at 60.
+# the per-step wall clock the deepening loop enforces stays at 60.
 LIVE_MAX_PDF_PAGES = 40
 STEP_TIMEOUT_SECONDS = 60
 PDF_PARSE_TIMEOUT_SECONDS = 120
@@ -217,7 +217,7 @@ class ParsedPage:
 class LiveResult:
     """One live fetch: whether it grew the shared index, the chunks this turn
     can answer from either way, the page's outlinks (the deepening loop's
-    candidates, so Stage 8 never refetches to get them) and the gate's verdict.
+    candidates, so the loop never refetches to get them) and the gate's verdict.
 
     `persisted` answers "is this page in the shared index", `stored_now` answers
     "did this fetch put it there" — and the two really do come apart in both
@@ -365,7 +365,7 @@ def maybe_unload_llm(base_url: str, model: str) -> None:
 # shared for a different reason: a fresh `Throttle` starts with `_last = 0.0`,
 # so a per-call instance never waits and the 1 req/s promise would hold only
 # within a single call, while a per-call `RobotsCache` refetches robots.txt for
-# every page. Stage 8's loop injects this same pair rather than making its own.
+# every page. The deepening loop injects this same pair rather than making its own.
 
 
 @lru_cache(maxsize=1)
@@ -627,7 +627,7 @@ def run_gate_measurement(
 ) -> int:
     """Score the gate against the frozen annotation set, one row at a time.
 
-    This is the Stage 7 measurement: at least 18 of 20 keeps the LLM gate,
+    This is the gate's measurement: at least 18 of 20 keeps the LLM gate,
     below that the design degrades to the ScopeRule table — a finding to record
     in the experiment log, never a silent fix. Nothing is parsed or stored here; a row
     whose page cannot be fetched still scores, with the reason printed.

@@ -59,7 +59,7 @@ class ParsedMeta(BaseModel):
     course: str
     seconds: float
     parsed_at: str
-    # Web-source provenance (M2.5), threaded through to the chunk payload.
+    # Web-source provenance, threaded through to the chunk payload.
     # All optional with defaults so every sidecar already on disk stays valid;
     # the PDF path never sets them (a legal terminal state, not missing data).
     # Field semantics are owned by docs/docling-pipeline.md.

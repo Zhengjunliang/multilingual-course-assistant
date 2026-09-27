@@ -233,7 +233,7 @@ def main(argv: list[str] | None = None) -> None:
                 urls=[sample.url],
             )
         )
-        answers[row_id] = f"# {row_id}\n\n{draft.answer}\n\nFonte: {sample.url}\n"
+        answers[row_id] = f"# {row_id}\n\n{draft.answer}\n\nSource: {sample.url}\n"
         logger.info("%s [%s] %s", row_id, locale, draft.question)
     drafted = (
         0
@@ -262,8 +262,8 @@ def main(argv: list[str] | None = None) -> None:
             )
         )
         grow_answers[row_id] = (
-            f"# {row_id}\n\n{draft.answer}\n\nFonte attesa (non ancora nel KB): {url}\n"
-            f"Ancora: {anchor}\nDa verificare al primo fetch (Stage 9).\n"
+            f"# {row_id}\n\n{draft.answer}\n\nExpected source (not in the index yet): {url}\n"
+            f"Anchor: {anchor}\nTo verify at the first fetch.\n"
         )
         logger.info("%s [%s] %s", row_id, locale, draft.question)
     grown = write_drafts(

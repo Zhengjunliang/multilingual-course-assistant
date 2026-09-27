@@ -213,7 +213,7 @@ def main(argv: list[str] | None = None) -> None:
         action="append",
         default=None,
         help="collection to retrieve from; repeat for a merged pool (default: slides). "
-        "The M2.5b agent router will pick this automatically",
+        "rag.agent's router picks it automatically",
     )
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
