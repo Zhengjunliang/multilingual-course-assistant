@@ -1,55 +1,66 @@
-# Gold set — 冒烟版（M2）+ campus（M2.5）
+# Gold sets
 
-`smoke.jsonl`：30–50 个 EN→EN 问答对，人工撰写，chunk 大小 / top-k / prompt 的调参依据。M3 扩为全量（`#19`；抽样与校验方法归 [docs/architecture.md](../docs/architecture.md) 评估方法一行）。
+The questions that retrieval and routing are scored on, and the relevance gate's labelled set. This file owns their schema, the id prefixes, the writing rules and the acceptance thresholds; `rag/gold.py`, `rag/golddraft.py` and `rag/live.py` cite it.
 
-campus 集（M2.5，LLM 起草 → Claude 逐题核对 → 人工按 URL 抽查定稿）：
+| File | Prefix | Size | What it is | How it was written |
+| --- | --- | --- | --- | --- |
+| `smoke.jsonl` | `q` | 40 questions, all EN | course questions over the 31 decks, the tuning signal for chunk size, top-k and prompt | drafted by an LLM from the chunks, then checked by hand against the cited page |
+| `control.jsonl` | `k` | 5 questions, EN | a control group against lexical leakage between a question's wording and the indexed text | written directly from the original PDFs, without looking at the chunks |
+| `campus.jsonl` | `c` | 32 questions: EN 12 · IT 13 · ZH 7 | campus questions, scored by URL | drafted by `rag.golddraft` from pages in the index, checked by Claude row by row, then sampled by URL by the author |
+| `campus-autogrow.jsonl` | `g` | 7 questions | questions whose answer pages are deliberately **not** in the index (form PDFs included), for the automatic-growth acceptance run | drafted by `rag.golddraft` from the outlink graph, checked the same way |
+| `relevance-gate.jsonl` | — | 20 URLs: 10 relevant, 10 irrelevant | the relevance gate's labelled set; not questions (section below) | drafted by an LLM, checked by Claude, sampled by the author |
 
-- `campus.jsonl` — 校园信息题（it/en/zh 混合），按 URL 判分；验收门 EN/IT hit@5 ≥ 0.80，ZH 单独报告
-- `campus-autogrow.jsonl` — 答案页**故意不在库里**的题（含 modulo PDF 题），M2.5b 自增长验收用（先 0/N，跑完流程 ≥⌈0.7N⌉），PR1 不跑分
-- `relevance-gate.jsonl` — M2.5b 相关性门标注集（见下方专节；**非本页 GoldQuestion schema，不可传给 `rag.gold`**）
+**Acceptance thresholds**, owned here:
 
-## 存放
+- **Campus set**: hit@5 ≥ 0.80 for EN and for IT, each on its own; ZH is reported without a threshold. `rag.gold` prints per-locale rates when a set mixes locales.
+- **Automatic growth**: from 0/N before the run to at least ⌈0.7 N⌉ after it (5 of the 7 questions).
+- **Relevance gate**: at least 18 of the 20 labels.
 
-- **问题 + 引用**：本目录 `*.jsonl`，进 git（问题为原创撰写，无版权问题）。
-- **参考答案**（含课件/网页原文摘录）：`data/gold/answers/<id>.md`，gitignore，**永不进 git**。
+The measured values are in [docs/experiment-log.md](../docs/experiment-log.md), entries of 2026-08-24 and 2026-09-14; the automatic-growth remeasurement is 🔜 M3 `#24`, and a gate measurement that can be repeated needs frozen page content (`#83`). The course side of the gold sets is English only: the set covering both scenarios in EN, IT and ZH is 🔜 M3 `#19`.
 
-## 格式
+## Storage
 
-`smoke.jsonl` 一行一题：
+- **Questions and references**: the `*.jsonl` files here, in git (the questions are original writing).
+- **Reference answers**, which quote slides or web pages: `data/gold/answers/<id>.md`, gitignored and **never** in git.
+- `rag.golddraft` writes its draft answers into `data/gold/answers/` and numbers its drafts from 1 on every run, so running it again overwrites the reviewed `c` and `g` answers. Point a new run elsewhere with `--answers-dir`.
+
+## Question format
+
+One question per line, for example the first row of `smoke.jsonl`:
 
 ```json
-{"id": "q001", "locale": "en", "question": "...", "source_file": "2-orm_django_2025.pdf", "page": 12, "answer_ref": "data/gold/answers/q001.md"}
+{"id": "q001", "locale": "en", "question": "What is an Object-Relational Mapping and what problem does it solve?", "source_file": "2-orm_django_2025.pdf", "page": 11, "answer_ref": "data/gold/answers/q001.md"}
 ```
 
-| 字段 | 说明 |
+| Field | Meaning |
 | --- | --- |
 | `id` | A prefix and three digits. One prefix per set: `q` smoke, `k` control, `c` campus, `g` campus-autogrow; ids are unique across all sets, because answers are named by id in one directory (`tests/test_gold.py`) |
-| `locale` | 提问语言；冒烟版全部 `en`，跨语言题（`it`/`zh`）🔜 M2.5/M3 |
-| `question` | 学生视角的自然提问，不抄课件原句 |
-| `source_file` | 答案所在 PDF 文件名（`data/corpus/PPM/` 下的原名）；campus 题省略（默认 `""`） |
-| `page` | 答案主要出处页（1-based，与 chunk payload 的 `page` 同义）；campus 题省略（默认 `0`） |
-| `answer_ref` | 参考答案文件相对仓库根的路径 |
-| `target` | 路由标签（agent 应查哪个库）；可省，默认 `slides`；campus 题写 `unifi_web` |
-| `urls` | campus 题的 ground truth：命中 = top-k 里任一 web chunk 的 `url` ∈ 此列表（尾斜杠不敏感）。带 `urls` 的题按 URL 判分，不看 `source_file`/`page`。同一答案存在于多个页面时列出所有**核实过的**等价页（多参考；只加验证过含答案的页，不加"检索碰巧返回的"页） |
+| `locale` | the question's language: `en` in smoke and control; `en`, `it` or `zh` in the campus sets |
+| `question` | a student's natural question, not a sentence copied from a slide |
+| `source_file` | the PDF that holds the answer, by its name under `data/corpus/PPM/`; `""` for campus questions |
+| `page` | the answer's main page (1-based, the same meaning as the chunk payload's `page`); `0` for campus questions |
+| `answer_ref` | the reference answer's path, relative to the repository root (the commands run from there) |
+| `target` | `slides` (the default when absent) or `unifi_web`: the collection the router should choose, and the one the question is scored against — `rag.gold` searches that single collection, so the non-regression gates keep a constant meaning (`rag/gold.py`) |
+| `urls` | the ground truth of a campus question: a hit is any web chunk in the top k whose `url` is in the list (a trailing slash is ignored). A question with `urls` is scored by URL, never by `source_file` or `page`. When the answer is on several pages, every **verified** equivalent page is listed — never a page that retrieval merely happened to return |
 
-## relevance-gate.jsonl（M2.5b 相关性门标注集）
+## relevance-gate.jsonl
 
-**不是 GoldQuestion**：缺 `id`/`question`/`answer_ref` 必填项，传给 `uv run python -m rag.gold` 会校验报错。唯一消费方 = M2.5b Stage 7 相关性门质量测量（真机 ≥18/20，先 commit 冻结再测）。20 条 URL 全部取自 `data/webcorpus/registry.jsonl` 出链图的未爬候选（LLM 起草 → Claude 逐条核对 → 用户抽查定稿）。
+**Not a gold question**: it has no `id`, `question` or `answer_ref`, and `rag.gold` rejects it by design (`GateRow` in `rag/live.py`). Its one consumer is `uv run python -m rag.live --measure-gate`. The 20 URLs are uncrawled candidates from the outlink graph in `data/webcorpus/registry.jsonl`, and the set is frozen by a commit of its own before any measurement.
 
 ```json
-{"url": "https://...", "label": "relevant", "note": "为何该入库/不该入库"}
+{"url": "https://...", "label": "relevant", "note": "why the page should or should not be stored"}
 ```
 
-| 字段 | 说明 |
+| Field | Meaning |
 | --- | --- |
-| `url` | 待判定页面；10 相关（含 DSU/CISIA/PDF 边界例）+ 10 无关（含商业页与 unifi 域内登录页硬负例） |
-| `label` | `relevant`（应持久入库）/ `irrelevant`（不入库）——判据是「内容值得进校园 KB」，不是域名 |
-| `note` | 标注理由，人工抽查与 M3 错误分析用 |
+| `url` | the page to judge: 10 relevant (DSU, CISIA and a PDF among the borderline cases) and 10 irrelevant (commercial pages, and login pages inside the unifi domain as hard negatives) |
+| `label` | `relevant` (should be stored) or `irrelevant` (should not); the criterion is whether the content belongs in the campus knowledge base, not the domain |
+| `note` | the reason for the label, for sampling checks and error analysis |
 
-## 撰写规则
+## Writing rules
 
-1. 每题必须能在 `source_file` + `page` 指向的位置找到依据；写题时先翻到那一页。
-2. 按文件/主题分层：31 份 deck 尽量都有题，避免题目只覆盖解析得好的部分。
-3. 问题风格多样化：定义（what is）、对比（difference between）、操作（how to）、代码理解各占一部分。
-4. 参考答案写要点 + 课件原文摘录（便于人工判卷），不写成完整作文。
-5. 一题一个主出处；确实跨页的，`page` 取起始页，答案文件里注明其余页码。
+1. Every course question has its answer at `source_file` + `page`: open that page before writing the question. Every campus question has its answer on each page in `urls`.
+2. Stratify by file and topic: every one of the 31 decks should have questions, so the set does not cover only the parts that parse well.
+3. Vary the style: definitions (what is), comparisons (difference between), procedures (how to) and reading code, each a share.
+4. A reference answer is key points plus source excerpts (easy to grade by hand), not an essay.
+5. One main source per question; when an answer truly spans pages, `page` is the first and the answer file names the others.
