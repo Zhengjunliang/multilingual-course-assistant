@@ -207,7 +207,7 @@ def main(argv: list[str] | None = None) -> None:
                 "routing report is LLM-only; retrieval flags ignored: %s", ", ".join(overridden)
             )
         # Fixed seed: the run-twice-identical gate must not rest on greedy
-        # decoding alone; recorded in diario at Stage 9.
+        # decoding alone; recorded in docs/experiment-log.md, entry of 2026-08-24.
         report = routing_report(
             questions,
             build_completer(

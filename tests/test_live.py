@@ -264,7 +264,7 @@ def test_an_unchanged_page_is_never_re_parsed_or_written_twice(
     with caplog.at_level("INFO"):
         again = ingest(web_client, fetcher, RELEVANT, registry)
 
-    # The wording is diario evidence: a skip must say so, not "persisted".
+    # The wording is experiment-log evidence: a skip must say so, not "persisted".
     assert "unchanged since" in caplog.text
     assert fetcher.requested.count(URL) == 2
     assert again.persisted is True  # stored, it simply did not have to be written again
@@ -293,7 +293,7 @@ def test_changed_content_replaces_the_stored_version_and_appends_a_row(
     with caplog.at_level("INFO"):
         result = ingest(web_client, StubFetcher(updated), RELEVANT, registry)
 
-    assert "content changed" in caplog.text  # the diario's changed-count reads this
+    assert "content changed" in caplog.text  # the experiment log's changed-count reads this
     assert result.persisted is True
     assert result.chunks
     assert len(recorded_deletes) == 2
