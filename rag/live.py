@@ -595,7 +595,7 @@ def fetch_and_ingest(
         # found no points for them, so the run that wrote them was rolled back
         # (`delete_by_run` deletes points, never rows). That is the acceptance
         # protocol's main path, and calling it "content changed" would put a
-        # change in the diario that never happened.
+        # change in the experiment log that never happened.
         change = "reindexed after rollback"
     logger.info("%s: %s, %d chunks persisted under %s", url, change, len(parsed.chunks), run_id)
     return LiveResult(
@@ -628,7 +628,7 @@ def run_gate_measurement(
 
     This is the Stage 7 measurement: at least 18 of 20 keeps the LLM gate,
     below that the design degrades to the ScopeRule table — a finding to record
-    in the diario, never a silent fix. Nothing is parsed or stored here; a row
+    in the experiment log, never a silent fix. Nothing is parsed or stored here; a row
     whose page cannot be fetched still scores, with the reason printed.
     """
     rows = load_gate_rows(labeled_path)
@@ -720,7 +720,7 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     # Fixed seed: the run-twice-identical gate must not rest on greedy decoding
-    # alone; recorded in diario at Stage 9.
+    # alone; recorded in docs/experiment-log.md, entry of 2026-08-24.
     completer = build_completer(
         env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0, seed=0
     )

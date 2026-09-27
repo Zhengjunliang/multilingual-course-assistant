@@ -36,7 +36,7 @@ Retrieval is unchanged as well: `gold/smoke.jsonl` returns **38/40 (95%)** befor
 
 ### 3. The consequence for reproducibility
 
-Two numbers recorded in [architecture.md](architecture.md), section «语料与交付范围», were produced with `pypdf` 6.16.1: the corpus's **~650 000 characters** and the OCR gain on `3.5-HTML5` (**10001 → 20032 characters**). They are not wrong, but they **depend on the version of the extraction library**, exactly as generation results depend on the model revision. The version of the parsing stack therefore joins the reproducibility list.
+Two numbers recorded earlier in this log date from 2026-07-31, when `pypdf` was not a locked dependency and its version was not recorded: the corpus's **~650 000 characters** (entry of 2026-07-31) and the OCR gain on `3.5-HTML5` (**10001 → 20032 characters**, entry of 2026-08-02, section 2). This entry first said they were produced with 6.16.1, the version it upgraded from. They are not wrong, but they **depend on the version of the extraction library**, exactly as generation results depend on the model revision. The version of the parsing stack therefore joins the reproducibility list.
 
 ### 4. The relevance gate: 17/20 — and the finding that the number is not comparable
 
@@ -220,11 +220,51 @@ The infrastructure, on the other hand, was entirely validated in the field: the 
 
 Two complete runs with live writes and rollbacks left the snapshot untouched: the read/write split (the `ingest_source` filter in the prefetch branches; deletion bound to `(url, ingest_source)`) is verified end to end.
 
+### 5. Routing accuracy on the campus set
+
+The router (`route()` in `rag/agent.py`) was scored on the 32 questions of `gold/campus.jsonl`: **exact 22/32 · wide 26/32**, `both` chosen 4 times, 0 fallbacks, identical over two runs. *Exact* counts a routed target equal to the question's `target`, so `both` is a miss; *wide* accepts any routed set that contains the target (`RoutingReport` in `rag/gold.py`). The router prompt measured is pinned by its hash in `tests/test_agent.py` (`ROUTER_PROMPT_SHA256`): changing the prompt requires rerunning this report in the same commit. The figure is single-turn (entry of 2026-08-27, section 2).
+
 ### Reproducibility
 
 **Measured configuration**: every figure in this entry comes from commit `ee15f37`; both arms ran on the same tree (no code change between the two runs). Afterwards, **without remeasuring**, two design defects the run itself exposed were fixed: the candidate choice admits an explicit refusal ("none of the candidates can contain the answer"), and candidates are traced back through the `referrer_url` when the retrieval hits are PDFs without outlinks. Both fixes stand on their own — a forced choice writes into the shared knowledge base pages the model itself calls irrelevant; a blind graph shuts a whole class of questions out of deepening — but **their effect on the score is not measured**. The remeasurement runs in M3 on the size grid (`#24`): a comparison with the 0/7 here has to keep in mind that two variables changed together (the fixes and the model size).
 
-Gate: `uv run python -m rag.live --measure-gate` (labels in `gold/relevance-gate.jsonl`). Run: `uv run python -m rag.agent "<question>" --question-id gNNN --run-id live-<id>` for the seven questions of `gold/campus-autogrow.jsonl`; scoring with `uv run python -m rag.gold gold/campus-autogrow.jsonl --live on`; rollback with `uv run python -m rag.live --rollback <run_id>`. Decision log per question in `data/webcorpus/decisions.jsonl` (outside the repository). Models: Qwen3-Embedding-0.6B (CPU for the live branch), the Qwen3 0.6B reranker, LLM `qwen3:4b-instruct-2507-q4_K_M` through Ollama, `temperature=0.0`, `seed=0`.
+Gate: `uv run python -m rag.live --measure-gate` (labels in `gold/relevance-gate.jsonl`). Run: `uv run python -m rag.agent "<question>" --question-id gNNN --run-id live-<id>` for the seven questions of `gold/campus-autogrow.jsonl`; scoring with `uv run python -m rag.gold gold/campus-autogrow.jsonl --live on`; rollback with `uv run python -m rag.live --rollback <run_id>`. Routing report: `uv run python -m rag.gold gold/campus.jsonl --routing`. Decision log per question in `data/webcorpus/decisions.jsonl` (outside the repository). Models: Qwen3-Embedding-0.6B (CPU for the live branch), the Qwen3 0.6B reranker, LLM `qwen3:4b-instruct-2507-q4_K_M` through Ollama, `temperature=0.0`, `seed=0`.
+
+## 2026-08-23 — Outlinks and candidate ranking for the deepening loop
+
+### 1. How many links a page offers
+
+In the registry of the two seed crawls, a page has a median of **79** non-PDF outlinks (p90 **138**, max **232**; all outlinks: **83 / 143 / 640**), and PDF outlinks reach p90 **9** and max **408**. A cap of 10 candidates drops about nine links in ten, so the ranking has to be explicit rather than follow DOM or registry order; the rule is in [unifi-web-source.md](unifi-web-source.md). Every attachment row in the registry on 2026-08-24 (**132/132**: 127 from the first crawl, 5 written live by the run `live-stage9-nodeepen`) appears among its carrier page's outlinks, which is why pages the retrieval returned are excluded from the candidates.
+
+### 2. Offline ranking quality
+
+On the gold questions with their real carrier pages: g001's correct PDF ranks **2/32**, with a margin of **+0.267** at the top-5 boundary; g002's ranks **3/40**, margin **+0.056**. Both are inside the top 5, so none of the named fallbacks (lexical pre-filter, GPU encoding window, anchor-vector cache) was needed. g002's thin margin is a known weak point: a sibling PDF on the same page has a word-for-word identical anchor, and the only distinguishing signal is the DOM section heading, which `extract_links` does not collect (`#23`).
+
+### Reproducibility
+
+Registry `data/webcorpus/registry.jsonl` of the 2026-08-22 crawls (outside the repository); ranking by `narrow_candidates()` in `rag/agent.py` with the CPU dense encoder, as of commit `52cd016`, which recorded these figures. No CLI runs the ranking on its own, and the counting method behind the outlink statistics was not recorded; the registry has grown with live rows since.
+
+## 2026-08-22 — Two seed crawls of the campus website
+
+### 1. The crawls
+
+| Run | Site sections | Items fetched | At the 500-item cap |
+| --- | --- | --- | --- |
+| `crawl-20260822-143647` | `ingegneria` **497** (**370** pages + **127** PDFs) · `servizi` **1** | **498** | 940 URLs left in the queue |
+| `crawl-20260822-164843` | `servizi` **327** · `mobilita` **74** · `international` **99** | **500** pages | 2101 URLs left in the queue |
+
+Together: **998** items (**871** pages and **127** PDFs) over 4 site sections, indexed as **29098 points** in `unifi_web` — the count the evaluation isolation and every rollback are checked against (entry of 2026-08-24). The figures first recorded ("497 pages + 127 PDFs", `servizi` 328, 501 pages in the second run) counted the PDFs twice and summed `servizi` over both runs; the numbers above are read from each run's `manifest.json` and from the registry. Office attachments are not followed: the **46** found in the first crawl were all blank application-form templates.
+
+### Reproducibility
+
+```bash
+uv run python -m rag.crawl --out data/webcorpus --sections servizi,mobilita,international    # the second run
+uv run python -m rag.webparse data/webcorpus/<run_id>
+uv run python -m rag.chunk data/webparsed/<run_id> --out-dir data/webchunks/<run_id>
+uv run python -m rag.index data/webchunks/<run_id> --collection unifi_web
+```
+
+The first run used an earlier scope table, recorded in its manifest (`ingegneria` `/`, `international` `/international`, `servizi` `/vp-`; no `mobilita`), so the current `DEFAULT_SCOPE` reproduces the second run only. Snapshots in `data/webcorpus/` (outside the repository); code as of commit `20ab9f2`.
 
 ## 2026-08-21 — Full corpus indexing, the extended gold set, local generation
 
@@ -266,3 +306,36 @@ The first end-to-end check of the retrieval → generation chain running entirel
 ### Reproducibility
 
 Index rebuilt from scratch in the collection `slides` (embedded Qdrant, `data/qdrant/`); gold sets versioned in `gold/smoke.jsonl` and `gold/control.jsonl`; reference answers (copyrighted excerpts) outside the repository in `data/gold/answers/`. Generation model: `qwen3:4b-instruct-2507-q4_K_M` through Ollama 0.32.15, endpoint `http://localhost:11434/v1`.
+
+## 2026-08-02 — Adaptive parsing routes, and OCR against a VLM
+
+### 1. Routing over the 31 documents
+
+`rag/probe.py` reads four signals from the PDF structure without loading a model or rendering a page — text per page, share of empty pages, image objects, font table — and routes each file: `classic + ocr` **1** document (`3.5-HTML5-Part-2`, **16 of 32** pages nearly empty), `classic + formula` **4** (the image and video compression decks), `classic` **26**. No false positive; **27/31** documents skip the formula model and **30/31** skip OCR. The thresholds are this corpus's measured values (`EMPTY_PAGE_CHARS = 50`, `NEEDS_VISION_RATIO = 0.3`); the rules are in [docling-pipeline.md](docling-pipeline.md).
+
+### 2. OCR against a VLM on the image-based deck
+
+`3.5-HTML5-Part-2` parsed both ways: OCR **527 s** (measured on 2026-07-31), VLM **1059 s**. The VLM produces more characters (**22621** against **20032**) but fewer distinct words (**671** against **729**), losing technical literals such as `avc1.42e01e`, `autoplay` and `codecs` for narrative words: the VLM paraphrases, OCR transcribes, and BM25 depends on literal tokens. Dead sections: **20** with the VLM, **19** with OCR. OCR doubles what the text layer gives (**10001 → 20032** characters, also measured on 2026-07-31). An empty-page ratio above the threshold therefore routes to `classic + ocr`, not to the VLM.
+
+VLM speed: more than **56 s** per page on CPU, **33 s** per page on the laptop GPU with the CUDA build of torch — only **1.7×** faster, because token-by-token decoding is bound by latency, not compute.
+
+### 3. What the default configuration drops
+
+- **Formulas**: `2.1 IMAGES GENERAL CONCEPTS` (**35** pages) shows **1** `formula-not-decoded` placeholder without enrichment and **4** LaTeX formulas with it — three were dropped without even a placeholder. Counting placeholders underestimates the loss.
+- **Images**: in **9** sampled decks (about **322** pages), **63** dead sections — a heading with nothing but `<!-- image -->` under it — and **401** image placeholders (counted on 2026-08-04). Extreme case `3.5`: **19/19** sections dead. This is the denominator of the picture-description ablation (`#28`).
+- **Ligatures**: present in the text layer of **17** PDFs, up to **97** in one (`non-proﬁt`, `conﬁgured`, `micc.uniﬁ.it`); NFKC normalisation in `rag/parse.py` leaves **0**.
+
+### Reproducibility
+
+`uv run python -m rag.probe data\corpus\PPM` for the routing; `uv run python -m rag.parse "data\corpus\PPM\3.5-HTML5-Part-2--CSS-Positioning-Classic-Part-1.pdf" --profile manual --pipeline vlm` against the default route for the comparison. Code as of commits `aaf93da` and `f171b6f`; `pypdf` 6.14.2 (`uv.lock` at `aaf93da`). The nine sampled decks were not listed in the record.
+
+## 2026-07-31 — The corpus measured
+
+- **Size**: **31** PDFs, about **1200** pages and **650 000** characters, in `data/corpus/PPM/` (outside git: copyrighted material).
+- **Language**: English in about **23** (Django, Docker, JavaScript, image and video compression, REST, Flask), Italian or mixed in about **8** (`3.1-web-intro-html`, `3.6`–`3.8`, `HTML5_tag_semantici`). Languages also mix inside one file, which is why `locale` is a chunk field.
+- **Text layer**: present in all **31**; no scanned document.
+- **OCR on a document that has a text layer is waste**: a **28**-page deck gives the same output with and without OCR (**11040** characters) in **43.8 s** against **27.0 s**, so OCR costs **62%** more time for nothing. `do_ocr` is off by default in `rag/parse.py`, against Docling's own default.
+
+### Reproducibility
+
+Measured with `pypdf` over `data/corpus/PPM`, before it was a locked dependency, so its version was not recorded (commit `fb00303` records the figures); `uv run python -m rag.probe data\corpus\PPM` reproduces the page and text-layer counts. The 28-page deck of the OCR comparison was not named in the record.

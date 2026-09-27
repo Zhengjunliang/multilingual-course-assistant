@@ -779,7 +779,7 @@ def main(argv: list[str] | None = None) -> None:
     run_id = args.run_id or "live-" + datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
 
     # Fixed seed: the run-twice-identical gate must not rest on greedy decoding
-    # alone; recorded in diario at Stage 9.
+    # alone; recorded in docs/experiment-log.md, entry of 2026-08-24.
     completer = build_completer(
         env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0, seed=0
     )
