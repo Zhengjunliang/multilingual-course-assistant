@@ -74,7 +74,7 @@ class ScopeRule(BaseModel):
 
 # Seed sections, kept in sync with the table in docs/unifi-web-source.md.
 # Each path_prefix must be a real page: it doubles as the link-BFS seed URL
-# (calibrated against the live site at the Stage 3.5 handover).
+# (calibrated against the live site).
 DEFAULT_SCOPE = (
     ScopeRule(section="ingegneria", host="ingegneria.unifi.it"),
     ScopeRule(section="servizi", host="www.unifi.it", path_prefix="/it/studia-con-noi"),

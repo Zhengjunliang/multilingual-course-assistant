@@ -170,7 +170,8 @@ class Chunk(BaseModel):
     `embed_text` is the heading-contextualized version — the dense side only, so a
     heading chain can help semantic retrieval without polluting lexical matching.
     Provenance fields exist so M3 can attribute every chunk to its parse
-    configuration and corpus snapshot; they cannot be backfilled once indexed.
+    configuration and corpus snapshot; a field added later costs a relabel
+    pass over the index (`set_payload`) or a reindex.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -188,7 +189,7 @@ class Chunk(BaseModel):
     parse_variant: str
     docling_version: str
     source_sha256: str
-    # Web-source provenance (M2.5). All optional with defaults so every payload
+    # Web-source provenance. All optional with defaults so every payload
     # already in the index and every slides chunk stays valid: for slides,
     # `kind` is "slides" and the rest is None — a legal terminal state, not
     # missing data. Replacement granularity for web chunks is the
@@ -209,9 +210,9 @@ def furniture_threshold(num_pages: int) -> int:
     """A heading repeated on this many distinct pages is page furniture.
 
     Corpus evidence: the repeated page header `HTML &amp; CSS` shows up on 21/32
-    and 32/32 pages of the decks it pollutes, while genuine sections span 2-4
-    consecutive slides. 20% of the document with a floor of 5 separates the two
-    with a wide margin either side.
+    pages of `3.5-HTML5-Part-2` parsed with OCR and on 32/32 parsed with the VLM,
+    while genuine sections span 2-4 consecutive slides. 20% of the document with a
+    floor of 5 separates the two with a wide margin either side.
     """
     return max(5, ceil(num_pages / 5))
 

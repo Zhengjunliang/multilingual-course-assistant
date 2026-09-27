@@ -243,9 +243,8 @@ def delete_by_run(client: QdrantClient, run_id: str, collection: str = WEB_COLLE
     condition plus one mistyped run id would delete a frozen crawl snapshot
     that no rollback can restore. With `ingest_source == "live"` welded into
     the filter, a crawl run id deletes exactly zero points — the eval-isolation
-    rule of docs/architecture.md ("live never touches the crawl snapshot")
-    enforced at the predicate, the same reason `delete_web_versions` is scoped
-    by pair.
+    rule of docs/architecture.md enforced at the predicate, the same reason
+    `delete_web_versions` is scoped by pair.
     """
     from qdrant_client import models
 

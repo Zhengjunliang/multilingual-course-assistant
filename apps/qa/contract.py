@@ -30,7 +30,7 @@ A stream is one `start`, any number of `token`s, and one terminator::
 treat both the same way instead of inferring failure from a sentence that
 happens to end mid-word.
 
-This module is the single source for that shape. Stage 4 (the SPA) reads it:
+This module is the single source for that shape. The frontend reads it:
 adding a field is additive there, renaming one breaks it.
 """
 

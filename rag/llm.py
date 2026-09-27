@@ -16,7 +16,7 @@ Two call shapes cover every consumer:
 
 Both shapes decode greedily by default (`temperature=0.0`, optional `seed`)
 instead of inheriting the server's sampling defaults — an intentional
-reproducibility change made when the router landed (M2.5b), so a measurement
+reproducibility change made when the router landed, so a measurement
 can be repeated. Ollama's OpenAI-compatible endpoint accepts both fields.
 
 Every request is also bounded in time. The SDK's own default is ten minutes,

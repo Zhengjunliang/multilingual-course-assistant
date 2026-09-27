@@ -152,8 +152,8 @@ def test_cli_scores_each_question_against_its_target_collection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A campus question must be answered from unifi_web and a slides question
-    from slides — within one gold file, one run (the Stage 5 campus gate
-    shape). Cross-collection leakage would show as a MISS on either row."""
+    from slides — within one gold file, one run (the shape of the campus
+    gate). Cross-collection leakage would show as a MISS on either row."""
     qdrant_path = tmp_path / "qdrant"
     qdrant = open_client(qdrant_path)
     ensure_collection(qdrant, StubDense().dimension())

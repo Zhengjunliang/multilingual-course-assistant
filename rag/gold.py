@@ -51,7 +51,7 @@ class GoldQuestion(BaseModel):
     source_file: str = ""
     page: int = 0
     answer_ref: str
-    # Routing label for the M2.5 agent: which collection should answer this.
+    # Routing label for the agent's router: which collection should answer this.
     # Default keeps every existing slides line valid without rewriting the file.
     target: str = "slides"
     # Ground-truth pages for campus questions: a hit is any retrieved web chunk
