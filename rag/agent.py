@@ -15,7 +15,7 @@ When the stored corpus cannot answer, `deepen()` follows links instead of
 refusing: assess what was retrieved, narrow the outlink graph to a numbered
 shortlist, let the model pick one — or say none of them can hold the answer —
 fetch it through `rag.live`, retrieve again.
-Three steps at most, and the state machine (docs/unifi-web-source.md owns it)
+Three steps at most, and the state machine (its diagram is in docs/unifi-web-source.md)
 ends by answering from whatever was gathered — an honest refusal is the last
 resort, not the default. A refusal still carries the one thing a student can
 act on: paste the URL of the page that holds the answer.
@@ -139,8 +139,7 @@ one JSON object, no prose:
 
 
 class RouteDecision(BaseModel):
-    """The router's reply (field set fixed by the campus web source design,
-    docs/unifi-web-source.md; routing accuracy over several turns is still
+    """The router's reply (routing accuracy over several turns is still
     unmeasured — work item #22).
 
     `target` ranges over the two real collection names plus the routing-only
@@ -405,7 +404,7 @@ def graph_outlinks(
 
     What retrieval already surfaced is never a candidate. A carrier page lists
     the attachment it carries — that is where the crawler found it, and it holds
-    for all 132 attachment rows of the first snapshot — so without this the step
+    for all 132 attachment rows of the registry on 2026-08-24 — so without this the step
     offers the hit back to itself and the loop spends one of its three fetches
     re-reading a page whose text is already in this turn's context. The
     incremental check would even call that fetch `already indexed`, whose whole
@@ -557,7 +556,7 @@ def deepen(
     max_steps: int = DEEPEN_MAX_STEPS,
     step_timeout: float = STEP_TIMEOUT_SECONDS,
 ) -> DeepenResult:
-    """The deepening state machine (docs/unifi-web-source.md owns it).
+    """The deepening state machine (its diagram is in docs/unifi-web-source.md).
 
     Retrieve, ask whether that answers the question, and if it does not, narrow
     the outlink graph to a shortlist, pick one, fetch it through `rag.live` and

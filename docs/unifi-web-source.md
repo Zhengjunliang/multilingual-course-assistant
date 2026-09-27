@@ -1,103 +1,108 @@
-# Fonte web UniFi — 爬取、快照与自增长层
+# UniFi web source — crawl, snapshots and automatic growth
 
-校园信息源（UniFi 网站 → Qdrant `unifi_web` collection）的设计属主：scope 规则、快照与 registry 布局、深化循环。chunk 字段表的属主是 [docling-pipeline.md](docling-pipeline.md)（§3.6，含 web 侧取值规则与替换粒度）；余下的 autogrow 分数门重测见 `#24`；架构决策（自增长写入门 · eval 隔离 · agent 编排）在 [docs/architecture.md](architecture.md) 决策表。
+This file owns the design of the campus source (the UniFi website, Qdrant collection `unifi_web`): the scope table, multi-collection retrieval, the snapshot and registry layout, the deepening loop's state machine and rules, the decision-log schema and the fallback. The reasons behind each rule of the loop are written in the docstrings of `rag/agent.py` and `rag/live.py`, next to the code they explain; the chunk fields are [docling-pipeline.md](docling-pipeline.md), section 3.6; the eval-isolation rule is [architecture.md](architecture.md); every measurement is [experiment-log.md](experiment-log.md), entries of 2026-08-22 to 2026-08-24.
 
-各节状态随实现逐节标注；自增长验收的完整实测记录（门 18/20 · 双臂 0/7 · 逐题归因）归 [experiment-log.md](experiment-log.md)。
+## Scope table
 
-## Scope 规则表
+The seed crawl follows a **deterministic scope table**: an LLM relevance verdict on 500 pages one by one is not affordable, so the LLM judges only what automatic growth writes. The scope is not locked to the `unifi.it` domain. Each row's path prefix is a real page and doubles as a seed for the link BFS.
 
-种子爬取用**确定性规则表**（不锁 unifi.it 域——LLM 语义相关性判定只作用于自增长写入，分层理由：500 页逐页过 LLM 不经济）。✅ 实现于 `rag/crawl.py` 的 `DEFAULT_SCOPE`；每行的 path_prefix 必须是真实页面（兼作 link-BFS 种子）：
-
-| 板块（section slug） | 规则 | 状态 |
+| Section | Rule | Status |
 | --- | --- | --- |
-| `ingegneria` | `ingegneria.unifi.it/*`（sitemap.php + link-BFS） | ✅ 首爬 2026-08-22：497 页 + 127 PDF（`data/webcorpus/crawl-20260822-143647`），撞 500 页顶时队列剩 940 |
-| `servizi` | `www.unifi.it/it/studia-con-noi*`（报名、学费、segreterie） | ✅ 二爬 2026-08-22：328 页（`data/webcorpus/crawl-20260822-164843`，本轮 3 板块合计 501 页，收队时队列剩 2101） |
-| `mobilita` | `www.unifi.it/it/ateneo/nel-mondo*`（Erasmus 与国际流动） | ✅ 二爬 2026-08-22：74 页（同 run） |
-| `international` | `www.unifi.it/en/*`（英文版，国际学生入口） | ✅ 二爬 2026-08-22：99 页（同 run） |
-| 校外学生刚需域（DSU Toscana、CISIA 等） | 显式条目按需加 | 🔜 查询缺口驱动 |
+| `ingegneria` | `ingegneria.unifi.it/*` | ✅ `rag/crawl.py` `DEFAULT_SCOPE`; crawled 2026-08-22 |
+| `servizi` | `www.unifi.it/it/studia-con-noi*` (enrolment, fees, secretariats) | ✅ `rag/crawl.py`; crawled 2026-08-22 |
+| `mobilita` | `www.unifi.it/it/ateneo/nel-mondo*` (Erasmus and international mobility) | ✅ `rag/crawl.py`; crawled 2026-08-22 |
+| `international` | `www.unifi.it/en/*` (the English site, the entry point for international students) | ✅ `rag/crawl.py`; crawled 2026-08-22 |
+| domains students depend on (DSU Toscana, CISIA, …) | an explicit row each, added when an unanswered question shows the need | — |
 
-硬底线（全部路径共用）：robots 遵守 · 1 req/s · `--max-pages` 500 硬顶 · UA 表明论文用途 · PDF 附件 ≤20MB · 只读。附件只收 PDF：Office 后缀（`.doc(x)` `.xls(x)` `.ppt(x)` `.rtf` …）不跟进——首爬实测 46 个全是空白申请表模板，无问答价值；出链图仍记录这些链接。`--sections` 取规则表子集，补爬时把页数配额留给新板块（首爬 ingegneria 一家即打满 500 页）。
+The crawl's hard limits, all code constants in `rag/crawl.py`: robots.txt respected · one request per second (`REQUEST_INTERVAL_SECONDS`) · at most 500 pages per run (`DEFAULT_MAX_PAGES`, `--max-pages`) · a user agent that states the thesis use · PDF attachments up to 20 MB (`MAX_ATTACHMENT_BYTES`) · read-only. Each host's `sitemap.xml`, then `sitemap.php`, seeds the BFS. Attachments are PDF only: office files and archives (`SKIPPED_EXTENSIONS`: `.doc(x)`, `.xls(x)`, `.ppt(x)`, `.rtf`, `.odt`, `.zip`) are not followed — the office files on these sites are blank forms; the outlink graph records their links all the same. `--sections` crawls a subset of the table, so a follow-up run spends the page cap on new sections.
 
-## 多 collection 检索
+## Multi-collection retrieval
 
-✅ 实现于 `rag/search.py` `search()`（`collections` 参数），gold 按 `GoldQuestion.target` 选库：
+✅ `search()` in `rag/search.py` takes `collections`; a gold question picks them by its `target`.
 
-- **rerank 路径**：每库各出一个 fusion 候选池（每池 20）→ 合并成一个池 → 统一 rerank 取 top-k。跨库可比性由 reranker 保证（它只看 query×文本）。
-- **`--no-rerank` 路径**：RRF 分数**跨库不可比**，不合并——每库各取 top-k，按名次 round-robin 交错后截断到 k（是定义不是融合；长池的余名次补满剩余名额）。
-- **ADR-1 作用域**（决策属主 [architecture.md](architecture.md)）：`ingest_source`/`ingest_run_id` 过滤条件只进 `unifi_web` 的两个 prefetch 分支，slides 分支永不携带——slides 非回归门的语义因此不可能漂移。
-- 多库合并只发生在 agent 路由 `both`（✅ `rag/agent.py` `collections_for()`）；两个非回归门（slides · campus）恒单库。
+- **With rerank**: each collection yields its own fusion pool (20 per pool, `PREFETCH_LIMIT`), the pools are merged, and one rerank takes the top k. Scores are comparable across collections because the reranker reads only the query and the text.
+- **With `--no-rerank`**: RRF scores are **not comparable across collections**, so the pools are not merged: each collection gives its top k, the lists are interleaved round-robin by rank and cut to k. This is a definition, not a fusion; the longer list fills the remaining slots.
+- The `ingest_source` and `ingest_run_id` condition goes into the `unifi_web` prefetch branches only: the eval-isolation rule of [architecture.md](architecture.md).
+- Collections are merged only when the router says `both` (`collections_for()` in `rag/agent.py`); the two non-regression gates, slides and campus, each search one collection.
 
-快照总量（两轮爬取合计）：**998 页 · 4 板块 · `unifi_web` 29098 点**——这是 eval 隔离与回滚验证反复对照的基线点数。
+## Snapshot and registry layout
 
-## 快照与 registry 布局
-
-✅ 实现于 `rag/crawl.py`（快照 + manifest + registry 写入）与 `rag/live.py`（live 行追加）；布局如下：
-
-两个工件，生命周期相反：
+✅ `rag/crawl.py` writes snapshots, manifests and registry rows; `rag/live.py` appends live rows. Two artefacts with opposite lifecycles:
 
 ```
 data/webcorpus/
 ├── <run_id>/
-│   ├── manifest.json          # 不可变：该次 run 抓了哪些 URL + hash（M3 引用的快照身份）
-│   ├── <page>.html            # 原始抓取物
-│   └── <attachment>.pdf       # 页面直链附件
-└── registry.jsonl             # append-only 全局账本，crawl 与 live 都追加
+│   ├── manifest.json          # immutable: run_id, created_at, rules, max_pages, pages[{url, file, content_hash, fetch_date}]
+│   └── <sha256(url)[:16]>.html|.pdf   # raw pages and attachments, named by a hash of the URL (artifact_name())
+└── registry.jsonl             # append-only ledger, written by both crawl and live
 ```
 
-`registry.jsonl` 一行一条：`url · content_hash · fetch_date · ingest_run_id · ingest_source("crawl"|"live") · trigger · outlinks[]`（anchor text + URL）。同一 URL 以最后一条为准。三个职责共用：**出链图查询**（自增长候选）、**增量判定**（content_hash 变了才重解析重索引）、**回滚分组**（按 `ingest_run_id` 取 URL 列表 → Qdrant payload filter 删除）。
+A registry row (`RegistryEntry` in `rag/crawl.py`): `url · content_hash · fetch_date · ingest_run_id · ingest_source ("crawl" | "live") · trigger · referrer_url · section · outlinks[]` (anchor text and URL). The last row for a URL wins. The ledger has three duties: the **outlink graph** (candidates for growth), the **incremental check** (a page is parsed and indexed again only when its `content_hash` changes) and **rollback grouping** (a run is rolled back by deleting the points of its `ingest_run_id` from Qdrant by payload filter, `delete_by_run()` in `rag/index.py`; the registry names the runs).
 
-- 并发/中断语义：论文期单进程写；读取端跳过损坏行并告警；M5 并发语义归 M5。
-- 回滚连带：删除某次 live 写入后，同 URL 更早的 crawl 版本**保留**（回到快照态，期望行为）。
-- 存放：`data/`（gitignore）内，与语料同风险姿态；备份随 `data/gold` 同批。
+- Concurrency: one process writes; readers skip a corrupt row with a warning. Concurrent writers come with the Celery worker, 🔜 M5 `#34`.
+- Rolling back a live write keeps the earlier crawl version of the same URL: the index returns to the snapshot.
+- Storage: `data/` (gitignored), with the corpus's risk posture.
 
-## 深化循环
+## The deepening loop
 
-状态机与预算落代码（下方逐项标注真实路径）。自增长验收实测：**双臂（主臂 · `--no-deepen`）均 0/7**，等分证明瓶颈不在跳链而在上游（判定饱和 · 强制选择 · 路由误送 · 门判据范围）；步预算分解墙钟（解析 ≤46.6s · encode 77–117s/页 · 显存峰值 7923 MiB）与逐题归因见 [experiment-log.md](experiment-log.md)。
-
-以「有可以回答的信息」为停止条件的 agent 迭代抓取（原 self-assess 并入「够答？」判定）：
+✅ `deepen()` in `rag/agent.py` is the state machine below, and `narrow_candidates()` builds the shortlist; the command is `uv run python -m rag.agent "<question>" [--no-deepen]`. The web API routes and retrieves without the loop (`apps/qa/engine.py`): its fetches write into the shared index and take tens of seconds each, so running it from the site is an asynchronous task, 🔜 M5 `#34`. 🔶 A page the gate passes is stored at once (`rag/live.py`); the decided human confirmation step is `#48`, which has no milestone. The diagram is `deepen()` as the code runs it; every exit ends in generation over the hits gathered, which refuses only when nothing grounds an answer. When a step stored a page and then went over the step clock, and no later step retrieved again, one more retrieval runs before generation, so the answer cites what was stored.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Fetch: 目标 URL（贴链接 / 出链图候选）
-    Fetch --> Gate: 抓取成功
-    Gate --> Persist: LLM 判「大学相关」
-    Gate --> Ephemeral: 不相关 → 仅本次可用，不落库
-    Persist --> Assess
-    Ephemeral --> Assess
-    Assess --> [*]: 够回答 → 生成答案
-    Assess --> Pick: 不够 & 步数 < 3
-    Assess --> Refuse: 不够 & 步数 = 3 → 用现有内容答或拒答
-    Pick --> Fetch: 从编号候选（非 PDF 余弦 top-10 + PDF 余弦 top-5）选一
-    Pick --> Refuse: 候选全部不可能含答案 → 拒绝选择，不抓取
-    Refuse --> [*]
+    state Cap <<choice>>
+    [*] --> Retrieve
+    Retrieve --> Assess: otherwise
+    Retrieve --> Cap: first pass of a fresh question, or a page found unchanged with no pending write
+    Assess --> [*]: answerable
+    Assess --> Cap: not answerable
+    Cap --> [*]: step cap reached
+    Cap --> Narrow: steps left
+    Narrow --> [*]: no candidates
+    Narrow --> Pick
+    Pick --> [*]: every candidate unsuitable
+    Pick --> Fetch
+    Fetch --> Cap: over the step clock, no retrieval
+    Fetch --> Stored: gate relevant and parse complete (stored now, or found unchanged)
+    Fetch --> Ephemeral: gate not relevant, or parse incomplete
+    Fetch --> Retrieve: nothing readable came back
+    Stored --> Retrieve
+    Ephemeral --> Retrieve
 ```
 
-✅ 实现于 `rag/agent.py` `deepen()`（状态机）与 `narrow_candidates()`（候选收窄）；`ask` 入口 `uv run python -m rag.agent "<question>" [--no-deepen]`。
+The loop's hard caps and budgets are all code constants:
 
-**允许拒绝选择（mini-ADR）**：编号候选**不得强制选一**——抓取写的是**共享**知识库，跟进一条模型自己判定为无关的链接，代价落在此后每一个问题上（验收跑 g004 双臂 · g006 降级臂：模型在 reason 里写下「没有链接含答案，但任务要求必须选一个」后抓了无关页）。Pick 步因此带显式拒绝位（`rag/agent.py` `CandidateChoice.unsuitable`，提示词明写「never required to pick」），✅ 实现于 `pick_candidate()`：拒绝 → 停止深化、**不发起任何抓取**、按「用现有内容答或拒答」收尾，决策日志记 `unsuitable`。与**回退**语义分开且都保留：回复解析不了或编号越界仍取余弦第一名并记 `PICK_FALLBACK_REASON`（坏回复不该花掉一步）——前者 `choice` 为空且 reason 是模型原话，后者 `choice` 有 URL 且 reason 是固定回退串，M3 归因据此区分「模型主动拒绝」与「回复坏了」。
+| Rule | Value | Where | Why |
+| --- | --- | --- | --- |
+| steps per question | at most 3 fetches | `DEEPEN_MAX_STEPS` | bounds latency and writes into the shared index |
+| shortlist | 10 links and 5 PDFs, two separate quotas | `MAX_LINK_CANDIDATES`, `MAX_PDF_CANDIDATES`, `narrow_candidates()` | one page can link forty decree PDFs; one shared quota would let navigation push out the one attachment that answers |
+| ranking | cosine between `RouteDecision.query` and the anchor text plus URL path (plus the file name for a PDF), on the shared CPU encoder; never DOM order | `ranking_text()`, `narrow_candidates()` | a page's first links are its navigation; the cosine is plain Python, no numpy |
+| candidate source | the outlinks of the hit rows and of the pages fetched this turn; a hit without outlinks (a PDF) falls back to its carrier page's row; pages this step retrieved and pages fetched this turn are excluded | `graph_outlinks()`, `_carrier_row()` | PDF rows record no outlinks; a carrier page lists its own attachments, which would hand the hits back as candidates |
+| refusing to pick | allowed: the model may reject the whole shortlist, and no fetch follows | `CandidateChoice.unsuitable`, `pick_candidate()` | a forced pick writes a page the model itself called irrelevant into the shared index |
+| unparseable pick | an unparseable reply or an out-of-range number takes the top-ranked candidate, recorded as a fallback | `PICK_FALLBACK_REASON` | a broken reply should not waste a step; the log tells it from a refusal |
+| step clock | 60 s, covering the assessment, the pick, the fetch and the gate | `STEP_TIMEOUT_SECONDS` (`rag/live.py`), `_timed_fetch()` | the LLM reload after an unload lands on the next call, so it is charged to the step that causes it; the clock stops when the gate answers |
+| over the step clock | the step's content is dropped and the loop moves to the next candidate; a stored page is not undone, and one extra retrieval at the end picks it up | `deepen()` | a write that happened is real; the turn must cite what was stored, not what it replaced |
+| PDF parse budget | 120 s, outside the step clock | `PDF_PARSE_TIMEOUT_SECONDS` (`rag/live.py`) | the corpus's largest PDF needs 66–69 s on CPU |
+| LLM request ceiling | 30 s | `DEFAULT_TIMEOUT_SECONDS` (`rag/llm.py`) | the SDK's default of ten minutes per request would void any budget |
+| ephemeral chunks | 5 in the turn's context | `EPHEMERAL_CHUNK_LIMIT`, `rank_chunks()` | the page is not in the index, so the loop ranks it, to the same size as the retrieval top-k |
+| live parsing | CPU, classic pipeline, no OCR, at most 40 pages | `LIVE_MAX_PDF_PAGES` (`rag/live.py`) | the three models on the GPU leave no room for a PDF parse |
+| live dense encoding | on CPU, through the one encoder per (model, device) that `rag/index.py` caches; its first load and every encode run outside the step clock | `cached_dense_encoder()` (`rag/index.py`) | encoding 13–18 chunks takes 77–117 s on CPU: charged to the step, every successful write would count as a timeout; costs that amortise or have a budget of their own stay off the clock |
+| unloading the LLM | `ollama stop` between the gate and the parse, local Ollama only | `maybe_unload_llm()` (`rag/live.py`) | frees GPU memory; a no-op on any other endpoint |
+| `--no-deepen` | follows no page link: the shortlist holds linked PDFs only, in the same cosine order, without the top-5 cut | `narrow_candidates(link_hopping=False)` | the two arms then differ in link hopping alone |
 
-硬上限与预算（全部代码常量，非约定）：≤3 步/题（`DEEPEN_MAX_STEPS`）· 单步墙钟 60s（`rag/live.py` `STEP_TIMEOUT_SECONDS`；超时按「没拿到」继续——该步内容丢弃、不再对未变内容付一次「够答？」判定，直接换下一候选）· **PDF 解析步独立预算 120s**（`rag/live.py` `PDF_PARSE_TIMEOUT_SECONDS`；实测语料最大 PDF 18.4MB 走 CPU classic 40 页顶需 66–69s，压在 60s 步钟内会把恰恰最值得抓的长文档全部判成 PARTIAL_SUCCESS 不可入库）· 单次 LLM 请求 30s（`rag/llm.py` `DEFAULT_TIMEOUT_SECONDS`；SDK 默认 600s + 重试会让任何墙钟预算变成空文，这是步钟下面的硬兜底）· ephemeral 页带入本轮上下文的 chunk 数 ≤5（`rag/agent.py` `EPHEMERAL_CHUNK_LIMIT`，按同一余弦排序取前 5——不在库中，检索排不了它）· live 解析走 CPU + classic 禁 OCR + 页数 ≤40 · live 的 dense encode 走 CPU（`rag/index.py` `(model, device)` 键控懒缓存单实例，**首次加载单独计时不占步预算**——懒加载一次/进程可摊销）· LLM 段间卸载（`OLLAMA_KEEP_ALIVE=0` + 控制流内卸载点）。降级开关 `--no-deepen`：只抓目标页 + 直链 PDF，不跳链接（继承同一余弦排序，**不继承 top-5 截断**——两臂只差「跳链接」单变量，归因才成立）。
+## Decision log
 
-**60s 步钟计什么（ADR，与上面几个独立预算配套）**：步钟覆盖**四件事**——「够答？」判定 + 候选选一 + fetch + 相关性门，即全部网络等待与 LLM 等待；**解析与 encode 不计入**，各守自己的预算。
+✅ `Decision` in `rag/agent.py`, appended to `data/webcorpus/decisions.jsonl` (`--decision-log` changes the path); the raw material of the error taxonomy (`#23`). A row is `run_id · question_id · step · candidates[] · choice · reason · outcome`. `candidates[]` keeps the anchor text, without which "the shortlist was wrong" cannot be told from "the model chose wrong". `outcome` is one of:
 
-- 判定为什么在里面：上一步在门后卸载了 LLM（`OLLAMA_KEEP_ALIVE=0`），**重载墙钟就落在卸载后的第一次 LLM 调用上**——正常情况是本步的「够答？」判定，上一步超时跳过判定时则是候选选一。重载不计入 = 步预算无法被超出，等于没有预算；计入是设计，不是遗漏。
-- 停表落点：`fetch_and_ingest` 的卸载 hook 恰在门给出判定、解析/encode 开工之前触发，`rag/agent.py` `_timed_fetch()` 就用它停表。
-- 解析/encode 为什么在外面：实测一页 18 chunk 的 CPU dense encode 需 117s，若计入 60s 步钟，**每一次成功入库都会被判成「没拿到」**，深化循环等于自锁；解析侧同理（66–69s > 60s）。与上面「首次加载单独计时不占步预算」同一条口径：不可摊销的等待计入步钟，可摊销或另有硬预算的重活不计。
-- 未到门就结束的抓取（robots 拒绝 / 死链 / 不支持类型）hook 不触发，**全程计入**——那本来就全是网络等待。
-- 超时不撤销写入：`rag/live.py` 已落库的页不因步钟作废，循环只是本轮不看它。故循环收尾时若有「已入库但未及重检索」的步，补跑一次检索（零 LLM 成本），否则答案会引用被替换掉的旧版本。
+- `answered` — the assessment judged the material enough;
+- `persisted` — the fetched page was stored;
+- `already indexed` — the page was in the index, unchanged: the knowledge base did not grow, retrieval had not surfaced it;
+- `ephemeral` — the gate refused the page or its parse was incomplete; it is read this turn only;
+- `not retrieved` — nothing readable came back;
+- `timeout` — the step went over its clock;
+- `no candidates` — the graph offered nothing, or nothing survived the narrowing;
+- `unsuitable` — a shortlist existed and the model rejected all of it;
+- `steps exhausted` — the step cap was reached.
 
-**候选收窄（mini-ADR）**：registry 实测每页非 PDF 出链中位数 79 / p90 138 / max 232（全量 83/143/640），PDF 出链 p90 9 / max 408；「≤10」丢弃约九成链接，所以排序规则必须显式，**禁用 DOM / registry 顺序**——页面靠前的链接是导航。
+## Fallback
 
-- 排序串：非 PDF = `anchor_text + url path`；PDF = `anchor_text + 文件名 + url path`（文件名本就在 path 内，重复即加权：法令式 PDF 没有 anchor 句子、path 段也无语义，文件名是它仅有的文本）。
-- 打分：排序串经 `rag/index.py` 的 CPU dense encoder 编码，与 `RouteDecision.query` 算余弦；余弦是 `rag/agent.py` 私有纯 Python helper（dot/norm over `list[float]`），**不引 numpy**——非声明依赖，且候选量级下这层开销可忽略（编码开销另守步钟 ADR）。
-- 名额：非 PDF top-10 与 PDF top-5 **两个独立配额**，PDF 不挤占非 PDF 名额。理由两侧对称：g001/g002 的唯一 referrer 页各挂 32/40 个法令式 PDF，无条件保留 = 洪水口从出链搬到 PDF；合并配额则让导航链把唯一含答案的附件挤出去。输出为两组合并后按余弦降序的单一编号列表。
-- 候选来源：命中页 registry 行的 `outlinks`（本轮现抓的页由 `LiveResult.outlinks` 当场交出，不回头重抓）；命中行**无出链**时（只有 HTML 页记出链，PDF 附件行不记）回落到该行 `referrer_url` 指向的**承载页**行，用承载页的出链当候选，候选的 referrer 记承载页 URL——否则 top 命中全是 PDF 的问题（验收跑 g007/g008 双臂 · g002 降级臂）永远无候选可跳。✅ 实现于 `rag/agent.py` `graph_outlinks()` + `_carrier_row()`；既无出链又无 `referrer_url`（或 referrer 行不在账本里）的命中不贡献候选，静默跳过；候选按 URL 去重，承载页本身也是命中时不会重复出候选。
-- **检索已命中的页不作候选**：承载页必然把它挂的附件也列在出链里（爬虫就是从那儿发现它的——首爬 132 个附件行 132/132 如此），不排除就等于把本轮命中原样递回候选列表，白耗三步预算之一去重读一份文本已在上下文里的页；而增量判定会把这次抓取记成 `already indexed`，那个取值的定义恰恰是「库里有、**检索没捞出来**」，于是往 M3 归因原料里系统性写入语义相反的行。✅ `rag/agent.py` `graph_outlinks()` 按本步全部命中 URL 过滤（不只过滤读图的那一行——承载页自身也是命中时，附件会从承载页那一行漏回来）。
-- 候选带 referrer：每个候选连同**挂它的那一页 URL** 一起排序、一起交给 `fetch_and_ingest`（`rag/agent.py` `Candidate`），registry 行与 chunk payload 的 `referrer_url` 由此而来——字段属主 [docling-pipeline.md](docling-pipeline.md) §3.6：web chunk 必须记住附件挂在哪一页，只有 slides 可为空。
-- 离线排序质量实测（gold 问题 × 真实 referrer 页）：g001 正解 PDF 名次 **2/32**，top-5 边界分差 **+0.267**；g002 名次 **3/40**，分差 **+0.056**。两题均在 top-5 内，具名 fallback（词法预筛 / GPU 编码窗口 / anchor 向量缓存）无需启用。g002 分差薄 = 已知脆弱点（同页有逐字相同 anchor 的兄弟 PDF，区分信号只在 DOM 分节标题里，`extract_links` 不采集），记为 M3 错误分类法改进候选。
-
-逐题决策日志（M3 错误分类法原料）schema：`run_id · question_id · step · candidates[] · choice · reason · outcome`。✅ `rag/agent.py` `Decision` 模型，append-only 落 `data/webcorpus/decisions.jsonl`（`--decision-log` 可改）。`candidates[]` 落 anchor 原文，否则无法区分「候选没给对」与「模型选错」；`outcome` 取值 `answered · persisted · already indexed · ephemeral · not retrieved · timeout · no candidates · unsuitable · steps exhausted`（`already indexed` = 增量判定认出该页未变、库未增长，与 `persisted` 分开记以便 M3 归因；`unsuitable` = 候选列表给了、模型判定全部不可能含答案而拒绝选择，与 `no candidates` 的「图里本就没有候选」是两种不同失败）。
-
-## 兜底行为
-
-出链图无候选且问题未带 URL → 拒答 + 指路：建议去 unifi.it 搜索，并提示「把网址贴给我，我就能学会」（自增长留给贴链接路径）。✅ 实现于 `rag/agent.py` `pointer_line`（it/en/zh 按 locale 出文案），验收跑中 g007/g008 实际触发。
+When a turn ends with no hit, generation refuses without calling the LLM (`rag/answer.py`), and the command-line agent adds `pointer_line()` in Italian, English or Chinese: paste the URL of the page that holds the answer, which is how the shared index grows. The web API does not add it.
