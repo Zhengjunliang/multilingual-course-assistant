@@ -7,7 +7,7 @@
 
 - **Project**: multilingual-course-assistant — multilingual question answering over university course material, plus campus-information QA (RAG over open-weights LLMs, the Qwen family; **QA only, ⛔ generating or grading exercises**) and a website (the PPM part), in one repository. **Bachelor's thesis (*triennale*)**, UniFi, supervisor (*relatore*) Prof. Marco Bertini; one developer (Junliang Zheng).
 - **Pointers**: progress, milestones, blockers and deferred work → **GitHub issues** (milestones M3 · M4 · M5 · M6 · M7), never a checklist file in the repository; decisions taken without the supervisor that are in force → `docs/decisions.md`; code layout and module responsibilities → `README.md`; the stack decision table and the supervisor's constraints → `docs/architecture.md`; the check chain, identical locally and in CI → `scripts/check.py`; one topic per file under `docs/`. This file holds pointers only.
-- **Scope**: **no proprietary LLM APIs** (OpenAI, Claude) — open-weights models only. The course scenario's corpus is slides and lecture-note PDFs only; the campus scenario's corpus is a crawl snapshot of the UniFi website plus pages fetched live when a student's question calls for them (stored permanently once the LLM relevance gate passes them, so the corpus grows by itself; not locked to the unifi.it domain).
+- **Scope**: **no proprietary LLM APIs** (OpenAI, Claude) — open-weights models only. The course scenario's corpus is slides and lecture-note PDFs only; the campus scenario's corpus is a crawl snapshot of the UniFi website plus pages fetched live when a student's question calls for them (not locked to the unifi.it domain). 🔶 The code stores a fetched page once the LLM relevance gate passes it, so the corpus grows by itself; a human confirmation step before storing is decided and is `#48`.
 - **Dependencies**: **🔒 items must not bring in a dependency or a config file**; 🔶 items add theirs with `uv add`, and **only in the milestone that really uses it** — an installed dependency nothing uses is noise, and it puts something unexplainable in `uv.lock`. Frontend npm dependencies follow the same rule: `npm install --prefix frontend`, and `package-lock.json` is committed like `uv.lock` (CI runs `npm ci`). "Really uses" means **code runs it**, not "deployment will need it" — nobody can verify the latter.
 - **Boundaries**: **`rag/` never imports Django** — the thesis core must run and be evaluated without the web; `tests/test_smoke.py` guards this. **`frontend/` is the same boundary from the other side**: it knows only the TypeScript mirror of `apps/qa/contract.py`, never the Django models; the contract's single source is the Python side, and `tests/test_qa_contract.py` keeps the two from drifting. `frontend/dist/` is a build artefact (gitignored), which is why the frontend build runs before every Django step of `scripts/check.py`. `data/` (course material and everything derived from it) is gitignored and **never** enters git. Further directories are created in the milestone that needs them; no "while I'm here" directories before that.
 - **Language as a domain**: the business domain is multilingual; every row that carries user-visible text, and every function that produces it, carries a `locale` field or parameter from the start, except where `docs/decisions.md` records why not (2026-09-25, *The data model is decided on paper*, point 6, and *PPM read from Moodle and Cineca*, point 3). No hard-coded language strings.
@@ -34,7 +34,7 @@
 
 ## 4. Domain invariants
 
-🔜 To be written once the thesis scope is refined. Only business rules whose violation is a bug, not preferences. While this section is empty, invent no invariants.
+The business rules whose violation is a bug are the scope invariants of `docs/data-model.md`; invent no others.
 
 ## 5. Documentation conventions
 
@@ -42,7 +42,7 @@
 
 🔶 **Partial** — the rule applies at once to everything new or rewritten; existing documents are migrated under **issue #43**, which owns the list of files and their state.
 
-**Map** — the root files plus `docs/`. No other plan or checklist files anywhere in the repository:
+**Map** — the root files, `docs/` and `gold/README.md`. No other plan or checklist files anywhere in the repository:
 
 | File | Contents |
 | ---- | -------- |
@@ -50,6 +50,7 @@
 | `CLAUDE.md` | Agent rules, project overview, documentation conventions |
 | `docs/decisions.md` | Decisions in force: the date, what was decided, why; a reversal replaces what it reverses |
 | `docs/*.md` | One topic per file, created only when the topic exists |
+| `gold/README.md` | Gold set schema, id prefixes, writing rules and acceptance thresholds |
 
 **Progress is owned by GitHub issues, never by a markdown file**: milestone checklists, blockers and deferred work live only in issues; documents say *what* and *why*, never *not yet*.
 
