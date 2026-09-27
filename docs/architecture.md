@@ -116,3 +116,5 @@ MICC access ✅: account and public key registered (confirmed by the system admi
 
 - The system Python 3.10 stays untouched; the project's version is managed by uv ✅ (`.python-version` says 3.12).
 - PyPI gives Windows the CPU build of torch; the project points it at the CUDA build (see the compute strategy above).
+- Redis has no native Windows build: on this machine it runs in Docker or WSL2. 🔜 M5 `#34`.
+- Celery's default worker pool is not supported on Windows: the development worker uses the `solo` pool, and deployment is on Linux. 🔜 M5 `#34`.
