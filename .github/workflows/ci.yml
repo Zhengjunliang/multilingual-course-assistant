@@ -10,7 +10,7 @@ name: CI
 #
 # What replaced that saving is worth more: a path filter is an event-level
 # switch, so a filtered-out commit starts no workflow and therefore reports no
-# status at all. With `check` required on main, a documentation-only pull
+# status at all. With `check` and `hooks` required on main, a documentation-only pull
 # request would then wait forever for a status that never arrives. Filter and
 # required checks cannot both be had; this repository now has the checks.
 on:
@@ -32,7 +32,8 @@ jobs:
   # request waits on does not get longer.
   hooks:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Caps as `check` below: the job's catches a hung run, the step's is the budget.
+    timeout-minutes: 12
     steps:
       # This job runs code fetched from the hook repositories; nothing it does
       # needs the token afterwards, so the token is not left in .git/config.
@@ -60,12 +61,18 @@ jobs:
 
       # A step of scripts/check.py called by name, like every step of `check`
       # below; tests/test_check_script.py reads both jobs as one chain.
+      # About twice its measured median of 3.5 s, rounded up to a minute; a cold
+      # cache, which builds the hook environments, measured 20 s.
       - name: Pre-commit hooks over every tracked file
+        timeout-minutes: 1
         run: uv run --only-dev --locked python scripts/check.py hooks
 
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # About twice the slowest run measured, 389 s, nearly all of it a torch
+    # download (#87), so that a slow network is not mistaken for a hang. The
+    # budget is the cap on the tests step, which network time does not touch.
+    timeout-minutes: 12
     env:
       # Not a secret: this key only ever signs throwaway CI sessions. Its length
       # is not arbitrary — `check --deploy` rejects anything under 50 characters.
@@ -126,7 +133,10 @@ jobs:
       - name: System and deployment checks
         run: uv run python scripts/check.py deploy
 
+      # About twice its measured median of 54.5 s, rounded up to minutes: a suite
+      # that needs longer has grown a regression to look at, not to wait for.
       - name: Tests
+        timeout-minutes: 2
         run: uv run python scripts/check.py tests
 
   audit:
