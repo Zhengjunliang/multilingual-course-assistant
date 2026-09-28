@@ -1,0 +1,27 @@
+# typos checks spelling against a list of known misspellings, so words it does
+# not know pass. That is what lets it run over a multilingual repository: only
+# foreign-language data by design and generated lockfiles are left out, never
+# hand-written code.
+[files]
+extend-exclude = [
+  # Questions in Italian and Chinese: the gold sets are multilingual on purpose.
+  "gold/*.jsonl",
+  # The Italian and Chinese interface catalogues; en.json stays checked.
+  "frontend/src/i18n/it.json",
+  "frontend/src/i18n/zh-hans.json",
+  # Generated, and full of package names.
+  "uv.lock",
+  "frontend/package-lock.json",
+]
+
+[default]
+extend-ignore-re = [
+  # A line ending in a `spellchecker:disable-line` comment is quoted foreign
+  # text: the recipe from typos' own reference, with markdown's `<!-- -->` added.
+  "(?Rm)^.*(#|//|<!--)[ \\t]*spellchecker:disable-line([ \\t]*-->)?$",
+]
+extend-ignore-identifiers-re = [
+  # Index names makemigrations generates: the model and field names cut short
+  # plus a hash (`qa_message_convers_561460_idx`), not words anyone wrote.
+  "^\\w+_[0-9a-f]{6}_idx$",
+]

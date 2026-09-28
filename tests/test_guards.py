@@ -4,14 +4,18 @@ One module for every guard, on purpose: the examples live next to each rule, so
 adding a rule adds its proof here without a new test — the pattern zulip uses
 for its custom lint rules (outside the repository:
 tools/tests/test_zulint_custom_rules.py). A rule whose good examples start to
-fail, or whose bad examples stop failing, turns this module red.
+fail, or whose bad examples stop failing, turns this module red. The last
+section checks the configuration the hooks run under.
 """
 
 from __future__ import annotations
 
 import ast
 import re
+import shutil
+import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -184,3 +188,58 @@ def test_guards_import_only_the_standard_library() -> None:
     ]
 
     assert foreign == []
+
+
+# --- the configuration the hooks run under -----------------------------------
+
+TYPOS = ROOT / "_typos.toml"
+
+
+def test_every_hook_repository_is_pinned_by_commit() -> None:
+    """A tag can be moved under a pin, a SHA cannot; `# frozen:` is the readable half."""
+    repos = re.findall(r"- repo: (https://\S+)\n\s+rev: (.*)", CONFIG)
+
+    assert len(repos) == CONFIG.count("- repo: https://")
+    assert [r for r, rev in repos if not re.fullmatch(r"[0-9a-f]{40}\s+# frozen: \S+", rev)] == []
+
+
+def _tracked() -> set[str]:
+    git = shutil.which("git")
+    assert git is not None
+    # -z: without it git quotes and escapes any path that is not plain ASCII.
+    listed = subprocess.run(
+        [git, "ls-files", "-z"], cwd=ROOT, capture_output=True, text=True, check=True
+    )
+    return set(listed.stdout.split("\0"))
+
+
+def test_every_spelling_exclusion_names_tracked_files() -> None:
+    """An exclusion that matches nothing in git is a leftover, or a typo of its own."""
+    excluded = tomllib.loads(TYPOS.read_text(encoding="utf-8"))["files"]["extend-exclude"]
+    tracked = _tracked()
+
+    assert [
+        pattern
+        for pattern in excluded
+        if not any(path.relative_to(ROOT).as_posix() in tracked for path in ROOT.glob(pattern))
+    ] == []
+
+
+def test_everything_the_spell_checker_lets_through_says_why() -> None:
+    """Each exclusion, ignore pattern and accepted word sits under a comment with its reason."""
+    unexplained: list[str] = []
+    explained, section = False, ""
+    for line in TYPOS.read_text(encoding="utf-8").splitlines():
+        text = line.strip()
+        if text.startswith("#"):
+            explained = True
+        elif text.startswith("[") and text.endswith("]"):
+            section, explained = text, False
+        elif not text or text.endswith("[") or text == "]":
+            explained = False
+        elif not explained and (
+            text.startswith('"') or "extend-words" in section or "extend-identifiers" in section
+        ):
+            unexplained.append(text)
+
+    assert unexplained == []
