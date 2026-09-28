@@ -29,13 +29,15 @@ from __future__ import annotations
 
 import io
 import re
+import shutil
+import subprocess
 import tokenize
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator, Mapping
+    from collections.abc import Callable, Iterator, Mapping, Sequence
 
     # Repository-relative POSIX path -> the file's text.
     Files = Mapping[str, str]
@@ -76,9 +78,15 @@ class Guard:
     # The files the guard reads, when it reads a fixed set rather than the
     # files its hook passes it.
     paths: tuple[str, ...] = ()
-    # Whether it reads every tracked file: rules about references between
-    # files, which a commit can break without touching the file that refers.
+    # Whether it reads the repository as a whole, every tracked file or its
+    # history, which a commit can break without touching what the rule reads.
     repository: bool = False
+    # How it reads its input, when that is not files as they are on disk: a
+    # commit message as git will store it, or the history.
+    read: Callable[[Sequence[str]], Files] | None = None
+    # Whether a marker can silence a finding. A commit message has no comment
+    # syntax to hold one, and history is not rewritten: it keeps its own list.
+    ignorable: bool = True
 
 
 @dataclass(frozen=True)
@@ -89,6 +97,22 @@ class Marker:
     target: int
     rules: frozenset[str]
     reason: str
+
+
+def git(*args: str) -> str:
+    """What a git command prints; the guards that read the repository go through it."""
+    program = shutil.which("git")
+    if program is None:
+        raise SystemExit("git is not on PATH, and this guard reads the repository")
+    done = subprocess.run(
+        [program, *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+    )
+    return done.stdout
 
 
 def _opener(path: str) -> str:
@@ -145,7 +169,7 @@ def run(guard: Guard, files: Files, known: frozenset[str] = frozenset()) -> list
     findings: list[Finding] = []
     silenced: dict[tuple[str, int], set[str]] = {}
     valid: list[Marker] = []
-    for marker in markers(files):
+    for marker in markers(files) if guard.ignorable else []:
         unknown = sorted(marker.rules - known) if known else []
         if not marker.reason:
             findings.append(Finding(marker.path, marker.line, MARKER_RULE, "needs `: <reason>`"))

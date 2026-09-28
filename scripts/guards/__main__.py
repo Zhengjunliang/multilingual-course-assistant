@@ -1,31 +1,24 @@
 """python -m scripts.guards <guard> [file ...]: run one guard and print what it finds.
 
-A guard that names its own paths reads those, whatever it is passed; the others
-read the files given. Exit code 1 when there is a finding, so a pre-commit hook
-fails on it.
+A guard with a reader of its own reads what that returns (a commit message, the
+history); one that names its own paths reads those, whatever it is passed; the
+others read the files given. Exit code 1 when there is a finding, so a
+pre-commit hook fails on it.
 """
 
 from __future__ import annotations
 
 import argparse
 import io
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
-from scripts.guards import run
+from scripts.guards import git, run
 from scripts.guards.registry import GUARDS, RULE_IDS
 
 
 def _tracked() -> list[str]:
-    git = shutil.which("git")
-    if git is None:
-        raise SystemExit("git is not on PATH, and this guard reads every tracked file")
-    listed = subprocess.run(
-        [git, "ls-files", "-z"], capture_output=True, text=True, encoding="utf-8", check=True
-    )
-    return [path for path in listed.stdout.split("\0") if path]
+    return [path for path in git("ls-files", "-z").split("\0") if path]
 
 
 def _text(path: Path) -> str:
@@ -43,8 +36,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     guard = GUARDS[args.guard]
-    paths = _tracked() if guard.repository else (guard.paths or args.files)
-    files = {Path(path).as_posix(): _text(Path(path)) for path in paths}
+    if guard.read is not None:
+        files = guard.read(args.files)
+    else:
+        paths = _tracked() if guard.repository else (guard.paths or args.files)
+        files = {Path(path).as_posix(): _text(Path(path)) for path in paths}
     findings = run(guard, files, RULE_IDS)
     # A finding quotes the file, and on Windows the pipe pre-commit reads this
     # through is encoded in the ANSI code page unless told otherwise.

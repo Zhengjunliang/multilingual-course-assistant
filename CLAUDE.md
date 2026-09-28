@@ -27,10 +27,10 @@
 
 ## 3. Git
 
-1. **Commits belong to the user**: the AI may edit files and run `git add`, `git diff`, `git status`; it **never runs `git commit`** — it prints the full command for the user to run. One logical unit per commit, messages in English, Conventional Commits (`feat:` · `fix:` · `docs:` · `chore:` · `refactor:` · `test:`).
+1. **Commits belong to the user**: the AI may edit files and run `git add`, `git diff`, `git status`; it **never runs `git commit`** — it prints the full command for the user to run. One logical unit per commit, messages in English, Conventional Commits with the types of commitlint's config-conventional (`feat:` · `fix:` · `docs:` · `refactor:` · `test:` · `ci:` · `build:` · `chore:` …); the `commit-msg` hook (`scripts/guards/commits.py`) holds the full list and rejects the rest.
 2. **No signatures**: commit messages and pull request bodies carry **no** AI tool signature (`Co-Authored-By: Claude …`, `🤖 Generated with …` or the like). A message ends with its last line of content.
 3. **Remotes and history belong to the user**: the AI **never runs** `git push` and does no remote or account-level operation (creating or deleting repositories, changing `git remote`, `git config --global`, `gh auth`). **Shared history is never rewritten**: no `push --force` (including `-f` and `--force-with-lease`) without an explicit request, no `reset --hard` over uncommitted work, no rebase or `--amend` of a published commit. Everything else: **print the command, the user runs it**.
-4. **Branches**: work on `main` (personal repository). Propose a branch for experimental changes.
+4. **Branches**: work on `main` (personal repository). Propose a branch for experimental changes. History is linear: a branch is rebased onto `main`, never merged with it (the `commit-history` hook).
 
 ## 4. Domain invariants
 

@@ -11,8 +11,8 @@ section checks the configuration the hooks run under.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import re
-import shutil
 import subprocess
 import sys
 import tomllib
@@ -21,11 +21,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from scripts.guards import MARKER_RULE, Guard, markers, run
+from scripts.guards import MARKER_RULE, Guard, commits, git, history, markers, run
 from scripts.guards.__main__ import main
 from scripts.guards.registry import GUARDS
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from scripts.guards import Rule
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,7 +38,7 @@ RULES = [(guard, rule) for guard in GUARDS.values() for rule in guard.rules]
 @pytest.mark.parametrize(("guard", "rule"), RULES, ids=[rule.id for _, rule in RULES])
 def test_rule_patterns(guard: Guard, rule: Rule) -> None:
     """Good examples pass untouched; each bad one is flagged by this very rule."""
-    alone = Guard(guard.name, (rule,))
+    alone = dataclasses.replace(guard, rules=(rule,))
 
     assert rule.good
     assert rule.bad
@@ -247,13 +249,8 @@ def test_every_hook_repository_is_pinned_by_commit() -> None:
 
 
 def _tracked() -> set[str]:
-    git = shutil.which("git")
-    assert git is not None
     # -z: without it git quotes and escapes any path that is not plain ASCII.
-    listed = subprocess.run(
-        [git, "ls-files", "-z"], cwd=ROOT, capture_output=True, text=True, check=True
-    )
-    return set(listed.stdout.split("\0"))
+    return set(git("-C", str(ROOT), "ls-files", "-z").split("\0"))
 
 
 def test_every_spelling_exclusion_names_tracked_files() -> None:
@@ -286,3 +283,91 @@ def test_everything_the_spell_checker_lets_through_says_why() -> None:
             unexplained.append(text)
 
     assert unexplained == []
+
+
+# --- commit messages ------------------------------------------------------------
+
+
+def test_the_message_hook_is_staged_on_the_message_and_the_rest_at_commit_time() -> None:
+    """What the configuration asks of pre-commit; `pre-commit install` sets up both."""
+    assert "stages: [commit-msg]" in _hook("commit-msg")
+    assert "default_stages: [pre-commit]" in CONFIG
+    assert "default_install_hook_types: [pre-commit, commit-msg]" in CONFIG
+
+
+VERBOSE = (
+    "{header}\n"
+    "# Please enter the commit message for your changes.\n"
+    "# ------------------------ >8 ------------------------\n"
+    "+x = 1  # guard-ignore lang-han\n"
+    "+# una nota della sessione\n"
+)
+
+
+@pytest.mark.parametrize(("header", "code"), [("feat: check it", 0), ("Check it", 1)])
+def test_a_message_from_the_editor_is_read_as_git_will_store_it(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    header: str,
+    code: int,
+) -> None:
+    """Git drops the comment lines and the diff of `commit --verbose` after the hook."""
+    monkeypatch.delenv("GIT_EDITOR", raising=False)
+    message = tmp_path / "COMMIT_EDITMSG"
+    message.write_bytes(VERBOSE.format(header=header).encode("utf-8"))
+
+    assert main(["commit-msg", str(message)]) == code
+    assert ("commit-header" in capsys.readouterr().out) == bool(code)
+
+
+def test_a_message_given_on_the_command_line_keeps_its_comment_lines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`git commit -m` stores a `#` line as written, and says so with GIT_EDITOR=:."""
+    monkeypatch.setenv("GIT_EDITOR", ":")
+    message = tmp_path / "COMMIT_EDITMSG"
+    message.write_bytes(b"fix: x  \n\n#48 is open\n\n")
+
+    assert list(commits.read_message([str(message)]).values()) == ["fix: x\n\n#48 is open\n"]
+
+
+LOG = "m\nb p\nMerge p into b\n\0p\n\nfeat: x\n\0"
+
+
+def _git(shallow: str = "false") -> Callable[..., str]:
+    """git as read_history asks it: for HEAD, whether the clone is shallow, the log."""
+
+    def answer(*args: str) -> str:
+        return {"--verify": "m\n", "--is-shallow-repository": f"{shallow}\n"}.get(args[1], LOG)
+
+    return answer
+
+
+@pytest.mark.parametrize(
+    ("ref", "held"), [("refs/pull/110/merge", ["p"]), ("refs/heads/main", ["m", "p"])]
+)
+def test_the_merge_actions_makes_to_test_a_pull_request_is_not_history(
+    monkeypatch: pytest.MonkeyPatch, ref: str, held: list[str]
+) -> None:
+    monkeypatch.setattr(history, "git", _git())
+    monkeypatch.setenv("GITHUB_REF", ref)
+    monkeypatch.setenv("GITHUB_SHA", "m")
+
+    assert list(history.read_history([])) == held
+
+
+def test_a_shallow_clone_is_refused_with_the_fix(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(history, "git", _git(shallow="true"))
+
+    with pytest.raises(SystemExit, match="fetch-depth: 0"):
+        history.read_history([])
+
+
+def test_a_repository_without_a_commit_has_no_history(monkeypatch: pytest.MonkeyPatch) -> None:
+    def unborn(*args: str) -> str:
+        raise subprocess.CalledProcessError(128, ["git", *args])
+
+    monkeypatch.setattr(history, "git", unborn)
+
+    assert history.read_history([]) == {}
