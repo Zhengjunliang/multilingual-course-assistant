@@ -111,6 +111,17 @@ def test_rule_ids_are_unique() -> None:
     assert len(ids) == len(set(ids))
 
 
+@pytest.mark.parametrize(
+    "guard", [g for g in GUARDS.values() if g.repository], ids=lambda g: g.name
+)
+def test_a_guard_reading_the_repository_runs_on_every_commit(guard: Guard) -> None:
+    """A reference breaks in a commit that stages only its target, so no file filter."""
+    hook = _hook(guard.name)
+
+    assert "pass_filenames: false" in hook
+    assert "always_run: true" in hook
+
+
 @pytest.mark.parametrize("guard", [g for g in GUARDS.values() if g.paths], ids=lambda g: g.name)
 def test_a_guard_reading_fixed_paths_runs_whenever_one_of_them_changes(guard: Guard) -> None:
     """Its hook passes no file names, and its `files:` pattern covers every path it reads."""
@@ -157,17 +168,17 @@ PARALLEL_GOOD = (
     "apps/api/v1/views.py",
     "docs/api_v1.md",
     "gold/campus_v1.jsonl",
-    "docs/v2-notes.md",
+    "notes/v2-notes.md",
     "tests/test_backup.py",
     "rag/news.py",
     "rag/deep_copy.py",
     "frontend/src/code-copy.tsx",
-    "docs/whats-new.md",
+    "notes/whats-new.md",
 )
 PARALLEL_BAD = (
     "rag/answer.py.bak",
     "rag/answer.py.orig",
-    "docs/notes.md.old",
+    "notes/notes.md.old",
     "NOTES.OLD",
     "rag/answer_old.py",
     "rag/answer-v2.py",
