@@ -83,9 +83,23 @@ def test_rule_for_matches_host_and_prefix() -> None:
 
 
 def test_sitemap_parse_is_lenient() -> None:
-    urls = sitemap_urls(SITEMAP)
-    assert "https://ingegneria.unifi.it/vp-185-per-laurearsi.html" in urls
-    assert "https://ingegneria.unifi.it/vp-1-home.html" in urls  # whitespace stripped
+    """Sitemaps in the wild are not always valid XML; an XML parser would lose
+    every URL of one to a single stray character."""
+    # An unclosed <url>, a bare `&`, an upper-case <LOC> padded with whitespace,
+    # and an entry after the root element has closed.
+    broken = """<urlset>
+<url><loc>https://ingegneria.unifi.it/vp-1.html?a=1&b=2</loc>
+<url><LOC>
+  https://ingegneria.unifi.it/vp-2.html
+</LOC></url>
+</urlset>
+<url><loc>https://ingegneria.unifi.it/vp-3.html</loc></url>"""
+
+    assert sitemap_urls(broken) == [
+        "https://ingegneria.unifi.it/vp-1.html?a=1&b=2",
+        "https://ingegneria.unifi.it/vp-2.html",
+        "https://ingegneria.unifi.it/vp-3.html",
+    ]
 
 
 def test_extract_links_absolutizes_and_drops_fragments() -> None:

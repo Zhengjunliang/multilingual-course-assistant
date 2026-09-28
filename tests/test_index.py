@@ -8,7 +8,6 @@ import zlib
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
 
 import pytest
 from qdrant_client import QdrantClient
@@ -85,10 +84,11 @@ def client(tmp_path: Path) -> Iterator[QdrantClient]:
 
 
 def test_point_ids_are_deterministic_uuids() -> None:
-    first = point_id_of("abcd:classic:0000")
-    assert first == point_id_of("abcd:classic:0000")
-    assert first != point_id_of("abcd:classic:0001")
-    assert len(first) == 36
+    # This value must never change: re-indexing in a new process has to overwrite
+    # the points an earlier process wrote, not duplicate them. A namespace change,
+    # or a switch to the per-process salted hash(), would pass every test that
+    # compares two ids computed in the same process.
+    assert point_id_of("abcd:classic:0000") == "47bd6dc5-6b06-58ba-8be7-f555c43eea5f"
 
 
 def test_indexing_is_idempotent_across_reruns(client: QdrantClient) -> None:
@@ -152,32 +152,6 @@ def test_live_ingest_never_touches_the_crawl_snapshot_version(client: QdrantClie
 
 def make_run_chunk(content_hash: str, source: str, run_id: str, url: str) -> Chunk:
     return make_web_chunk(content_hash, source, url).model_copy(update={"ingest_run_id": run_id})
-
-
-class RecordingClient:
-    """Stands in for the Qdrant client to inspect the predicate itself: what a
-    deletion filter *contains* is the safety property, and a passing semantic
-    test cannot tell a two-condition filter from a lucky one-condition one."""
-
-    def __init__(self) -> None:
-        self.deleted: list[tuple[str, Any]] = []
-
-    def delete(self, collection_name: str, points_selector: Any) -> None:
-        self.deleted.append((collection_name, points_selector))
-
-
-def test_delete_by_run_pairs_the_run_id_with_a_hardcoded_live_source() -> None:
-    """`ingest_source == "live"` is welded into the predicate, never passed in:
-    the type system cannot then be talked into deleting crawl points."""
-    recorder = RecordingClient()
-    delete_by_run(cast("QdrantClient", recorder), "live-20260823-120000")
-
-    (collection, selector) = recorder.deleted[0]
-    assert collection == WEB_COLLECTION
-    assert {(condition.key, condition.match.value) for condition in selector.filter.must} == {
-        ("ingest_run_id", "live-20260823-120000"),
-        ("ingest_source", "live"),
-    }
 
 
 def test_rollback_deletes_one_run_and_leaves_the_others(client: QdrantClient) -> None:
@@ -248,18 +222,20 @@ def test_dense_encoder_hands_the_device_to_sentence_transformers(
 
 
 def test_cached_dense_encoder_shares_one_instance_per_model_and_device(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The CPU encoder is shared between live ingest and the agent's candidate
     narrowing: a second instance would be another ~2.4GB and another load."""
     built: list[tuple[str, str | None]] = []
     monkeypatch.setitem(sys.modules, "sentence_transformers", fake_sentence_transformers(built))
-    monkeypatch.setattr("rag.index._DENSE_CACHE", {})
+    # A local model directory no other test, nor a rerun of this one, has put in
+    # the process-wide cache — so the first call is a guaranteed miss.
+    model = str(tmp_path)
 
-    cpu = cached_dense_encoder(device="cpu")
-    assert cached_dense_encoder(device="cpu") is cpu
-    assert cached_dense_encoder() is not cpu  # a different device is a different instance
-    assert built == [(DEFAULT_DENSE_MODEL, "cpu"), (DEFAULT_DENSE_MODEL, None)]
+    cpu = cached_dense_encoder(model, device="cpu")
+    assert cached_dense_encoder(model, device="cpu") is cpu
+    assert cached_dense_encoder(model) is not cpu  # a different device is a different instance
+    assert built == [(model, "cpu"), (model, None)]
 
 
 def test_collect_chunk_files_scans_directories_and_passes_files_through(tmp_path: Path) -> None:

@@ -142,40 +142,30 @@ def test_course_defaults_to_the_containing_directory(tmp_path: Path) -> None:
     assert course_of(deck) == "PPM"
 
 
-def recorded_pdf_options(monkeypatch: pytest.MonkeyPatch, **kwargs: object) -> object:
-    """Build a classic converter against a recorder: the real one would load the
-    layout models, and the device/timeout are pipeline options anyway."""
+def classic_pdf_options(**kwargs: object) -> object:
+    """The PDF pipeline options of a real classic converter. Building one loads
+    no model — docling initialises a pipeline on its first conversion — so the
+    options are read straight off the converter the code returns."""
     from docling.datamodel.base_models import InputFormat
 
-    captured: dict[InputFormat, object] = {}
-
-    class RecordingConverter:
-        def __init__(self, format_options: dict[InputFormat, object]) -> None:
-            captured.update(format_options)
-
-    monkeypatch.setattr("docling.document_converter.DocumentConverter", RecordingConverter)
-    build_converter("classic", **kwargs)  # pyright: ignore[reportArgumentType] - forwarded kwargs
-    return captured[InputFormat.PDF].pipeline_options  # pyright: ignore[reportAttributeAccessIssue]
+    converter = build_converter("classic", **kwargs)  # pyright: ignore[reportArgumentType] - forwarded kwargs
+    return converter.format_to_options[InputFormat.PDF].pipeline_options
 
 
-def test_build_converter_leaves_docling_own_accelerator_default_alone(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_build_converter_leaves_docling_own_accelerator_default_alone() -> None:
     """`device=None` must mean "docling decides", which is not the same as
     passing its "auto" sentinel: `AcceleratorOptions` is a BaseSettings, so
     constructing one at all overrides the DOCLING_DEVICE environment variable."""
     from docling.datamodel.pipeline_options import PdfPipelineOptions
 
-    options = recorded_pdf_options(monkeypatch)
+    options = classic_pdf_options()
 
     assert options.accelerator_options == PdfPipelineOptions().accelerator_options  # pyright: ignore[reportAttributeAccessIssue]
     assert options.document_timeout is None  # pyright: ignore[reportAttributeAccessIssue]
 
 
-def test_build_converter_pins_the_device_and_timeout_for_live_ingest(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    options = recorded_pdf_options(monkeypatch, device="cpu", document_timeout=60)
+def test_build_converter_pins_the_device_and_timeout_for_live_ingest() -> None:
+    options = classic_pdf_options(device="cpu", document_timeout=60)
 
     assert options.accelerator_options.device == "cpu"  # pyright: ignore[reportAttributeAccessIssue]
     assert options.document_timeout == 60  # pyright: ignore[reportAttributeAccessIssue]

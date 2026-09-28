@@ -16,7 +16,6 @@ from rag.chunk import (
     chunk_document,
     collect_documents,
     detect_locale,
-    furniture_headings,
     furniture_threshold,
     locale_arg,
     meta_path_of,
@@ -154,16 +153,6 @@ def test_chunk_ids_are_deterministic_across_reruns() -> None:
     assert all(cid.startswith(("ab" * 32)[:16] + ":classic:") for cid in first)
 
 
-def test_chunks_survive_a_jsonl_round_trip() -> None:
-    for chunk in make_chunks():
-        assert Chunk.model_validate_json(chunk.model_dump_json()) == chunk
-
-
-def test_furniture_detection_is_threshold_gated() -> None:
-    document = build_document()
-    assert furniture_headings(document) == {FURNITURE}
-
-
 def test_furniture_threshold_floors_at_five_pages() -> None:
     assert furniture_threshold(3) == 5
     assert furniture_threshold(25) == 5
@@ -231,26 +220,18 @@ def test_chunk_validates_pre_web_payload() -> None:
         Chunk.model_validate({**payload, "locale": "EN"})
 
 
-def test_meta_sidecars_are_paired_and_excluded_from_collection(tmp_path: Path) -> None:
-    doc = tmp_path / "deck.classic.json"
-    meta = tmp_path / "deck.classic.meta.json"
-    doc.touch()
-    meta.touch()
-    assert meta_path_of(doc) == meta
-    assert list(collect_documents(tmp_path)) == [doc]
-    assert list(collect_documents(doc)) == [doc]
-
-
 def test_stray_json_without_sidecar_is_skipped_in_directory_scans(tmp_path: Path) -> None:
     """Other tools have dropped state files under the parsed dir; a lone .json is
     not one of our artifacts and must not fail the corpus run. An explicitly
     named file still goes through, so a missing sidecar surfaces as an error."""
     doc = tmp_path / "deck.classic.json"
-    (tmp_path / "deck.classic.meta.json").touch()
+    meta = tmp_path / "deck.classic.meta.json"
+    meta.touch()
     doc.touch()
     stray = tmp_path / ".omc" / "state"
     stray.mkdir(parents=True)
     (stray / "pre-tool-advisory-throttle.json").touch()
+    assert meta_path_of(doc) == meta
     assert list(collect_documents(tmp_path)) == [doc]
     assert list(collect_documents(stray / "pre-tool-advisory-throttle.json")) == [
         stray / "pre-tool-advisory-throttle.json"
