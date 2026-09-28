@@ -50,7 +50,7 @@ The three disagreements make it concrete:
 | --- | --- | --- | --- |
 | `testcisia.it/calendario.php?tolc=ingegneria` | relevant | irrelevant | `elenca date TOLC di atenei diversi da Firenze` (lists TOLC dates of universities other than Florence) |
 | `cercachi.unifi.it/cercachi-per-13.html` | relevant | irrelevant | `rubrica telefonica del personale, non un servizio agli studenti` (a staff phone directory, not a student service) |
-| `sol.unifi.it/tesionlinestudente/engine` | irrelevant | **relevant** | `servizio Tesi Online di ateneo, è un servizio allo studente` (the university's Tesi Online service, a student service) |
+| `sol.unifi.it/tesionlinestudente/engine` | irrelevant | **relevant** | `servizio Tesi Online di ateneo, è un servizio allo studente` (the university's Tesi Online service, a student service) | <!-- spellchecker:disable-line -->
 
 The first is a **calendar page**: its content changes by definition, and three weeks apart it lists different sessions. The other two are not model errors but **debatable labels**: a staff directory is a service of the university but not of the student, and submitting the thesis is certainly a student service — on the third case the model's reason holds better than the label.
 
