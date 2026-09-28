@@ -3,8 +3,8 @@
 /**
  * The drawer, asserted by opening it.
  *
- * This is the check `routes/ChatPage.test.ts` says in its own header it cannot
- * make: `Sheet` is a Radix portal aimed at `document.body`, and a string render
+ * A check no string render can make: `Sheet` is a Radix portal aimed at
+ * `document.body`, and a string render
  * has no body to aim at, so the drawer's contents came back as an empty string
  * and the only thing that could be tested was whether the element was still
  * spelled in the source. With a document the question becomes the real one —

@@ -12,7 +12,7 @@ describe("the avatar", () => {
     // `Account.username` is required by the serializer, so this is not a state
     // the API can produce — but a component that throws on "" is a component
     // that throws during a form's first keystroke.
-    expect(render(<Avatar name="" />)).toContain("<span");
+    expect(render(<Avatar name="" />).replace(/<[^>]*>/g, "")).toBe("");
   });
 
   it("takes a whole character, not half a surrogate pair", () => {

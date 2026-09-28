@@ -4,7 +4,9 @@
  *
  * Both checks read the directory rather than a list written by hand, which is
  * the point: a primitive added and forgotten has to be caught by the check, not
- * by the person who would have had to remember to update it.
+ * by the person who would have had to remember to update it. A listing that
+ * matched nothing would let every check here pass; `routes/StyleguidePage.test.tsx`
+ * fails on that, through the same helper.
  */
 
 import { describe, expect, it } from "vitest";
@@ -27,12 +29,6 @@ const RAW_STEP =
   /\b(?:min-h-\d+|max-h-\d+|h-\d+|gap-[xy]?-?\d+|[pm][xytbrl]?-\d+|text-(?:xs|sm|base|lg|xl|[2-9]xl))\b/g;
 
 describe("the component layer", () => {
-  it("has files to check", () => {
-    // Guards the checks below: a glob that quietly matched nothing would let
-    // every other assertion in this file pass for the wrong reason.
-    expect(componentFiles().length).toBeGreaterThan(0);
-  });
-
   it("exports each name from one file only", () => {
     const owner = new Map<string, string>();
     const collisions: string[] = [];

@@ -41,10 +41,4 @@ describe("the empty state", () => {
     // the fold and the front door stops looking like one.
     expect(html()).toContain("overflow-x-auto");
   });
-
-  it("renders without a router or a session", () => {
-    // The reason it is its own component: ChatPage needs both, and standing
-    // them up to look at a heading is how a test stops being run.
-    expect(() => html()).not.toThrow();
-  });
 });
