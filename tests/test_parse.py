@@ -165,10 +165,10 @@ def test_persist_writes_document_and_sidecar_as_a_pair(tmp_path: Path) -> None:
 def test_parse_requires_the_edition(
     args: list[str], expected: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`rag.parse` no longer infers the course from the target directory name
-    (docs/decisions.md, 2026-09-28, *Slides points carry their edition, and a
-    re-index replaces a source file within it*): both flags are required, and
-    a malformed one is refused before any file is touched."""
+    """`rag.parse` takes the edition from its flags, never from the target
+    directory name (docs/decisions.md, 2026-09-28, *Slides points carry their
+    edition, and a re-index replaces a source file within it*): both flags are
+    required, and a malformed one is refused before any file is touched."""
     with pytest.raises(SystemExit):
         main(["missing.pdf", *args])
     assert expected in capsys.readouterr().err

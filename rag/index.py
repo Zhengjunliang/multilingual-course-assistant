@@ -6,9 +6,9 @@ local (embedded, serverless) Qdrant collection with two named vectors: `dense`
 full `Chunk` payload rides along so retrieval can filter and cite without ever
 reopening the source artifacts.
 
-A directory holds one edition's whole set of files: indexing a directory also
-drops, within the editions it holds, the points of files that left it. A single
-file never deletes another file's points.
+A directory holds the whole set of files of each edition it contains: indexing
+a directory also drops, within those editions, the points of files that left
+it. A single file never deletes another file's points.
 
     uv run python -m rag.index data/chunks
     uv run python -m rag.index "data/chunks/<deck>.classic.jsonl"

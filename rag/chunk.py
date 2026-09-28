@@ -226,8 +226,9 @@ class Chunk(BaseModel):
     `embed_text` is the heading-contextualized version — the dense side only, so a
     heading chain can help semantic retrieval without polluting lexical matching.
     Provenance fields exist so M3 can attribute every chunk to its parse
-    configuration and corpus snapshot; a field added later costs a relabel
-    pass over the index (`set_payload`) or a reindex.
+    configuration and corpus snapshot; a field added later costs a rewrite of
+    the stored points that keeps their vectors (docs/data-model.md, migration
+    order, step ④) or a reindex.
     """
 
     model_config = ConfigDict(frozen=True)

@@ -200,8 +200,8 @@ class Engine:
             self.dense,
             self.sparse,
             self.reranker,
-            # Every edition: `None` until `#36` computes the caller's scope
-            # from their programme (docs/data-model.md).
+            # `None`: every edition; the caller's scope, computed from their
+            # programme, is `#36` (docs/data-model.md).
             scope=None,
             limit=TOP_K,
             collections=available,

@@ -35,7 +35,7 @@ erDiagram
 
 ## The contract between `apps/` and `rag/`
 
-✅ `rag/search.py` takes `scope`. 🔜 M5: `apps/qa/engine.py` passes `None` until `#36` computes a scope, and the anonymous path of `#93` passes `[]`. `rag/` never imports Django, so no model instance crosses the boundary: only strings, `EditionKey(course, academic_year)` — a `NamedTuple` of two strings defined in `rag/` — and plain dicts.
+✅ `rag/search.py` takes `scope`, and `apps/qa/engine.py` passes `None`, every edition. 🔜 M5: `#36` computes the caller's scope, and the anonymous path of `#93` passes `[]`. `rag/` never imports Django, so no model instance crosses the boundary: only strings, `EditionKey(course, academic_year)` — a `NamedTuple` of two strings defined in `rag/` — and plain dicts.
 
 - The search functions take `scope: Sequence[EditionKey] | None` in place of the single `course` string, keyword-only and with no default; the command line takes `--scope CODE:YEAR`, once per edition.
 - `scope=None` means unrestricted. The command line passes it when `--scope` is absent, `rag.answer` and `rag.agent` always, and `apps/qa/engine.py` for logged-in requests. The gold runs pin PPM's own pair (`rag/gold.py`), never the current edition, and stop when the index holds none of it.
@@ -43,7 +43,7 @@ erDiagram
 - The scope applies to the slides branch only, written inside each prefetch branch for the reason given in [docling-pipeline.md](docling-pipeline.md), section 4.1, under the fusion trap.
 - In the web collection, `course` is a site-section slug such as `ingegneria` (values listed in [docling-pipeline.md](docling-pipeline.md), section 3.6), not a course key; a scope never matches it.
 - Re-indexing a slides file writes its new points, then deletes the others under (`source_file`, `course`, `academic_year`) (`rag/index.py`): the source file within its edition is the identity, and `source_sha256` only says whether the content changed, so another edition of the same PDF is never touched ([decisions.md](decisions.md), 2026-09-28, *Slides points carry their edition, and a re-index replaces a source file within it*, point 2).
-- Indexing a directory also deletes, for each edition the directory holds, the points of files no longer in it, and skips that when any file failed; a single file never deletes another (`rag/index.py`; [decisions.md](decisions.md), 2026-09-28, *Slides points carry their edition, and a re-index replaces a source file within it*, point 3).
+- Indexing a directory also deletes, for each edition the directory holds, the points of files that left it, and skips that when any file failed; a single file never deletes another (`rag/index.py`; [decisions.md](decisions.md), 2026-09-28, *Slides points carry their edition, and a re-index replaces a source file within it*, point 3).
 
 ## `WebSource` and the registry
 

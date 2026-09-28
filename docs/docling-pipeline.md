@@ -145,7 +145,7 @@ The chunker needs **the object tree with its hierarchy and page numbers** (headi
 
 ### 3.6 The chunk payload contract
 
-The fields every chunk carries into the index, **from the first day**: a field added later costs a relabel pass over the index (`set_payload`, no GPU; [data-model.md](data-model.md), migration step ④) or a reindex. The contract model is `Chunk` in `rag/chunk.py`; the output is `data/chunks/<name>.<variant>.jsonl`, one chunk per line:
+The fields every chunk carries into the index, **from the first day**: a field added later costs a rewrite of the stored points that keeps their vectors, no GPU, as step ④ of the migration order in [data-model.md](data-model.md) does, or a reindex. The contract model is `Chunk` in `rag/chunk.py`; the output is `data/chunks/<name>.<variant>.jsonl`, one chunk per line:
 
 | Field | Meaning |
 | --- | --- |
