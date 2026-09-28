@@ -35,6 +35,8 @@ uv run python manage.py createsuperuser
 | run the tests quickly | `uv run pytest` |
 | run everything CI runs | `uv run python scripts/check.py` |
 
+A test is added, changed or deleted by the criteria of [docs/testing.md](docs/testing.md), which also lists the tests kept whatever the criteria say.
+
 **While the site is running, the `rag` CLIs that touch the index fail** (`rag.index`, `rag.search`, `rag.agent`, …): local Qdrant is embedded and holds an exclusive lock on `data/qdrant`, so whichever process opens it first keeps it; the endpoints answer 503 with that explanation in the opposite case. Stop the server with `Ctrl+C` to use the CLI. 🔜 This goes away when Qdrant becomes a service (`#33`, M5).
 
 **Changing a model** means regenerating the app's migration and rebuilding the local database, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`). Until a database has to keep its data, each app has one migration, `0001_initial.py`, rewritten on every change rather than followed by a `0002` ([docs/decisions.md](docs/decisions.md), 2026-09-26). Save the data **before** editing the model — `dumpdata` reads every column the model declares, so it fails once the model is ahead of the database — then run the rest one line at a time, stopping at the first that fails: the third line deletes the local database.
@@ -181,7 +183,7 @@ The deepening loop is not in this endpoint: it fetches pages and writes to the s
 | `scripts/` | `check.py`, the check chain |
 | `tests/` | pytest. `test_smoke.py` guards the `rag/` boundary and the Django configuration; `test_qa_contract.py` the contract and its mirror; `test_check_script.py` the chain and the workflow that calls it; `test_qa_engine.py` and `test_spa.py` carry no `django_db`, so pytest-django fails them if they touch the database |
 | `gold/` | Gold question sets; schema in [gold/README.md](gold/README.md) |
-| `docs/` | One topic per file: decisions, architecture, the security review, the data model, the Docling pipeline, the web source, RAG analysis, the experiment log |
+| `docs/` | One topic per file: decisions, architecture, the security review, the data model, the Docling pipeline, the web source, RAG analysis, the experiment log, when a test may be deleted |
 | `.github/` | `workflows/ci.yml` (the check chain + dependency audit), `workflows/secrets.yml` (gitleaks), `dependabot.yml` |
 | `data/` | Course material and everything derived from it (parsed output, the local Qdrant index): gitignored, **never** in git |
 
