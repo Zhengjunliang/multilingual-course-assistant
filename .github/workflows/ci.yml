@@ -26,6 +26,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The head of the chain, in a job of its own so that it runs beside `check`
+  # rather than ahead of it: the hooks need neither torch nor PostgreSQL, so
+  # `--only-dev` installs pre-commit and nothing heavy, and the path a pull
+  # request waits on does not get longer.
+  hooks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # This job runs code fetched from the hook repositories; nothing it does
+      # needs the token afterwards, so the token is not left in .git/config.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+          # setup-uv's cache key does not carry the job's name, so without a
+          # suffix this job and the others save to one key, and whichever
+          # finishes first decides what the next run restores.
+          cache-suffix: hooks
+
+      # The hook environments (ruff, pre-commit-hooks) are built on first use;
+      # the key moves with the config that pins them and the Python they run on.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.python-version', '.pre-commit-config.yaml') }}
+
+      # A step of scripts/check.py called by name, like every step of `check`
+      # below; tests/test_check_script.py reads both jobs as one chain.
+      - name: Pre-commit hooks over every tracked file
+        run: uv run --only-dev --locked python scripts/check.py hooks
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -78,26 +112,15 @@ jobs:
       # each one runs, in which order and why, is written there once. DEBUG off
       # and the TLS flag travel with the steps too; this job sets only the
       # credentials and the database. tests/test_check_script.py fails if a
-      # step here runs anything else, goes missing or changes places.
+      # step of this job or of `hooks` runs anything else, goes missing,
+      # repeats or changes places.
       - name: Frontend lint, types, catalogues, contrast, tests and build
         run: uv run python scripts/check.py frontend
-
-      - name: Lint
-        run: uv run python scripts/check.py lint
-
-      - name: Format
-        run: uv run python scripts/check.py format
 
       - name: Types
         run: uv run python scripts/check.py types
 
-      - name: Django system checks
-        run: uv run python scripts/check.py django
-
-      - name: Migration drift
-        run: uv run python scripts/check.py migrations
-
-      - name: Deployment checks
+      - name: System and deployment checks
         run: uv run python scripts/check.py deploy
 
       - name: Tests
@@ -111,10 +134,10 @@ jobs:
 
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
-          # The check job caches the same store, but a cache is scoped per job:
-          # without this, every audit run re-downloads pip-audit and its whole
+          # Without this, every audit run re-downloads pip-audit and its whole
           # tree through `uvx`. Nothing is installed into a venv here, so what
-          # gets saved stays small.
+          # gets saved stays small. The key carries no job name, so `check`
+          # restores and saves the same entry as this job.
           enable-cache: true
 
       - name: Audit locked dependencies

@@ -1,6 +1,13 @@
+# One definition, run in two places: at commit time over the staged files, and
+# by the `hooks` step of scripts/check.py over every tracked file — which is
+# how CI runs it too.
+#
+# Every rev is a commit SHA, as the action pins in ci.yml are: a tag can be
+# moved, a SHA cannot. The `# frozen:` comment is the readable half, and
+# Dependabot's pre-commit ecosystem moves both together.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -8,11 +15,19 @@ repos:
       - id: check-toml
       - id: check-merge-conflict
       # Course material and model weights must never be committed.
+      # --enforce-all: by default the hook looks only at files being added,
+      # so over every tracked file, as the chain runs it, it would look at none.
+      # The lockfiles are generated and grow with every dependency; they are
+      # not what this hook is here to stop.
       - id: check-added-large-files
+        args: [--enforce-all]
+        exclude: ^(uv\.lock|frontend/package-lock\.json)$
       - id: detect-private-key
 
+  # The one place ruff runs, so a commit and CI cannot judge a file with two
+  # different versions of it.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.1
+    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
     hooks:
       - id: ruff-check
         args: [--fix]
@@ -21,6 +36,6 @@ repos:
   # pyproject.toml and uv.lock must move together; CI's `uv sync --locked` would
   # catch the drift anyway, but catching it before the commit exists is cheaper.
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.12.1
+    rev: 8ff2449591c8de025b17661ba76d60237a1ae62b # frozen: 0.12.1
     hooks:
       - id: uv-lock

@@ -66,6 +66,14 @@ updates:
     schedule:
       interval: "monthly"
 
+  # The hook revs in .pre-commit-config.yaml, ruff's among them: ruff is not a
+  # dev dependency, so the uv ecosystem above does not see it, and this one
+  # is what keeps the only pin it has from going stale.
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+
   # The action pins in ci.yml are SHAs, and a SHA says nothing about how old it
   # is — the trailing `# vN` comment is the only readable part, and it is written
   # by hand. This ecosystem is what moves both, together.

@@ -57,18 +57,19 @@ A field added as `NOT NULL` without a default has no value in `data/dev.json`; a
 [scripts/check.py](scripts/check.py) is the one definition of what "green" means, locally and in CI. Without arguments it runs every step in order; with names it runs only those, in chain order:
 
 ```powershell
-uv run python scripts/check.py              # all eight steps
-uv run python scripts/check.py lint types   # only these two
+uv run python scripts/check.py               # all five steps
+uv run python scripts/check.py hooks types   # only these two
 ```
 
 | Step | Runs |
 | ---- | ---- |
+| `hooks` | every hook of `.pre-commit-config.yaml` except `uv-lock`, over every tracked file: file hygiene, `detect-private-key`, ruff lint and format |
 | `frontend` | biome, `tsc`, catalogue keys, colour contrast, vitest, production build |
-| `lint` · `format` · `types` | `ruff check` · `ruff format --check` · `pyright` |
-| `django` · `migrations` · `deploy` | `manage.py check` · `makemigrations --check --dry-run` · `check --deploy --fail-level WARNING` |
-| `tests` | `pytest --cov`, with the coverage gate |
+| `types` | `pyright` |
+| `deploy` | `manage.py check --deploy --fail-level WARNING`, which runs the ordinary system checks too |
+| `tests` | `pytest --cov`, with the coverage gate; migration drift is one of the tests |
 
-The chain runs with `DJANGO_DEBUG=false` whatever `.env` says, because that is how CI tests. Why each step is where it is — `frontend` first, the TLS flag only on `deploy` — is written next to the step in the script. Interrupting the `frontend` step on Windows makes `cmd` ask `Terminate batch job (Y/N)?`: answer `Y`.
+A hook that rewrites a file (ruff, trailing whitespace) fails the run that rewrote it: review the diff, `git add`, run again. The chain runs with `DJANGO_DEBUG=false` whatever `.env` says, because that is how CI tests. Why each step is where it is — `frontend` first, the TLS flag only on `deploy` — is written next to the step in the script. Interrupting the `frontend` step on Windows makes `cmd` ask `Terminate batch job (Y/N)?`: answer `Y`.
 
 ## Frontend
 
@@ -195,7 +196,7 @@ Access and hardware are in [docs/architecture.md](docs/architecture.md). SSH ali
 
 ## CI
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) runs on pushes to `main` and on pull requests. The `check` job installs with `uv sync --locked` and `npm ci` — so `uv.lock` and `frontend/package-lock.json` are committed with every dependency change — and then calls each step of `scripts/check.py` by name; [tests/test_check_script.py](tests/test_check_script.py) fails if the job runs anything else. The `audit` job runs pip-audit over the lockfile and `npm audit --omit=dev`, and [.github/workflows/secrets.yml](.github/workflows/secrets.yml) scans the whole history with gitleaks weekly. Dependency updates arrive as monthly Dependabot pull requests ([.github/dependabot.yml](.github/dependabot.yml)).
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs on pushes to `main` and on pull requests. Two jobs call the steps of `scripts/check.py` by name, side by side: `hooks` runs the `hooks` step with only the dev dependencies installed, and `check` installs with `uv sync --locked` and `npm ci` — so `uv.lock` and `frontend/package-lock.json` are committed with every dependency change — and runs the rest; [tests/test_check_script.py](tests/test_check_script.py) fails if either job runs anything else, or a step goes missing, repeats or changes places. The `audit` job runs pip-audit over the lockfile and `npm audit --omit=dev`, and [.github/workflows/secrets.yml](.github/workflows/secrets.yml) scans the whole history with gitleaks weekly. Dependency updates arrive as monthly Dependabot pull requests ([.github/dependabot.yml](.github/dependabot.yml)).
 
 ## Language
 

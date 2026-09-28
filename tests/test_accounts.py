@@ -42,6 +42,7 @@ def test_no_pending_migrations() -> None:
     """A model edited without `makemigrations` would only surface as a runtime error.
 
     `--check` exits non-zero when the models and the migrations have drifted
-    apart; CI runs the same command, this pins it to the local run too.
+    apart. This test is the only gate on that drift: the check chain has no
+    migrations step of its own.
     """
     call_command("makemigrations", "--check", "--dry-run", verbosity=0)

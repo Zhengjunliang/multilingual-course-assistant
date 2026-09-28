@@ -1,11 +1,11 @@
 """The one check chain: what CI runs, runnable here under the same names.
 
-    uv run python scripts/check.py              # every step, in order
-    uv run python scripts/check.py lint types   # only these, still in chain order
+    uv run python scripts/check.py               # every step, in order
+    uv run python scripts/check.py hooks types   # only these, still in chain order
 
 CI calls this script once per step (.github/workflows/ci.yml) instead of
 spelling the commands out a second time, and tests/test_check_script.py fails
-when the workflow runs anything else, skips a step or reorders one. That is
+when the workflow runs anything else, skips a step, repeats or reorders one. That is
 what keeps "green here" and "green in CI" the same statement.
 
 The mode variables travel with the steps for the same reason: CI tests with
@@ -63,7 +63,22 @@ def _npm(script: str) -> tuple[str, ...]:
 
 
 STEPS: tuple[Step, ...] = (
-    # First, ahead of every Django step: frontend/dist is a build artefact that
+    # First, because it is the cheapest to fail: every hook of
+    # .pre-commit-config.yaml over every tracked file, so what a commit has to
+    # pass and what the chain runs are one definition. CI runs this step in a
+    # job of its own, beside the rest, since it needs neither torch nor the
+    # database. uv-lock is skipped here and only here: it resolves over the
+    # network, and CI's `uv sync --locked` is the same gate.
+    Step(
+        "hooks",
+        ((PYTHON, "-m", "pre_commit", "run", "--all-files", "--show-diff-on-failure"),),
+        env={"SKIP": "uv-lock"},
+        hint=(
+            "A hook that rewrites files (ruff, whitespace) fails the run that "
+            "rewrote them: review the diff above, `git add`, and run again."
+        ),
+    ),
+    # Ahead of every Django step: frontend/dist is a build artefact that
     # is not in git, and `check --deploy --fail-level WARNING` fails on the
     # STATICFILES_DIRS entry pointing at it (staticfiles.W004) when it is absent.
     # Inside the step, the static gates run first because they are the cheapest
@@ -78,15 +93,13 @@ STEPS: tuple[Step, ...] = (
         cwd=FRONTEND,
         requires=(FRONTEND / "node_modules", "npm ci --prefix frontend"),
     ),
-    Step("lint", ((PYTHON, "-m", "ruff", "check", "."),)),
-    Step("format", ((PYTHON, "-m", "ruff", "format", "--check", "."),)),
     Step("types", ((PYTHON, "-m", "pyright"),)),
-    Step("django", ((PYTHON, "manage.py", "check"),)),
-    Step("migrations", ((PYTHON, "manage.py", "makemigrations", "--check", "--dry-run"),)),
     # --fail-level WARNING is what makes this a gate: without it the command
     # prints its findings and exits 0. BEHIND_TLS only here: it turns on
     # SECURE_SSL_REDIRECT, which would make the test client follow a 301 out
-    # of every request in `tests`.
+    # of every request in `tests`. `--deploy` adds its checks to the ordinary
+    # ones rather than replacing them, so there is no plain `manage.py check`
+    # step; migration drift is tests/test_accounts.py::test_no_pending_migrations.
     Step(
         "deploy",
         ((PYTHON, "manage.py", "check", "--deploy", "--fail-level", "WARNING"),),
