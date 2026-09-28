@@ -19,7 +19,7 @@ function open(isOpen: boolean) {
       open={isOpen}
       onOpenChange={() => {}}
       title="Account"
-      description="Gestisci le tue preferenze."
+      description="Gestisci le tue preferenze." // spellchecker:disable-line
       closeLabel="Chiudi"
     >
       <p>Junliang Zheng</p>
@@ -40,7 +40,7 @@ describe("the dialog", () => {
     const { unmount } = open(true);
 
     expect(document.body.textContent).toContain("Account");
-    expect(document.body.textContent).toContain("Gestisci le tue preferenze.");
+    expect(document.body.textContent).toContain("Gestisci le tue preferenze."); // spellchecker:disable-line
     expect(document.body.textContent).toContain("Junliang Zheng");
 
     unmount();
