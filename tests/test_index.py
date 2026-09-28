@@ -345,11 +345,13 @@ def test_directory_index_drops_the_files_that_left_it(
 
     (current / "b.classic.jsonl").unlink()
     if change == "renamed":
-        write_chunk_file(current / "c.classic.jsonl", "c.pdf", "bb" * 32)
+        # Its own sha: with b's, c's points would take b's ids and overwrite them,
+        # and b's one point would be gone without the sync dropping it.
+        write_chunk_file(current / "c.classic.jsonl", "c.pdf", "cc" * 32)
     capsys.readouterr()
     main([str(current), "--qdrant-path", str(qdrant)])
 
-    assert "dropped" in capsys.readouterr().out
+    assert "dropped 1 points" in capsys.readouterr().out
     renamed = {("2025-2026", "c.pdf")} if change == "renamed" else set()
     assert indexed_files(qdrant) == {("2025-2026", "a.pdf"), ("2024-2025", "b.pdf"), *renamed}
 
