@@ -3,9 +3,10 @@
 Two halves. The runner's own behaviour — a failing step ends the chain and its
 exit code comes back — is tested with throwaway steps, so no real tool runs.
 The drift guard reads .github/workflows/ci.yml as text and names the first way
-the check job has stopped matching the chain: a command that is not a step, a
-step missing or out of place, an action that is not setup, a step made
-conditional or allowed to fail, or an environment the workflow sets beyond
+the chain jobs have stopped matching the chain: a command that is not a step, a
+step missing, repeated or out of place, a job outside the chain calling it, an
+action that is not setup, a step or a job made conditional or allowed to fail, a
+line the guard cannot read, or an environment the workflow sets beyond
 credentials and the database. Every one of those has a synthetic workflow below
 proving the guard notices it, and each asserts which reason it gives — a guard
 whose pattern quietly stopped matching would otherwise pass forever.
@@ -23,10 +24,21 @@ from scripts import check
 
 WORKFLOW = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ci.yml"
 
-# What the check job may do besides calling the chain: get the tools it needs.
+# The jobs that run the chain, in chain order, each with the one prefix its
+# calls use. Between them they call every step exactly once. `hooks` installs
+# only the dev group, so it never pays for the torch download `check` needs.
+CHAIN_JOBS = {
+    "hooks": "uv run --only-dev --locked python scripts/check.py",
+    "check": "uv run python scripts/check.py",
+}
+# What a chain job may do besides calling the chain: get the tools it needs.
 SETUP_RUNS = frozenset({"uv sync --locked", "npm ci"})
-SETUP_ACTIONS = ("actions/checkout@", "astral-sh/setup-uv@", "actions/setup-node@")
-STEP_CALL = re.compile(r"uv run python scripts/check\.py (?P<step>[a-z]+)")
+SETUP_ACTIONS = (
+    "actions/checkout@",
+    "astral-sh/setup-uv@",
+    "actions/setup-node@",
+    "actions/cache@",
+)
 # Credentials and the database are the workflow's to set; the mode is the chain's.
 WORKFLOW_ENV = re.compile(r"DJANGO_SECRET_KEY|DJANGO_DB_[A-Z]+")
 # One `key: value` line of a step, with or without the list dash in front.
@@ -34,6 +46,13 @@ STEP_KEY = re.compile(r"(?:-\s+)?(?P<key>[a-z-]+)\s*:\s*(?P<value>.*)")
 # Step keys that change what a green step means: an environment of its own, a
 # condition that can skip it, or permission to fail.
 STEP_FORBIDDEN = frozenset({"env", "if", "continue-on-error"})
+# The same for a whole job, whatever the value: a skipped job reports success.
+JOB_FORBIDDEN = frozenset({"if", "continue-on-error"})
+# A job's name line, directly under `jobs:`, and a key of the job itself.
+JOB_HEADER = re.compile(r"  (?P<name>[A-Za-z0-9_-]+):\s*(?:#.*)?")
+JOB_KEY = re.compile(r"    (?P<key>[a-z-]+):")
+# Any way of reaching the chain: the script's path or its module name.
+CHAIN = re.compile(r"scripts[/.]check\b")
 
 
 def _block(lines: list[str], header: str, indent: int) -> list[str] | None:
@@ -46,6 +65,25 @@ def _block(lines: list[str], header: str, indent: int) -> list[str] | None:
     return lines[start:end]
 
 
+def _jobs(lines: list[str]) -> dict[str, list[str]]:
+    """Every job's lines, by name; a line at job level that names no job is an error."""
+    jobs = _block(lines, "jobs:", 0) or []
+    found: dict[str, list[str]] = {}
+    for line in jobs:
+        if not re.match(r"  [^\s#]", line):
+            continue
+        header = JOB_HEADER.fullmatch(line)
+        if header is None:
+            raise ValueError(f"cannot read {line!r} as the start of a job")
+        found[header["name"]] = _block(jobs, line, 2) or []
+    return found
+
+
+def _is_comment(line: str) -> bool:
+    """A comment may name the chain; only code calls it."""
+    return line.lstrip().startswith("#")
+
+
 def _env_drift(block: list[str] | None, where: str) -> str | None:
     for line in block or []:
         key = line.strip().split(":", 1)[0]
@@ -54,35 +92,58 @@ def _env_drift(block: list[str] | None, where: str) -> str | None:
     return None
 
 
-def drift(workflow: str) -> str | None:
-    """How the check job has stopped matching the chain, or None when it has not."""
-    lines = workflow.splitlines()
-    job = _block(lines, "  check:", 2)
-    if job is None:
-        raise ValueError("no `check` job in the workflow")
-    if "    continue-on-error: true" in job:
-        return "the job is allowed to fail"
+def _job_drift(name: str, job: list[str]) -> tuple[str | None, list[str]]:
+    """How one chain job has stopped matching, and the steps it calls."""
+    for line in job:
+        key = JOB_KEY.match(line)
+        if key is not None and key["key"] in JOB_FORBIDDEN:
+            return f"the {name} job has `{key['key']}:`, so it can pass without passing", []
+    call = re.compile(re.escape(CHAIN_JOBS[name]) + r" (?P<step>[a-z]+)")
     called: list[str] = []
     for line in _block(job, "    steps:", 4) or []:
+        if not line.strip() or _is_comment(line):
+            continue
         entry = STEP_KEY.fullmatch(line.strip())
         if entry is None:
-            continue
+            return f"the {name} job has a step line that is not `key: value`: {line.strip()!r}", []
         key, value = entry["key"], entry["value"].strip()
         if key in STEP_FORBIDDEN:
-            return f"a step has `{key}:`, which changes what its green means"
+            return f"a step of the {name} job has `{key}:`, which changes what its green means", []
         if key == "uses" and not value.startswith(SETUP_ACTIONS):
-            return f"uses an action that is not setup: {value}"
+            return f"the {name} job uses an action that is not setup: {value}", []
         if key == "run" and value not in SETUP_RUNS:
-            call = STEP_CALL.fullmatch(value)
-            if call is None:
-                return f"runs something that is not a step of the chain: {value!r}"
-            called.append(call["step"])
+            step = call.fullmatch(value)
+            if step is None:
+                return (
+                    f"the {name} job runs something that is not a step of the chain: {value!r}",
+                    [],
+                )
+            called.append(step["step"])
+    return _env_drift(_block(job, "    env:", 4), f"the {name} job"), called
+
+
+def drift(workflow: str) -> str | None:
+    """How the chain jobs have stopped matching the chain, or None when they have not."""
+    lines = workflow.splitlines()
+    jobs = _jobs(lines)
+    missing = [name for name in CHAIN_JOBS if name not in jobs]
+    if missing:
+        raise ValueError(f"no `{missing[0]}` job in the workflow")
+    for name, job in jobs.items():
+        if name not in CHAIN_JOBS and any(
+            CHAIN.search(line) and not _is_comment(line) for line in job
+        ):
+            return f"the {name} job calls the chain, which only {' and '.join(CHAIN_JOBS)} may"
+    called: list[str] = []
+    for name in CHAIN_JOBS:
+        found, calls = _job_drift(name, jobs[name])
+        if found is not None:
+            return found
+        called += calls
     chain = [step.name for step in check.STEPS]
     if called != chain:
-        return f"calls {called}, the chain is {chain}"
-    return _env_drift(_block(lines, "env:", 0), "the workflow") or _env_drift(
-        _block(job, "    env:", 4), "the job"
-    )
+        return f"the chain jobs call {called}, the chain is {chain}"
+    return _env_drift(_block(lines, "env:", 0), "the workflow")
 
 
 # --- the runner -------------------------------------------------------------
@@ -141,7 +202,7 @@ def test_an_unknown_step_is_refused_and_the_valid_ones_named(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert check.main(["nope"]) == 2
-    assert "frontend, lint, format" in capsys.readouterr().err
+    assert "hooks, frontend, types" in capsys.readouterr().err
 
 
 @pytest.mark.usefixtures("in_venv")
@@ -215,44 +276,55 @@ def test_the_mode_is_the_chains_whatever_the_environment_says(
 # --- the drift guard --------------------------------------------------------
 
 
+def _job(name: str, runs: list[str], head: str = "", extra: str = "") -> str:
+    steps = "".join(f"      - name: step\n        run: {run}\n" for run in runs)
+    return f"  {name}:\n{head}    steps:\n      - uses: actions/checkout@v7\n{steps}{extra}"
+
+
 def _workflow(
     runs: list[str],
     job_env: tuple[str, ...] = (),
     extra: str = "",
     top: str = "",
     job_extra: str = "",
+    hooks: list[str] | None = None,
+    hooks_extra: str = "",
+    audit: str = "      - run: uvx pip-audit\n",
 ) -> str:
-    """A check job shaped like the real one, with a second job it must not read."""
+    """Chain jobs shaped like the real ones, and a third job outside the chain."""
     env = "".join(f"      {line}\n" for line in ("DJANGO_SECRET_KEY: k", *job_env))
-    steps = "".join(f"      - name: step\n        run: {run}\n" for run in runs)
+    check_head = (
+        f"{job_extra}    env:\n{env}"
+        "    services:\n      postgres:\n        env:\n          POSTGRES_DB: mca\n"
+    )
     return (
-        f"{top}"
-        "jobs:\n"
-        "  check:\n"
-        f"{job_extra}"
-        "    env:\n"
-        f"{env}"
-        "    services:\n"
-        "      postgres:\n"
-        "        env:\n"
-        "          POSTGRES_DB: mca\n"
-        "    steps:\n"
-        "      - uses: actions/checkout@v7\n"
-        f"{steps}"
-        f"{extra}"
-        "  audit:\n"
-        "    steps:\n"
-        "      - run: uvx pip-audit\n"
+        f"{top}jobs:\n"
+        + _job("hooks", HOOKS_CALLS if hooks is None else hooks, head=hooks_extra)
+        + _job("check", runs, head=check_head, extra=extra)
+        + f"  audit:\n    steps:\n{audit}"
     )
 
 
-CALLS = [f"uv run python scripts/check.py {step.name}" for step in check.STEPS]
+STEPS = [step.name for step in check.STEPS]
+HOOKS_CALLS = [f"{CHAIN_JOBS['hooks']} {name}" for name in STEPS[:1]]
+CALLS = [f"{CHAIN_JOBS['check']} {name}" for name in STEPS[1:]]
 IN_ORDER = ["uv sync --locked", "npm ci", *CALLS]
+
+
+def test_the_hooks_job_runs_the_head_of_the_chain() -> None:
+    """The synthetic split below gives `hooks` the first step and `check` the rest."""
+    assert STEPS[0] == "hooks"
 
 
 def test_the_synthetic_workflow_is_in_step_with_the_chain() -> None:
     """The baseline every red case below differs from in exactly one way."""
     assert drift(_workflow(IN_ORDER)) is None
+
+
+def test_a_comment_naming_the_chain_is_not_a_call() -> None:
+    comment = "      # the chain itself runs elsewhere: scripts/check.py tests\n"
+
+    assert drift(_workflow(IN_ORDER, audit=comment + "      - run: uvx pip-audit\n")) is None
 
 
 @pytest.mark.parametrize(
@@ -271,6 +343,11 @@ def test_the_synthetic_workflow_is_in_step_with_the_chain() -> None:
             "the chain is",
             id="steps-reordered",
         ),
+        pytest.param(
+            _workflow([f"{CHAIN_JOBS['check']} {STEPS[0]}", *IN_ORDER]),
+            "the chain is",
+            id="a-step-called-twice",
+        ),
         pytest.param(_workflow([*IN_ORDER, "|"]), "not a step of the chain", id="a-block-scalar"),
         pytest.param(
             _workflow([*IN_ORDER[:-1], f"{CALLS[-1]} && echo more"]),
@@ -281,6 +358,21 @@ def test_the_synthetic_workflow_is_in_step_with_the_chain() -> None:
             _workflow(IN_ORDER, extra="      -   run: uv run mypy\n"),
             "not a step of the chain",
             id="a-dash-with-extra-spaces",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER, hooks=[f"{CHAIN_JOBS['check']} {STEPS[0]}"]),
+            "the hooks job runs something that is not a step",
+            id="the-hooks-job-installs-everything",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER, audit=f"      - run: {CALLS[-1]}\n"),
+            "the audit job calls the chain",
+            id="an-unguarded-job-calls-a-step",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER, audit=f"      - run: |\n          {CALLS[-1]}\n"),
+            "the audit job calls the chain",
+            id="an-unguarded-job-calls-a-step-in-a-block",
         ),
         pytest.param(
             _workflow(IN_ORDER, extra="      - uses: some/lint-action@v1\n"),
@@ -309,12 +401,39 @@ def test_the_synthetic_workflow_is_in_step_with_the_chain() -> None:
         ),
         pytest.param(
             _workflow(IN_ORDER, job_extra="    continue-on-error: true\n"),
-            "allowed to fail",
+            "the check job has `continue-on-error:`",
             id="a-job-allowed-to-fail",
         ),
         pytest.param(
+            _workflow(IN_ORDER, job_extra="    if: false\n"),
+            "the check job has `if:`",
+            id="a-job-skipped",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER, hooks_extra="    continue-on-error: true\n"),
+            "the hooks job has `continue-on-error:`",
+            id="the-hooks-job-allowed-to-fail",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER, hooks_extra="    continue-on-error: ${{ true }}\n"),
+            "the hooks job has `continue-on-error:`",
+            id="the-hooks-job-allowed-to-fail-by-an-expression",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER, extra="          || true\n"),
+            "not `key: value`",
+            id="a-command-continued-on-the-next-line",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER)
+            + "  extra:  # added later\n    steps:\n"
+            + "      - run: uv run python -m scripts.check tests\n",
+            "the extra job calls the chain",
+            id="a-commented-job-calls-the-chain-as-a-module",
+        ),
+        pytest.param(
             _workflow(IN_ORDER, job_env=('DJANGO_DEBUG: "false"',)),
-            "the job sets DJANGO_DEBUG",
+            "the check job sets DJANGO_DEBUG",
             id="the-mode-in-the-job",
         ),
         pytest.param(
@@ -331,9 +450,17 @@ def test_the_drift_guard_names_each_way_of_drifting(workflow: str, reason: str) 
     assert reason in found
 
 
-def test_a_workflow_without_a_check_job_is_an_error_not_a_pass() -> None:
-    with pytest.raises(ValueError, match="check"):
-        drift("jobs:\n  audit:\n    steps:\n      - run: x\n")
+@pytest.mark.parametrize("job", CHAIN_JOBS)
+def test_a_workflow_without_a_chain_job_is_an_error_not_a_pass(job: str) -> None:
+    workflow = _workflow(IN_ORDER).replace(f"  {job}:\n", "  renamed:\n")
+
+    with pytest.raises(ValueError, match=job):
+        drift(workflow)
+
+
+def test_a_job_level_line_the_guard_cannot_read_is_an_error_not_a_pass() -> None:
+    with pytest.raises(ValueError, match="cannot read"):
+        drift(_workflow(IN_ORDER) + "  - run: uv run python scripts/check.py tests\n")
 
 
 def test_ci_runs_exactly_the_chain() -> None:
