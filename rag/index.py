@@ -6,6 +6,10 @@ local (embedded, serverless) Qdrant collection with two named vectors: `dense`
 full `Chunk` payload rides along so retrieval can filter and cite without ever
 reopening the source artifacts.
 
+A directory holds one edition's whole set of files: indexing a directory also
+drops, within the editions it holds, the points of files that left it. A single
+file never deletes another file's points.
+
     uv run python -m rag.index data/chunks
     uv run python -m rag.index "data/chunks/<deck>.classic.jsonl"
 """
@@ -22,7 +26,7 @@ from rag.chunk import Chunk, EditionKey
 from rag.probe import configure_cli_logging
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Iterator, Mapping, Sequence
 
     from qdrant_client import QdrantClient
     from qdrant_client import models as qmodels
@@ -268,6 +272,62 @@ def replace_slides_sources(
         )
 
 
+def sync_editions(
+    client: QdrantClient, seen: Mapping[EditionKey, set[str]], collection: str = COLLECTION
+) -> int:
+    """After a directory run: for each edition the directory holds, delete the
+    points whose source file is no longer in it, and return how many.
+
+    LangChain's `full` cleanup limited to the editions this run saw: another
+    edition, and another directory's edition, is never touched. `main` runs it
+    only after a directory run with no failed file, since the points of a file
+    that failed would look gone. The files and the point count are logged
+    before the delete, which takes exactly the ids that were logged.
+    """
+    from qdrant_client import models
+
+    dropped = 0
+    for edition, files in sorted(seen.items()):
+        gone = models.Filter(
+            must=[
+                models.FieldCondition(key="course", match=models.MatchValue(value=edition.course)),
+                models.FieldCondition(
+                    key="academic_year", match=models.MatchValue(value=edition.academic_year)
+                ),
+            ],
+            must_not=[
+                models.FieldCondition(key="source_file", match=models.MatchAny(any=sorted(files)))
+            ],
+        )
+        ids: list[models.ExtendedPointId] = []
+        names: set[str] = set()
+        offset = None
+        while True:
+            points, offset = client.scroll(
+                collection,
+                scroll_filter=gone,
+                limit=256,
+                offset=offset,
+                with_payload=["source_file"],
+            )
+            ids.extend(point.id for point in points)
+            names.update(str((point.payload or {})["source_file"]) for point in points)
+            if offset is None:
+                break
+        if not ids:
+            continue
+        logger.info(
+            "%s:%s: deleting %d points of files no longer in the directory: %s",
+            edition.course,
+            edition.academic_year,
+            len(ids),
+            ", ".join(sorted(names)),
+        )
+        client.delete(collection, points_selector=models.PointIdsList(points=ids))
+        dropped += len(ids)
+    return dropped
+
+
 def count_web_versions(
     client: QdrantClient, url: str, source: str, collection: str = COLLECTION
 ) -> int:
@@ -321,6 +381,16 @@ def delete_by_run(client: QdrantClient, run_id: str, collection: str = WEB_COLLE
     )
 
 
+def _slides_sources_of(chunks: Sequence[Chunk]) -> set[tuple[str, EditionKey]]:
+    """The (source_file, edition) keys a file's slides chunks replace, and a
+    directory run syncs by."""
+    return {
+        (chunk.source_file, EditionKey(chunk.course, chunk.academic_year))
+        for chunk in chunks
+        if chunk.kind == "slides" and chunk.academic_year is not None
+    }
+
+
 def index_chunks(
     client: QdrantClient,
     chunks: Sequence[Chunk],
@@ -363,13 +433,7 @@ def index_chunks(
     )
     if web_pairs:
         delete_web_versions(client, web_pairs, collection, keep=keep)
-    slides_sources = sorted(
-        {
-            (chunk.source_file, EditionKey(chunk.course, chunk.academic_year))
-            for chunk in chunks
-            if chunk.kind == "slides" and chunk.academic_year is not None
-        }
-    )
+    slides_sources = sorted(_slides_sources_of(chunks))
     if slides_sources:
         replace_slides_sources(client, slides_sources, keep, collection)
     return len(points)
@@ -393,18 +457,37 @@ def main(argv: list[str] | None = None) -> None:
 
     chunk_files = list(collect_chunk_files(args.target))
     failed = 0
+    seen: dict[EditionKey, set[str]] = {}
     for path in chunk_files:
         try:
-            count = index_chunks(client, load_chunks(path), dense, sparse, args.collection)
+            chunks = load_chunks(path)
+            sources = _slides_sources_of(chunks)
+            if any(source in seen.get(edition, set()) for source, edition in sources):
+                # Indexing it would silently replace the other file's points.
+                logger.error("%s: repeats a source file of another file in this run", path.name)
+                failed += 1
+                continue
+            count = index_chunks(client, chunks, dense, sparse, args.collection)
         except Exception:
             # One bad file must not lose the rest of the corpus run.
             logger.exception("%s: indexing failed", path.name)
             failed += 1
             continue
+        for source, edition in sources:
+            seen.setdefault(edition, set()).add(source)
         logger.info("%s: %d chunks upserted", path.name, count)
 
-    client.close()
     print(f"indexed {len(chunk_files) - failed}/{len(chunk_files)}")
+    # A web directory holds no slides edition, so it has nothing to sync.
+    if args.target.is_dir() and seen:
+        if failed:
+            logger.warning(
+                "sync skipped: %d file(s) failed, and their points would look gone", failed
+            )
+        else:
+            dropped = sync_editions(client, seen, args.collection)
+            print(f"dropped {dropped} points of files no longer in {args.target}")
+    client.close()
     if failed:
         raise SystemExit(1)
 

@@ -291,17 +291,9 @@ def test_load_chunks_skips_blank_lines(tmp_path: Path) -> None:
     assert load_chunks(path) == [chunk]
 
 
-def test_cli_survives_a_bad_file_and_reports_the_tally(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """One corrupt JSONL must not lose the rest of the corpus run, but it must
-    still fail the exit code so automation notices."""
-    chunks_dir = tmp_path / "chunks"
-    chunks_dir.mkdir()
-    (chunks_dir / "deck.classic.jsonl").write_text(
-        make_chunk().model_dump_json() + "\n", encoding="utf-8"
-    )
-    (chunks_dir / "bad.classic.jsonl").write_text("not json\n", encoding="utf-8")
+@pytest.fixture
+def stub_encoders(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The CLI builds its own encoders; these stand in for the real models."""
 
     def stub_dense(model_name: str) -> DenseEncoder:
         return StubDense()
@@ -311,9 +303,93 @@ def test_cli_survives_a_bad_file_and_reports_the_tally(
 
     monkeypatch.setattr("rag.index.build_dense_encoder", stub_dense)
     monkeypatch.setattr("rag.index.build_sparse_encoder", stub_sparse)
+
+
+def write_chunk_file(
+    path: Path, source_file: str, sha: str, academic_year: str = "2025-2026"
+) -> None:
+    """One PDF's chunk file as `rag.chunk` writes it: a `Chunk` per JSONL line."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    chunks = [
+        chunk.model_copy(update={"source_file": source_file})
+        for chunk in make_deck(academic_year, sha, 1)
+    ]
+    path.write_text("".join(chunk.model_dump_json() + "\n" for chunk in chunks), encoding="utf-8")
+
+
+def indexed_files(qdrant_path: Path) -> set[tuple[str, str]]:
+    """(academic_year, source_file) of every point the CLI left behind."""
+    stored = open_client(qdrant_path)
+    points, _ = stored.scroll(COLLECTION, limit=100, with_payload=True)
+    stored.close()
+    return {
+        (str((point.payload or {})["academic_year"]), str((point.payload or {})["source_file"]))
+        for point in points
+    }
+
+
+@pytest.mark.parametrize("change", ["deleted", "renamed"])
+@pytest.mark.usefixtures("stub_encoders")
+def test_directory_index_drops_the_files_that_left_it(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], change: str
+) -> None:
+    """A deck deleted or renamed in the directory must stop answering, and the
+    same deck in another edition, indexed from another directory, must not."""
+    qdrant = tmp_path / "qdrant"
+    older, current = tmp_path / "2024-2025", tmp_path / "2025-2026"
+    write_chunk_file(older / "b.classic.jsonl", "b.pdf", "bb" * 32, "2024-2025")
+    write_chunk_file(current / "a.classic.jsonl", "a.pdf", "aa" * 32)
+    write_chunk_file(current / "b.classic.jsonl", "b.pdf", "bb" * 32)
+    main([str(older), "--qdrant-path", str(qdrant)])
+    main([str(current), "--qdrant-path", str(qdrant)])
+
+    (current / "b.classic.jsonl").unlink()
+    if change == "renamed":
+        write_chunk_file(current / "c.classic.jsonl", "c.pdf", "bb" * 32)
+    capsys.readouterr()
+    main([str(current), "--qdrant-path", str(qdrant)])
+
+    assert "dropped" in capsys.readouterr().out
+    renamed = {("2025-2026", "c.pdf")} if change == "renamed" else set()
+    assert indexed_files(qdrant) == {("2025-2026", "a.pdf"), ("2024-2025", "b.pdf"), *renamed}
+
+
+@pytest.mark.usefixtures("stub_encoders")
+def test_single_file_index_deletes_no_other_file(tmp_path: Path) -> None:
+    """Updating one file is how a partial update is done: it must not read as
+    a directory that lost every other file."""
+    qdrant = tmp_path / "qdrant"
+    write_chunk_file(tmp_path / "chunks" / "a.classic.jsonl", "a.pdf", "aa" * 32)
+    write_chunk_file(tmp_path / "chunks" / "b.classic.jsonl", "b.pdf", "bb" * 32)
+    main([str(tmp_path / "chunks"), "--qdrant-path", str(qdrant)])
+    main([str(tmp_path / "chunks" / "a.classic.jsonl"), "--qdrant-path", str(qdrant)])
+    assert indexed_files(qdrant) == {("2025-2026", "a.pdf"), ("2025-2026", "b.pdf")}
+
+
+@pytest.mark.parametrize("failure", ["corrupt", "duplicate-source"])
+@pytest.mark.usefixtures("stub_encoders")
+def test_cli_survives_a_bad_file_and_reports_the_tally(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], failure: str
+) -> None:
+    """One bad file must not lose the rest of the corpus run, but it must still
+    fail the exit code so automation notices, and skip the sync: the points of
+    a file that failed would look gone. Two files of one source in one edition
+    count as a failure, since the second would silently replace the first."""
+    qdrant = tmp_path / "qdrant"
+    write_chunk_file(tmp_path / "gone.classic.jsonl", "gone.pdf", "ee" * 32)
+    main([str(tmp_path / "gone.classic.jsonl"), "--qdrant-path", str(qdrant)])
+    chunks_dir = tmp_path / "chunks"
+    write_chunk_file(chunks_dir / "deck.classic.jsonl", "deck.pdf", "aa" * 32)
+    if failure == "corrupt":
+        (chunks_dir / "bad.classic.jsonl").write_text("not json\n", encoding="utf-8")
+    else:
+        write_chunk_file(chunks_dir / "deck-copy.classic.jsonl", "deck.pdf", "aa" * 32)
+
+    capsys.readouterr()
     with pytest.raises(SystemExit):
-        main([str(chunks_dir), "--qdrant-path", str(tmp_path / "qdrant")])
+        main([str(chunks_dir), "--qdrant-path", str(qdrant)])
     assert "indexed 1/2" in capsys.readouterr().out
+    assert ("2025-2026", "gone.pdf") in indexed_files(qdrant)
 
 
 def test_importing_index_loads_none_of_the_heavy_dependencies() -> None:
