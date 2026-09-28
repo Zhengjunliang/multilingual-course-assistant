@@ -243,21 +243,28 @@ def main(argv: list[str] | None = None) -> None:
     if ingest_source is None and args.ingest_source != parser.get_default("ingest_source"):
         logger.warning("--live on opens the filter; --ingest-source %s ignored", args.ingest_source)
 
-    dense = build_dense_encoder(args.dense_model)
-    sparse = build_sparse_encoder()
-    reranker = None if args.no_rerank else build_reranker(args.rerank_model)
     client = open_client(args.qdrant_path)
     # An index without the pinned edition would score every slides question a
-    # MISS and report a false 0/N; stop and say why instead.
+    # MISS and report a false 0/N; stop and say why, before the ~2.4GB of VRAM
+    # the retrieval stack costs is spent on an index that cannot answer.
     if any(question.target == COLLECTION for question in questions) and (
         not client.collection_exists(COLLECTION)
         or client.count(COLLECTION, count_filter=payload_filter(None, scope=EVAL_SCOPE)).count == 0
     ):
         client.close()
-        edition = ", ".join(f"{key.course}:{key.academic_year}" for key in EVAL_SCOPE)
-        raise SystemExit(
-            f"no slides point in {edition}: relabel or re-index the slides collection first (#96)"
+        editions = ", ".join(f"{key.course}:{key.academic_year}" for key in EVAL_SCOPE)
+        parse_runs = " and ".join(
+            f"rag.parse --course {key.course} --academic-year {key.academic_year}"
+            for key in EVAL_SCOPE
         )
+        raise SystemExit(
+            f"the index holds no slides point of {editions}: rebuild the slides with "
+            f"{parse_runs}, then rag.chunk and rag.index (#96)"
+        )
+
+    dense = build_dense_encoder(args.dense_model)
+    sparse = build_sparse_encoder()
+    reranker = None if args.no_rerank else build_reranker(args.rerank_model)
 
     scored = 0
     per_locale: dict[str, list[bool]] = {}

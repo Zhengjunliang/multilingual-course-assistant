@@ -171,6 +171,12 @@ def test_cli_reports_hits_and_rate(
     )
     index_chunks(other, [last_year], StubDense(), StubSparse())
     other.close()
+
+    def no_model(*args: object) -> None:
+        raise AssertionError("the edition guard must stop the run before any model is built")
+
+    monkeypatch.setattr("rag.index.build_dense_encoder", no_model)
+    monkeypatch.setattr("rag.index.build_sparse_encoder", no_model)
     with pytest.raises(SystemExit, match="B028451:2025-2026"):
         main([str(gold_file), "--qdrant-path", str(other_path), "--no-rerank"])
 
