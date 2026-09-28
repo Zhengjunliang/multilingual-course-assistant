@@ -72,6 +72,9 @@ class Guard:
     # The files the guard reads, when it reads a fixed set rather than the
     # files its hook passes it.
     paths: tuple[str, ...] = ()
+    # Whether it reads every tracked file: rules about references between
+    # files, which a commit can break without touching the file that refers.
+    repository: bool = False
 
 
 @dataclass(frozen=True)

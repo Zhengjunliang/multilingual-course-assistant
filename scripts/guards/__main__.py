@@ -9,11 +9,31 @@ from __future__ import annotations
 
 import argparse
 import io
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 from scripts.guards import run
 from scripts.guards.registry import GUARDS, RULE_IDS
+
+
+def _tracked() -> list[str]:
+    git = shutil.which("git")
+    if git is None:
+        raise SystemExit("git is not on PATH, and this guard reads every tracked file")
+    listed = subprocess.run(
+        [git, "ls-files", "-z"], capture_output=True, text=True, encoding="utf-8", check=True
+    )
+    return [path for path in listed.stdout.split("\0") if path]
+
+
+def _text(path: Path) -> str:
+    """The file's text; a binary file is there to be linked to, not read."""
+    try:
+        return path.read_bytes().decode("utf-8")
+    except (UnicodeDecodeError, OSError):
+        return ""
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,8 +43,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     guard = GUARDS[args.guard]
-    paths = guard.paths or args.files
-    files = {Path(path).as_posix(): Path(path).read_bytes().decode("utf-8") for path in paths}
+    paths = _tracked() if guard.repository else (guard.paths or args.files)
+    files = {Path(path).as_posix(): _text(Path(path)) for path in paths}
     findings = run(guard, files, RULE_IDS)
     # A finding quotes the file, and on Windows the pipe pre-commit reads this
     # through is encoded in the ANSI code page unless told otherwise.

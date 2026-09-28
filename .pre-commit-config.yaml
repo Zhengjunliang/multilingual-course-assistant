@@ -70,6 +70,20 @@ repos:
         language: python
         entry: python -m scripts.guards language
         types_or: [python, javascript, ts, tsx, markdown]
+      # The documentation conventions of CLAUDE.md: one file at a time for
+      # what one file shows, the whole repository on every commit for
+      # references, which break when their target moves.
+      - id: doc-conventions
+        name: status markers carry evidence, no temporal words, no heading links
+        language: python
+        entry: python -m scripts.guards doc-conventions
+        types_or: [markdown]
+      - id: doc-references
+        name: links, document paths, decision entries and cited paths resolve
+        language: python
+        entry: python -m scripts.guards doc-references
+        pass_filenames: false
+        always_run: true
       # Agent rule 6 of CLAUDE.md: one correct implementation, with the old
       # versions in git history rather than beside the file. A `v2` or later
       # counts, since it implies a `v1` beside it; a lone `v1` may be an API's.
