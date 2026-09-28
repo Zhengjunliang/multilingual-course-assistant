@@ -114,7 +114,7 @@ def test_pick_autogrow_guarantees_pdf_presence() -> None:
     candidates += [
         ("https://ingegneria.unifi.it/upload/m1.pdf", "Modulo uno"),
         ("https://ingegneria.unifi.it/upload/m2.pdf", "Modulo due"),
-        ("https://ingegneria.unifi.it/upload/m3.pdf", "Modulo tre"),
+        ("https://ingegneria.unifi.it/upload/m3.pdf", "Modulo tre"),  # spellchecker:disable-line
     ]
     picked = pick_autogrow(candidates, seed=3)
     assert len(picked) == 8
