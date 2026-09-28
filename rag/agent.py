@@ -247,7 +247,7 @@ def route(question: str, completer: Completer, history: Sequence[Turn] = ()) -> 
     It arrives as a prefix inside the one user message, never as extra
     conversation turns. The system prompt above demands a bare JSON object, and
     an `assistant` message holding prose is a demonstration of the opposite; the
-    measured cost of a mis-taught router is `route` falling back to `both` on
+    measured cost of a wrongly taught router is `route` falling back to `both` on
     questions it used to place, which is the router's fallback count moving off
     zero without a single test noticing.
 
