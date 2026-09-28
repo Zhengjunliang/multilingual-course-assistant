@@ -2,11 +2,12 @@
 
 One query fans out into two prefetch branches — dense (Qwen3-Embedding, query
 prompt) and sparse (BM25) — fused with Reciprocal Rank Fusion, then optionally
-reordered by Qwen3-Reranker. Payload filters (`--locale`, `--course`) must sit
+reordered by Qwen3-Reranker. Payload filters (`--locale`, `--scope`) must sit
 inside *each* prefetch branch: with fusion queries the embedded Qdrant ignores
 a top-level filter (verified empirically).
 
     uv run python -m rag.search "What is an ORM?"
+    uv run python -m rag.search "What is an ORM?" --scope B028451:2025-2026
     uv run python -m rag.search "Cosa sono le migrazioni?" --locale it --no-rerank
 """
 
@@ -19,7 +20,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from pydantic import BaseModel, ConfigDict
 
-from rag.chunk import Chunk, locale_arg
+from rag.chunk import Chunk, edition_arg, locale_arg
 from rag.index import (
     COLLECTION,
     DEFAULT_DENSE_MODEL,
@@ -40,6 +41,8 @@ if TYPE_CHECKING:
 
     from qdrant_client import QdrantClient
     from qdrant_client import models as qmodels
+
+    from rag.chunk import EditionKey
 
 logger = logging.getLogger(__name__)
 
@@ -121,27 +124,54 @@ def build_reranker(model_name: str = DEFAULT_RERANK_MODEL) -> Reranker:
 
 def payload_filter(
     locale: str | None,
-    course: str | None,
+    *,
+    scope: Sequence[EditionKey] | None,
     ingest_source: str | None = None,
     ingest_run_id: str | None = None,
 ) -> qmodels.Filter | None:
     """Equality conditions for one prefetch branch. The web-source pair
     (`ingest_source`, `ingest_run_id`) exists for eval isolation and rollback
-    on `unifi_web`; scoping them to that collection is `search()`'s job."""
+    on `unifi_web`, and `scope` for the slides editions a caller may see;
+    keeping each to its own collection is `search()`'s job.
+
+    `scope=None` adds no condition; a non-empty scope matches a point of any
+    listed edition. An empty scope raises instead of becoming a filter: Qdrant
+    reads an empty `should` as no condition at all, so `[]` would match every
+    edition — the opposite of what it means (docs/data-model.md)."""
     from qdrant_client import models
 
     fields = (
         ("locale", locale),
-        ("course", course),
         ("ingest_source", ingest_source),
         ("ingest_run_id", ingest_run_id),
     )
-    conditions = [
+    conditions: list[qmodels.Condition] = [
         models.FieldCondition(key=key, match=models.MatchValue(value=value))
         for key, value in fields
         if value
     ]
-    return models.Filter(must=list(conditions)) if conditions else None
+    if scope is not None:
+        if not scope:
+            raise ValueError("an empty scope matches no slides: skip the branch, never query it")
+        conditions.append(
+            models.Filter(
+                should=[
+                    models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="course", match=models.MatchValue(value=edition.course)
+                            ),
+                            models.FieldCondition(
+                                key="academic_year",
+                                match=models.MatchValue(value=edition.academic_year),
+                            ),
+                        ]
+                    )
+                    for edition in scope
+                ]
+            )
+        )
+    return models.Filter(must=conditions) if conditions else None
 
 
 def hybrid_search(
@@ -150,18 +180,22 @@ def hybrid_search(
     dense: DenseEncoder,
     sparse: SparseEncoder,
     *,
+    scope: Sequence[EditionKey] | None,
     limit: int = 5,
     prefetch_limit: int = PREFETCH_LIMIT,
     locale: str | None = None,
-    course: str | None = None,
     collection: str = COLLECTION,
     ingest_source: str | None = None,
     ingest_run_id: str | None = None,
 ) -> list[Hit]:
     from qdrant_client import models
 
+    if scope is not None and not scope:
+        return []  # `[]` sees no slides (docs/data-model.md), so nothing is queried
     indices, values = sparse.encode_query(query)
-    query_filter = payload_filter(locale, course, ingest_source, ingest_run_id)
+    query_filter = payload_filter(
+        locale, scope=scope, ingest_source=ingest_source, ingest_run_id=ingest_run_id
+    )
     response = client.query_points(
         collection,
         prefetch=[
@@ -219,9 +253,9 @@ def search(
     sparse: SparseEncoder,
     reranker: Reranker | None,
     *,
+    scope: Sequence[EditionKey] | None,
     limit: int = 5,
     locale: str | None = None,
-    course: str | None = None,
     collections: Sequence[str] = (COLLECTION,),
     ingest_source: str | None = None,
     ingest_run_id: str | None = None,
@@ -231,7 +265,9 @@ def search(
     `limit`; without one, fusion order interleaves round-robin (the M3
     no-rerank baseline). The web-source conditions apply only to the
     `unifi_web` branch (the eval-isolation rule, docs/architecture.md): slides prefetches never
-    carry them, so slides retrieval semantics cannot drift with web features."""
+    carry them, so slides retrieval semantics cannot drift with web features.
+    `scope` applies only to the slides branch, the other way round: in
+    `unifi_web`, `course` is a site-section slug that no edition matches."""
     pools: list[list[Hit]] = []
     for collection in collections:
         is_web = collection == WEB_COLLECTION
@@ -241,9 +277,9 @@ def search(
                 query,
                 dense,
                 sparse,
+                scope=None if is_web else scope,
                 limit=PREFETCH_LIMIT if reranker else limit,
                 locale=locale,
-                course=course,
                 collection=collection,
                 ingest_source=ingest_source if is_web else None,
                 ingest_run_id=ingest_run_id if is_web else None,
@@ -271,7 +307,14 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--no-rerank", action="store_true", help="fusion order only (M3 baseline)")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--locale", type=locale_arg, default=None)
-    parser.add_argument("--course", default=None)
+    parser.add_argument(
+        "--scope",
+        action="append",
+        type=edition_arg,
+        default=None,
+        metavar="CODE:YEAR",
+        help="limit slides to this edition; repeat for several (default: every edition)",
+    )
     args = parser.parse_args(argv)
 
     configure_cli_logging()
@@ -287,9 +330,9 @@ def main(argv: list[str] | None = None) -> None:
         dense,
         sparse,
         reranker,
+        scope=args.scope,
         limit=args.top_k,
         locale=args.locale,
-        course=args.course,
         collections=tuple(args.collection) if args.collection else (COLLECTION,),
     )
     client.close()

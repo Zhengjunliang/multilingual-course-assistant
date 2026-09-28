@@ -99,7 +99,7 @@ Course PDFs go in `data/corpus/<course>/` (gitignored). Every command below is `
 | `parse` | parse with Docling following that routing → `data\parsed\` | `data\corpus\PPM --course B028451 --academic-year 2025-2026` · `"<file>.pdf" --course B028451 --academic-year 2025-2026 --profile manual --pipeline vlm` |
 | `chunk` | chunk parsed documents → `data\chunks\*.jsonl` | `data\parsed` |
 | `index` | encode into the local Qdrant collection → `data\qdrant\` | `data\chunks` |
-| `search` | hybrid retrieval (dense + BM25 + RRF) + Qwen3 reranker | `"What is an ORM?"` |
+| `search` | hybrid retrieval (dense + BM25 + RRF) + Qwen3 reranker | `"What is an ORM?"` · `"What is an ORM?" --scope B028451:2025-2026` |
 | `answer` | retrieve + generate a cited answer | `"What is an ORM?"` |
 | `agent` | route to course or campus collection, retrieve, answer; deepens by fetching linked pages unless `--no-deepen` | `"Quando scadono le tasse?"` |
 | `gold` | retrieval hit@k over a gold set, or the router's report with `--routing` | `gold\smoke.jsonl` · `gold\campus.jsonl --routing` |

@@ -25,8 +25,9 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, ConfigDict, Field
 
 from rag.agent import FALLBACK_REASON, collections_for, route
+from rag.chunk import EditionKey
 from rag.probe import configure_cli_logging
-from rag.search import DEFAULT_RERANK_MODEL, build_reranker, search
+from rag.search import DEFAULT_RERANK_MODEL, build_reranker, payload_filter, search
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -35,6 +36,10 @@ if TYPE_CHECKING:
     from rag.search import Hit
 
 logger = logging.getLogger(__name__)
+
+# The evaluation scope is pinned, never the current edition: a switch must not
+# move an M3 number (`#96`).
+EVAL_SCOPE = (EditionKey("B028451", "2025-2026"),)
 
 
 class GoldQuestion(BaseModel):
@@ -146,6 +151,7 @@ def routing_report(questions: Sequence[GoldQuestion], completer: Completer) -> R
 
 def main(argv: list[str] | None = None) -> None:
     from rag.index import (
+        COLLECTION,
         DEFAULT_DENSE_MODEL,
         DEFAULT_QDRANT_DIR,
         build_dense_encoder,
@@ -241,6 +247,17 @@ def main(argv: list[str] | None = None) -> None:
     sparse = build_sparse_encoder()
     reranker = None if args.no_rerank else build_reranker(args.rerank_model)
     client = open_client(args.qdrant_path)
+    # An index without the pinned edition would score every slides question a
+    # MISS and report a false 0/N; stop and say why instead.
+    if any(question.target == COLLECTION for question in questions) and (
+        not client.collection_exists(COLLECTION)
+        or client.count(COLLECTION, count_filter=payload_filter(None, scope=EVAL_SCOPE)).count == 0
+    ):
+        client.close()
+        edition = ", ".join(f"{key.course}:{key.academic_year}" for key in EVAL_SCOPE)
+        raise SystemExit(
+            f"no slides point in {edition}: relabel or re-index the slides collection first (#96)"
+        )
 
     scored = 0
     per_locale: dict[str, list[bool]] = {}
@@ -255,6 +272,7 @@ def main(argv: list[str] | None = None) -> None:
             dense,
             sparse,
             reranker,
+            scope=EVAL_SCOPE,
             limit=args.top_k,
             collections=(question.target,),
             # Single passthrough, no per-collection branching: `search()` drops

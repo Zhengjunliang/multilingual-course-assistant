@@ -35,11 +35,11 @@ erDiagram
 
 ## The contract between `apps/` and `rag/`
 
-🔜 M5. `rag/` never imports Django, so no model instance crosses the boundary: only strings, `EditionKey(course, academic_year)` — a `NamedTuple` of two strings defined in `rag/` — and plain dicts.
+✅ `rag/search.py` takes `scope`. 🔜 M5: `apps/qa/engine.py` passes `None` until `#36` computes a scope, and the anonymous path of `#93` passes `[]`. `rag/` never imports Django, so no model instance crosses the boundary: only strings, `EditionKey(course, academic_year)` — a `NamedTuple` of two strings defined in `rag/` — and plain dicts.
 
-- The search functions take `scope: Sequence[EditionKey] | None` in place of the single `course` string, keyword-only and with no default; the command line takes `--scope CODE:YEAR`.
-- `scope=None` means unrestricted. The command line and the evaluation pass it, and so does `apps/qa/engine.py` for logged-in requests until `#36` computes a scope. The gold runs pin PPM's own pair, never `is_current`.
-- `scope=[]` means the slides collection is skipped; an anonymous request passes it.
+- The search functions take `scope: Sequence[EditionKey] | None` in place of the single `course` string, keyword-only and with no default; the command line takes `--scope CODE:YEAR`, once per edition.
+- `scope=None` means unrestricted. The command line passes it when `--scope` is absent, `rag.answer` and `rag.agent` always, and `apps/qa/engine.py` for logged-in requests. The gold runs pin PPM's own pair (`rag/gold.py`), never the current edition, and stop when the index holds none of it.
+- `scope=[]` means the slides collection is skipped: no query runs, because Qdrant reads an empty `should` as no condition and would match every edition.
 - The scope applies to the slides branch only, written inside each prefetch branch for the reason given in [docling-pipeline.md](docling-pipeline.md), section 4.1, under the fusion trap.
 - In the web collection, `course` is a site-section slug such as `ingegneria` (values listed in [docling-pipeline.md](docling-pipeline.md), section 3.6), not a course key; a scope never matches it.
 

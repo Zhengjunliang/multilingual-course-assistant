@@ -3,16 +3,17 @@ inside every prefetch branch (a top-level filter is silently ignored under
 fusion — verified against the embedded Qdrant), and keep the reranker an
 optional, swappable stage. All tests run offline on stub encoders."""
 
+import inspect
 import subprocess
 import sys
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 
 import pytest
 from qdrant_client import QdrantClient
 from test_index import StubDense, StubSparse, make_chunk
 
-from rag.chunk import Chunk
+from rag.chunk import Chunk, EditionKey, chunk_id_of
 from rag.index import (
     WEB_COLLECTION,
     DenseEncoder,
@@ -26,6 +27,7 @@ from rag.search import (
     Reranker,
     hybrid_search,
     main,
+    payload_filter,
     rerank_hits,
     round_robin,
     search,
@@ -75,10 +77,14 @@ class KeywordReranker:
 
 
 def test_locale_filter_applies_to_both_prefetch_branches(client: QdrantClient) -> None:
-    hits = hybrid_search(client, MIGRAZIONI_TEXT, StubDense(), StubSparse(), locale="it")
+    hits = hybrid_search(
+        client, MIGRAZIONI_TEXT, StubDense(), StubSparse(), scope=None, locale="it"
+    )
     assert hits
     assert all(hit.chunk.locale == "it" for hit in hits)
-    hits = hybrid_search(client, MIGRAZIONI_TEXT, StubDense(), StubSparse(), locale="en")
+    hits = hybrid_search(
+        client, MIGRAZIONI_TEXT, StubDense(), StubSparse(), scope=None, locale="en"
+    )
     assert all(hit.chunk.locale == "en" for hit in hits)
 
 
@@ -97,13 +103,15 @@ def test_rerank_of_no_hits_is_empty() -> None:
 
 
 def test_search_without_reranker_keeps_fusion_order(client: QdrantClient) -> None:
-    hits = search(client, ORM_TEXT, StubDense(), StubSparse(), None, limit=2)
+    hits = search(client, ORM_TEXT, StubDense(), StubSparse(), None, scope=None, limit=2)
     assert len(hits) <= 2
     assert hits[0].chunk.text == ORM_TEXT
 
 
 def test_search_with_reranker_promotes_its_ranking(client: QdrantClient) -> None:
-    hits = search(client, "django orm", StubDense(), StubSparse(), KeywordReranker(), limit=1)
+    hits = search(
+        client, "django orm", StubDense(), StubSparse(), KeywordReranker(), scope=None, limit=1
+    )
     assert [hit.chunk.text for hit in hits] == [ORM_TEXT]
 
 
@@ -125,6 +133,7 @@ def test_multi_collection_pool_reranks_across_both(two_collection_client: Qdrant
         StubDense(),
         StubSparse(),
         KeywordReranker(),
+        scope=None,
         limit=1,
         collections=("slides", WEB_COLLECTION),
     )
@@ -140,6 +149,7 @@ def test_no_rerank_multi_collection_interleaves_round_robin(
         StubDense(),
         StubSparse(),
         None,
+        scope=None,
         limit=2,
         collections=("slides", WEB_COLLECTION),
     )
@@ -171,6 +181,7 @@ def test_web_source_conditions_reach_only_the_unifi_web_branches(
         StubDense(),
         StubSparse(),
         None,
+        scope=None,
         collections=("slides", WEB_COLLECTION),
         ingest_source="crawl",
     )
@@ -180,11 +191,82 @@ def test_web_source_conditions_reach_only_the_unifi_web_branches(
 
 
 def test_slides_hits_are_unchanged_by_web_source_conditions(client: QdrantClient) -> None:
-    baseline = search(client, ORM_TEXT, StubDense(), StubSparse(), None, limit=3)
+    baseline = search(client, ORM_TEXT, StubDense(), StubSparse(), None, scope=None, limit=3)
     with_source = search(
-        client, ORM_TEXT, StubDense(), StubSparse(), None, limit=3, ingest_source="crawl"
+        client,
+        ORM_TEXT,
+        StubDense(),
+        StubSparse(),
+        None,
+        scope=None,
+        limit=3,
+        ingest_source="crawl",
     )
     assert with_source == baseline
+
+
+@pytest.mark.parametrize(
+    "function",
+    [payload_filter, hybrid_search, search],
+    ids=["payload_filter", "hybrid_search", "search"],
+)
+def test_scope_is_keyword_only_without_default(function: Callable[..., object]) -> None:
+    """pyright catches a call that forgets `scope`; it cannot catch a default
+    that makes forgetting it legal, and silently unrestricted."""
+    parameter = inspect.signature(function).parameters["scope"]
+    assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameter.default is inspect.Parameter.empty
+
+
+THIS_YEAR = EditionKey("B028451", "2025-2026")
+LAST_YEAR = EditionKey("B028451", "2024-2025")
+
+
+@pytest.mark.parametrize(
+    ("scope", "editions"),
+    [
+        (None, {THIS_YEAR, LAST_YEAR}),
+        ([THIS_YEAR], {THIS_YEAR}),
+        ([THIS_YEAR, LAST_YEAR], {THIS_YEAR, LAST_YEAR}),
+        ([], set()),
+    ],
+    ids=["unrestricted", "one", "any-of-two", "empty"],
+)
+def test_scope_decides_which_slides_editions_a_search_sees(
+    two_collection_client: QdrantClient,
+    scope: list[EditionKey] | None,
+    editions: set[EditionKey],
+) -> None:
+    """The scope sits inside both slides prefetch branches and in no web one:
+    at the top level fusion ignores it and the other edition leaks back in; in
+    the web branches no page matches it, and campus answers vanish. `[]` sees
+    no slides at all, never every edition."""
+    last_year = make_chunk(0, ORM_TEXT)
+    last_year = last_year.model_copy(
+        update={
+            "academic_year": LAST_YEAR.academic_year,
+            "chunk_id": chunk_id_of(
+                LAST_YEAR, last_year.source_sha256, last_year.parse_variant, last_year.chunk_index
+            ),
+        }
+    )
+    index_chunks(two_collection_client, [last_year], StubDense(), StubSparse())
+
+    hits = search(
+        two_collection_client,
+        ORM_TEXT,
+        StubDense(),
+        StubSparse(),
+        None,
+        scope=scope,
+        collections=("slides", WEB_COLLECTION),
+    )
+
+    seen = {
+        (hit.chunk.course, hit.chunk.academic_year) for hit in hits if hit.chunk.kind == "slides"
+    }
+    assert seen == editions
+    assert [hit.chunk.url for hit in hits if hit.chunk.kind == "web"] == [TASSE_URL]
 
 
 def test_cli_prints_ranked_citations(
@@ -216,6 +298,17 @@ def test_cli_prints_ranked_citations(
 
     main([ORM_TEXT, "--qdrant-path", str(qdrant_path), "--no-rerank", "--locale", "en"])
     assert "deck.pdf p.1" in capsys.readouterr().out
+
+    main(
+        [ORM_TEXT, "--qdrant-path", str(qdrant_path), "--no-rerank", "--scope", "B028451:2025-2026"]
+    )
+    assert "deck.pdf p.1" in capsys.readouterr().out
+
+    # A malformed edition stops at the flag, before any model or index opens.
+    for value, reason in (("B003725", "expected CODE:YEAR"), ("B028451:2025/2026", "invariant 1")):
+        with pytest.raises(SystemExit):
+            main([ORM_TEXT, "--qdrant-path", str(qdrant_path), "--scope", value])
+        assert reason in capsys.readouterr().err
 
 
 def test_importing_search_loads_none_of_the_heavy_dependencies() -> None:

@@ -232,6 +232,7 @@ def main(argv: list[str] | None = None) -> None:
         dense,
         sparse,
         reranker,
+        scope=None,
         limit=args.top_k,
         collections=tuple(args.collection) if args.collection else (COLLECTION,),
     )

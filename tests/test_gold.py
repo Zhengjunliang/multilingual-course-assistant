@@ -12,7 +12,15 @@ from test_agent import ScriptedCompleter
 from test_index import StubDense, StubSparse, make_chunk
 from test_search import ORM_TEXT, TASSE_TEXT, TASSE_URL, make_web_chunk
 
-from rag.gold import GoldQuestion, is_hit, load_gold, main, missing_answer_refs, routing_report
+from rag.gold import (
+    EVAL_SCOPE,
+    GoldQuestion,
+    is_hit,
+    load_gold,
+    main,
+    missing_answer_refs,
+    routing_report,
+)
 from rag.index import WEB_COLLECTION, ensure_collection, index_chunks, open_client
 from rag.search import Hit
 
@@ -149,6 +157,23 @@ def test_cli_reports_hits_and_rate(
     assert "q001 MISS" in out
     assert "hit@5: 1/2 (50%)" in out
 
+    # An index holding only another edition stops the run instead of
+    # reporting a false 0/2 against the pinned one.
+    other_path = tmp_path / "other-edition"
+    other = open_client(other_path)
+    ensure_collection(other, StubDense().dimension())
+    last_year = make_chunk(0, ORM_TEXT)
+    last_year = last_year.model_copy(
+        update={
+            "academic_year": "2024-2025",
+            "chunk_id": last_year.chunk_id.replace("2025-2026", "2024-2025"),
+        }
+    )
+    index_chunks(other, [last_year], StubDense(), StubSparse())
+    other.close()
+    with pytest.raises(SystemExit, match="B028451:2025-2026"):
+        main([str(gold_file), "--qdrant-path", str(other_path), "--no-rerank"])
+
 
 def test_cli_scores_each_question_against_its_target_collection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -229,6 +254,8 @@ def test_cli_pins_retrieval_to_the_crawl_snapshot_by_default(
     main([str(gold_file), "--qdrant-path", str(tmp_path / "qdrant"), "--no-rerank"])
     capsys.readouterr()
     assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [("crawl", None)]
+    # The edition is pinned the same way, so a switch cannot move a gate number.
+    assert [call["scope"] for call in calls] == [EVAL_SCOPE]
 
 
 def test_cli_forwards_snapshot_and_ingest_source_to_search(
