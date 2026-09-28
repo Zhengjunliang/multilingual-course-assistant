@@ -39,3 +39,24 @@ repos:
     rev: 8ff2449591c8de025b17661ba76d60237a1ae62b # frozen: 0.12.1
     hooks:
       - id: uv-lock
+
+  # Rules of this repository that no off-the-shelf linter knows. The python
+  # ones are guards of scripts/guards, each rule proven by the good and bad
+  # examples tests/test_guards.py runs; `language: python` gives them a
+  # virtualenv of their own, which is why they use the standard library only.
+  - repo: local
+    hooks:
+      - id: env-example-parity
+        name: .env.example names exactly the variables config/env.py reads
+        language: python
+        entry: python -m scripts.guards env-example-parity
+        files: ^(\.env\.example|config/env\.py)$
+        pass_filenames: false
+      # Agent rule 6 of CLAUDE.md: one correct implementation, with the old
+      # versions in git history rather than beside the file. A `v2` or later
+      # counts, since it implies a `v1` beside it; a lone `v1` may be an API's.
+      - id: no-parallel-versions
+        name: no second version of a file next to the first
+        language: fail
+        entry: "a parallel version of a file; keep one, git history holds the old ones:"
+        files: '(?i)(\.(old|bak|orig)$|[-_]old\.[^/]*$|[-_]v[2-9][0-9]*(\.[^/]*)?(/|$)| (- )?copy( \(?[0-9]+\)?)?(\.[^/]*)?$)'
