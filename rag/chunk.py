@@ -305,13 +305,18 @@ def chunk_document(
     """
     from docling_core.transforms.chunker.doc_chunk import DocMeta
 
-    # A slides sidecar without a year keeps the unprefixed id form, the one
-    # every slides chunk had before `#96`.
-    edition = (
-        edition_of(meta.course, meta.academic_year)
-        if meta.kind == "slides" and meta.academic_year
-        else None
-    )
+    # A slides sidecar without an edition cannot be reindexed correctly (its
+    # chunk ids would collide with any other edition of the same deck), so it
+    # is a hard failure rather than a silent unprefixed id; a web sidecar has
+    # no edition by construction and keeps `edition=None`.
+    edition: EditionKey | None = None
+    if meta.kind == "slides":
+        if meta.academic_year is None:
+            raise ValueError(
+                f"{meta.source_file}: a slides sidecar without academic_year; "
+                "parse it again with --academic-year"
+            )
+        edition = edition_of(meta.course, meta.academic_year)
 
     furniture = furniture_headings(document)
     chunks: list[Chunk] = []

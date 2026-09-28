@@ -8,9 +8,12 @@ original PDF and never import docling. By default each file is profiled first an
 parsed with the configuration that profile calls for (see `rag.probe`);
 `--profile manual` forces one configuration, which is what experiments need:
 
-    uv run python -m rag.parse data/corpus/PPM --out-dir data/parsed
-    uv run python -m rag.parse "data/corpus/PPM/<slides>.pdf" --profile manual --ocr
-    uv run python -m rag.parse "data/corpus/PPM/<slides>.pdf" --profile manual --pipeline vlm
+    uv run python -m rag.parse data/corpus/PPM \
+        --course B028451 --academic-year 2025-2026 --out-dir data/parsed
+    uv run python -m rag.parse "data/corpus/PPM/<slides>.pdf" \
+        --course B028451 --academic-year 2025-2026 --profile manual --ocr
+    uv run python -m rag.parse "data/corpus/PPM/<slides>.pdf" \
+        --course B028451 --academic-year 2025-2026 --profile manual --pipeline vlm
 """
 
 from __future__ import annotations
@@ -218,12 +221,6 @@ def persist(document: DoclingDocument, meta: ParsedMeta, out_dir: Path) -> tuple
     return doc_path, meta_path
 
 
-def course_of(target: Path) -> str:
-    """Default course name from the layout `data/corpus/<course>/...`."""
-    base = target if target.is_dir() else target.parent
-    return base.name
-
-
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", type=Path, help="a PDF, or a directory of PDFs")
@@ -246,8 +243,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--course",
-        default=None,
-        help="course label carried into every chunk payload; defaults to the target directory name",
+        required=True,
+        help="the edition's course code, carried into every chunk payload",
+    )
+    parser.add_argument(
+        "--academic-year",
+        required=True,
+        help="the edition's academic year (YYYY-YYYY), carried into every chunk payload",
     )
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     args = parser.parse_args(argv)
@@ -258,9 +260,17 @@ def main(argv: list[str] | None = None) -> None:
     if manual and (args.ocr or args.formula) and (args.pipeline or "classic") != "classic":
         parser.error("--ocr and --formula apply to the classic pipeline only")
 
+    # Function-level import: `rag.chunk` imports this module, so a module-level
+    # import here would be circular.
+    from rag.chunk import edition_of
+
+    try:
+        edition_of(args.course, args.academic_year)
+    except ValueError as exc:
+        parser.error(str(exc))
+
     configure_cli_logging()
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    course = args.course or course_of(args.target)
 
     # One converter per distinct configuration, not per file: rebuilding it would
     # reload the layout and table models for every deck in the directory.
@@ -299,7 +309,8 @@ def main(argv: list[str] | None = None) -> None:
                 source_sha256=sha256_of(pdf),
                 parse_variant=variant,
                 docling_version=docling_version(),
-                course=course,
+                course=args.course,
+                academic_year=args.academic_year,
                 seconds=round(result.seconds, 1),
                 parsed_at=datetime.now(UTC).isoformat(timespec="seconds"),
             )

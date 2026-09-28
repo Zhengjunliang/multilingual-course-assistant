@@ -2,6 +2,12 @@
 
 This file owns the decisions taken without the supervisor that are in force: the date, what was decided, why, and what it costs. A reversed decision is removed, and the entry that replaces it says what it replaced; `git log -p --follow docs/decisions.md` keeps the old text. ⛔ Not here: the stack table and the state of each choice's verification, owned by [architecture.md](architecture.md); progress, blockers and deferred work, owned by GitHub issues (milestones M3 · M4 · M5 · M6 · M7).
 
+## 2026-09-28 — Slides points carry their edition, and a re-index replaces a source file within it
+
+1. **`rag.parse` requires `--course` and `--academic-year` and no longer infers the course from the target directory name.** Both flags are `required=True`; `main()` checks the pair against `rag.chunk.edition_of` before touching a file and refuses through `parser.error` on a malformed one.
+   **Why:** a directory name (`PPM`) is not a course code, and re-parsing by directory name would write points that match neither the delete key nor the evaluation's edition.
+   **The price:** every parse spells out the edition.
+
 ## 2026-09-28 — An AD code belongs to one course, and codes and years are written in ASCII
 
 1. **An AD code belongs to one course.** `CurriculumEntry.clean()` refuses an `ad_code` that another course's entry holds, or that is another course's `Course.code`; `Course.clean()` refuses a `code` an entry of another course holds as its `ad_code`. A course's own code, listed as its own entry's `ad_code` — PPM's TECNICO APPLICATIVO row, `ad_code="B028451"` — is not a conflict.

@@ -170,6 +170,15 @@ def test_only_slides_chunk_ids_carry_the_edition() -> None:
     assert web_ids[0] == ("ab" * 32)[:16] + ":classic:0000"
 
 
+def test_slides_without_an_edition_are_refused() -> None:
+    """A slides sidecar with no academic_year cannot be reindexed correctly (its
+    chunk ids would collide with any other edition of the same deck); the CLI
+    must count this as a failed file, not silently fall back to the old
+    unprefixed id form."""
+    with pytest.raises(ValueError, match="academic_year"):
+        make_chunks(make_meta(academic_year=None))
+
+
 def test_furniture_threshold_floors_at_five_pages() -> None:
     assert furniture_threshold(3) == 5
     assert furniture_threshold(25) == 5

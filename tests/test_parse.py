@@ -11,7 +11,6 @@ import pytest
 from rag.parse import (
     ParsedMeta,
     build_converter,
-    course_of,
     main,
     normalize_text,
     persist,
@@ -94,16 +93,33 @@ def test_variant_names_encode_the_enabled_enrichments() -> None:
         assert variant_of(plan) == expected
 
 
-def test_manual_flags_are_rejected_under_auto_profile() -> None:
+def test_manual_flags_are_rejected_under_auto_profile(capsys: pytest.CaptureFixture[str]) -> None:
     """Silently ignoring --ocr under --profile auto would parse with a configuration
     the user did not ask for; argparse must refuse before any file is touched."""
     with pytest.raises(SystemExit):
-        main(["missing.pdf", "--ocr"])
+        main(["missing.pdf", "--course", "B028451", "--academic-year", "2025-2026", "--ocr"])
+    assert "--profile manual" in capsys.readouterr().err
 
 
-def test_classic_only_flags_are_rejected_on_the_vlm_pipeline() -> None:
+def test_classic_only_flags_are_rejected_on_the_vlm_pipeline(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     with pytest.raises(SystemExit):
-        main(["missing.pdf", "--profile", "manual", "--pipeline", "vlm", "--ocr"])
+        main(
+            [
+                "missing.pdf",
+                "--course",
+                "B028451",
+                "--academic-year",
+                "2025-2026",
+                "--profile",
+                "manual",
+                "--pipeline",
+                "vlm",
+                "--ocr",
+            ]
+        )
+    assert "classic pipeline only" in capsys.readouterr().err
 
 
 def test_persist_writes_document_and_sidecar_as_a_pair(tmp_path: Path) -> None:
@@ -134,13 +150,28 @@ def test_persist_writes_document_and_sidecar_as_a_pair(tmp_path: Path) -> None:
     assert ParsedMeta.model_validate_json(meta_path.read_text(encoding="utf-8")) == meta
 
 
-def test_course_defaults_to_the_containing_directory(tmp_path: Path) -> None:
-    corpus = tmp_path / "PPM"
-    corpus.mkdir()
-    deck = corpus / "deck.pdf"
-    deck.touch()
-    assert course_of(corpus) == "PPM"
-    assert course_of(deck) == "PPM"
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    [
+        pytest.param(["--academic-year", "2025-2026"], "--course", id="no-course"),
+        pytest.param(["--course", "B028451"], "--academic-year", id="no-year"),
+        pytest.param(
+            ["--course", "B028451", "--academic-year", "2025/2026"],
+            "invariant 1",
+            id="malformed-year",
+        ),
+    ],
+)
+def test_parse_requires_the_edition(
+    args: list[str], expected: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`rag.parse` no longer infers the course from the target directory name
+    (docs/decisions.md, 2026-09-28, *Slides points carry their edition, and a
+    re-index replaces a source file within it*): both flags are required, and
+    a malformed one is refused before any file is touched."""
+    with pytest.raises(SystemExit):
+        main(["missing.pdf", *args])
+    assert expected in capsys.readouterr().err
 
 
 def classic_pdf_options(**kwargs: object) -> object:
