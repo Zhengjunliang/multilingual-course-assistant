@@ -14,7 +14,8 @@ cd multilingual-course-assistant
 uv sync                          # uv brings its own Python 3.12; the system interpreter is untouched
 npm ci --prefix frontend         # Node version in frontend/.nvmrc
 Copy-Item .env.example .env      # fill DJANGO_SECRET_KEY and DJANGO_DB_PASSWORD; commands in the file
-uv run pre-commit install
+uv run pre-commit install        # the commit and commit-message hooks; rerun it in a clone from before 2026-09-28
+git config pull.rebase true      # history is linear: a pull rebases onto main instead of merging it
 docker compose up -d             # PostgreSQL (the Docker Desktop engine has to be running)
 uv run python manage.py migrate
 uv run python manage.py createsuperuser

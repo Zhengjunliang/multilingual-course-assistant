@@ -5,6 +5,12 @@
 # Every rev is a commit SHA, as the action pins in ci.yml are: a tag can be
 # moved, a SHA cannot. The `# frozen:` comment is the readable half, and
 # Dependabot's pre-commit ecosystem moves both together.
+#
+# `pre-commit install` sets up both git hooks below. Every hook runs at commit
+# time except commit-msg, which runs on the message; without default_stages, a
+# hook that names no stage would run on the message file as well.
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
@@ -82,6 +88,20 @@ repos:
         name: links, document paths, decision entries and cited paths resolve
         language: python
         entry: python -m scripts.guards doc-references
+        pass_filenames: false
+        always_run: true
+      # Commit messages (CLAUDE.md, section 3): the message a commit is about
+      # to get, and every commit already made, which catches what never met
+      # the first hook. CI's hooks job fetches the whole history for it.
+      - id: commit-msg
+        name: the message is a Conventional Commit, in English, with no AI signature
+        language: python
+        entry: python -m scripts.guards commit-msg
+        stages: [commit-msg]
+      - id: commit-history
+        name: every commit in history keeps those rules, and none is a merge
+        language: python
+        entry: python -m scripts.guards commit-history
         pass_filenames: false
         always_run: true
       # Agent rule 6 of CLAUDE.md: one correct implementation, with the old

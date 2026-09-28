@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from scripts.guards.commits import COMMIT_MSG
 from scripts.guards.docs import DOC_CONVENTIONS
 from scripts.guards.docs_refs import DOC_REFERENCES
+from scripts.guards.history import COMMIT_HISTORY
 from scripts.guards.language import LANGUAGE
 from scripts.guards.repo import ENV_EXAMPLE_PARITY
 
@@ -19,6 +21,8 @@ GUARDS: dict[str, Guard] = {
         LANGUAGE,
         DOC_CONVENTIONS,
         DOC_REFERENCES,
+        COMMIT_MSG,
+        COMMIT_HISTORY,
     )
 }
 # Every rule id, so that a marker naming one that does not exist is caught.
