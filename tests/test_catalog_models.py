@@ -283,8 +283,9 @@ def test_codes_are_capital_letters_and_digits(
 def test_year_of_study_is_bounded(
     programme: DegreeProgramme, course: Course, year_of_study: int
 ) -> None:
-    """0 passes `PositiveSmallIntegerField`'s own `>= 0` check; this constraint
-    alone holds the 1-6 range."""
+    """0 passes `PositiveSmallIntegerField`'s own `>= 0` check; the database
+    constraint holds the 1-6 range for every write path, `create` included,
+    and the field's validators only place the message on the form field."""
     with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
         CurriculumEntry.objects.create(
             programme=programme, course=course, year_of_study=year_of_study, ad_code="B028451"
@@ -325,8 +326,10 @@ def test_an_entry_cannot_take_an_ad_code_of_another_course(
 def test_a_new_course_cannot_take_an_ad_code_another_course_uses(
     other_course: Course, entry: Callable[..., CurriculumEntry]
 ) -> None:
-    """A new course cannot claim a code some course's curriculum entry already
-    lists as an AD code."""
+    """A new course cannot claim a code some course's curriculum entry lists
+    as an AD code. Once saved it is not checked again: its code cannot change,
+    so a conflict written with the ORM, which skips `clean()`, does not block
+    its later edits."""
     entry(course=other_course, ad_code="B003712")
     new_course = Course(code="B003712", name="Some Other Course")
 
@@ -334,6 +337,10 @@ def test_a_new_course_cannot_take_an_ad_code_another_course_uses(
         new_course.full_clean()
 
     assert "code" in excinfo.value.error_dict
+
+    new_course.save()
+    new_course.name = "Renamed Course"
+    new_course.full_clean()
 
 
 def test_names_carry_the_project_locale(programme: DegreeProgramme, course: Course) -> None:

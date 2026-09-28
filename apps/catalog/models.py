@@ -141,20 +141,20 @@ class Course(models.Model):
         return f"[{self.code}] {self.name}"
 
     def clean(self) -> None:
-        """Reject a code an entry of another course already holds as its `ad_code`.
+        """Reject a new course whose code an entry of another course holds as its `ad_code`.
 
-        The reverse check of `CurriculumEntry.clean()`: a course's own entries
-        may use its own code as their `ad_code`
+        The reverse check of `CurriculumEntry.clean()`
         (docs/decisions.md, 2026-09-28, *An AD code belongs to one course, and
-        codes and years are written in ASCII*), so the course's own entries
-        are excluded here.
+        codes and years are written in ASCII*). It runs only when the course is
+        added: the code cannot change after the first save, so a later edit
+        has nothing to check, and the admin's change page, where `code` is
+        read-only, has no field an error on `code` could be reported on. A
+        course being added has no entries of its own, so every entry found
+        belongs to another.
         """
-        if not self.code:
+        if not self._state.adding or not self.code:
             return
-        taken = CurriculumEntry.objects.filter(ad_code=self.code)
-        if self.pk is not None:
-            taken = taken.exclude(course__pk=self.pk)
-        if taken.exists():
+        if CurriculumEntry.objects.filter(ad_code=self.code).exists():
             raise ValidationError({"code": _("This code is already another course's AD code.")})
 
 
@@ -162,9 +162,9 @@ class CourseEdition(models.Model):
     """One academic year of a course.
 
     At most one edition per course is current, and that is a database
-    constraint, not a convention: once `#36` scopes a student's search, it
-    will default to the current edition, so two current ones would make the
-    default depend on which row the planner returned first. The constraint
+    constraint, not a convention: the current edition is the default scope of
+    a student's search (`#36`), so two current ones would make that default
+    depend on which row the planner returned first. The constraint
     cannot be deferred, which fixes the order of a switch — clear the old flag,
     then set the new one, inside one transaction (docs/data-model.md,
     invariant 2).
