@@ -159,25 +159,21 @@ def test_a_course_with_editions_cannot_be_deleted(course: Course) -> None:
         course.delete()
 
 
+@pytest.mark.parametrize(
+    "curriculum",
+    [
+        pytest.param("TECNICO APPLICATIVO", id="a-curriculum"),
+        # The reason "no curriculum" is an empty string: two NULLs would both be let in.
+        pytest.param("", id="no-curriculum"),
+    ],
+)
 def test_entry_is_unique_per_programme_curriculum_and_ad_code(
-    entry: Callable[..., CurriculumEntry], other_course: Course
+    entry: Callable[..., CurriculumEntry], other_course: Course, curriculum: str
 ) -> None:
-    entry()
+    entry(curriculum=curriculum)
 
     with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
-        entry(course=other_course)
-
-    assert violation(excinfo.value).constraint_name == "catalog_entry_unique_ad_code"
-
-
-def test_two_entries_with_empty_curriculum_and_same_ad_code_are_refused(
-    entry: Callable[..., CurriculumEntry], other_course: Course
-) -> None:
-    """The reason "no curriculum" is an empty string: two NULLs would both be let in."""
-    entry(curriculum="")
-
-    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
-        entry(course=other_course, curriculum="")
+        entry(course=other_course, curriculum=curriculum)
 
     assert violation(excinfo.value).constraint_name == "catalog_entry_unique_ad_code"
 

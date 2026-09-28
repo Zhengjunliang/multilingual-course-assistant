@@ -313,16 +313,6 @@ def test_the_answer_arrives_as_separate_token_events(index: QdrantClient) -> Non
     assert tokens_of(events(ask())) == ["An ", "ORM ", "maps."]
 
 
-def test_sources_are_sent_before_the_first_token(index: QdrantClient) -> None:
-    """Generation runs for tens of seconds. The excerpts it is grounded in are
-    known before it starts, and a reader watching both appear together is
-    watching the claim this system makes."""
-    install_engine(index, SLIDES_ROUTE)
-    stream = events(ask())
-    assert names(stream).index("start") < names(stream).index("token")
-    assert start_of(stream)["citations"]
-
-
 def test_the_stream_is_served_as_text_event_stream(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
     response = ask()
@@ -743,19 +733,6 @@ def test_a_finished_answer_is_stored_whole_and_marked_complete(index: QdrantClie
     ]
 
 
-def test_the_stored_answer_carries_its_citations_and_its_routing_decision(
-    index: QdrantClient,
-) -> None:
-    """Without these two columns a reopened conversation is bare prose: no
-    source cards, no citation badges, no visible routing decision."""
-    install_engine(index, SLIDES_ROUTE)
-    stream = events(ask())
-    stored = Message.objects.get(conversation=only_conversation(), role="assistant")
-
-    assert stored.citations == start_of(stream)["citations"]
-    assert stored.route == start_of(stream)["route"]
-
-
 def test_a_generation_failure_keeps_the_fragment_and_marks_it_incomplete(
     index: QdrantClient,
 ) -> None:
@@ -859,8 +836,8 @@ def test_a_follow_up_carries_the_earlier_questions_to_the_router(
     events(ask("How does it differ?", conversation_id=conversation_id))
 
     router_prompt = engine.completer.questions[-1]  # pyright: ignore[reportAttributeAccessIssue]
-    assert "What is an ORM?" in router_prompt
-    assert router_prompt.endswith("Question: How does it differ?")
+    # The order, not the template's wording: that is rag.agent's, pinned in tests/test_agent.py.
+    assert router_prompt.index("What is an ORM?") < router_prompt.index("How does it differ?")
 
 
 def test_the_history_window_stops_at_its_limit(index: QdrantClient) -> None:

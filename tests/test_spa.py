@@ -47,16 +47,7 @@ def unbuilt(tmp_path: Path) -> Iterator[Path]:
 
 @pytest.mark.usefixtures("built")
 @pytest.mark.parametrize("path", SPA_PATHS)
-def test_a_path_the_spa_routes_gets_the_shell(client: Client, path: str) -> None:
-    response = client.get(path)
-
-    assert response.status_code == 200
-    assert response.headers["Content-Type"] == "text/html; charset=utf-8"
-    assert response.content == SHELL
-
-
-@pytest.mark.usefixtures("built")
-def test_the_shell_is_served_without_signing_in(client: Client) -> None:
+def test_a_path_the_spa_routes_gets_the_shell_without_signing_in(client: Client, path: str) -> None:
     """The gate is on /api, not on the page that will ask the reader to log in.
 
     Stated as a test because it reads like a hole and is not one: a visitor has
@@ -67,7 +58,11 @@ def test_the_shell_is_served_without_signing_in(client: Client) -> None:
     the second half of the claim — a 200 here is a 200 that consulted no
     session table and no user row.
     """
-    assert client.get("/").status_code == 200
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "text/html; charset=utf-8"
+    assert response.content == SHELL
 
 
 @pytest.mark.usefixtures("unbuilt")
