@@ -576,14 +576,16 @@ def fetch_and_ingest(
             verdict=verdict,
         )
 
-    # Scoped to (url, "live"): the crawl snapshot version of this page survives
-    # untouched. `index_chunks` scopes the same delete, but only for the pairs
-    # its chunks carry — doing it here also replaces a page that now parses to
-    # nothing. The third argument is not optional in spirit: its default is the
-    # slides collection, and omitting it would delete from the wrong index.
-    delete_web_versions(client, [(url, "live")], collection)
+    # Write, then delete, scoped to (url, "live"): the crawl snapshot version of
+    # this page survives untouched. `index_chunks` upserts the chunks and then
+    # deletes the pair's other points itself, so the page is never missing from
+    # the index. A page that parses to nothing has nothing to write, and its
+    # live version is removed here. The collection argument is not optional in
+    # spirit: its default is the slides collection, the wrong index.
     if parsed.chunks:
         index_chunks(client, parsed.chunks, dense, sparse, collection)
+    else:
+        delete_web_versions(client, [(url, "live")], collection)
     # The outlinks ride into the ledger the way the crawler writes them: the
     # deepening loop reads its candidates from the registry's outlink graph.
     append_registry(registry_path, entry.model_copy(update={"outlinks": parsed.outlinks}))

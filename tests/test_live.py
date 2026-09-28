@@ -144,16 +144,22 @@ def stub_chunking(monkeypatch: pytest.MonkeyPatch) -> None:
 def recorded_deletes(monkeypatch: pytest.MonkeyPatch) -> list[tuple[list[tuple[str, str]], str]]:
     """A scoped delete leaves no trace to assert on afterwards — an ephemeral
     fetch that wrongly deleted the crawl version of a page would look exactly
-    like one that touched nothing. So the call itself is recorded."""
+    like one that touched nothing. So the call itself is recorded, wherever it
+    is made: in `rag.live`, or inside `index_chunks` after its upsert."""
     calls: list[tuple[list[tuple[str, str]], str]] = []
 
     def recording_delete(
-        client: QdrantClient, pairs: Sequence[tuple[str, str]], collection: str
+        client: QdrantClient,
+        pairs: Sequence[tuple[str, str]],
+        collection: str,
+        *,
+        keep: Sequence[str] = (),
     ) -> None:
         calls.append((list(pairs), collection))
-        delete_web_versions(client, pairs, collection)
+        delete_web_versions(client, pairs, collection, keep=keep)
 
     monkeypatch.setattr("rag.live.delete_web_versions", recording_delete)
+    monkeypatch.setattr("rag.index.delete_web_versions", recording_delete)
     return calls
 
 
@@ -224,6 +230,7 @@ def test_a_gated_page_persists_and_replaces_only_its_own_live_version(
         StubSparse(),
         WEB_COLLECTION,
     )
+    recorded_deletes.clear()  # the seed's own replacement is not under test
 
     registry = tmp_path / "registry.jsonl"
     result = ingest(web_client, StubFetcher(site()), RELEVANT, registry)
@@ -592,6 +599,7 @@ def test_a_page_that_now_parses_to_nothing_still_replaces_its_old_version(
         StubSparse(),
         WEB_COLLECTION,
     )
+    recorded_deletes.clear()  # the seed's own replacement is not under test
 
     registry = tmp_path / "registry.jsonl"
     result = ingest(web_client, StubFetcher(site()), RELEVANT, registry)
