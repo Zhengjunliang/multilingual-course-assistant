@@ -63,17 +63,46 @@ def test_a_marker_at_the_end_of_a_line_silences_that_line_only() -> None:
 
 
 @pytest.mark.parametrize(
-    "line",
+    ("path", "text"),
     [
-        pytest.param("a guard-ignore needs a reason", id="prose"),
-        pytest.param('message = "a guard-ignore env-parity needs `: <reason>`"', id="a-string"),
+        pytest.param("x.md", "a guard-ignore needs a reason\n", id="prose"),
+        pytest.param("x.md", "the guard-ignore env-parity: marker\n", id="prose-with-a-colon"),
+        pytest.param("x.md", "# guard-ignore lang-han: a heading\n", id="a-heading"),
         pytest.param(
-            "# the guard-ignore env-parity marker takes a reason", id="a-comment-about-it"
+            "x.md", "```\n<!-- guard-ignore lang-han: shown -->\n```\n", id="a-fenced-example"
+        ),
+        pytest.param("x.ts", "# guard-ignore lang-han: not a TS comment\n", id="a-wrong-opener"),
+        pytest.param("x.py", 'm = "# guard-ignore env-parity: in a string"\n', id="a-string"),
+        pytest.param("x.py", '"""\n# guard-ignore env-parity: in a docstring\n"""\n', id="a-doc"),
+        pytest.param(
+            "x.py", "# the guard-ignore env-parity marker takes a reason\n", id="a-mention"
         ),
     ],
 )
-def test_mentioning_a_marker_is_not_one(line: str) -> None:
-    assert markers({"x.py": line}) == ({}, [])
+def test_mentioning_a_marker_is_not_one(path: str, text: str) -> None:
+    assert markers({path: text}) == []
+
+
+def test_a_marker_naming_no_rule_is_refused() -> None:
+    guard = GUARDS["env-example-parity"]
+    files = dict(guard.rules[0].good[0])
+    files[".env.example"] += "EXTRA=1  # guard-ignore env-parity, env-party: a typo in it\n"
+
+    found = run(guard, files, frozenset({"env-parity"}))
+
+    # Refused whole: a marker that names a missing rule silences nothing either.
+    assert [(f.rule, f.message) for f in found] == [
+        ("env-parity", "EXTRA is not read by config/env.py"),
+        (MARKER_RULE, "no rule is called env-party"),
+    ]
+
+
+def test_a_marker_that_silences_nothing_is_refused() -> None:
+    guard = GUARDS["env-example-parity"]
+    files = dict(guard.rules[0].good[0])
+    files[".env.example"] += "# guard-ignore env-parity: a variable deleted since\n"
+
+    assert [f.rule for f in run(guard, files)] == [MARKER_RULE]
 
 
 def test_rule_ids_are_unique() -> None:

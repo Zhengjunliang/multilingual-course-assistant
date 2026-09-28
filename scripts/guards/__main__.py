@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from scripts.guards import run
-from scripts.guards.registry import GUARDS
+from scripts.guards.registry import GUARDS, RULE_IDS
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     guard = GUARDS[args.guard]
     paths = guard.paths or args.files
     files = {Path(path).as_posix(): Path(path).read_bytes().decode("utf-8") for path in paths}
-    findings = run(guard, files)
+    findings = run(guard, files, RULE_IDS)
     # A finding quotes the file, and on Windows the pipe pre-commit reads this
     # through is encoded in the ANSI code page unless told otherwise.
     if isinstance(sys.stdout, io.TextIOWrapper):
