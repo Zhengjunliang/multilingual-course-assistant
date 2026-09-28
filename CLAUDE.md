@@ -18,8 +18,8 @@
 2. **Contract-first**: where a shared contract exists (types, data schema, API), it is the **single source**; change the contract first, then its consumers, keeping both sides in step within the same change.
 3. **Stage large tasks**: a change across layers (data / service / interface) is split into separate stages; never cover every layer in one session.
 4. **Split large files**: when a file exceeds 250 lines, change the logic layer first and the view layer after; never both at once.
-5. **Language**: identifiers, code comments, commit messages, repository documents and GitHub issues are in English (see the documentation conventions). **Talk to the user in Chinese**, whatever language they write in.
-6. **One correct implementation, no noise**: keep exactly one correct implementation. Refactors **replace in place** — no parallel or alternative versions, no "backup" of old code (history lives in git). Dead code is noise and is deleted outright.
+5. **Language**: identifiers, code comments, commit messages, repository documents and GitHub issues are in English (the table in section 5 names the guard behind each). **Talk to the user in Chinese**, whatever language they write in.
+6. **One correct implementation, no noise**: keep exactly one correct implementation. Refactors **replace in place** — no parallel or alternative versions, no "backup" of old code (history lives in git; the `no-parallel-versions` hook refuses `*.bak`, `*_v2.*` and the like). Dead code is noise and is deleted outright.
 7. **Follow the official format, invent no fields**: API responses, config, manifests and SDK parameters follow the official schema exactly. When in doubt, read the official documentation before implementing.
 8. **Style belongs to the linters**: formatting and naming are enforced by linters and formatters; this file does not repeat them.
 9. **Dangerous operations go to the user; writes stay inside the project**: for anything irreversible or outside the project, **print the command and let the user run it in their own terminal**. The AI **never runs**: recursive or bulk deletion, registry or system configuration changes, system-wide installs or uninstalls, any command that **writes to or connects to a live environment** of a hosted service (cloud DB, storage, auth service, paid API — migrations, seeds, resets, DDL, DML, admin APIs, deployments). Outside the project directory, read only. Inside it, deleting a single file (refactor, dead code) is allowed after listing the file and the reason. The AI is limited to **fully offline** operations: generating clients or types from local files, editing migration files, reading schemas.
@@ -39,6 +39,25 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 ## 5. Documentation conventions
 
 **Documents are in English.** The repository's markdown and its GitHub issues are written in English and maintained in place, **with no parallel translations** — two languages would mean keeping the same content twice. The thesis body and its delivery attachments are written in Italian outside the repository. Talk to the user in Chinese (agent rule 5). Decision and reasons: `docs/decisions.md`, 2026-09-23.
+
+**Every rule has a guard or says it has none.** A guard is a hook of `.pre-commit-config.yaml`, run at commit time and by `scripts/check.py`; `review` marks what only a reader can check. String literals, the UI catalogues and the gold set are data, in whatever language the data is.
+
+| Layer | Rule | Guard |
+| ----- | ---- | ----- |
+| Identifiers | English | `review` |
+| Comments and docstrings (Python, TypeScript, JavaScript) | English | `language` |
+| pytest test names | English | `language` |
+| vitest test titles (string literals) | English | `review` |
+| Markdown prose | English | `language` |
+| Every tracked file | no known misspelling | `typos` |
+| Status markers, temporal wording, links between files | the conventions below | `doc-conventions` |
+| Links, document paths, decision references, paths a status marker cites | they resolve | `doc-references` |
+| Commit messages | English Conventional Commits, no AI signature | `commit-msg`, `commit-history` |
+| History | linear | `commit-history` |
+| File names | one version of a file (agent rule 6) | `no-parallel-versions` |
+| `.env.example` | names exactly what `config/env.py` reads | `env-example-parity` |
+| GitHub issues | English | `review` |
+| Any piece of information | one owner | `review` |
 
 **Map** — the root files, `docs/` and `gold/README.md`. No other plan or checklist files anywhere in the repository:
 
