@@ -3,10 +3,11 @@
 A refusal the database makes is asserted by the name of the constraint
 PostgreSQL reports, not merely by the exception class: an `IntegrityError`
 raised by some other constraint would otherwise pass for the one under test.
-The rules kept in validators — consecutive years, the year of study, the
-language — are asserted through `full_clean`, on the field they belong to. The
-rows are shaped on PPM as UniFi lists it (docs/decisions.md, 2026-09-25, *PPM
-read from Moodle and Cineca*).
+The rules kept in validators — consecutive years, the language — are asserted
+through `full_clean`, on the field they belong to; the year of study, like the
+code formats, is a database rule, asserted the same way as any other
+constraint. The rows are shaped on PPM as UniFi lists it (docs/decisions.md,
+2026-09-25, *PPM read from Moodle and Cineca*).
 """
 
 from __future__ import annotations
@@ -90,9 +91,23 @@ def test_edition_is_unique_per_course_and_year(course: Course) -> None:
     assert violation(excinfo.value).constraint_name == "catalog_edition_unique_course_year"
 
 
-@pytest.mark.parametrize("academic_year", ["2025/2026", "25-26", "2025-26", "2025-202a"])
+@pytest.mark.parametrize(
+    "academic_year",
+    [
+        "2025/2026",
+        "25-26",
+        "2025-26",
+        "2025-202a",
+        pytest.param("٢٠٢٥-٢٠٢٦", id="non-ascii-digits"),
+    ],
+)
 def test_edition_academic_year_must_match_the_format(course: Course, academic_year: str) -> None:
-    """The shape is a database rule; `create` skips validators, so this reaches it."""
+    """The shape is a database rule; `create` skips validators, so this reaches it.
+
+    `[0-9]` in the constraint, not a digit class, is why Arabic-Indic digits are
+    refused here regardless of collation (docs/decisions.md, 2026-09-28, *An AD
+    code belongs to one course, and codes and years are written in ASCII*).
+    """
     with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
         CourseEdition.objects.create(course=course, academic_year=academic_year)
 
@@ -191,11 +206,33 @@ def test_entry_is_unique_per_programme_curriculum_and_course(
 
 
 def test_one_course_in_two_curricula_is_two_entries(
-    entry: Callable[..., CurriculumEntry], course: Course
+    programme: DegreeProgramme, course: Course
 ) -> None:
-    """PPM as recorded: one course, each curriculum under the code specific to it."""
-    entry()
-    entry(curriculum="TECNICO SCIENTIFICO", ad_code="B003712")
+    """PPM as recorded: one course, each curriculum under the code specific to it.
+
+    Both rows pass `full_clean()` before saving: the TA row's `ad_code` is the
+    course's own code, the permitted case `CurriculumEntry.clean()` carves out
+    of the AD-code rule (docs/decisions.md, 2026-09-28, *An AD code belongs to
+    one course, and codes and years are written in ASCII*).
+    """
+    first = CurriculumEntry(
+        programme=programme,
+        course=course,
+        curriculum="TECNICO APPLICATIVO",
+        year_of_study=3,
+        ad_code="B028451",
+    )
+    second = CurriculumEntry(
+        programme=programme,
+        course=course,
+        curriculum="TECNICO SCIENTIFICO",
+        year_of_study=3,
+        ad_code="B003712",
+    )
+    first.full_clean()
+    first.save()
+    second.full_clean()
+    second.save()
 
     ad_codes = CurriculumEntry.objects.filter(course=course).values_list("ad_code", flat=True)
     assert sorted(ad_codes) == ["B003712", "B028451"]
@@ -208,18 +245,95 @@ def test_curriculum_is_never_null(entry: Callable[..., CurriculumEntry]) -> None
     assert violation(excinfo.value).column_name == "curriculum"
 
 
+@pytest.mark.parametrize(
+    "field",
+    [
+        pytest.param("course-code", id="course-code"),
+        pytest.param("entry-ad-code", id="entry-ad-code"),
+    ],
+)
+@pytest.mark.parametrize(
+    "bad_code",
+    [
+        pytest.param("B028451 ", id="trailing-space"),
+        pytest.param("B02:8451", id="colon"),
+        pytest.param("b028451", id="lowercase"),
+    ],
+)
+def test_codes_are_capital_letters_and_digits(
+    entry: Callable[..., CurriculumEntry], field: str, bad_code: str
+) -> None:
+    """`create` skips validators, so this reaches the database constraint alone."""
+    make_bad_row = (
+        (lambda: Course.objects.create(code=bad_code, name="Some Other Course"))
+        if field == "course-code"
+        else (lambda: entry(ad_code=bad_code))
+    )
+
+    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+        make_bad_row()
+
+    expected = (
+        "catalog_course_code_format" if field == "course-code" else "catalog_entry_ad_code_format"
+    )
+    assert violation(excinfo.value).constraint_name == expected
+
+
 @pytest.mark.parametrize("year_of_study", [0, 7])
 def test_year_of_study_is_bounded(
     programme: DegreeProgramme, course: Course, year_of_study: int
 ) -> None:
-    row = CurriculumEntry(
-        programme=programme, course=course, year_of_study=year_of_study, ad_code="B028451"
+    """0 passes `PositiveSmallIntegerField`'s own `>= 0` check; this constraint
+    alone holds the 1-6 range."""
+    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+        CurriculumEntry.objects.create(
+            programme=programme, course=course, year_of_study=year_of_study, ad_code="B028451"
+        )
+
+    assert violation(excinfo.value).constraint_name == "catalog_entry_year_of_study_range"
+
+
+@pytest.mark.parametrize("conflict", ["another-entry", "another-course-code"])
+def test_an_entry_cannot_take_an_ad_code_of_another_course(
+    programme: DegreeProgramme,
+    course: Course,
+    other_course: Course,
+    entry: Callable[..., CurriculumEntry],
+    conflict: str,
+) -> None:
+    """Another course's entry, or its own code, already answers to this AD code."""
+    if conflict == "another-entry":
+        entry(course=other_course, curriculum="TECNICO SCIENTIFICO", ad_code="B999999")
+        ad_code = "B999999"
+    else:
+        ad_code = other_course.code
+
+    candidate = CurriculumEntry(
+        programme=programme,
+        course=course,
+        curriculum="TECNICO APPLICATIVO",
+        year_of_study=3,
+        ad_code=ad_code,
     )
 
     with pytest.raises(ValidationError) as excinfo:
-        row.full_clean()
+        candidate.full_clean()
 
-    assert "year_of_study" in excinfo.value.error_dict
+    assert "ad_code" in excinfo.value.error_dict
+
+
+def test_a_new_course_cannot_take_an_ad_code_another_course_uses(
+    other_course: Course, entry: Callable[..., CurriculumEntry]
+) -> None:
+    """A new course cannot claim a code some course's curriculum entry already
+    lists as an AD code."""
+    entry(course=other_course, ad_code="B003712")
+    new_course = Course(code="B003712", name="Some Other Course")
+
+    with pytest.raises(ValidationError) as excinfo:
+        new_course.full_clean()
+
+    assert "code" in excinfo.value.error_dict
 
 
 def test_names_carry_the_project_locale(programme: DegreeProgramme, course: Course) -> None:
@@ -253,3 +367,5 @@ def test_str_names_rows_the_way_the_university_does(
     assert str(course) == "[B028451] Progettazione e Produzione Multimediale"
     assert str(edition) == "B028451:2025-2026"
     assert str(entry(curriculum="", ad_code="B003712")) == "B003712 (B047)"
+    assert repr(CourseEdition()) == "<CourseEdition: ?:>"
+    assert repr(CurriculumEntry()) == "<CurriculumEntry: (?)>"

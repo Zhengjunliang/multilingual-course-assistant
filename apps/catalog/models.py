@@ -17,7 +17,10 @@ Nothing here points at the user model. Roles, uploaded material and a student's
 programme will point at these tables; an arrow the other way would make the
 catalogue depend on who is reading it. The schema, its invariants and the
 contract with `rag/` are owned by docs/data-model.md; the reasons for each
-choice by docs/decisions.md, the two entries of 2026-09-25.
+choice by docs/decisions.md, the two entries of 2026-09-25, and the code and
+year formats and the rule that an AD code names one course by
+docs/decisions.md, 2026-09-28, *An AD code belongs to one course, and codes
+and years are written in ASCII*.
 """
 
 from __future__ import annotations
@@ -26,15 +29,27 @@ import re
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-_ACADEMIC_YEAR = re.compile(r"(\d{4})-(\d{4})", re.ASCII)
+_ACADEMIC_YEAR = re.compile(r"([0-9]{4})-([0-9]{4})", re.ASCII)
 
 # One message for both halves of the rule, so a person entering a year reads the
 # same sentence whichever half rejected it.
 _ACADEMIC_YEAR_MESSAGE = _("An academic year is two consecutive years, such as 2025-2026.")
+
+# The database side: PostgreSQL's `~` is not line-sensitive, and `$` matches
+# only the string's end, so this class also serves as a check constraint.
+_CODE_PATTERN = r"^[A-Z0-9]+$"
+
+_CODE_MESSAGE = _("A code is capital letters and digits, such as B028451.")
+
+# The Python side: `RegexValidator` runs `search()`, so a bare `$` would let a
+# trailing newline through; `\A…\Z` anchors both ends the way `^…$` does in SQL.
+validate_code = RegexValidator(r"\A[A-Z0-9]+\Z", message=_CODE_MESSAGE, code="code")
+
+_YEAR_OF_STUDY_MESSAGE = _("A year of study is between 1 and 6.")
 
 
 def validate_academic_year(value: str) -> None:
@@ -94,6 +109,7 @@ class Course(models.Model):
     code = models.CharField(
         max_length=16,
         unique=True,
+        validators=(validate_code,),
         verbose_name=_("code"),
         help_text=_(
             "AD code of the Moodle course that holds the material, such as B028451. "
@@ -113,20 +129,45 @@ class Course(models.Model):
         ordering = ("code",)
         verbose_name = _("course")
         verbose_name_plural = _("courses")
+        constraints = (
+            models.CheckConstraint(
+                condition=models.Q(code__regex=_CODE_PATTERN),
+                name="catalog_course_code_format",
+                violation_error_message=_CODE_MESSAGE,
+            ),
+        )
 
     def __str__(self) -> str:
         return f"[{self.code}] {self.name}"
+
+    def clean(self) -> None:
+        """Reject a code an entry of another course already holds as its `ad_code`.
+
+        The reverse check of `CurriculumEntry.clean()`: a course's own entries
+        may use its own code as their `ad_code`
+        (docs/decisions.md, 2026-09-28, *An AD code belongs to one course, and
+        codes and years are written in ASCII*), so the course's own entries
+        are excluded here.
+        """
+        if not self.code:
+            return
+        taken = CurriculumEntry.objects.filter(ad_code=self.code)
+        if self.pk is not None:
+            taken = taken.exclude(course__pk=self.pk)
+        if taken.exists():
+            raise ValidationError({"code": _("This code is already another course's AD code.")})
 
 
 class CourseEdition(models.Model):
     """One academic year of a course.
 
     At most one edition per course is current, and that is a database
-    constraint, not a convention: a search defaults to the current edition, so
-    two current ones would make the default depend on which row the planner
-    returned first. The constraint cannot be deferred, which fixes the order of a
-    switch — clear the old flag, then set the new one, inside one transaction
-    (docs/data-model.md, invariant 2).
+    constraint, not a convention: once `#36` scopes a student's search, it
+    will default to the current edition, so two current ones would make the
+    default depend on which row the planner returned first. The constraint
+    cannot be deferred, which fixes the order of a switch — clear the old flag,
+    then set the new one, inside one transaction (docs/data-model.md,
+    invariant 2).
     """
 
     # PROTECT, not CASCADE: an edition will own material whose points live in
@@ -155,7 +196,7 @@ class CourseEdition(models.Model):
                 name="catalog_edition_unique_course_year",
             ),
             models.CheckConstraint(
-                condition=models.Q(academic_year__regex=r"^\d{4}-\d{4}$"),
+                condition=models.Q(academic_year__regex=r"^[0-9]{4}-[0-9]{4}$"),
                 name="catalog_edition_academic_year_format",
                 violation_error_message=_ACADEMIC_YEAR_MESSAGE,
             ),
@@ -167,9 +208,11 @@ class CourseEdition(models.Model):
         )
 
     def __str__(self) -> str:
-        # Reads the course row: an edition is not recognisable by its year alone.
+        # getattr, not self.course: an unsaved row with no course raises
+        # RelatedObjectDoesNotExist, a subclass of AttributeError getattr catches.
         # CODE:YEAR is how a scope is spelt on the command line (docs/data-model.md).
-        return f"{self.course.code}:{self.academic_year}"
+        course = getattr(self, "course", None)
+        return f"{course.code if course else '?'}:{self.academic_year}"
 
 
 class CurriculumEntry(models.Model):
@@ -212,6 +255,7 @@ class CurriculumEntry(models.Model):
     )
     ad_code = models.CharField(
         max_length=16,
+        validators=(validate_code,),
         verbose_name=_("AD code"),
         help_text=_(
             "The official code of the course in this curriculum. When the curriculum "
@@ -232,8 +276,40 @@ class CurriculumEntry(models.Model):
                 fields=("programme", "curriculum", "course"),
                 name="catalog_entry_unique_course",
             ),
+            models.CheckConstraint(
+                condition=models.Q(ad_code__regex=_CODE_PATTERN),
+                name="catalog_entry_ad_code_format",
+                violation_error_message=_CODE_MESSAGE,
+            ),
+            models.CheckConstraint(
+                condition=models.Q(year_of_study__gte=1, year_of_study__lte=6),
+                name="catalog_entry_year_of_study_range",
+                violation_error_message=_YEAR_OF_STUDY_MESSAGE,
+            ),
         )
 
     def __str__(self) -> str:
+        # getattr, not self.programme: an unsaved row with no programme raises
+        # RelatedObjectDoesNotExist, a subclass of AttributeError getattr catches.
         # The prefix Moodle puts on a course title, "<AD code> (<programme>)".
-        return f"{self.ad_code} ({self.programme.code}) {self.curriculum}".rstrip()
+        programme = getattr(self, "programme", None)
+        return f"{self.ad_code} ({programme.code if programme else '?'}) {self.curriculum}".strip()
+
+    def clean(self) -> None:
+        """Reject an `ad_code` another course already holds.
+
+        `full_clean` calls `clean()` even where the form has rejected the
+        foreign key, hence `getattr` rather than `self.course`. The course's
+        own code, listed as its own entry's `ad_code` (PPM's TECNICO
+        APPLICATIVO row), is not a conflict
+        (docs/decisions.md, 2026-09-28, *An AD code belongs to one course, and
+        codes and years are written in ASCII*).
+        """
+        course = getattr(self, "course", None)
+        if course is None or not self.ad_code:
+            return
+        other_entry = CurriculumEntry.objects.filter(ad_code=self.ad_code).exclude(course=course)
+        if other_entry.exists():
+            raise ValidationError({"ad_code": _("This AD code is already used by another course.")})
+        if Course.objects.filter(code=self.ad_code).exclude(pk=course.pk).exists():
+            raise ValidationError({"ad_code": _("This AD code is already another course's code.")})
