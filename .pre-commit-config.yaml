@@ -33,6 +33,17 @@ repos:
         args: [--fix]
       - id: ruff-format
 
+  # Spelling, against a list of known misspellings rather than a dictionary, so
+  # Italian and Chinese mostly pass; _typos.toml says what it leaves out and why.
+  # Report only, unlike upstream's default `--write-changes`: an Italian word
+  # that happens to be a known English misspelling would otherwise be
+  # "corrected" in place, and a fix in a quotation is a corruption.
+  - repo: https://github.com/crate-ci/typos
+    rev: 00f422f3b19c57bc6338715ebfe3316d38768461 # frozen: v1.50.3
+    hooks:
+      - id: typos
+        args: [--force-exclude]
+
   # pyproject.toml and uv.lock must move together; CI's `uv sync --locked` would
   # catch the drift anyway, but catching it before the commit exists is cheaper.
   - repo: https://github.com/astral-sh/uv-pre-commit
