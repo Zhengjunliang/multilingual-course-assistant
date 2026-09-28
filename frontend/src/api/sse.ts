@@ -31,11 +31,10 @@ export interface SseFrame {
 /**
  * One raw frame, or `null` when the text is not one.
  *
- * Exported for its own test: the chunk boundary that matters most is the one
- * that falls inside a `data:` line, and that case is unreachable from outside
- * unless the split can be staged deliberately.
+ * Only the first newline is looked for, so a third line is not refused: it
+ * lands inside `data`, where `readAnswerEvents` fails to parse it as JSON.
  */
-export function parseFrame(frame: string): SseFrame | null {
+function parseFrame(frame: string): SseFrame | null {
   const newline = frame.indexOf("\n");
   if (newline === -1) return null;
   const nameLine = frame.slice(0, newline);

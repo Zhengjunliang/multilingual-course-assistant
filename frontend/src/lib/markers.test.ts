@@ -31,12 +31,6 @@ function badge(marker: string, number: number) {
 }
 
 describe("badgesOf", () => {
-  it("gives two citations of the same page one badge", () => {
-    // The docstring's own case: two chunks of one page are two citations and
-    // one thing the reader is being pointed at.
-    expect(badgesOf([cite("[PPM 3]"), cite("[PPM 3]")])).toEqual([badge("[PPM 3]", 1)]);
-  });
-
   it("numbers distinct markers from one, in retrieval order", () => {
     expect(badgesOf([cite("[PPM 7]"), cite("[WEB 1]"), cite("[PPM 7]"), cite("[PPM 2]")])).toEqual([
       badge("[PPM 7]", 1),
@@ -102,13 +96,17 @@ describe("segmentAnswer", () => {
   });
 
   it("reassembles into the answer it was given", () => {
-    // One assertion for "loses nothing" and "repeats nothing" together.
-    const answer = "Before [PPM 1] middle [WEB 2] after.";
+    // Loses nothing and repeats nothing, spelled out segment by segment: a
+    // rebuilt string would stay equal with a wrong offset or a wrong badge, and
+    // a failure here names the segment that broke.
     const badges = [badge("[PPM 1]", 1), badge("[WEB 2]", 2)];
-    const rebuilt = segmentAnswer(answer, badges)
-      .map((segment) => (segment.kind === "text" ? segment.text : segment.badge.marker))
-      .join("");
-    expect(rebuilt).toBe(answer);
+    expect(segmentAnswer("Before [PPM 1] middle [WEB 2] after.", badges)).toEqual([
+      { kind: "text", at: 0, text: "Before " },
+      { kind: "badge", at: 7, badge: badge("[PPM 1]", 1) },
+      { kind: "text", at: 14, text: " middle " },
+      { kind: "badge", at: 22, badge: badge("[WEB 2]", 2) },
+      { kind: "text", at: 29, text: " after." },
+    ]);
   });
 
   it("returns the whole answer as one segment when no marker turns up", () => {

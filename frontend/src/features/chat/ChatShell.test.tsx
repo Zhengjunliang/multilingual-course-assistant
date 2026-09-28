@@ -3,21 +3,19 @@
 /**
  * The frame, asserted by using it.
  *
- * `routes/ChatPage.test.ts` says in its own header why it reads source instead
- * of rendering: the page wants a router and a session, and the drawer is a
- * portal a string render cannot see. The frame has neither problem — it takes
+ * The chat page wants a router and a session, and the drawer is a portal a
+ * string render cannot see. The frame has neither problem — it takes
  * its sidebar and its controls as slots and holds nothing but a boolean — so
  * the two checks that used to be spellings of class names can be the real
  * question instead: does the button open the drawer, and does the drawer put
  * the sidebar on the page.
  *
- * The one claim that cannot be answered here is the breakpoint: `hidden
- * lg:block` is a media query, jsdom loads no stylesheet and computes no layout,
- * so nothing rendered would tell the two states apart. It also cannot be read
- * off the disk from *this* file — asking for a document costs
- * `import.meta.url`, which Vite's client transform turns into an http URL that
- * `fileURLToPath` refuses. It lives in `routes/ChatPage.test.ts`, which stayed
- * on the node environment for exactly that reason.
+ * The breakpoint is answered by the fixed column's class list. jsdom loads no
+ * stylesheet and computes no media query, so it cannot say whether the column
+ * is on screen at a given width; but `hidden lg:block` is in the DOM as two
+ * classes, and reading them off the mounted `aside` survives the class string
+ * being built with `cn(...)` or reordered, which a regex over the source did
+ * not.
  */
 
 import { act } from "react";
@@ -71,6 +69,18 @@ describe("the chat frame", () => {
     expect(container.textContent).toContain("Cosa vuoi sapere?");
 
     unmount();
+  });
+
+  it("hides the fixed column below the large breakpoint", () => {
+    // On a phone the drawer is the sidebar; the column beside the thread would
+    // leave the answer a strip of the screen.
+    const { container, unmount } = shell();
+    const classes = [...(container.querySelector("aside")?.classList ?? [])];
+    // Unmounted before asserting: a failure here must not leave a sidebar on
+    // the page for the cases below, which count them.
+    unmount();
+
+    expect(classes).toEqual(expect.arrayContaining(["hidden", "lg:block"]));
   });
 
   it("opens the drawer when the sidebar button is pressed", () => {

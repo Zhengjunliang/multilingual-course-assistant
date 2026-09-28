@@ -1,18 +1,21 @@
+// @vitest-environment jsdom
+
 /**
  * The source strip: what it carries, and how it survives a narrow screen.
  *
- * The click that links a pill in the prose to its card is not here. A string
- * render has no events, and pretending otherwise would be worse than admitting
- * it — so the click is one of the two entries on the manual list in the pull
- * request. What *is* here is everything the click depends on: the marker is on
- * the card, the highlighted card is the one wearing the ring, and the strip is
- * still the horizontally scrolling row a phone needs it to be.
+ * The click on a pill in the prose belongs to AnswerStream and reaches this
+ * component as `highlighted`. What this file checks is what the strip does with
+ * it: the highlighted card is the one wearing the ring and the fill, and a card
+ * folded behind the "more" button is unfolded rather than left out of reach.
+ * Both read a mounted strip, the second because only a document runs the
+ * strip's effect; the rest are markup and read a string render.
  */
 
 import { describe, expect, it } from "vitest";
 
 import type { Citation } from "@/api/contract";
 import { badgesOf } from "@/lib/markers";
+import { mount } from "@/test/mount";
 import { render } from "@/test/render";
 import { CitationList } from "./CitationList";
 
@@ -47,19 +50,44 @@ function strip(highlighted: string | null = null): string {
   );
 }
 
+function mounted(citations: readonly Citation[], highlighted: string | null) {
+  return mount(
+    <CitationList
+      citations={citations}
+      badges={badgesOf(citations)}
+      cited={null}
+      highlighted={highlighted}
+      onSelect={() => {}}
+    />,
+  );
+}
+
+/**
+ * The classes of the card showing `excerpt`, and only the card's own: the badge
+ * inside every card is filled with `bg-mark` too.
+ */
+function cardClasses(container: HTMLElement, excerpt: string): string[] {
+  const item = [...container.querySelectorAll("li")].find((li) =>
+    li.textContent?.includes(excerpt),
+  );
+  const card = item?.firstElementChild;
+  if (card == null) throw new Error(`no card shows "${excerpt}"`);
+  return [...card.classList];
+}
+
 describe("the source strip", () => {
-  it("carries each marker on its card, which is what a click aims at", () => {
-    const html = strip();
+  it("unfolds when the highlighted card is behind the fold", () => {
+    // A `both` route can carry more excerpts than the strip shows; clicking the
+    // pill of a folded one must still land on its card.
+    const seven = Array.from({ length: 7 }, (_, i) => citation(`[Excerpt ${i + 1}]`, i + 1));
 
-    expect(html).toContain('data-marker="[Excerpt 1]"');
-    expect(html).toContain('data-marker="[Excerpt 2]"');
-  });
+    const folded = mounted(seven, null);
+    expect(folded.container.textContent).not.toContain("Excerpt behind [Excerpt 7].");
+    folded.unmount();
 
-  it("rings the highlighted card and only that one", () => {
-    const html = strip("[Excerpt 2]");
-    const rings = [...html.matchAll(/ring-ink/g)];
-
-    expect(rings).toHaveLength(1);
+    const { container, unmount } = mounted(seven, "[Excerpt 7]");
+    expect(container.textContent).toContain("Excerpt behind [Excerpt 7].");
+    unmount();
   });
 
   // These two stand in for a gate that cannot exist. The palette is achromatic,
@@ -67,8 +95,17 @@ describe("the source strip", () => {
   // than by colour, and check-contrast.mjs has nothing left to measure about it:
   // it can prove --mark is a step away from the page, not that anything wears
   // it. That is what these assert.
-  it("fills the highlighted card as well as ringing it", () => {
-    expect(strip("[Excerpt 2]")).toContain("bg-mark ring-2 ring-ink");
+  it("fills and rings the highlighted card, and no other", () => {
+    const { container, unmount } = mounted(CITATIONS, "[Excerpt 2]");
+    const highlighted = cardClasses(container, "Excerpt behind [Excerpt 2].");
+    const other = cardClasses(container, "Excerpt behind [Excerpt 1].");
+
+    expect(highlighted).toContain("bg-mark");
+    expect(highlighted).toContain("ring-ink");
+    expect(other).not.toContain("bg-mark");
+    expect(other).not.toContain("ring-ink");
+
+    unmount();
   });
 
   it("fills the badge that opens a source", () => {

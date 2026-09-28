@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 /**
  * The route line says where the answer came from, loudly enough to be read, and
  * the sources sit above the answer rather than under it.
@@ -6,14 +8,22 @@
  * the route and the citations arrive together, before the first token, and the
  * point of this stage was to put that fact on the screen at the moment it is
  * true.
+ *
+ * The document is for one case. How loud the route line is depends on which
+ * element around it carries a type size, and a string render can only answer
+ * that by naming the tag; a mounted turn answers it with `closest`.
  */
 
 import { describe, expect, it } from "vitest";
 
 import type { Citation, RouteDecision } from "@/api/contract";
+import { mount } from "@/test/mount";
 import { render } from "@/test/render";
 import { TurnView } from "./TurnView";
 import type { Turn } from "./useAsk";
+
+/** The type-size tokens of index.css, smallest first. */
+const TYPE_SIZES = ".text-caption, .text-body, .text-title, .text-display";
 
 function citation(marker: string, page: number): Citation {
   return {
@@ -80,11 +90,27 @@ describe("the route line", () => {
     // It used to be `text-muted text-xs`, which said the right thing in the
     // quietest voice available. Guarding the negative is the only way to keep a
     // later tidy-up from putting it back.
-    const line = /<p class="([^"]*)"[^>]*>(?:(?!<\/p>).)*entrambe le fonti/s.exec(view(turn()));
+    const { container, unmount } = mount(
+      <TurnView
+        turn={turn()}
+        live={false}
+        thinking={false}
+        highlighted={null}
+        onHighlight={() => {}}
+      />,
+    );
+    // The deepest element holding the route name comes last in document order;
+    // the nearest one around it with a type size is the line, whatever its tag.
+    const name = [...container.querySelectorAll("*")]
+      .filter((element) => element.textContent?.includes("entrambe le fonti"))
+      .at(-1);
+    const line = name?.closest(TYPE_SIZES);
+    if (line == null) throw new Error("no type size is set around the route line");
 
-    expect(line).not.toBeNull();
-    expect(line?.[1]).not.toContain("text-caption");
-    expect(line?.[1]).toContain("text-body");
+    expect([...line.classList]).toContain("text-body");
+    expect([...line.classList]).not.toContain("text-caption");
+
+    unmount();
   });
 });
 

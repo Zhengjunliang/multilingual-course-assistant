@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFrame, readAnswerEvents, readFrames } from "@/api/sse";
+import { readAnswerEvents, readFrames } from "@/api/sse";
 
 /** A body stream carrying these strings as chunks, in order. */
 function streamOf(chunks: readonly string[]): ReadableStream<Uint8Array> {
@@ -39,36 +39,27 @@ const START_FRAME =
 const TOKEN_FRAME = 'event: token\ndata: {"text": "An ORM "}\n\n';
 const END_FRAME = "event: end\ndata: {}\n\n";
 
-describe("parseFrame", () => {
-  it("refuses a frame with no newline", () => {
-    // Narrower than "is not two lines" on purpose: a third line is not
-    // rejected, it lands inside `data`. Saying "two lines" here would promise
-    // a check the implementation does not make.
-    expect(parseFrame("event: end")).toBeNull();
-  });
-
-  it("refuses a frame whose fields are not event and data", () => {
-    expect(parseFrame('id: 1\ndata: {"text": "x"}')).toBeNull();
-    expect(parseFrame('event: token\nfoo: {"text": "x"}')).toBeNull();
-  });
-
-  it("splits the name from the payload", () => {
-    expect(parseFrame('event: token\ndata: {"text": "x"}')).toEqual({
-      name: "token",
-      data: '{"text": "x"}',
-    });
-  });
-});
-
 describe("readFrames", () => {
+  // "Has no newline" is narrower than "is not two lines" on purpose: a third
+  // line is not rejected, it lands inside `data`. Saying "two lines" here would
+  // promise a check the implementation does not make.
+  it.each([
+    ["has no newline", "event: end\n\n"],
+    ["opens with a field other than event", 'id: 1\ndata: {"text": "x"}\n\n'],
+    ["follows event with a field other than data", 'event: token\nfoo: {"text": "x"}\n\n'],
+  ])("drops a frame that %s and still delivers the next one", async (_, malformed) => {
+    const frames = await collect(readFrames(streamOf([malformed + TOKEN_FRAME])));
+    expect(frames.map((frame) => frame.name)).toEqual(["token"]);
+  });
+
   it("releases three frames arriving in one chunk", async () => {
     const frames = await collect(readFrames(streamOf([START_FRAME + TOKEN_FRAME + END_FRAME])));
     expect(frames.map((frame) => frame.name)).toEqual(["start", "token", "end"]);
   });
 
   it("buffers a frame cut in the middle of its data line", async () => {
-    // The boundary the module's own docstring calls the one that matters: the
-    // network split falls inside the payload, so neither half is a frame.
+    // The boundary that matters most: the network split falls inside the
+    // payload, so neither half is a frame.
     const frames = await collect(
       readFrames(streamOf(['event: token\ndata: {"te', 'xt": "An ORM "}\n\n'])),
     );
