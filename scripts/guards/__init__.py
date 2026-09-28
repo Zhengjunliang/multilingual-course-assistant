@@ -19,7 +19,10 @@ end of the line it silences, or alone on the line above it.
 
     # guard-ignore env-parity: read by docker-compose.yml, not by Django
 
-A marker without a reason is itself a finding.
+A marker without a reason is itself a finding, and so is one that names no
+rule or silences nothing. Only a comment in the file's own syntax holds one; a
+TypeScript string that spells out a `//` marker is the one place this reading
+is fooled, since TypeScript comments are found by a lexical scan.
 """
 
 from __future__ import annotations
@@ -44,6 +47,7 @@ MARKER = re.compile(
     r"(?:#|//|<!--)\s*guard-ignore\s+(?P<rules>[a-z0-9-]+(?:\s*,\s*[a-z0-9-]+)*)"
     r"\s*(?::(?P<reason>.*?))?\s*(?:-->)?\s*$"
 )
+CODE_SPAN = re.compile(r"`[^`\n]*`")
 
 
 @dataclass(frozen=True)
@@ -99,15 +103,16 @@ def _lines(path: str, text: str) -> Iterator[tuple[int, str, int]]:
     """Where a marker may sit: each line, and the column its comment starts at.
 
     In Python only a real comment counts, so a marker quoted in a string or a
-    docstring is not one; in markdown, not one shown in a fenced code block.
+    docstring is not one; in markdown, not one shown in code, fenced or inline.
     """
     if not path.endswith(".py"):
-        fenced = False
+        markdown, fenced = _opener(path) == "<!--", False
         for number, line in enumerate(text.splitlines(), 1):
-            if _opener(path) == "<!--" and line.lstrip().startswith(("```", "~~~")):
+            if markdown and line.lstrip().startswith(("```", "~~~")):
                 fenced = not fenced
             elif not fenced:
-                yield number, line, 0
+                shown = CODE_SPAN.sub(lambda span: " " * len(span.group()), line)
+                yield number, shown if markdown else line, 0
         return
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(text).readline))

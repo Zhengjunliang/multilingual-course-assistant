@@ -69,6 +69,9 @@ def test_a_marker_at_the_end_of_a_line_silences_that_line_only() -> None:
         pytest.param("x.md", "the guard-ignore env-parity: marker\n", id="prose-with-a-colon"),
         pytest.param("x.md", "# guard-ignore lang-han: a heading\n", id="a-heading"),
         pytest.param(
+            "x.md", "Write `<!-- guard-ignore lang-han: why -->` after it.\n", id="inline-code"
+        ),
+        pytest.param(
             "x.md", "```\n<!-- guard-ignore lang-han: shown -->\n```\n", id="a-fenced-example"
         ),
         pytest.param("x.ts", "# guard-ignore lang-han: not a TS comment\n", id="a-wrong-opener"),
