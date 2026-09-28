@@ -70,9 +70,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-FALLBACK_REASON = "fallback: unparseable router reply"
-ASSESS_FALLBACK_REASON = "fallback: unparseable assessment"
-PICK_FALLBACK_REASON = "fallback: unparseable pick, took the top-ranked candidate"
+FALLBACK_REASON = "fallback: unparsable router reply"
+ASSESS_FALLBACK_REASON = "fallback: unparsable assessment"
+PICK_FALLBACK_REASON = "fallback: unparsable pick, took the top-ranked candidate"
 
 # Hard caps, all of them code constants rather than convention
 # (docs/unifi-web-source.md): three fetches per question, and a shortlist a 4B

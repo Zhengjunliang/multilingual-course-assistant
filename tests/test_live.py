@@ -1,6 +1,6 @@
 """Live ingest is the only query-time writer into the shared index, so what
 these tests pin is its boundary: a gated page replaces exactly its own live
-version and leaves the crawl snapshot alone, while a refused — or unparseable —
+version and leaves the crawl snapshot alone, while a refused — or unparsable —
 gate writes nothing at all and still hands back the chunks this turn answers
 from. Robots, the CPU/page caps and the Ollama unload are code, not convention.
 Everything runs offline: stub fetcher, stub completer, stub encoders and an

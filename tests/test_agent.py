@@ -257,7 +257,7 @@ def run_loop(
     return result.hits, result.decisions
 
 
-def test_unparseable_reply_falls_back_to_both() -> None:
+def test_unparsable_reply_falls_back_to_both() -> None:
     """The fallback is the frozen contract: both collections cost latency, a
     raised exception costs the answer."""
     decision = route("Quando scadono le tasse?", StubCompleter("sorry, I cannot do JSON"))
@@ -705,7 +705,7 @@ def test_an_already_indexed_step_over_budget_earns_no_catch_up_retrieval() -> No
     assert len(retrievals) == 1  # the opening one, and no closing one
 
 
-def test_an_unparseable_assessment_reads_as_not_yet_and_keeps_the_loop_going() -> None:
+def test_an_unparsable_assessment_reads_as_not_yet_and_keeps_the_loop_going() -> None:
     """A 4B model failing to produce JSON must not end the turn as "answered":
     the loop reads it as "not yet", which costs one fetch out of a bounded
     three, while the opposite reading would answer from material nobody judged."""
@@ -760,7 +760,7 @@ def test_a_pick_outside_the_shortlist_falls_back_to_the_top_ranked_candidate(rep
     assert decisions[0].reason == PICK_FALLBACK_REASON
 
 
-def test_an_unparseable_pick_falls_back_instead_of_reading_as_a_refusal() -> None:
+def test_an_unparsable_pick_falls_back_instead_of_reading_as_a_refusal() -> None:
     """A garbled reply and a deliberate refusal must stay two different events.
     A reply that does not validate keeps the older contract — fetch the
     top-ranked candidate and record that the choice was not the model's — while

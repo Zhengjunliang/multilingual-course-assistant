@@ -133,7 +133,7 @@ PDF_PARSE_TIMEOUT_SECONDS = 120
 # the first list; more would only slow a decision that is already binary.
 GATE_SAMPLE_CHARS = 1500
 
-GATE_FALLBACK_REASON = "gate: unparseable reply"
+GATE_FALLBACK_REASON = "gate: unparsable reply"
 
 # Local Ollama, the only endpoint this module knows how to unload.
 OLLAMA_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})

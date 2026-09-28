@@ -375,7 +375,7 @@ def test_routing_report_scores_exact_wide_both_and_fallback() -> None:
         make_question(),  # slides -> slides: exact and wide
         campus,  # unifi_web -> both: wide only
         campus.model_copy(update={"id": "c002"}),  # unifi_web -> slides: neither
-        campus.model_copy(update={"id": "c003"}),  # unparseable -> fallback both: wide only
+        campus.model_copy(update={"id": "c003"}),  # unparsable -> fallback both: wide only
     ]
     completer = ScriptedCompleter(
         [routed("slides"), routed("both"), routed("slides"), "sorry, no JSON"]
