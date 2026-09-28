@@ -7,11 +7,11 @@ entry pointing at the same course, never a copy of it. A `CourseEdition` is one
 academic year of a course, and it is the row the rest of the site will hang on:
 material, syllabus, reading list, teachers.
 
-`(course.code, academic_year)` is also the pair the slides chunks of `rag/` are
-to carry in place of the corpus directory name (docs/data-model.md, chunk
-payload mapping). It crosses that boundary as two plain strings — `rag/` never
-imports Django — so the strings themselves are the contract, which is why
-neither may change once the edition exists.
+`(course.code, academic_year)` is the pair every slides chunk of `rag/` carries
+(`rag/chunk.py`), in place of the corpus directory name (docs/data-model.md,
+chunk payload mapping). It crosses that boundary as two plain strings — `rag/`
+never imports Django — so the strings themselves are the contract, which is
+why neither may change once the edition exists.
 
 Nothing here points at the user model. Roles, uploaded material and a student's
 programme will point at these tables; an arrow the other way would make the

@@ -27,17 +27,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 FURNITURE = "HTML &amp; CSS"
 
 
-def make_meta() -> ParsedMeta:
-    return ParsedMeta(
-        source_file="deck.pdf",
-        source_path="/corpus/PPM/deck.pdf",
-        source_sha256="ab" * 32,
-        parse_variant="classic",
-        docling_version="0.0.0",
-        course="PPM",
-        seconds=1.5,
-        parsed_at="2026-08-03T00:00:00+00:00",
-    )
+def make_meta(**overrides: object) -> ParsedMeta:
+    fields: dict[str, object] = {
+        "source_file": "deck.pdf",
+        "source_path": "/corpus/PPM/deck.pdf",
+        "source_sha256": "ab" * 32,
+        "parse_variant": "classic",
+        "docling_version": "0.0.0",
+        "course": "B028451",
+        "academic_year": "2025-2026",
+        "seconds": 1.5,
+        "parsed_at": "2026-08-03T00:00:00+00:00",
+    }
+    fields.update(overrides)
+    return ParsedMeta.model_validate(fields)
 
 
 def build_document():  # DoclingDocument return type stays a lazy import
@@ -78,7 +81,7 @@ def build_document():  # DoclingDocument return type stays a lazy import
     return document
 
 
-def make_chunks() -> list[Chunk]:
+def make_chunks(meta: ParsedMeta | None = None) -> list[Chunk]:
     from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
     from docling_core.transforms.chunker.tokenizer.base import BaseTokenizer
 
@@ -93,7 +96,7 @@ def make_chunks() -> list[Chunk]:
             return self
 
     chunker = HybridChunker(tokenizer=WordTokenizer())
-    return chunk_document(build_document(), chunker, make_meta(), "en")
+    return chunk_document(build_document(), chunker, meta or make_meta(), "en")
 
 
 def merge_sort_chunk(chunks: list[Chunk]) -> Chunk:
@@ -108,7 +111,8 @@ def test_every_payload_field_is_populated() -> None:
         assert chunk.text
         assert chunk.embed_text
         assert chunk.locale == "en"
-        assert chunk.course == "PPM"
+        assert chunk.course == "B028451"
+        assert chunk.academic_year == "2025-2026"
         assert chunk.source_file == "deck.pdf"
         assert chunk.page >= 1
         assert chunk.pages
@@ -149,8 +153,21 @@ def test_chunk_ids_are_deterministic_across_reruns() -> None:
     first = [c.chunk_id for c in make_chunks()]
     second = [c.chunk_id for c in make_chunks()]
     assert first == second
-    assert first[0] == ("ab" * 32)[:16] + ":classic:0000"
-    assert all(cid.startswith(("ab" * 32)[:16] + ":classic:") for cid in first)
+    prefix = "B028451:2025-2026:" + ("ab" * 32)[:16] + ":classic:"
+    assert first[0] == prefix + "0000"
+    assert all(cid.startswith(prefix) for cid in first)
+
+
+def test_only_slides_chunk_ids_carry_the_edition() -> None:
+    """Two editions of the same deck must not collide on `chunk_id`: the same
+    PDF taught in 2024-2025 and in 2025-2026 gets disjoint id sets. A web meta
+    (no edition) keeps the old, unprefixed id form."""
+    ids_2024 = {c.chunk_id for c in make_chunks(make_meta(academic_year="2024-2025"))}
+    ids_2025 = {c.chunk_id for c in make_chunks(make_meta(academic_year="2025-2026"))}
+    assert ids_2024.isdisjoint(ids_2025)
+
+    web_ids = [c.chunk_id for c in make_chunks(make_meta(kind="web", academic_year=None))]
+    assert web_ids[0] == ("ab" * 32)[:16] + ":classic:0000"
 
 
 def test_furniture_threshold_floors_at_five_pages() -> None:
@@ -211,6 +228,7 @@ def test_chunk_validates_pre_web_payload() -> None:
     }
     chunk = Chunk.model_validate(payload)
     assert chunk.kind == "slides"
+    assert chunk.academic_year is None
     assert chunk.url is None
     assert chunk.ingest_source is None
     assert chunk.content_hash is None
@@ -218,6 +236,8 @@ def test_chunk_validates_pre_web_payload() -> None:
     assert Chunk.model_validate({**payload, "locale": "zh"}).locale == "zh"
     with pytest.raises(ValidationError):
         Chunk.model_validate({**payload, "locale": "EN"})
+    with pytest.raises(ValidationError):
+        Chunk.model_validate({**payload, "academic_year": "2025/2026"})
 
 
 def test_stray_json_without_sidecar_is_skipped_in_directory_scans(tmp_path: Path) -> None:

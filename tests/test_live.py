@@ -121,6 +121,8 @@ def fake_chunk_document(
             update={
                 "chunk_id": f"{meta.source_sha256[:16]}:{meta.parse_variant}:0000",
                 "kind": "web",
+                "course": meta.section or "web",
+                "academic_year": None,
                 "parse_variant": meta.parse_variant,
                 "url": meta.url,
                 "ingest_source": meta.ingest_source,

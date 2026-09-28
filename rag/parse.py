@@ -59,6 +59,11 @@ class ParsedMeta(BaseModel):
     course: str
     seconds: float
     parsed_at: str
+    # The academic year of a slides edition, alongside `course`
+    # (`rag/chunk.py`, `EditionKey`); a plain string, not the pattern-checked
+    # `AcademicYear` — checking it here would need `rag.chunk`, which already
+    # imports this module. None in a sidecar written before `#96`.
+    academic_year: str | None = None
     # Web-source provenance, threaded through to the chunk payload.
     # All optional with defaults so every sidecar already on disk stays valid;
     # the PDF path never sets them (a legal terminal state, not missing data).

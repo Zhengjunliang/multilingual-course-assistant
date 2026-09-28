@@ -17,7 +17,7 @@ import logging
 import re
 from math import ceil
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
@@ -65,6 +65,62 @@ def locale_arg(value: str) -> str:
         return normalize_locale(value)
     except ValueError as exc:
         raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+# The format rule's owner is docs/data-model.md, invariant 1 (`Course.code`,
+# `CourseEdition.academic_year`); `rag/` never imports Django, so this restates
+# the same two ASCII patterns and points back to that owner rather than
+# defining a second source of truth.
+_COURSE_CODE = r"^[A-Z0-9]+$"
+_ACADEMIC_YEAR = r"^[0-9]{4}-[0-9]{4}$"
+AcademicYear = Annotated[str, StringConstraints(pattern=_ACADEMIC_YEAR)]
+
+
+class EditionKey(NamedTuple):
+    """One course edition as `rag/` sees it: two plain strings, never a model
+    instance — `rag/` never imports Django (docs/data-model.md, the contract
+    between `apps/` and `rag/`)."""
+
+    course: str
+    academic_year: str
+
+
+def edition_of(course: str, academic_year: str) -> EditionKey:
+    """The one place on the rag side that checks an edition's spelling.
+
+    `ValueError` names the rule's real owner instead of leaving a caller to
+    guess: the two patterns themselves are docs/data-model.md, invariant 1.
+    """
+    if not re.fullmatch(_COURSE_CODE, course, re.ASCII) or not re.fullmatch(
+        _ACADEMIC_YEAR, academic_year, re.ASCII
+    ):
+        raise ValueError(
+            f"not an edition: {course!r}, {academic_year!r} (docs/data-model.md, invariant 1)"
+        )
+    return EditionKey(course, academic_year)
+
+
+def edition_arg(value: str) -> EditionKey:
+    """argparse adapter for CODE:YEAR flags; the rule itself is `edition_of`."""
+    course, sep, academic_year = value.partition(":")
+    try:
+        if not sep:
+            raise ValueError("expected CODE:YEAR, such as B028451:2025-2026")
+        return edition_of(course, academic_year)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{value!r}: {exc}") from exc
+
+
+def chunk_id_of(
+    edition: EditionKey | None, source_sha256: str, parse_variant: str, index: int
+) -> str:
+    """The chunk id: a content part that names the bytes and the parse, prefixed
+    with the edition for a slides chunk that has one — so one PDF taught under
+    two editions gets disjoint id sets instead of colliding on `chunk_id`. A
+    web chunk (`edition=None`) keeps its unprefixed form unchanged
+    (docs/docling-pipeline.md, section 3.6)."""
+    content = f"{source_sha256[:16]}:{parse_variant}:{index:04d}"
+    return content if edition is None else f"{edition.course}:{edition.academic_year}:{content}"
 
 
 DEFAULT_OUT_DIR = Path(__file__).resolve().parent.parent / "data" / "chunks"
@@ -182,6 +238,7 @@ class Chunk(BaseModel):
     embed_text: str
     locale: Locale
     course: str
+    academic_year: AcademicYear | None = None
     source_file: str
     page: int
     pages: list[int]
@@ -248,6 +305,14 @@ def chunk_document(
     """
     from docling_core.transforms.chunker.doc_chunk import DocMeta
 
+    # A slides sidecar without a year keeps the unprefixed id form, the one
+    # every slides chunk had before `#96`.
+    edition = (
+        edition_of(meta.course, meta.academic_year)
+        if meta.kind == "slides" and meta.academic_year
+        else None
+    )
+
     furniture = furniture_headings(document)
     chunks: list[Chunk] = []
     for index, chunk in enumerate(chunker.chunk(document)):
@@ -261,12 +326,13 @@ def chunk_document(
             Chunk(
                 # Deterministic across re-runs of the same corpus snapshot + parse
                 # configuration, so re-indexing overwrites instead of duplicating.
-                chunk_id=f"{meta.source_sha256[:16]}:{meta.parse_variant}:{index:04d}",
+                chunk_id=chunk_id_of(edition, meta.source_sha256, meta.parse_variant, index),
                 chunk_index=index,
                 text=normalize_text(chunk.text),
                 embed_text=normalize_text(chunker.contextualize(chunk)),
                 locale=locale,
                 course=meta.course,
+                academic_year=meta.academic_year,
                 source_file=meta.source_file,
                 page=pages[0] if pages else 1,
                 pages=pages,

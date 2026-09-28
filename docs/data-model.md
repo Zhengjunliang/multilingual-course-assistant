@@ -49,7 +49,7 @@ erDiagram
 
 ## Chunk payload mapping
 
-✅ The field table and the web-side values are owned by [docling-pipeline.md](docling-pipeline.md), section 3.6, with the model in `rag/chunk.py`. 🔜 M5: in the slides collection, `course` holds a UniFi course code (`B028451` for PPM) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default. A slides `chunk_id` carries both, so one PDF in two editions yields two identities.
+✅ The field table and the web-side values are owned by [docling-pipeline.md](docling-pipeline.md), section 3.6, with the model in `rag/chunk.py`. 🔶 In the slides collection, `course` holds a UniFi course code (`B028451` for PPM) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default; a slides `chunk_id` carries both, so one PDF in two editions yields two identities — the fields and the id are `rag/chunk.py`, and the stored points move to them with `#96`.
 
 ## Migration order
 

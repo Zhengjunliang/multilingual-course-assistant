@@ -42,7 +42,13 @@ TASSE_URL = "https://www.unifi.it/it/studia-con-noi/tasse"
 
 def make_web_chunk(index: int, text: str) -> Chunk:
     return make_chunk(index, text).model_copy(
-        update={"kind": "web", "url": TASSE_URL, "ingest_source": "crawl"}
+        update={
+            "kind": "web",
+            "course": "unifi",
+            "academic_year": None,
+            "url": TASSE_URL,
+            "ingest_source": "crawl",
+        }
     )
 
 

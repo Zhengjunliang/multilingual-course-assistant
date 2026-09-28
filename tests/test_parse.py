@@ -38,6 +38,7 @@ def test_parsed_meta_validates_pre_web_sidecar() -> None:
         }
     )
     assert meta.kind == "slides"
+    assert meta.academic_year is None
     assert meta.lang is None
     assert meta.url is None
     assert meta.ingest_source is None

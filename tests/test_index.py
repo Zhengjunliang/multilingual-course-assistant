@@ -59,12 +59,13 @@ def make_chunk(
     index: int = 0, text: str = "Merge sort splits the array.", locale: Locale = "en"
 ) -> Chunk:
     return Chunk(
-        chunk_id=f"{'ab' * 8}:classic:{index:04d}",
+        chunk_id=f"B028451:2025-2026:{'ab' * 8}:classic:{index:04d}",
         chunk_index=index,
         text=text,
         embed_text=f"Algorithms\n{text}",
         locale=locale,
-        course="PPM",
+        course="B028451",
+        academic_year="2025-2026",
         source_file="deck.pdf",
         page=index + 1,
         pages=[index + 1],
@@ -116,6 +117,8 @@ def make_web_chunk(
         update={
             "chunk_id": f"{content_hash[:16]}:html:0000",
             "kind": "web",
+            "course": "ingegneria",
+            "academic_year": None,
             "url": url,
             "ingest_source": source,
             "content_hash": content_hash,

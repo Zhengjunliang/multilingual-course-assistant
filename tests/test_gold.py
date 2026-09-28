@@ -57,6 +57,8 @@ def test_campus_hit_scores_by_url_not_by_page() -> None:
     web_chunk = make_chunk(0, ORM_TEXT).model_copy(
         update={
             "kind": "web",
+            "course": "ingegneria",
+            "academic_year": None,
             "url": "https://www.ingegneria.unifi.it/vp-185-per-laurearsi.html/",
         }
     )

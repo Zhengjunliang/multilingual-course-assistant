@@ -149,12 +149,13 @@ The fields every chunk carries into the index, **from the first day**: a field a
 
 | Field | Meaning |
 | --- | --- |
-| `chunk_id` | `first 16 hex of sha256:variant:index`, deterministic — the same corpus snapshot and parse configuration give the same ids, so rebuilding the index overwrites instead of duplicating |
+| `chunk_id` | slides: `course:academic_year:first 16 hex of sha256:variant:index`, prefixed with the edition (`rag/chunk.py`, `chunk_id_of`); web: `first 16 hex of sha256:variant:index`, unchanged. Deterministic — the same edition, corpus snapshot and parse configuration give the same ids, so rebuilding the index overwrites instead of duplicating, and two editions of the same PDF get disjoint id sets |
 | `chunk_index` | position in the document |
 | `text` | the raw chunk text, NFKC — the sparse (BM25) side, and what the user is shown |
 | `embed_text` | the output of `contextualize()` (after heading filtering), NFKC — **the dense side only** |
 | `locale` | a BCP-47 primary subtag (2–3 lowercase letters, checked by a pydantic pattern). Precedence: CLI `--locale` > sidecar `lang` (for web, `<html lang>`) > heuristic (CJK characters ≥ 20% → `zh`, otherwise a majority vote of Italian and English stopwords, a tie going to `en`) |
-| `course` · `source_file` | from the sidecar. For web: `course` is the site-section slug (e.g. `ingegneria`), or `"web"` when the registry row has none (`rag/webparse.py`); `source_file` is the snapshot artefact name (a hash of the URL plus the extension — URL basenames collide across a site (`index.html`), hashes do not; the URL itself is in `url`) |
+| `course` · `source_file` | from the sidecar. For slides: `course` is a UniFi course code, `Course.code` (e.g. `B028451`); for web: `course` is the site-section slug (e.g. `ingegneria`), or `"web"` when the registry row has none (`rag/webparse.py`); `source_file` is the snapshot artefact name (a hash of the URL plus the extension — URL basenames collide across a site (`index.html`), hashes do not; the URL itself is in `url`) |
+| `academic_year` | slides: the course edition's academic year (e.g. `2025-2026`), joining `course` as the edition key; web: null. Slides rows written before `#96` are null too, and reachable only with `scope=None` |
 | `page` | 1-based, the first page of the chunk's first item — the anchor of a citation such as "p. 12". For web: PDF attachments carry real pages, HTML chunks carry `1` (`rag/chunk.py` takes the first page, or 1 when there is none); a web hit is scored by `urls`, not by page |
 | `pages` | every page the chunk spans (when a merge crosses slides, `page` stays the start and `pages` keeps the truth); for HTML chunks, `[]` |
 | `heading_path` | the filtered heading chain, possibly empty |
