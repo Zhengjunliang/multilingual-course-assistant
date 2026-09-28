@@ -73,8 +73,14 @@ def mirror() -> str:
     return MIRROR.read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("model", MIRRORED, ids=lambda model: model.__name__)
-def test_the_mirror_declares_every_model(mirror: str, model: type[BaseModel]) -> None:
+# A model with fields is proven declared by the field test below, which cannot
+# find a field without its interface; only a model with none needs asking.
+@pytest.mark.parametrize(
+    "model", [model for model in MIRRORED if not model.model_fields], ids=lambda m: m.__name__
+)
+def test_the_mirror_declares_every_model_without_fields(
+    mirror: str, model: type[BaseModel]
+) -> None:
     name = model.__name__
     declared = f"export interface {name} " in mirror or f"export type {name} " in mirror
     assert declared, f"{name} is not declared in {MIRROR.name}"
