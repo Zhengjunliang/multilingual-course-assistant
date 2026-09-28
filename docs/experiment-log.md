@@ -2,6 +2,52 @@
 
 What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; every number is reproducible with the commands in its entry's *Reproducibility* section. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
+## 2026-09-28 — The slides points move to their edition key without re-embedding
+
+### 1. What moved
+
+`rag/relabel.py` at `3ebc020` moves each slides point to its post-`#96` edition key without touching its vector: it scrolls the point's stored vector and payload, upserts them under the new id with the edition fields added, verifies the vector survived unchanged, then deletes the old id. `course` moves from `"PPM"` to `"B028451"`, `academic_year` from unset to `"2025-2026"`, and `chunk_id` is recomputed under the post-`#96` rule that folds both into the id.
+
+Before the run, the whole index was copied to `data/backup/96/` (the `qdrant` directory identical to the source, 413496400 bytes; 31 sidecars; 31 chunk files) as the rollback point.
+
+A dry run (`--dry-run`) reported it would move 1234 points across 31 source files and rewrite 31 sidecars and 31 chunk files (1234 lines); opening the embedded client took 27.50 s and peaked at 1627.7 MiB, because the same client also loads `unifi_web`'s 29098 points.
+
+The real run scanned 1234 points (31 source files); every id matched the pre-`#96` rule, and the 1234 old-id → new-id pairs were recorded to `data/relabel-96/ids-20260928T184623Z.json` before anything was written. It upserted the 1234 points under their new ids, in batches of 256 (3.49 s), then **reopened the client** (4.78 s) and compared vectors against what that fresh client read back: **1234/1234 identical**. Only then did it delete the 1234 old points (2.82 s) from the id list recorded at scan time, and rewrite the 31 sidecars and 31 chunk files (1234 lines, 0.12 s). The comparison runs on a reopened client because the embedded client normalises cosine vectors in memory as it works with them; only the persisted state on disk keeps the raw values it actually wrote, so comparing against the in-memory copy would not have caught a write that landed wrong.
+
+Final invariants held: 1234 slides points in the collection = 1234 chunk ids across the 31 chunk files, the two id sets equal, 0 points labelled `PPM`, and `unifi_web` unchanged at 29098 points both before and after (a fresh open reports 29098 too).
+
+### 2. The smoke gold before, between and after
+
+Three runs of `gold/smoke.jsonl` (40 questions, rerank path) isolate the relabel from the scope filter that `#96` also added:
+
+| Run | What it ran | What it isolates | hit@5 |
+| --- | --- | --- | --- |
+| before | branch code, `rag.gold.EVAL_SCOPE` forced to `None`, on the index before the relabel | the search as it ran before `#96`'s scope existed | 38/40 (95%) |
+| mid | the same forced-`None` run, on the relabelled index | the relabel alone (scope disabled in both) | 38/40 (95%) |
+| after | branch head, scope pinned to `B028451:2025-2026` | the scope filter alone (relabel applied in both) | 38/40 (95%) |
+
+`before` and `mid` were meant to compare the pre-scope commit against the relabelled index; forcing `EVAL_SCOPE` to `None` for one run reproduces that comparison without leaving the branch. The per-question HIT/MISS columns and the `top:` column are identical before→mid (the relabel changed nothing the ranking depends on) and mid→after (the scope filter changed nothing, because every point belongs to the one edition it names). Both misses are `q028` in all three runs (`4.2 Docker.pdf` p.11 wanted, `4.1 Docker.pdf` p.58 returned), unrelated to `#96`.
+
+The scope filter was also checked directly on the relabelled index: `rag.search "Cosa sono le migrazioni?" --scope B028451:2025-2026 --no-rerank` returns slides (top: `2-orm_django_2025.pdf` p.24); the same question with `--scope B028451:2024-2025` — an edition the corpus does not hold — returns none.
+
+### Reproducibility
+
+```powershell
+# dry run, then the real run, both at 3ebc020
+.venv\Scripts\python.exe -m rag.relabel --from-course PPM --to B028451:2025-2026 --dry-run
+.venv\Scripts\python.exe -m rag.relabel --from-course PPM --to B028451:2025-2026
+
+# smoke gold: before/mid force the scope off, after pins it (branch head)
+.venv\Scripts\python.exe -c "import rag.gold as g; g.EVAL_SCOPE = None; g.main(['gold/smoke.jsonl'])"
+.venv\Scripts\python.exe -m rag.gold gold/smoke.jsonl
+
+# the scope filter alone
+.venv\Scripts\python.exe -m rag.search "Cosa sono le migrazioni?" --scope B028451:2025-2026 --no-rerank
+.venv\Scripts\python.exe -m rag.search "Cosa sono le migrazioni?" --scope B028451:2024-2025 --no-rerank
+```
+
+Rollback point: `data/backup/96/` (copied before the run). Id map: `data/relabel-96/ids-20260928T184623Z.json` (1234 pairs). `rag/relabel.py` at `3ebc020` is a one-off script, deleted in the commit that records this entry.
+
 ## 2026-09-14 — A pypdf upgrade changes the extracted text without changing the routing
 
 ### 1. The comparison

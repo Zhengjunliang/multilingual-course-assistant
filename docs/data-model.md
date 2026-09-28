@@ -51,16 +51,16 @@ erDiagram
 
 ## Chunk payload mapping
 
-✅ The field table and the web-side values are owned by [docling-pipeline.md](docling-pipeline.md), section 3.6, with the model in `rag/chunk.py`. 🔶 In the slides collection, `course` holds a UniFi course code (`B028451` for PPM) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default; a slides `chunk_id` carries both, so one PDF in two editions yields two identities — the fields and the id are `rag/chunk.py`, and the stored points move to them with `#96`.
+✅ The field table and the web-side values are owned by [docling-pipeline.md](docling-pipeline.md), section 3.6, with the model in `rag/chunk.py`. In the slides collection, `course` holds a UniFi course code (`B028451` for PPM) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default; a slides `chunk_id` carries both, so one PDF in two editions yields two identities. The stored points moved to these fields without re-embedding ([experiment-log.md](experiment-log.md), entry of 2026-09-28, *The slides points move to their edition key without re-embedding*).
 
 ## Migration order
 
-🔶 ① is in `apps/catalog/migrations/0001_initial.py`; 🔜 M5: ② to ④. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisions.md](decisions.md), 2026-09-26.
+✅ ① is in `apps/catalog/migrations/0001_initial.py`, and ④ is done ([experiment-log.md](experiment-log.md), entry of 2026-09-28, *The slides points move to their edition key without re-embedding*); 🔜 M5: ② and ③. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisions.md](decisions.md), 2026-09-26.
 
 - ① Catalogue tables: `DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`.
 - ② `RoleAssignment`, with the roles of `#93`.
 - ③ Content tables — `CourseMaterial` (`#35`), `Syllabus`, `ReadingItem`, `WebSource` — and `User.year_of_study` with the student course list (`#36`).
-- ④ The Qdrant payload remap, zero GPU: `set_payload` writes the course code and `academic_year`, and each slides point moves to its new id (scroll the stored vectors, upsert under the new id, delete the old one). The `data/parsed/*.meta.json` and `data/chunks/*.jsonl` sidecars are rewritten in the same batch.
+- ④ The Qdrant payload remap, zero GPU: scroll each slides point's stored vector, upsert it under its new id with the course code and `academic_year` in the full payload, compare the result on a reopened client, then delete the old ids from the list recorded at scan time. The `data/parsed/*.meta.json` and `data/chunks/*.jsonl` sidecars are rewritten in the same run.
 
 Student uploads visible only to their author are deferred (`#36`): they would add one nullable `owner` column on `CourseMaterial`, an additive change.
 
