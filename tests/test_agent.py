@@ -308,18 +308,19 @@ def test_the_router_prompt_is_the_one_the_reported_accuracy_was_measured_with() 
 def test_a_question_with_no_history_reaches_the_router_exactly_as_before() -> None:
     """Conversations must be free for the first question of one.
 
-    The whole messages list is compared, not the question inside it: a change to
-    the system prompt or to the number of messages is precisely what would move
-    the fallback count without touching anything a routing assertion reads.
+    The whole messages list is pinned, not the question inside it: a change to
+    the system prompt, to the number of messages or a prefix on the bare question
+    is precisely what would move the fallback count without touching anything a
+    routing assertion reads.
     """
-    without = StubCompleter(ORM_REPLY)
-    empty = StubCompleter(ORM_REPLY)
+    completer = StubCompleter(ORM_REPLY)
 
-    route("What is an ORM?", without)
-    route("What is an ORM?", empty, history=())
+    route("What is an ORM?", completer)
 
-    assert without.messages == empty.messages
-    assert without.messages[-1]["content"] == "What is an ORM?"
+    assert completer.messages == [
+        {"role": "system", "content": ROUTER_SYSTEM_PROMPT},
+        {"role": "user", "content": "What is an ORM?"},
+    ]
 
 
 def test_history_puts_the_earlier_questions_ahead_of_this_one() -> None:
@@ -372,20 +373,6 @@ def test_collections_for_maps_each_target_to_real_collection_names() -> None:
     assert collections_for(make_decision("both")) == (COLLECTION, WEB_COLLECTION)
 
 
-def test_narrowing_keeps_a_link_dom_order_would_have_dropped() -> None:
-    """The whole reason the ranking exists: a page's first links are its
-    navigation, so an implementation that kept registry order would return ten
-    menu entries and drop the one link that answers the question."""
-    navigation = [candidate(f"Sezione {number}", f"/vp-{number}.html") for number in range(12)]
-    answer_link = candidate("Diploma Supplement", "/vp-220-diploma-supplement.html")
-
-    candidates = narrow_candidates(QUERY, [*navigation, answer_link], KeywordDense())
-
-    assert len(candidates) == MAX_LINK_CANDIDATES
-    assert candidates[0] == answer_link  # last in DOM order, first by cosine
-    assert candidates[0].referrer == SEED  # and it still knows which page carried it
-
-
 def test_pdf_candidates_hold_a_quota_that_never_costs_a_page_slot() -> None:
     """One referrer page can link forty decrees. A shared cap would let them
     flood the shortlist; a shared *ranking* would let navigation links push out
@@ -408,7 +395,12 @@ def test_pdf_candidates_hold_a_quota_that_never_costs_a_page_slot() -> None:
 
 def test_narrowing_returns_at_most_ten_pages_in_cosine_order() -> None:
     """Three legible grades: a link pointing the same way as the query, one that
-    over-weights half of it, and navigation that matches nothing."""
+    over-weights half of it, and navigation that matches nothing.
+
+    The navigation comes first and the best link last, as on a real page: a
+    page's first links are its navigation, so an implementation that kept
+    registry order would return ten menu entries and drop the one link that
+    answers the question — the whole reason the ranking exists."""
     best = candidate("Diploma Supplement", "/vp-220.html")
     second = candidate("Diploma Supplement", "/diploma.html")  # the same words, skewed
     third = candidate("Diploma", "/vp-221.html")  # half the query
@@ -1196,8 +1188,7 @@ def test_cli_answers_from_the_routed_collection_with_sources(
     out = capsys.readouterr().out
     assert "step 0: answered" in out  # the index already had it: no fetch at all
     assert "An ORM maps objects to tables" in out
-    assert "Sources:" in out
-    assert "[deck.pdf p.1]" in out
+    assert "Sources:\n  [deck.pdf p.1]" in out
     assert streamer.messages[-1]["content"].endswith("Question: What is an ORM?")
 
 

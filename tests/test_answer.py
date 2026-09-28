@@ -68,11 +68,13 @@ def test_the_generation_prompt_is_the_one_the_recorded_answers_were_produced_wit
 
 
 def test_a_question_with_no_history_builds_exactly_the_prompt_it_did_before() -> None:
+    """Byte for byte the pre-conversation user message: the M3 measurements
+    stay comparable only while a history-less prompt gains nothing."""
     hits = make_hits()
 
-    assert build_messages("What is an ORM?", hits, "it") == build_messages(
-        "What is an ORM?", hits, "it", ()
-    )
+    content = build_messages("What is an ORM?", hits, "it")[1]["content"]
+
+    assert content == f"{format_context(hits)}\n\nQuestion: What is an ORM?"
 
 
 def test_history_never_becomes_extra_messages() -> None:
@@ -136,13 +138,6 @@ def test_a_long_earlier_answer_is_truncated() -> None:
     assert content.index("Excerpt 1") < HISTORY_ANSWER_CHARS + 200
 
 
-def test_answer_streams_through_the_client() -> None:
-    streamer = StubStreamer()
-    tokens = list(answer("What is an ORM?", make_hits(), streamer, "en"))
-    assert "".join(tokens).startswith("An ORM maps")
-    assert streamer.messages  # the prompt actually reached the client
-
-
 def test_no_hits_refuses_in_the_question_language_without_calling_the_llm() -> None:
     streamer = StubStreamer()
     (english,) = list(answer("What is an ORM?", [], streamer, "en"))
@@ -180,8 +175,7 @@ def test_cli_answers_end_to_end_with_sources(
     main(["django orm", "--qdrant-path", str(qdrant_path), "--no-rerank"])
     out = capsys.readouterr().out
     assert "An ORM maps objects to tables" in out
-    assert "Sources:" in out
-    assert "[deck.pdf p.1]" in out
+    assert "Sources:\n  [deck.pdf p.1]" in out
 
 
 def test_source_marker_matches_the_prompt_citation_format() -> None:

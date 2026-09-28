@@ -7,8 +7,6 @@ import subprocess
 import sys
 from collections.abc import Iterator, Sequence
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, cast
 
 import pytest
 from qdrant_client import QdrantClient
@@ -28,7 +26,6 @@ from rag.search import (
     Reranker,
     hybrid_search,
     main,
-    payload_filter,
     rerank_hits,
     round_robin,
     search,
@@ -71,24 +68,12 @@ class KeywordReranker:
         return [1.0 if keyword in text.lower() else 0.0 for text in texts]
 
 
-def test_hybrid_search_finds_the_matching_chunk(client: QdrantClient) -> None:
-    hits = hybrid_search(client, ORM_TEXT, StubDense(), StubSparse(), limit=3)
-    assert hits
-    assert hits[0].chunk.text == ORM_TEXT
-    assert hits[0].chunk.source_file == "deck.pdf"
-
-
 def test_locale_filter_applies_to_both_prefetch_branches(client: QdrantClient) -> None:
     hits = hybrid_search(client, MIGRAZIONI_TEXT, StubDense(), StubSparse(), locale="it")
     assert hits
     assert all(hit.chunk.locale == "it" for hit in hits)
     hits = hybrid_search(client, MIGRAZIONI_TEXT, StubDense(), StubSparse(), locale="en")
     assert all(hit.chunk.locale == "en" for hit in hits)
-
-
-def test_payload_filter_is_none_when_nothing_is_filtered() -> None:
-    assert payload_filter(None, None) is None
-    assert payload_filter("en", None) is not None
 
 
 def test_rerank_replaces_scores_and_truncates() -> None:
@@ -163,43 +148,29 @@ def test_round_robin_interleaves_and_fills_the_remainder() -> None:
     assert round_robin([], 5) == []
 
 
-class RecordingClient:
-    """Captures the prefetch branches per collection; returns no points."""
+def test_web_source_conditions_reach_only_the_unifi_web_branches(
+    two_collection_client: QdrantClient,
+) -> None:
+    """The eval-isolation rule (docs/architecture.md): a crawl-only search must
+    not see the live version of a page, so `ingest_source` sits inside BOTH
+    unifi_web prefetch branches — a top-level filter is ignored under fusion,
+    and one unfiltered branch lets the live version back into the fused list —
+    and inside NONE of the slides branches, whose chunks carry no source."""
+    live = make_web_chunk(2, TASSE_TEXT).model_copy(update={"ingest_source": "live"})
+    index_chunks(two_collection_client, [live], StubDense(), StubSparse(), WEB_COLLECTION)
 
-    def __init__(self) -> None:
-        self.prefetch_by_collection: dict[str, Any] = {}
-
-    def query_points(self, collection: str, **kwargs: Any) -> Any:
-        self.prefetch_by_collection[collection] = kwargs["prefetch"]
-        return SimpleNamespace(points=[])
-
-
-def condition_keys(prefetch: Any) -> list[str]:
-    return [
-        condition.key
-        for branch in prefetch
-        if branch.filter is not None
-        for condition in branch.filter.must
-    ]
-
-
-def test_web_source_conditions_reach_only_the_unifi_web_branches() -> None:
-    """The eval-isolation rule (docs/architecture.md): `ingest_source` must land
-    inside BOTH unifi_web prefetch branches (a top-level filter is ignored under
-    fusion) and inside NONE of the slides branches."""
-    recorder = RecordingClient()
-    search(
-        cast("QdrantClient", recorder),
-        "query",
+    hits = search(
+        two_collection_client,
+        TASSE_TEXT,
         StubDense(),
         StubSparse(),
         None,
         collections=("slides", WEB_COLLECTION),
         ingest_source="crawl",
     )
-    web_keys = condition_keys(recorder.prefetch_by_collection[WEB_COLLECTION])
-    assert web_keys.count("ingest_source") == 2  # dense branch + sparse branch
-    assert "ingest_source" not in condition_keys(recorder.prefetch_by_collection["slides"])
+
+    assert [hit.chunk.ingest_source for hit in hits if hit.chunk.kind == "web"] == ["crawl"]
+    assert [hit.chunk.text for hit in hits if hit.chunk.kind == "slides"] == [ORM_TEXT]
 
 
 def test_slides_hits_are_unchanged_by_web_source_conditions(client: QdrantClient) -> None:
