@@ -7,6 +7,9 @@ This file owns the decisions taken without the supervisor that are in force: the
 1. **`rag.parse` requires `--course` and `--academic-year` and no longer infers the course from the target directory name.** Both flags are `required=True`; `main()` checks the pair against `rag.chunk.edition_of` before touching a file and refuses through `parser.error` on a malformed one.
    **Why:** a directory name (`PPM`) is not a course code, and re-parsing by directory name would write points that match neither the delete key nor the evaluation's edition.
    **The price:** every parse spells out the edition.
+2. **A re-index replaces a slides file by its source, (`source_file`, `course`, `academic_year`), and writes before it deletes.** `index_chunks` upserts a file's new points, then `replace_slides_sources` deletes every other point under that key (`rag/index.py`); the sha in `chunk_id` only says whether the content changed. Web chunks follow the same order under their (`url`, `ingest_source`) pair.
+   **Why:** deleting by sha, a file whose content changed looks for its new sha and never finds the old points, so both versions stay retrievable. LangChain's indexing API names a document by `source_id_key`, and its `incremental` cleanup removes the stale versions of the sources it saw during the run (outside the repository: LangChain source, `langchain_core/indexing/api.py`). An unmerged Dify pull request, #37068, reports vectors left behind when deletion recomputed ids instead of filtering on a stable field (outside the repository). Writing first means a file is never missing from the index; a crash between the two steps leaves extra points that the next run removes.
+   **The price:** one edition of one PDF has one parse variant in a collection.
 
 ## 2026-09-28 — An AD code belongs to one course, and codes and years are written in ASCII
 

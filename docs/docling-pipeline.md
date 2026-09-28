@@ -166,7 +166,9 @@ The fields every chunk carries into the index, **from the first day**: a field a
 | `ingest_run_id` · `ingest_source` · `trigger` | snapshot identity: which run, `"crawl"` (a crawl) or `"live"` (a fetch a student's question triggered), and what triggered it. Evaluation reads `crawl` by default (the eval-isolation rule, [architecture.md](architecture.md)) |
 | `content_hash` | the page content hash, for the incremental check (parse and index again only when it changes) |
 
-**Replacing web chunks**: `chunk_id` changes with `content_hash` (new content, new ids), and the replacement unit is the **(url, ingest_source) pair** — before an upsert, exactly that pair is deleted, so a crawl snapshot and live increments **never overwrite each other**. The snapshot and registry layout and the deepening loop are [unifi-web-source.md](unifi-web-source.md).
+**Replacing web chunks**: `chunk_id` changes with `content_hash` (new content, new ids), and the replacement unit is the **(url, ingest_source) pair** — after the upsert, the pair's other points are deleted, so a crawl snapshot and live increments **never overwrite each other**. The snapshot and registry layout and the deepening loop are [unifi-web-source.md](unifi-web-source.md).
+
+**Replacing slides chunks** is by source file within an edition, owned by [data-model.md](data-model.md), section on the contract between `apps/` and `rag/`.
 
 NFKC normalisation (`normalize_text` in `rag/parse.py`) is applied to `text` and `embed_text` **at this step**: the document JSON keeps the original, and the index sees only the folded text.
 

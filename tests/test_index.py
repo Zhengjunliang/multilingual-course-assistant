@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 from qdrant_client import QdrantClient
 
-from rag.chunk import Chunk, Locale
+from rag.chunk import Chunk, Locale, chunk_id_of, edition_of
 from rag.index import (
     COLLECTION,
     DEFAULT_DENSE_MODEL,
@@ -105,6 +105,39 @@ def test_payload_round_trips_the_full_chunk_contract(client: QdrantClient) -> No
     index_chunks(client, [chunk], StubDense(), StubSparse())
     (point,) = client.retrieve(COLLECTION, ids=[point_id_of(chunk.chunk_id)], with_payload=True)
     assert Chunk.model_validate(point.payload) == chunk
+
+
+def make_deck(academic_year: str, sha: str, count: int) -> list[Chunk]:
+    """`deck.pdf` as `rag.chunk` writes it for one edition and one content."""
+    edition = edition_of("B028451", academic_year)
+    return [
+        make_chunk(index).model_copy(
+            update={
+                "chunk_id": chunk_id_of(edition, sha, "classic", index),
+                "academic_year": academic_year,
+                "source_sha256": sha,
+            }
+        )
+        for index in range(count)
+    ]
+
+
+def test_slides_reindex_replaces_only_its_edition(client: QdrantClient) -> None:
+    """One PDF taught in two editions, then re-indexed in one with new content:
+    a delete keyed by the new sha finds nothing of the old content, and one
+    without the year would take the other edition's points along."""
+    old, new = "ab" * 32, "cd" * 32
+    index_chunks(client, make_deck("2024-2025", old, 2), StubDense(), StubSparse())
+    index_chunks(client, make_deck("2025-2026", old, 2), StubDense(), StubSparse())
+    index_chunks(client, make_deck("2024-2025", new, 1), StubDense(), StubSparse())
+
+    points, _ = client.scroll(COLLECTION, limit=100, with_payload=True)
+    chunks = [Chunk.model_validate(point.payload) for point in points]
+    assert {(chunk.academic_year, chunk.source_sha256, chunk.chunk_index) for chunk in chunks} == {
+        ("2024-2025", new, 0),
+        ("2025-2026", old, 0),
+        ("2025-2026", old, 1),
+    }
 
 
 def make_web_chunk(

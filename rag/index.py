@@ -18,13 +18,14 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
-from rag.chunk import Chunk
+from rag.chunk import Chunk, EditionKey
 from rag.probe import configure_cli_logging
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
     from qdrant_client import QdrantClient
+    from qdrant_client import models as qmodels
 
 logger = logging.getLogger(__name__)
 
@@ -185,11 +186,25 @@ def collect_chunk_files(target: Path) -> Iterator[Path]:
     yield from sorted(path for path in target.rglob("*.jsonl") if path.is_file())
 
 
+def _others_of(must: list[qmodels.Condition], keep: Sequence[str]) -> qmodels.Filter:
+    """The points matching every condition of `must`, less the ids in `keep`."""
+    from qdrant_client import models
+
+    return models.Filter(
+        must=must, must_not=[models.HasIdCondition(has_id=list(keep))] if keep else None
+    )
+
+
 def delete_web_versions(
-    client: QdrantClient, pairs: Sequence[tuple[str, str]], collection: str = COLLECTION
+    client: QdrantClient,
+    pairs: Sequence[tuple[str, str]],
+    collection: str = COLLECTION,
+    *,
+    keep: Sequence[str] = (),
 ) -> None:
-    """Scoped replacement for web chunks: delete exactly the (url,
-    ingest_source) pair being re-ingested. A web chunk_id changes with the
+    """Scoped replacement for web chunks: delete the points of exactly the
+    (url, ingest_source) pair being re-ingested, except the ids in `keep` —
+    the ones `index_chunks` has just written. A web chunk_id changes with the
     page's content, so upsert alone would leave the previous version alive;
     and an unscoped delete-by-url would let a live fetch destroy the crawl
     snapshot version — crawl and live never overwrite each other
@@ -200,13 +215,54 @@ def delete_web_versions(
         client.delete(
             collection,
             points_selector=models.FilterSelector(
-                filter=models.Filter(
-                    must=[
+                filter=_others_of(
+                    [
                         models.FieldCondition(key="url", match=models.MatchValue(value=url)),
                         models.FieldCondition(
                             key="ingest_source", match=models.MatchValue(value=source)
                         ),
-                    ]
+                    ],
+                    keep,
+                )
+            ),
+        )
+
+
+def replace_slides_sources(
+    client: QdrantClient,
+    sources: Sequence[tuple[str, EditionKey]],
+    keep: Sequence[str],
+    collection: str = COLLECTION,
+) -> None:
+    """After the upsert: delete every other point of one source file in one
+    edition, keyed by (source_file, course, academic_year).
+
+    Identity is the source; the sha in `chunk_id` only says whether the content
+    changed (LangChain's `source_id_key`). A delete keyed by the new sha would
+    miss the points of the old content. No `kind` condition: payloads written
+    before `kind` existed lack the key, and a web point's null `academic_year`
+    never matches a value.
+    """
+    from qdrant_client import models
+
+    for source_file, edition in sources:
+        client.delete(
+            collection,
+            points_selector=models.FilterSelector(
+                filter=_others_of(
+                    [
+                        models.FieldCondition(
+                            key="source_file", match=models.MatchValue(value=source_file)
+                        ),
+                        models.FieldCondition(
+                            key="course", match=models.MatchValue(value=edition.course)
+                        ),
+                        models.FieldCondition(
+                            key="academic_year",
+                            match=models.MatchValue(value=edition.academic_year),
+                        ),
+                    ],
+                    keep,
                 )
             ),
         )
@@ -275,8 +331,28 @@ def index_chunks(
     """Encode and upsert one document's chunks; `dense` reads `embed_text`
     (heading-contextualized), `sparse` reads raw `text` — the two-sided contract
     set at chunking time. Web chunks replace their own (url, ingest_source)
-    predecessors first; slides chunks rely on deterministic ids alone."""
+    predecessors and slides chunks their own (source_file, course,
+    academic_year) predecessors, after the upsert, so a document is never
+    missing from the index."""
     from qdrant_client import models
+
+    dense_vectors = dense.encode_documents([chunk.embed_text for chunk in chunks])
+    sparse_vectors = sparse.encode_documents([chunk.text for chunk in chunks])
+    keep = [point_id_of(chunk.chunk_id) for chunk in chunks]
+    points = [
+        models.PointStruct(
+            id=point_id,
+            vector={
+                DENSE_VECTOR: dense_vector,
+                SPARSE_VECTOR: models.SparseVector(indices=indices, values=values),
+            },
+            payload=chunk.model_dump(),
+        )
+        for chunk, point_id, dense_vector, (indices, values) in zip(
+            chunks, keep, dense_vectors, sparse_vectors, strict=True
+        )
+    ]
+    client.upsert(collection, points)
 
     web_pairs = sorted(
         {
@@ -286,24 +362,16 @@ def index_chunks(
         }
     )
     if web_pairs:
-        delete_web_versions(client, web_pairs, collection)
-
-    dense_vectors = dense.encode_documents([chunk.embed_text for chunk in chunks])
-    sparse_vectors = sparse.encode_documents([chunk.text for chunk in chunks])
-    points = [
-        models.PointStruct(
-            id=point_id_of(chunk.chunk_id),
-            vector={
-                DENSE_VECTOR: dense_vector,
-                SPARSE_VECTOR: models.SparseVector(indices=indices, values=values),
-            },
-            payload=chunk.model_dump(),
-        )
-        for chunk, dense_vector, (indices, values) in zip(
-            chunks, dense_vectors, sparse_vectors, strict=True
-        )
-    ]
-    client.upsert(collection, points)
+        delete_web_versions(client, web_pairs, collection, keep=keep)
+    slides_sources = sorted(
+        {
+            (chunk.source_file, EditionKey(chunk.course, chunk.academic_year))
+            for chunk in chunks
+            if chunk.kind == "slides" and chunk.academic_year is not None
+        }
+    )
+    if slides_sources:
+        replace_slides_sources(client, slides_sources, keep, collection)
     return len(points)
 
 
