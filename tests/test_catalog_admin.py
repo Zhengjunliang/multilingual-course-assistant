@@ -10,8 +10,10 @@ here is that the admin wires read-only fields and the action to it correctly.
 from __future__ import annotations
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.urls import reverse
 
+from apps.accounts.models import User
 from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
 
 pytestmark = pytest.mark.django_db
@@ -32,15 +34,23 @@ def other_course() -> Course:
     return Course.objects.create(code="B003725", name="Intelligenza Artificiale")
 
 
-@pytest.mark.parametrize("selected", ["one", "two"])
-def test_set_as_current_action_needs_exactly_one_edition(
-    admin_client, course: Course, selected: str
+@pytest.mark.parametrize("case", ["one", "two", "view-only-user"])
+def test_set_as_current_action_needs_one_edition_and_the_change_permission(
+    admin_client, client, course: Course, case: str
 ) -> None:
     first = CourseEdition.objects.create(course=course, academic_year="2024-2025")
     second = CourseEdition.objects.create(course=course, academic_year="2025-2026")
-    pks = [first.pk] if selected == "one" else [first.pk, second.pk]
+    pks = [first.pk, second.pk] if case == "two" else [first.pk]
+    poster = admin_client
+    if case == "view-only-user":
+        viewer = User.objects.create_user(username="viewer", is_staff=True)
+        viewer.user_permissions.add(
+            Permission.objects.get(content_type__app_label="catalog", codename="view_courseedition")
+        )
+        client.force_login(viewer)
+        poster = client
 
-    response = admin_client.post(
+    response = poster.post(
         reverse("admin:catalog_courseedition_changelist"),
         {"action": "set_as_current", "_selected_action": pks},
         follow=True,
@@ -48,13 +58,18 @@ def test_set_as_current_action_needs_exactly_one_edition(
 
     first.refresh_from_db()
     second.refresh_from_db()
-    if selected == "one":
+    if case == "one":
         assert first.is_current is True
         assert second.is_current is False
+        return
+    assert first.is_current is False
+    assert second.is_current is False
+    page = response.content.decode()
+    if case == "two":
+        assert "Select exactly one edition to switch." in page
     else:
-        assert first.is_current is False
-        assert second.is_current is False
-        assert "Select exactly one edition to switch." in response.content.decode()
+        assert response.status_code == 200
+        assert "Set as current edition" not in page
 
 
 def test_admin_add_page_cannot_set_is_current(admin_client, course: Course) -> None:
@@ -76,9 +91,9 @@ def test_saved_keys_are_read_only_in_the_admin(
     admin_client, programme: DegreeProgramme, course: Course, other_course: Course, case: str
 ) -> None:
     if case == "course-code":
-        # B028451's own TA entry lists B028451 as its ad_code: proves
-        # Course.clean() excludes the course's own entries, or every save of
-        # this particular course would fail full_clean() on an unrelated field.
+        # B028451's own TA entry lists B028451 as its ad_code, which
+        # Course.clean() must not take for a conflict: an edit of this course
+        # saves, with no error on a code the form does not show.
         CurriculumEntry.objects.create(
             programme=programme,
             course=course,

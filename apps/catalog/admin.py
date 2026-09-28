@@ -44,8 +44,6 @@ class CourseAdmin(admin.ModelAdmin):  # pyright: ignore[reportMissingTypeArgumen
 
 @admin.register(CourseEdition)
 class CourseEditionAdmin(admin.ModelAdmin):  # pyright: ignore[reportMissingTypeArgument]
-    # Always read-only: on the add page too, so a new row cannot be entered current.
-    readonly_fields = ("is_current",)
     list_display = ("__str__", "is_current")
     list_filter = ("is_current",)
     list_select_related = ("course",)
@@ -54,13 +52,16 @@ class CourseEditionAdmin(admin.ModelAdmin):  # pyright: ignore[reportMissingType
     def get_readonly_fields(
         self, request: HttpRequest, obj: Model | None = None
     ) -> tuple[str, ...]:
-        # course and academic_year join is_current on the change page: the pair
-        # is the search index's key (apps/catalog/models.py), fixed once saved.
+        # is_current is read-only on the add page too, so a new row cannot be
+        # entered current. course and academic_year join it on the change page:
+        # the pair is the search index's key (apps/catalog/models.py), fixed once saved.
         if obj is not None:
             return ("course", "academic_year", "is_current")
         return ("is_current",)
 
-    @admin.action(description=_("Set as current edition"))
+    # permissions: Django offers an action to every user who may see the
+    # changelist unless it names the permission it needs.
+    @admin.action(description=_("Set as current edition"), permissions=["change"])
     def set_as_current(self, request: HttpRequest, queryset: QuerySet[CourseEdition]) -> None:
         if queryset.count() != 1:
             self.message_user(
