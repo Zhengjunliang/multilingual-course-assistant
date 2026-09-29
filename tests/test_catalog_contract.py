@@ -4,8 +4,9 @@
 `frontend/src/api/catalog.ts` its shadow on the client, read as text the way
 tests/test_qa_contract.py reads the answer stream's mirror: every field a
 serializer declares must appear in the interface of the same name. The
-permission names are compared both ways, since the SPA matches them as strings
-and a misspelt one would hide a button without any type error.
+permission names and the error codes are compared both ways, since the SPA
+matches them as strings: a misspelt permission would hide a button, a
+misspelt code show the general sentence, without any type error.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from pathlib import Path
 import pytest
 from test_qa_contract import declaration
 
+from apps.catalog.errors import DRF_CODES_SHOWN, StaffError
 from apps.catalog.serializers import (
     CourseSerializer,
     EditionSerializer,
@@ -62,5 +64,8 @@ def test_the_mirror_declares_every_field(mirror: str) -> None:
     assert {name: fields for name, fields in missing.items() if fields} == {}
 
 
-def test_the_mirror_names_every_permission(mirror: str) -> None:
-    assert union(mirror, "Permission") == set(Permission)
+def test_the_mirror_names_every_permission_and_error_code(mirror: str) -> None:
+    assert (union(mirror, "Permission"), union(mirror, "StaffErrorCode")) == (
+        set(Permission),
+        set(StaffError) | DRF_CODES_SHOWN,
+    )

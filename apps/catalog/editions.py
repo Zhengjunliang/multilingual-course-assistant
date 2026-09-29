@@ -34,8 +34,8 @@ if TYPE_CHECKING:
 
     from apps.catalog.models import Course
 
-# One fixed sentence, so a page can tell this refusal from a plain lack of
-# permission on the edition itself without being told which edition is current.
+# One fixed sentence, which tells the caller why without saying which edition
+# is current; the catalogue API sends it with its code (apps/catalog/errors.py).
 SWITCH_NEEDS_BOTH = "Switching also needs edition.set_current on the course's current edition."
 
 

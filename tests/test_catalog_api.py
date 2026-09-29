@@ -1,7 +1,8 @@
 """The catalogue API, asked by each kind of caller in `world()` (tests/test_roles.py).
 
 What each caller gets is gathered into one mapping and compared whole, so a
-failure shows exactly which caller got what. A case that writes runs inside a
+failure shows exactly which caller got what; a refusal is compared by the code
+it carries (config/exceptions.py), which is what a page reads. A case that writes runs inside a
 transaction rolled back after it, so every case starts from the same world
 without building it again. Every caller logs in through `force_login`,
 which costs no password hash, and the session is real. `APIClient` skips the
@@ -19,7 +20,6 @@ from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 from test_roles import everyone, label, world
 
-from apps.catalog.editions import SWITCH_NEEDS_BOTH
 from apps.catalog.models import CourseEdition, CurriculumEntry
 from apps.roles.grants import revoke
 from apps.roles.models import RoleAssignment
@@ -27,6 +27,8 @@ from apps.roles.registry import Role
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from django.http.response import HttpResponseBase
 
     from apps.accounts.models import User
 
@@ -45,6 +47,13 @@ def as_user(user: User | None) -> APIClient:
     if user is not None:
         client.force_login(user)
     return client
+
+
+def code_of(response: HttpResponseBase) -> str | None:
+    """The code of a refusal of the whole request; None when Django, not DRF, answered."""
+    if not response["Content-Type"].startswith("application/json"):
+        return None
+    return response.json()["detail"]["code"]  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def switch_url(edition: CourseEdition) -> str:
@@ -180,13 +189,12 @@ def test_switching_the_current_edition() -> None:
 
     def switch(user: User | None, method: str) -> tuple[int, str, str | None]:
         response = getattr(as_user(user), method)(switch_url(w.ppm_new))
-        body = response.json()
-        if body.get("id") == w.ppm_new.pk and body.get("is_current") is True:
-            said = "the edition, now current"
-        elif body.get("detail") == SWITCH_NEEDS_BOTH:
-            said = "needs both"
+        if response.status_code == 200:
+            body = response.json()
+            now = body["id"] == w.ppm_new.pk and body["is_current"]
+            said = "the edition, now current" if now else None
         else:
-            said = None
+            said = code_of(response)
         current = CourseEdition.objects.get(course__code="B028451", is_current=True)
         return response.status_code, label(current), said
 
@@ -209,12 +217,12 @@ def test_switching_the_current_edition() -> None:
         "teacher of both years": (200, NEW, "the edition, now current"),
         # A first-year teacher may not replace last year's edition, and the
         # refusal says so: the secretariat switches it for them.
-        "first-year teacher": (403, OLD, "needs both"),
+        "first-year teacher": (403, OLD, "switch_needs_both"),
         "secretariat": (200, NEW, "the edition, now current"),
-        "other programme's secretariat": (404, OLD, None),
-        "student": (404, OLD, None),
-        "anonymous": (403, OLD, None),
-        "GET": (405, OLD, None),
+        "other programme's secretariat": (404, OLD, "not_found"),
+        "student": (404, OLD, "not_found"),
+        "anonymous": (403, OLD, "not_authenticated"),
+        "GET": (405, OLD, "method_not_allowed"),
     }
 
     # The flag every listed row carries is the switch's own answer: each row is
@@ -430,38 +438,47 @@ def test_staff_requests_that_change_nothing(
             response = getattr(as_user(user), method)(path, body)
             if response.status_code == 200 and isinstance(response.json(), list):
                 seen[case] = (200, [member["username"] for member in response.json()])
-            elif response.status_code in (200, 400):
-                seen[case] = (response.status_code, response.json())
+            elif response.status_code == 400:
+                seen[case] = (400, response.json())
             else:
-                seen[case] = response.status_code
+                seen[case] = (response.status_code, code_of(response))
 
     assert seen == {
-        "other programme's secretariat assigns in PPM": 404,
-        "teacher assigns a teacher": 403,
-        "teacher assigns on another course": 404,
-        "student assigns": 404,
-        "anonymous assigns": 403,
-        "student names nobody": 404,
-        "teacher names nobody": 403,
-        "secretariat names nobody": (400, {"username": ["No such user."]}),
+        "other programme's secretariat assigns in PPM": (404, "not_found"),
+        "teacher assigns a teacher": (403, "permission_denied"),
+        "teacher assigns on another course": (404, "not_found"),
+        "student assigns": (404, "not_found"),
+        "anonymous assigns": (403, "not_authenticated"),
+        "student names nobody": (404, "not_found"),
+        "teacher names nobody": (403, "permission_denied"),
+        # A field's refusal, in the same envelope DRF gives it, each message with its code.
+        "secretariat names nobody": (
+            400,
+            {"username": [{"message": "No such user.", "code": "no_such_user"}]},
+        ),
         "secretariat grants what is held": (
             400,
-            {"username": ["This user already holds this role here."]},
+            {
+                "username": [
+                    {"message": "This user already holds this role here.", "code": "already_held"}
+                ]
+            },
         ),
-        "secretariat assigns secretariat": 403,
-        "teacher assigns secretariat": 404,
-        "other programme's secretariat revokes": 404,
-        "teacher revokes": 403,
-        "secretariat revokes a non-member": 404,
-        "secretariat revokes their own row": 403,
+        "secretariat assigns secretariat": (403, "permission_denied"),
+        "teacher assigns secretariat": (404, "not_found"),
+        "other programme's secretariat revokes": (404, "not_found"),
+        "teacher revokes": (403, "permission_denied"),
+        "secretariat revokes a non-member": (404, "not_found"),
+        "secretariat revokes their own row": (403, "permission_denied"),
         "teacher lists the teachers": (200, ["continuing", "newcomer"]),
         "secretariat lists the secretariat": (200, ["dual", "inactive", "secretariat"]),
-        "student lists the teachers": 404,
-        "GET on a member": 405,
-        "DELETE on the collection": 405,
-        "OPTIONS on the collection": 405,
-        "a programme code with a NUL byte": 404,
-        "a username with a NUL byte": 404,
+        "student lists the teachers": (404, "not_found"),
+        "GET on a member": (405, "method_not_allowed"),
+        "DELETE on the collection": (405, "method_not_allowed"),
+        "OPTIONS on the collection": (405, "method_not_allowed"),
+        # No route matches, so Django answers before any view, with no code.
+        "a programme code with a NUL byte": (404, None),
+        "a username with a NUL byte": (404, None),
     }
     assert RoleAssignment.objects.count() == rows
     assert grant_lines(caplog) == []
