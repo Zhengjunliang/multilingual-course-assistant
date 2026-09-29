@@ -42,10 +42,12 @@ A test is added, changed or deleted by the criteria of [docs/testing.md](docs/te
 
 ```powershell
 # before editing models.py; -X utf8 because Windows would write the file in cp1252
-uv run python -X utf8 manage.py dumpdata auth.group accounts qa catalog --natural-foreign --indent 2 --output data/dev.json
+uv run python -X utf8 manage.py dumpdata auth.group accounts qa catalog roles --natural-foreign --indent 2 --output data/dev.json
 # after editing it
 $app = "catalog"                                      # the app whose model changed
 Remove-Item "apps/$app/migrations/0001_initial.py"
+# roles' 0001 depends on catalog's, and makemigrations cannot load a graph missing it
+if ($app -eq "catalog") { Remove-Item "apps/roles/migrations/0001_initial.py" }
 docker compose rm -s -f postgres; docker volume rm multilingual-course-assistant_postgres-data; docker compose up -d --wait   # deletes the local database, irreversibly; the Qdrant volume stays
 uv run python manage.py makemigrations                # the new 0001_initial.py goes into git
 uv run python manage.py migrate
@@ -184,6 +186,7 @@ The deepening loop is not in this endpoint: it fetches pages and writes to the s
 | `apps/accounts/` | Accounts: custom `User` = `AbstractUser` + `locale` · serializers for register, login and the account · session login and the CSRF cookie in `views.py` · `urls.py` · `admin.py` |
 | `apps/qa/` | QA API: `contract.py` (SSE contract, single source) · `serializers.py` · `models.py` (`Conversation`, `Message`, history window) · `conversations.py` (the chain's only ORM access) · `engine.py` (process-wide models + serial `stream_answer()`, reusing `rag/`, zero queries) · `views.py` (HTTP, SSE framing, when the answer is stored) · `conversation_views.py` · `sources.py` (which corpus PDF a sha256 names) · `source_views.py` · `urls.py` · `admin.py` |
 | `apps/catalog/` | The university catalogue: `models.py` (`DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`, and the database constraints that keep them consistent) · `editions.py` (`set_current()`, the one way to change a course's current edition) · `admin.py` (the four tables, and the `set_as_current` action that switches an edition through `set_current()`) · `migrations/` |
+| `apps/roles/` | Staff roles: `registry.py` (the roles, in code) · `models.py` (`RoleAssignment`, one role on one scope, and the constraints that make the two fit) · `migrations/` |
 | `rag/` | The RAG pipeline — **must never import Django**, so the thesis core runs and is evaluated without the web. `probe` · `parse` · `crawl` · `webparse` · `chunk` · `index` · `search` · `llm` (OpenAI-compatible client, pydantic JSON validation) · `answer` · `agent` (routing, read-only control flow) · `live` (query-time fetch, relevance gate, writes to the shared index, rollback) · `gold` · `golddraft` (drafts gold questions for human review) |
 | `frontend/` | React SPA: `src/api/` (contract mirror, SSE parser, CSRF-aware requests, account and conversation calls, the link to a cited PDF page) · `src/auth/` (session context, route guard) · `src/routes/` (login, register, chat, styleguide) · `src/features/chat/` (question state machine, turn rendering) · `src/components/` (account dialog and menu; `ui/` shadcn-style primitives) · `src/lib/markers.ts` · `src/theme/` · `src/i18n/` (three catalogues) · `src/test/` · `scripts/` (catalogue and contrast gates) · `public/fonts/` |
 | `scripts/` | `check.py`, the check chain |

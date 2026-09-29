@@ -6,7 +6,7 @@ This file owns the website's relational schema: its entities and relationships, 
 
 ## Entities and relationships
 
-✅ `User` exists in `apps/accounts/models.py`, `Conversation` and `Message` in `apps/qa/models.py`, and `DegreeProgramme`, `Course`, `CourseEdition` and `CurriculumEntry` in `apps/catalog/models.py`. 🔜 M5: every other entity below. `CourseEdition` is the centre: it owns the content, scopes a teacher, and is what a slides chunk's `course` and `academic_year` name. Rows with user-visible text carry `locale` — programme and course names, `Syllabus`, `ReadingItem`; relation tables and `CourseMaterial` do not, since a file's language is recorded per chunk.
+✅ `User` exists in `apps/accounts/models.py`, `Conversation` and `Message` in `apps/qa/models.py`, `DegreeProgramme`, `Course`, `CourseEdition` and `CurriculumEntry` in `apps/catalog/models.py`, and `RoleAssignment` in `apps/roles/models.py`. 🔜 M5: every other entity below. `CourseEdition` is the centre: it owns the content, scopes a teacher, and is what a slides chunk's `course` and `academic_year` name. Rows with user-visible text carry `locale` — programme and course names, `Syllabus`, `ReadingItem`; relation tables and `CourseMaterial` do not, since a file's language is recorded per chunk.
 
 ```mermaid
 erDiagram
@@ -27,7 +27,7 @@ erDiagram
 
 ## Scope invariants
 
-🔶 Enforced by database constraints where a constraint can express them; the rest waits for M5. ✅ The catalogue keys of invariant 1 and the constraint of invariant 2, in `apps/catalog/models.py`, and the switch of invariant 2, in `apps/catalog/editions.py`. 🔜 M5: the `WebSource` and `CourseMaterial` keys, and invariant 3.
+🔶 Enforced by database constraints where a constraint can express them; the rest waits for M5. ✅ The catalogue keys of invariant 1 and the constraint of invariant 2, in `apps/catalog/models.py`, the switch of invariant 2, in `apps/catalog/editions.py`, and the constraints of invariant 3, in `apps/roles/models.py`. 🔜 M5: the `WebSource` and `CourseMaterial` keys.
 
 1. **Keys and formats.** This is the single owner of the format rules below; a comment elsewhere, such as `edition_of()`'s, points here rather than repeating them. `DegreeProgramme.code` and `Course.code` are unique, and `Course.code` and `CurriculumEntry.ad_code` each match `^[A-Z0-9]+$`. A `CourseEdition` is unique per (`course`, `academic_year`), and `academic_year` matches `^[0-9]{4}-[0-9]{4}$`. A `CurriculumEntry` is unique per (`programme`, `curriculum`, `ad_code`) and per (`programme`, `curriculum`, `course`), with an empty string, never NULL, for "no curriculum", and its `year_of_study` is between 1 and 6. A `WebSource` is unique per (`url`, `edition`) with NULLs not distinct; a `CourseMaterial` per (`edition`, `sha256`). What the keys hold: `Course.code` is the AD code of the Moodle course that holds the material, fixed once entered, and any other AD code of the course is a `CurriculumEntry.ad_code`; when one curriculum lists two AD codes for a course, its entry takes the one listed only in that curriculum; an AD code belongs to one course, held by `Course.clean()` and `CurriculumEntry.clean()` rather than a database constraint ([decisions.md](decisions.md), 2026-09-28, *An AD code belongs to one course, and codes and years are written in ASCII*); `curriculum` is the name the Cineca catalogue prints, such as `TECNICO APPLICATIVO`.
 2. **One current edition per course.** A named conditional unique constraint on `course` where `is_current` is true. It cannot be deferred, so a switch runs in one transaction: lock the course's editions with `select_for_update`, clear the old flag, then set the new one. The switch is `set_current()` in `apps/catalog/editions.py`, the only code that changes which edition is current; it locks the rows in primary-key order, so two switches of one course queue instead of deadlocking.
@@ -55,7 +55,7 @@ erDiagram
 
 ## Migration order
 
-✅ ① is in `apps/catalog/migrations/0001_initial.py`, and ④ is done ([experiment-log.md](experiment-log.md), entry of 2026-09-28, *The slides points move to their edition key without re-embedding*); 🔜 M5: ② and ③. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisions.md](decisions.md), 2026-09-26.
+✅ ① is in `apps/catalog/migrations/0001_initial.py`, ② in `apps/roles/migrations/0001_initial.py`, and ④ is done ([experiment-log.md](experiment-log.md), entry of 2026-09-28, *The slides points move to their edition key without re-embedding*); 🔜 M5: ③. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisions.md](decisions.md), 2026-09-26. Roles' `0001` depends on the catalogue's, so rewriting the catalogue's rewrites both; the steps are in [README.md](../README.md), under *Changing a model*.
 
 - ① Catalogue tables: `DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`.
 - ② `RoleAssignment`, with the roles of `#93`.
