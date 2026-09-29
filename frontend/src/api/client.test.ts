@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 /**
  * A refusal before the stream, read the way the server writes it.
  *
@@ -10,7 +8,8 @@
  * retry in `useAsk` never ran. A plain JSON body stays readable too, for a
  * proxy or server that answers without the framing.
  *
- * jsdom only because `ask` reads the CSRF cookie off `document`.
+ * `ask` reads the CSRF cookie off `document`, the one browser object it needs,
+ * so a stand-in for that is enough and the file stays off jsdom.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -28,6 +27,7 @@ describe("a refused question", () => {
     ["framed as an error event", `event: error\ndata: ${BUSY}\n\n`, "text/event-stream"],
     ["sent as plain JSON", BUSY, "application/json"],
   ])("keeps the reason and the server's words when %s", async (_, body, type) => {
+    vi.stubGlobal("document", { cookie: "" });
     vi.stubGlobal(
       "fetch",
       async () =>
