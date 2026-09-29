@@ -13,10 +13,11 @@ chunk payload mapping). It crosses that boundary as two plain strings — `rag/`
 never imports Django — so the strings themselves are the contract, which is
 why neither may change once the edition exists.
 
-Nothing here points at the user model. Roles, uploaded material and a student's
-programme will point at these tables; an arrow the other way would make the
-catalogue depend on who is reading it. The schema, its invariants and the
-contract with `rag/` are owned by docs/data-model.md; the reasons for each
+Nothing here points at the user model. Roles (apps/roles/models.py) point
+at these tables, and so will uploaded material and a student's programme; an
+arrow the other way would make the catalogue depend on who is reading it.
+The schema, its invariants and the contract with `rag/` are owned by
+docs/data-model.md; the reasons for each
 choice by docs/decisions.md, the two entries of 2026-09-25, and the code and
 year formats and the rule that an AD code names one course by
 docs/decisions.md, 2026-09-28, *An AD code belongs to one course, and codes

@@ -178,6 +178,19 @@ The first request takes about a minute while the models load into GPU memory. An
 
 The deepening loop is not in this endpoint: it fetches pages and writes to the shared index, up to 3 fetches, so it runs only from `rag.agent` on the command line. Its web path is an asynchronous task (🔜 `#34`, M5).
 
+## Catalogue API
+
+What staff see and change, each within the scopes their roles cover ([apps/roles/registry.py](apps/roles/registry.py)): a teacher their editions, secretariat staff their programme and every edition of every course it offers, the superuser everything. Every item carries `permissions`, what the caller holds on it, which is what a page reads to decide what to offer.
+
+| Method and path | Does |
+| --------------- | ---- |
+| `GET /api/catalog/programmes` | the programmes the caller may view: `code`, `name`, `locale`, `permissions`; a student gets `[]` |
+| `GET /api/catalog/editions` | the editions the caller may view: `id`, `course` (`code`, `name`, `locale`), `academic_year`, `is_current`, `permissions` |
+| `POST /api/catalog/editions/<id>/set-current` | makes the edition its course's current one and answers with it (200) |
+
+- Status codes: 403 not logged in · 404 outside the caller's scope, whether or not it exists · 403 inside it without the permission · then 400 for the body. The scope is looked up before the permission and the permission before the body, so a refusal says nothing the caller may not see.
+- Switching needs `edition.set_current` on the new edition and, when the course has another current edition, on that one too; a refusal for the second reason carries the `detail` `"Switching also needs edition.set_current on the course's current edition."` ([docs/decisions.md](docs/decisions.md), 2026-09-29, *Staff permissions are a registry in code, answered by one backend; the admin is the superuser's*, point 4).
+
 ## Code layout
 
 | Path | Contents |
@@ -185,8 +198,8 @@ The deepening loop is not in this endpoint: it fetches pages and writes to the s
 | `config/` | Django project: `settings.py` (security headers conditional on `DEBUG` and `DJANGO_BEHIND_TLS`) · `urls.py` (with the SPA fallback) · `views.py` (the one non-API view, the SPA shell) · `admin.py` and `apps.py` (the admin site, which admits superusers only) · `env.py` (`.env` through pydantic-settings, shared by `rag/` and Django) · asgi/wsgi |
 | `apps/accounts/` | Accounts: custom `User` = `AbstractUser` + `locale` · serializers for register, login and the account · session login and the CSRF cookie in `views.py` · `urls.py` · `admin.py` |
 | `apps/qa/` | QA API: `contract.py` (SSE contract, single source) · `serializers.py` · `models.py` (`Conversation`, `Message`, history window) · `conversations.py` (the chain's only ORM access) · `engine.py` (process-wide models + serial `stream_answer()`, reusing `rag/`, zero queries) · `views.py` (HTTP, SSE framing, when the answer is stored) · `conversation_views.py` · `sources.py` (which corpus PDF a sha256 names) · `source_views.py` · `urls.py` · `admin.py` |
-| `apps/catalog/` | The university catalogue: `models.py` (`DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`, and the database constraints that keep them consistent) · `editions.py` (`set_current()`, the one way to change a course's current edition) · `admin.py` (the four tables, and the `set_as_current` action that switches an edition through `set_current()`) · `migrations/` |
-| `apps/roles/` | Staff roles: `registry.py` (the roles, in code) · `models.py` (`RoleAssignment`, one role on one scope, and the constraints that make the two fit) · `admin.py` (where the superuser grants and revokes roles) · `migrations/` |
+| `apps/catalog/` | The university catalogue: `models.py` (`DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`, and the database constraints that keep them consistent) · `editions.py` (`set_current()`, the one way to change a course's current edition) · `admin.py` (the four tables, and the `set_as_current` action that switches an edition through `set_current()`) · `serializers.py` · `views.py` (the catalogue API) · `urls.py` · `migrations/` |
+| `apps/roles/` | Staff roles: `registry.py` (the roles and their permissions, in code) · `models.py` (`RoleAssignment`, one role on one scope, and the constraints that make the two fit) · `scopes.py` (the one place that says which role covers which scope) · `backends.py` (`user.has_perm` on a scope) · `api.py` (the DRF permission and the base view that resolves a scope first) · `admin.py` (where the superuser grants and revokes roles) · `migrations/` |
 | `rag/` | The RAG pipeline — **must never import Django**, so the thesis core runs and is evaluated without the web. `probe` · `parse` · `crawl` · `webparse` · `chunk` · `index` · `search` · `llm` (OpenAI-compatible client, pydantic JSON validation) · `answer` · `agent` (routing, read-only control flow) · `live` (query-time fetch, relevance gate, writes to the shared index, rollback) · `gold` · `golddraft` (drafts gold questions for human review) |
 | `frontend/` | React SPA: `src/api/` (contract mirror, SSE parser, CSRF-aware requests, account and conversation calls, the link to a cited PDF page) · `src/auth/` (session context, route guard) · `src/routes/` (login, register, chat, styleguide) · `src/features/chat/` (question state machine, turn rendering) · `src/components/` (account dialog and menu; `ui/` shadcn-style primitives) · `src/lib/markers.ts` · `src/theme/` · `src/i18n/` (three catalogues) · `src/test/` · `scripts/` (catalogue and contrast gates) · `public/fonts/` |
 | `scripts/` | `check.py`, the check chain |

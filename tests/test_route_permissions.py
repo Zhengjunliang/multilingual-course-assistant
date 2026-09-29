@@ -184,7 +184,14 @@ def test_the_walk_reaches_every_app() -> None:
     """Without this, a walk that stopped descending would find nothing wrong."""
     reached = {name for name, _ in routes(get_resolver().url_patterns)}
 
-    assert reached >= {"accounts:me", "accounts:logout", "qa:ask", "qa:conversation", "spa"}
+    assert reached >= {
+        "accounts:me",
+        "accounts:logout",
+        "qa:ask",
+        "qa:conversation",
+        "catalog:editions",
+        "spa",
+    }
 
 
 def test_every_exemption_names_a_route() -> None:

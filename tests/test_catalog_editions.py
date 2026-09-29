@@ -13,6 +13,7 @@ import threading
 import time
 
 import pytest
+from django.core.exceptions import PermissionDenied
 from django.db import connection, transaction
 from django.test.utils import CaptureQueriesContext
 
@@ -73,6 +74,44 @@ def test_set_current_on_a_deleted_edition_changes_nothing(course: Course) -> Non
 
     assert current_editions() == [current.pk]
     assert not gone.is_current
+
+
+@pytest.mark.parametrize(
+    ("current_year", "expected"),
+    [
+        # Another edition is current and the check refuses it: nothing moves,
+        # and the check was asked about the row the switch would have cleared.
+        pytest.param("2024-2025", ("refused", ["2024-2025"], ["2024-2025"]), id="refused"),
+        # No edition to replace, so nothing to ask.
+        pytest.param(None, ("switched", ["2025-2026"], []), id="no-current-edition"),
+        # The target is already current: nothing is replaced, nothing asked.
+        pytest.param("2025-2026", ("switched", ["2025-2026"], []), id="already-current"),
+    ],
+)
+def test_the_replacement_check(
+    course: Course, current_year: str | None, expected: tuple[str, list[str], list[str]]
+) -> None:
+    for year in ("2024-2025", "2025-2026"):
+        CourseEdition.objects.create(
+            course=course, academic_year=year, is_current=year == current_year
+        )
+    target = CourseEdition.objects.get(academic_year="2025-2026")
+    asked: list[str] = []
+
+    def refuse(replaced: CourseEdition) -> bool:
+        asked.append(replaced.academic_year)
+        return False
+
+    try:
+        set_current(target, may_replace=refuse)
+        outcome = "switched"
+    except PermissionDenied:
+        outcome = "refused"
+
+    current = list(
+        CourseEdition.objects.filter(is_current=True).values_list("academic_year", flat=True)
+    )
+    assert (outcome, current, asked) == expected
 
 
 @pytest.mark.django_db(transaction=True)
