@@ -34,7 +34,7 @@ uv run python manage.py createsuperuser
 | work on the frontend | the above, plus `npm run dev --prefix frontend` → <http://localhost:5173/> |
 | run the tests quickly | `uv run pytest` |
 | run everything CI runs | `uv run python scripts/check.py` |
-| query or build an embedded index instead (tests, a machine without Docker) | `--qdrant <directory>` on any `rag` command; one process holds it at a time |
+| query or build an embedded index instead (tests, a machine without Docker) | `--qdrant <directory>` on any `rag` command that opens the index; one process holds it at a time |
 
 A test is added, changed or deleted by the criteria of [docs/testing.md](docs/testing.md), which also lists the tests kept whatever the criteria say.
 

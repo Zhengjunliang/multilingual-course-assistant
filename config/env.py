@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     django_db_port: int = 5432
 
     # Qdrant, served by docker-compose.yml and shared by every process that
-    # reads the index: the site, the rag CLIs, the worker. A server URL only: an
+    # reads the index: the site and the rag CLIs. A server URL only: an
     # embedded index is opened by passing its directory to a CLI's --qdrant,
     # never from here, since the one process holding it locks out every other.
     # 127.0.0.1, not localhost: compose publishes the port on IPv4 loopback
