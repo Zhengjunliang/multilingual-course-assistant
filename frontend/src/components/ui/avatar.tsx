@@ -1,8 +1,8 @@
 /**
  * A person, when there is no picture of them.
  *
- * `Account` carries an id, a username and a locale and nothing else — no image
- * URL, and adding one would mean touching `apps/accounts/`. So this is a letter
+ * `Account` carries no image URL — an id, a username, a locale and where the
+ * caller holds a role — and adding one would mean touching `apps/accounts/`. So this is a letter
  * in a circle, and `@radix-ui/react-avatar` is not installed: that component
  * exists to sequence an image load against a fallback, and there is no image to
  * load. A dependency whose entire job is the case that cannot happen here.

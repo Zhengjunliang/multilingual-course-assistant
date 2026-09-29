@@ -30,7 +30,7 @@ function dialog() {
     <ThemeProvider>
       <SessionContext
         value={{
-          account: { id: 1, username: "junliang", locale: "it" },
+          account: { id: 1, username: "junliang", locale: "it", is_superuser: false, roles: [] },
           logIn: async () => {},
           register: async () => {},
           logOut: async () => {},

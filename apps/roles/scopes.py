@@ -167,3 +167,24 @@ def held_on(user: Caller, scope: CourseEdition | DegreeProgramme) -> frozenset[P
     else:
         row = with_programme_roles(DegreeProgramme.objects.filter(pk=scope.pk), caller).first()
     return frozenset() if row is None else permissions_on(caller, row)
+
+
+def role_scopes(user: User) -> list[dict[str, object]]:
+    """Where `user` holds a role, one entry per row, in one query.
+
+    Each scope is named by the key a URL would name it with: an edition by its
+    id, a programme by its code. What the role allows there is not part of the
+    entry; it is answered per scope, and the SPA never derives a permission
+    from a role name.
+    """
+    rows = (
+        RoleAssignment.objects.filter(user=user)
+        .order_by("role", "edition", "programme__code")
+        .values_list("role", "edition", "programme__code")
+    )
+    return [
+        {"role": role, "edition": edition}
+        if role == Role.TEACHER
+        else {"role": role, "programme": programme}
+        for role, edition, programme in rows
+    ]
