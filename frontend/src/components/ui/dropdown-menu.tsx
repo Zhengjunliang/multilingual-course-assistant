@@ -21,7 +21,7 @@ import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-export interface DropdownEntry {
+interface DropdownEntry {
   /** Stable across renders and across languages, so not the label. */
   key: string;
   icon: LucideIcon;
