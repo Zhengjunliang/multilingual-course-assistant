@@ -30,7 +30,7 @@ uv run python manage.py createsuperuser
 | To | Run |
 | -- | --- |
 | start / stop PostgreSQL and Qdrant | `docker compose up -d` / `docker compose down` (data stays in the named volumes; `down -v` deletes both, the index and the pages fetched live that exist nowhere else included, irreversibly) |
-| serve the site | `uv run python manage.py runserver` → <http://127.0.0.1:8000/> (admin at `/admin/`) |
+| serve the site | `uv run python manage.py runserver` → <http://127.0.0.1:8000/> (admin at `/admin/`, superusers only) |
 | work on the frontend | the above, plus `npm run dev --prefix frontend` → <http://localhost:5173/> |
 | run the tests quickly | `uv run pytest` |
 | run everything CI runs | `uv run python scripts/check.py` |
@@ -182,11 +182,11 @@ The deepening loop is not in this endpoint: it fetches pages and writes to the s
 
 | Path | Contents |
 | ---- | -------- |
-| `config/` | Django project: `settings.py` (security headers conditional on `DEBUG` and `DJANGO_BEHIND_TLS`) · `urls.py` (with the SPA fallback) · `views.py` (the one non-API view, the SPA shell) · `env.py` (`.env` through pydantic-settings, shared by `rag/` and Django) · asgi/wsgi |
+| `config/` | Django project: `settings.py` (security headers conditional on `DEBUG` and `DJANGO_BEHIND_TLS`) · `urls.py` (with the SPA fallback) · `views.py` (the one non-API view, the SPA shell) · `admin.py` and `apps.py` (the admin site, which admits superusers only) · `env.py` (`.env` through pydantic-settings, shared by `rag/` and Django) · asgi/wsgi |
 | `apps/accounts/` | Accounts: custom `User` = `AbstractUser` + `locale` · serializers for register, login and the account · session login and the CSRF cookie in `views.py` · `urls.py` · `admin.py` |
 | `apps/qa/` | QA API: `contract.py` (SSE contract, single source) · `serializers.py` · `models.py` (`Conversation`, `Message`, history window) · `conversations.py` (the chain's only ORM access) · `engine.py` (process-wide models + serial `stream_answer()`, reusing `rag/`, zero queries) · `views.py` (HTTP, SSE framing, when the answer is stored) · `conversation_views.py` · `sources.py` (which corpus PDF a sha256 names) · `source_views.py` · `urls.py` · `admin.py` |
 | `apps/catalog/` | The university catalogue: `models.py` (`DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`, and the database constraints that keep them consistent) · `editions.py` (`set_current()`, the one way to change a course's current edition) · `admin.py` (the four tables, and the `set_as_current` action that switches an edition through `set_current()`) · `migrations/` |
-| `apps/roles/` | Staff roles: `registry.py` (the roles, in code) · `models.py` (`RoleAssignment`, one role on one scope, and the constraints that make the two fit) · `migrations/` |
+| `apps/roles/` | Staff roles: `registry.py` (the roles, in code) · `models.py` (`RoleAssignment`, one role on one scope, and the constraints that make the two fit) · `admin.py` (where the superuser grants and revokes roles) · `migrations/` |
 | `rag/` | The RAG pipeline — **must never import Django**, so the thesis core runs and is evaluated without the web. `probe` · `parse` · `crawl` · `webparse` · `chunk` · `index` · `search` · `llm` (OpenAI-compatible client, pydantic JSON validation) · `answer` · `agent` (routing, read-only control flow) · `live` (query-time fetch, relevance gate, writes to the shared index, rollback) · `gold` · `golddraft` (drafts gold questions for human review) |
 | `frontend/` | React SPA: `src/api/` (contract mirror, SSE parser, CSRF-aware requests, account and conversation calls, the link to a cited PDF page) · `src/auth/` (session context, route guard) · `src/routes/` (login, register, chat, styleguide) · `src/features/chat/` (question state machine, turn rendering) · `src/components/` (account dialog and menu; `ui/` shadcn-style primitives) · `src/lib/markers.ts` · `src/theme/` · `src/i18n/` (three catalogues) · `src/test/` · `scripts/` (catalogue and contrast gates) · `public/fonts/` |
 | `scripts/` | `check.py`, the check chain |

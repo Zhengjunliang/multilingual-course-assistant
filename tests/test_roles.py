@@ -5,7 +5,8 @@ scope. A refusal the database makes is asserted by the name of the constraint
 PostgreSQL reports, as in tests/test_catalog_models.py. What they grant: one
 `has_perm` truth table over every user, scope and permission, compared whole,
 so a failure prints the cells that differ; and the lists of apps/roles/scopes.py
-checked against it cell by cell.
+checked against it cell by cell. Last, the superuser enters a row in the admin,
+where a misfit is a form error.
 
 `world()` is the one set of people and scopes these tests share: every user is
 created without a password, so none of them costs a password hash.
@@ -13,11 +14,12 @@ created without a password, so none of them costs a password hash.
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, transaction
+from django.urls import reverse
 from test_catalog_models import violation
 
 from apps.accounts.models import User
@@ -31,6 +33,9 @@ from apps.roles.scopes import (
     with_edition_roles,
     with_programme_roles,
 )
+
+if TYPE_CHECKING:
+    from django.test import Client
 
 pytestmark = pytest.mark.django_db
 
@@ -296,3 +301,21 @@ def test_lists_and_permissions_agree_with_has_perm() -> None:
         assert not editions_for(AnonymousUser(), p).exists()
     for p in PROGRAMME_PERMISSIONS:
         assert not programmes_for(AnonymousUser(), p).exists()
+
+
+def test_the_admin_enters_a_role_and_refuses_a_misfit(client: Client) -> None:
+    w = world()
+    client.force_login(w.root)
+    add = reverse("admin:roles_roleassignment_add")
+
+    fits = client.post(add, {"user": w.student.pk, "role": "teacher", "edition": w.ppm_new.pk})
+    misfit = client.post(add, {"user": w.student.pk, "role": "teacher", "programme": w.b047.pk})
+
+    assert fits.status_code == 302
+    assert misfit.status_code == 200
+    assert "A teacher is assigned to an edition, secretariat staff to a programme." in (
+        misfit.content.decode()
+    )
+    assert [str(row) for row in RoleAssignment.objects.filter(user=w.student)] == [
+        "student · teacher · B028451:2025-2026"
+    ]
