@@ -16,7 +16,7 @@ npm ci --prefix frontend         # Node version in frontend/.nvmrc
 Copy-Item .env.example .env      # fill DJANGO_SECRET_KEY and DJANGO_DB_PASSWORD; commands in the file
 uv run pre-commit install        # the commit and commit-message hooks; rerun it in a clone from before 2026-09-28
 git config pull.rebase true      # history is linear: a pull rebases onto main instead of merging it
-docker compose up -d             # PostgreSQL (the Docker Desktop engine has to be running)
+docker compose up -d             # PostgreSQL and Qdrant (the Docker Desktop engine has to be running)
 uv run python manage.py migrate
 uv run python manage.py createsuperuser
 ```
@@ -29,7 +29,7 @@ uv run python manage.py createsuperuser
 
 | To | Run |
 | -- | --- |
-| start / stop PostgreSQL | `docker compose up -d` / `docker compose down` (data stays in the named volume; `down -v` deletes it, irreversibly) |
+| start / stop PostgreSQL and Qdrant | `docker compose up -d` / `docker compose down` (data stays in the named volumes; `down -v` deletes both, the index and the pages fetched live that exist nowhere else included, irreversibly) |
 | serve the site | `uv run python manage.py runserver` → <http://127.0.0.1:8000/> (admin at `/admin/`) |
 | work on the frontend | the above, plus `npm run dev --prefix frontend` → <http://localhost:5173/> |
 | run the tests quickly | `uv run pytest` |
@@ -47,7 +47,7 @@ uv run python -X utf8 manage.py dumpdata auth.group accounts qa catalog --natura
 # after editing it
 $app = "catalog"                                      # the app whose model changed
 Remove-Item "apps/$app/migrations/0001_initial.py"
-docker compose down -v; docker compose up -d --wait   # deletes the local database, irreversibly
+docker compose rm -s -f postgres; docker volume rm multilingual-course-assistant_postgres-data; docker compose up -d --wait   # deletes the local database, irreversibly; the Qdrant volume stays
 uv run python manage.py makemigrations                # the new 0001_initial.py goes into git
 uv run python manage.py migrate
 uv run python manage.py loaddata data/dev.json --ignorenonexistent
