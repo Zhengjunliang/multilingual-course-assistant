@@ -35,6 +35,7 @@ import {
 import Markdown, { type Components, type ExtraProps, type Options } from "react-markdown";
 import remarkCjkFriendly from "remark-cjk-friendly";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 
 import { type Badge, remarkPills } from "@/lib/markers";
 import { cn } from "@/lib/utils";
@@ -230,8 +231,16 @@ export interface AnswerMarkdownProps {
 export function AnswerMarkdown({ text, badges, onBadgeClick, rehypePlugins }: AnswerMarkdownProps) {
   // remark-cjk-friendly after remark-gfm, as its README asks: it lets bold
   // open and close next to the full-width punctuation of Chinese text.
+  // remark-math only marks `$$…$$` as math here, so that Markdown escapes
+  // leave its backslashes alone; typesetting it is MathMarkdown's job. A
+  // single `$` is not math: answers quote prices.
   const remarkPlugins = useMemo<Options["remarkPlugins"]>(
-    () => [remarkGfm, remarkCjkFriendly, [remarkPills, badges]],
+    () => [
+      remarkGfm,
+      remarkCjkFriendly,
+      [remarkMath, { singleDollarTextMath: false }],
+      [remarkPills, badges],
+    ],
     [badges],
   );
   const pills = useMemo(() => ({ badges, onBadgeClick }), [badges, onBadgeClick]);

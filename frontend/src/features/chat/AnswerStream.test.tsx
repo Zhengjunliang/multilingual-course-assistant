@@ -119,6 +119,26 @@ describe("an answer", () => {
     expect(html).not.toMatch(SENTINEL);
   });
 
+  it("keeps LaTeX intact, and typesets it once KaTeX is loaded", async () => {
+    // A set from the slides: Markdown alone would read `\{` as an escaped
+    // brace and drop the backslash.
+    const formula = String.raw`\{1, \sqrt{2}\}`;
+    const text = `L'insieme è $$${formula}$$.`;
+
+    // The first render has only the fallback: KaTeX is a chunk of its own.
+    const before = answer(text);
+    expect(before).toContain("language-math");
+    expect(before).toContain(formula);
+    expect(before).not.toContain('class="katex"');
+
+    await import("./MathMarkdown");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const after = answer(text);
+    expect(after).toContain('class="katex"');
+    expect(after).toContain(`<annotation encoding="application/x-tex">${formula}</annotation>`);
+  });
+
   it("bolds Chinese text that ends in full-width punctuation", () => {
     expect(answer("**注意：**请按时缴费。")).toContain("<strong>注意：</strong>请按时缴费。");
   });

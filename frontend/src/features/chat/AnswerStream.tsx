@@ -1,8 +1,26 @@
+import { lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Badge } from "@/lib/markers";
 import { withPills } from "@/lib/markers";
 import { AnswerMarkdown } from "./AnswerMarkdown";
+
+/**
+ * KaTeX, fetched with the first answer that needs it.
+ *
+ * A chunk that fails to load falls back to the answer without typesetting: the
+ * page has no error boundary, and a thrown import would take the whole chat
+ * down to show one formula.
+ */
+const MathMarkdown = lazy(() =>
+  import("./MathMarkdown").catch(() => ({ default: AnswerMarkdown })),
+);
+
+/**
+ * Display math, the only kind remark-math marks here. A `$$` inside a code
+ * sample matches too and costs one needless load, no more.
+ */
+const MATH = /\$\$[\s\S]+?\$\$/;
 
 interface AnswerStreamProps {
   text: string;
@@ -23,7 +41,9 @@ interface AnswerStreamProps {
  *
  * A half-written answer is parsed as it stands: an unclosed `**` shows its
  * asterisks until the closing pair arrives, and a web marker's URL is a link
- * until `end` turns the marker into a badge.
+ * until `end` turns the marker into a badge. Math is typeset only then too, so
+ * a formula is not re-laid out on every token; until KaTeX arrives it shows as
+ * its LaTeX source.
  */
 export function AnswerStream({ text, badges, complete, live, onBadgeClick }: AnswerStreamProps) {
   const { t } = useTranslation();
@@ -41,7 +61,13 @@ export function AnswerStream({ text, badges, complete, live, onBadgeClick }: Ans
     );
   }
 
-  return (
+  const plain = (
     <AnswerMarkdown text={withPills(text, badges)} badges={badges} onBadgeClick={onBadgeClick} />
+  );
+  if (!MATH.test(text)) return plain;
+  return (
+    <Suspense fallback={plain}>
+      <MathMarkdown text={withPills(text, badges)} badges={badges} onBadgeClick={onBadgeClick} />
+    </Suspense>
   );
 }
