@@ -31,6 +31,10 @@ void i18n.use(initReactI18next).init({
   },
   lng: DEFAULT_UI_LOCALE,
   fallbackLng: DEFAULT_UI_LOCALE,
+  // Django's tags are lower case. Left to itself i18next rewrites `zh-hans` to
+  // the BCP-47 casing `zh-Hans` while resolving it, finds no resources under
+  // that key, and falls back to Italian.
+  lowerCaseLng: true,
   // React escapes for us; doing it twice mangles apostrophes in Italian.
   interpolation: { escapeValue: false },
 });
