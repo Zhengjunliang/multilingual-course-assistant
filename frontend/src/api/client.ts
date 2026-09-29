@@ -61,10 +61,25 @@ function isUnavailability(value: unknown): value is Unavailability {
   return value === "busy" || value === "unavailable";
 }
 
+/**
+ * The JSON of a refusal, framed or not.
+ *
+ * This request asks for `text/event-stream`, so DRF writes its error bodies
+ * as one `error` event (apps/qa/views.py, `ServerSentEventRenderer`); whatever
+ * answers without that framing, a proxy for one, sends the JSON as it is.
+ */
+function refusalJson(text: string): unknown {
+  const field = "data: ";
+  const data = text.startsWith("event: error")
+    ? text.slice(text.indexOf(field) + field.length)
+    : text;
+  return JSON.parse(data);
+}
+
 async function failureOf(response: Response): Promise<AskFailed> {
   const retryAfter = retryAfterSeconds(response);
   try {
-    const body: unknown = await response.json();
+    const body = refusalJson(await response.text());
     if (typeof body === "object" && body !== null) {
       const { detail, reason } = body as { detail?: unknown; reason?: unknown };
       return new AskFailed(
