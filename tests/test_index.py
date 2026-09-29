@@ -354,8 +354,8 @@ def test_directory_index_drops_the_files_that_left_it(
     write_chunk_file(older / "b.classic.jsonl", "b.pdf", "bb" * 32, "2024-2025")
     write_chunk_file(current / "a.classic.jsonl", "a.pdf", "aa" * 32)
     write_chunk_file(current / "b.classic.jsonl", "b.pdf", "bb" * 32)
-    main([str(older), "--qdrant-path", str(qdrant)])
-    main([str(current), "--qdrant-path", str(qdrant)])
+    main([str(older), "--qdrant", str(qdrant)])
+    main([str(current), "--qdrant", str(qdrant)])
 
     (current / "b.classic.jsonl").unlink()
     if change == "renamed":
@@ -363,7 +363,7 @@ def test_directory_index_drops_the_files_that_left_it(
         # and b's one point would be gone without the sync dropping it.
         write_chunk_file(current / "c.classic.jsonl", "c.pdf", "cc" * 32)
     capsys.readouterr()
-    main([str(current), "--qdrant-path", str(qdrant)])
+    main([str(current), "--qdrant", str(qdrant)])
 
     assert "dropped 1 points" in capsys.readouterr().out
     renamed = {("2025-2026", "c.pdf")} if change == "renamed" else set()
@@ -377,8 +377,8 @@ def test_single_file_index_deletes_no_other_file(tmp_path: Path) -> None:
     qdrant = tmp_path / "qdrant"
     write_chunk_file(tmp_path / "chunks" / "a.classic.jsonl", "a.pdf", "aa" * 32)
     write_chunk_file(tmp_path / "chunks" / "b.classic.jsonl", "b.pdf", "bb" * 32)
-    main([str(tmp_path / "chunks"), "--qdrant-path", str(qdrant)])
-    main([str(tmp_path / "chunks" / "a.classic.jsonl"), "--qdrant-path", str(qdrant)])
+    main([str(tmp_path / "chunks"), "--qdrant", str(qdrant)])
+    main([str(tmp_path / "chunks" / "a.classic.jsonl"), "--qdrant", str(qdrant)])
     assert indexed_files(qdrant) == {("2025-2026", "a.pdf"), ("2025-2026", "b.pdf")}
 
 
@@ -393,7 +393,7 @@ def test_cli_survives_a_bad_file_and_reports_the_tally(
     count as a failure, since the second would silently replace the first."""
     qdrant = tmp_path / "qdrant"
     write_chunk_file(tmp_path / "gone.classic.jsonl", "gone.pdf", "ee" * 32)
-    main([str(tmp_path / "gone.classic.jsonl"), "--qdrant-path", str(qdrant)])
+    main([str(tmp_path / "gone.classic.jsonl"), "--qdrant", str(qdrant)])
     chunks_dir = tmp_path / "chunks"
     write_chunk_file(chunks_dir / "deck.classic.jsonl", "deck.pdf", "aa" * 32)
     if failure == "corrupt":
@@ -403,7 +403,7 @@ def test_cli_survives_a_bad_file_and_reports_the_tally(
 
     capsys.readouterr()
     with pytest.raises(SystemExit):
-        main([str(chunks_dir), "--qdrant-path", str(qdrant)])
+        main([str(chunks_dir), "--qdrant", str(qdrant)])
     assert "indexed 1/2" in capsys.readouterr().out
     assert ("2025-2026", "gone.pdf") in indexed_files(qdrant)
 

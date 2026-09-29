@@ -151,7 +151,7 @@ def test_cli_reports_hits_and_rate(
     monkeypatch.setattr("rag.index.build_dense_encoder", stub_dense)
     monkeypatch.setattr("rag.index.build_sparse_encoder", stub_sparse)
 
-    main([str(gold_file), "--qdrant-path", str(qdrant_path), "--no-rerank"])
+    main([str(gold_file), "--qdrant", str(qdrant_path), "--no-rerank"])
     out = capsys.readouterr().out
     assert "q001 HIT " in out
     assert "q001 MISS" in out
@@ -178,7 +178,7 @@ def test_cli_reports_hits_and_rate(
     monkeypatch.setattr("rag.index.build_dense_encoder", no_model)
     monkeypatch.setattr("rag.index.build_sparse_encoder", no_model)
     with pytest.raises(SystemExit, match="B028451:2025-2026"):
-        main([str(gold_file), "--qdrant-path", str(other_path), "--no-rerank"])
+        main([str(gold_file), "--qdrant", str(other_path), "--no-rerank"])
 
 
 def test_cli_scores_each_question_against_its_target_collection(
@@ -218,7 +218,7 @@ def test_cli_scores_each_question_against_its_target_collection(
     monkeypatch.setattr("rag.index.build_dense_encoder", stub_dense)
     monkeypatch.setattr("rag.index.build_sparse_encoder", stub_sparse)
 
-    main([str(gold_file), "--qdrant-path", str(qdrant_path), "--no-rerank"])
+    main([str(gold_file), "--qdrant", str(qdrant_path), "--no-rerank"])
     out = capsys.readouterr().out
     assert "q001 HIT " in out
     assert "c001 HIT " in out
@@ -257,7 +257,7 @@ def test_cli_pins_retrieval_to_the_crawl_snapshot_by_default(
     gold_file = tmp_path / "campus.jsonl"
     gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
 
-    main([str(gold_file), "--qdrant-path", str(tmp_path / "qdrant"), "--no-rerank"])
+    main([str(gold_file), "--qdrant", str(tmp_path / "qdrant"), "--no-rerank"])
     capsys.readouterr()
     assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [("crawl", None)]
     # The edition is pinned the same way, so a switch cannot move a gate number.
@@ -276,7 +276,7 @@ def test_cli_forwards_snapshot_and_ingest_source_to_search(
     main(
         [
             str(gold_file),
-            "--qdrant-path",
+            "--qdrant",
             str(tmp_path / "qdrant"),
             "--no-rerank",
             "--snapshot",
@@ -343,9 +343,7 @@ def test_live_off_keeps_the_crawl_filter_and_never_touches_the_live_module(
     gold_file = tmp_path / "campus.jsonl"
     gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
 
-    main(
-        [str(gold_file), "--qdrant-path", str(tmp_path / "qdrant"), "--no-rerank", "--live", "off"]
-    )
+    main([str(gold_file), "--qdrant", str(tmp_path / "qdrant"), "--no-rerank", "--live", "off"])
     capsys.readouterr()
     assert [call["ingest_source"] for call in calls] == ["crawl"]
 
@@ -363,7 +361,7 @@ def test_live_on_opens_the_read_side_filter(
     gold_file = tmp_path / "autogrow.jsonl"
     gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
 
-    main([str(gold_file), "--qdrant-path", str(tmp_path / "qdrant"), "--no-rerank", "--live", "on"])
+    main([str(gold_file), "--qdrant", str(tmp_path / "qdrant"), "--no-rerank", "--live", "on"])
     capsys.readouterr()
     assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [(None, None)]
 
@@ -383,7 +381,7 @@ def test_live_on_says_which_ingest_source_it_overrode(
     main(
         [
             str(gold_file),
-            "--qdrant-path",
+            "--qdrant",
             str(tmp_path / "qdrant"),
             "--no-rerank",
             "--live",

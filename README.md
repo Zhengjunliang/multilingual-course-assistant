@@ -34,6 +34,7 @@ uv run python manage.py createsuperuser
 | work on the frontend | the above, plus `npm run dev --prefix frontend` → <http://localhost:5173/> |
 | run the tests quickly | `uv run pytest` |
 | run everything CI runs | `uv run python scripts/check.py` |
+| query or build an embedded index instead (tests, a machine without Docker) | `--qdrant <directory>` on any `rag` command; one process holds it at a time |
 
 A test is added, changed or deleted by the criteria of [docs/testing.md](docs/testing.md), which also lists the tests kept whatever the criteria say.
 
@@ -98,7 +99,7 @@ Course PDFs go in `data/corpus/<course>/` (gitignored). Every command below is `
 | `probe` | profile PDFs and show the per-file routing, without parsing | `data\corpus\PPM` |
 | `parse` | parse with Docling following that routing → `data\parsed\` | `data\corpus\PPM --course B028451 --academic-year 2025-2026` · `"<file>.pdf" --course B028451 --academic-year 2025-2026 --profile manual --pipeline vlm` |
 | `chunk` | chunk parsed documents → `data\chunks\*.jsonl` | `data\parsed` |
-| `index` | encode into the local Qdrant collection → `data\qdrant\`; a directory holds the whole set of files of each edition it contains ([data-model.md](docs/data-model.md), the contract between `apps/` and `rag/`) — two editions of a deck need separate `--out-dir` directories when parsing and chunking | `data\chunks` |
+| `index` | encode into the Qdrant service (`QDRANT_URL`); a directory holds the whole set of files of each edition it contains ([data-model.md](docs/data-model.md), the contract between `apps/` and `rag/`) — two editions of a deck need separate `--out-dir` directories when parsing and chunking | `data\chunks` |
 | `search` | hybrid retrieval (dense + BM25 + RRF) + Qwen3 reranker | `"What is an ORM?"` · `"What is an ORM?" --scope B028451:2025-2026` |
 | `answer` | retrieve + generate a cited answer | `"What is an ORM?"` |
 | `agent` | route to course or campus collection, retrieve, answer; deepens by fetching linked pages unless `--no-deepen` | `"Quando scadono le tasse?"` |

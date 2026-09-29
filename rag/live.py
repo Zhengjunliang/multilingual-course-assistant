@@ -79,10 +79,10 @@ from rag.crawl import (
 )
 from rag.index import (
     DEFAULT_DENSE_MODEL,
-    DEFAULT_QDRANT_DIR,
     WEB_COLLECTION,
     DenseEncoder,
     SparseEncoder,
+    add_qdrant_argument,
     build_sparse_encoder,
     cached_dense_encoder,
     count_web_versions,
@@ -686,7 +686,7 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help=f"score the relevance gate against an annotation set (default: {DEFAULT_GATE_SET})",
     )
-    parser.add_argument("--qdrant-path", type=Path, default=DEFAULT_QDRANT_DIR)
+    add_qdrant_argument(parser)
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     args = parser.parse_args(argv)
@@ -711,7 +711,7 @@ def main(argv: list[str] | None = None) -> None:
     configure_cli_logging()
 
     if args.rollback is not None:
-        client = open_client(args.qdrant_path)
+        client = open_client(args.qdrant)
         before = client.count(WEB_COLLECTION).count
         delete_by_run(client, args.rollback)
         after = client.count(WEB_COLLECTION).count
@@ -739,7 +739,7 @@ def main(argv: list[str] | None = None) -> None:
     # charged to one step's budget.
     dense = cached_dense_encoder(args.dense_model, device="cpu")
     sparse = build_sparse_encoder()
-    client = open_client(args.qdrant_path)
+    client = open_client(args.qdrant)
     ensure_collection(client, dense.dimension(), WEB_COLLECTION)
     result = fetch_and_ingest(
         args.url,

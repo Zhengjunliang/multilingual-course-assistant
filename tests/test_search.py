@@ -291,23 +291,21 @@ def test_cli_prints_ranked_citations(
     monkeypatch.setattr("rag.search.build_sparse_encoder", stub_sparse)
     monkeypatch.setattr("rag.search.build_reranker", stub_reranker)
 
-    main(["django orm", "--qdrant-path", str(qdrant_path), "--top-k", "1"])
+    main(["django orm", "--qdrant", str(qdrant_path), "--top-k", "1"])
     out = capsys.readouterr().out
     assert "deck.pdf p.1" in out
     assert "Algorithms" in out
 
-    main([ORM_TEXT, "--qdrant-path", str(qdrant_path), "--no-rerank", "--locale", "en"])
+    main([ORM_TEXT, "--qdrant", str(qdrant_path), "--no-rerank", "--locale", "en"])
     assert "deck.pdf p.1" in capsys.readouterr().out
 
-    main(
-        [ORM_TEXT, "--qdrant-path", str(qdrant_path), "--no-rerank", "--scope", "B028451:2025-2026"]
-    )
+    main([ORM_TEXT, "--qdrant", str(qdrant_path), "--no-rerank", "--scope", "B028451:2025-2026"])
     assert "deck.pdf p.1" in capsys.readouterr().out
 
     # A malformed edition stops at the flag, before any model or index opens.
     for value, reason in (("B003725", "expected CODE:YEAR"), ("B028451:2025/2026", "invariant 1")):
         with pytest.raises(SystemExit):
-            main([ORM_TEXT, "--qdrant-path", str(qdrant_path), "--scope", value])
+            main([ORM_TEXT, "--qdrant", str(qdrant_path), "--scope", value])
         assert reason in capsys.readouterr().err
 
 

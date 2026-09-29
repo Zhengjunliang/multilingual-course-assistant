@@ -187,6 +187,17 @@ def open_client(location: str | Path | None = None) -> QdrantClient:
     return QdrantClient(path=text)
 
 
+def add_qdrant_argument(parser: argparse.ArgumentParser) -> None:
+    """The one --qdrant of every rag command, read by `open_client`."""
+    parser.add_argument(
+        "--qdrant",
+        metavar="URL|DIR",
+        default=None,
+        help="the Qdrant server's http(s) URL, or a directory to open as an embedded "
+        "index that one process holds at a time (default: QDRANT_URL)",
+    )
+
+
 def point_id_of(chunk_id: str) -> str:
     """Qdrant only accepts int/UUID ids; uuid5 keeps them deterministic so
     re-indexing the same snapshot overwrites instead of duplicating. The
@@ -503,7 +514,7 @@ def index_chunks(
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", type=Path, help="a chunk JSONL file, or a directory of them")
-    parser.add_argument("--qdrant-path", type=Path, default=DEFAULT_QDRANT_DIR)
+    add_qdrant_argument(parser)
     parser.add_argument("--collection", default=COLLECTION)
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     args = parser.parse_args(argv)
@@ -513,7 +524,7 @@ def main(argv: list[str] | None = None) -> None:
     # Encoders load once for the whole run — the model load dominates, not the upserts.
     dense = build_dense_encoder(args.dense_model)
     sparse = build_sparse_encoder()
-    client = open_client(args.qdrant_path)
+    client = open_client(args.qdrant)
     ensure_collection(client, dense.dimension(), args.collection)
 
     chunk_files = list(collect_chunk_files(args.target))

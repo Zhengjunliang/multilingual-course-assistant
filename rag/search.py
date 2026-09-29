@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from pydantic import BaseModel, ConfigDict
@@ -24,12 +23,12 @@ from rag.chunk import Chunk, edition_arg, locale_arg
 from rag.index import (
     COLLECTION,
     DEFAULT_DENSE_MODEL,
-    DEFAULT_QDRANT_DIR,
     DENSE_VECTOR,
     SPARSE_VECTOR,
     WEB_COLLECTION,
     DenseEncoder,
     SparseEncoder,
+    add_qdrant_argument,
     build_dense_encoder,
     build_sparse_encoder,
     open_client,
@@ -294,7 +293,7 @@ def search(
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("query")
-    parser.add_argument("--qdrant-path", type=Path, default=DEFAULT_QDRANT_DIR)
+    add_qdrant_argument(parser)
     parser.add_argument(
         "--collection",
         action="append",
@@ -322,7 +321,7 @@ def main(argv: list[str] | None = None) -> None:
     dense = build_dense_encoder(args.dense_model)
     sparse = build_sparse_encoder()
     reranker = None if args.no_rerank else build_reranker(args.rerank_model)
-    client = open_client(args.qdrant_path)
+    client = open_client(args.qdrant)
 
     hits = search(
         client,

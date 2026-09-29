@@ -722,7 +722,7 @@ def main(argv: list[str] | None = None) -> None:
     from rag.crawl import HttpxFetcher
     from rag.index import (
         DEFAULT_DENSE_MODEL,
-        DEFAULT_QDRANT_DIR,
+        add_qdrant_argument,
         build_dense_encoder,
         build_sparse_encoder,
         cached_dense_encoder,
@@ -762,7 +762,7 @@ def main(argv: list[str] | None = None) -> None:
         default=DEFAULT_DECISION_LOG,
         help=f"append the per-step decision rows here (default: {DEFAULT_DECISION_LOG})",
     )
-    parser.add_argument("--qdrant-path", type=Path, default=DEFAULT_QDRANT_DIR)
+    add_qdrant_argument(parser)
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
     args = parser.parse_args(argv)
@@ -788,7 +788,7 @@ def main(argv: list[str] | None = None) -> None:
     dense = build_dense_encoder(args.dense_model)
     sparse = build_sparse_encoder()
     reranker = None if args.no_rerank else build_reranker(args.rerank_model)
-    client = open_client(args.qdrant_path)
+    client = open_client(args.qdrant)
     fetcher = HttpxFetcher()
 
     def retrieve(query: str) -> list[Hit]:

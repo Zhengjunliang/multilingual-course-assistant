@@ -722,7 +722,7 @@ def test_cli_ingests_a_url_and_unloads_the_llm_before_the_heavy_work(
             "g001",
             "--run-id",
             RUN_ID,
-            "--qdrant-path",
+            "--qdrant",
             str(tmp_path / "qdrant"),
             "--registry",
             str(registry),
@@ -756,7 +756,7 @@ def test_cli_says_unchanged_rather_than_persisted_when_nothing_was_written(
         URL,
         "--trigger",
         "g001",
-        "--qdrant-path",
+        "--qdrant",
         str(tmp_path / "qdrant"),
         "--registry",
         str(tmp_path / "registry.jsonl"),
@@ -789,7 +789,7 @@ def test_rollback_cli_removes_one_run_and_reports_what_is_left(
     )
     client.close()
 
-    main(["--rollback", RUN_ID, "--qdrant-path", str(qdrant_path)])
+    main(["--rollback", RUN_ID, "--qdrant", str(qdrant_path)])
 
     out = capsys.readouterr().out
     assert f"rolled back {RUN_ID}: 1 points removed, 1 left in {WEB_COLLECTION}" in out

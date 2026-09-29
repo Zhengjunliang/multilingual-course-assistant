@@ -1014,7 +1014,7 @@ def test_a_two_hop_pdf_answer_is_reached_through_the_link_graph(
             "g001",
             "--run-id",
             RUN_ID,
-            "--qdrant-path",
+            "--qdrant",
             str(qdrant_path),
             "--registry",
             str(registry),
@@ -1120,7 +1120,7 @@ def test_empty_retrieval_refuses_then_points_to_a_url(
             "What is an ORM?",
             "--locale",
             locale,
-            "--qdrant-path",
+            "--qdrant",
             str(empty_index),
             "--registry",
             str(tmp_path / "registry.jsonl"),
@@ -1176,7 +1176,7 @@ def test_cli_answers_from_the_routed_collection_with_sources(
     main(
         [
             "What is an ORM?",
-            "--qdrant-path",
+            "--qdrant",
             str(qdrant_path),
             "--registry",
             str(tmp_path / "registry.jsonl"),

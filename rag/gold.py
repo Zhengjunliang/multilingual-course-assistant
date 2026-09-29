@@ -153,7 +153,7 @@ def main(argv: list[str] | None = None) -> None:
     from rag.index import (
         COLLECTION,
         DEFAULT_DENSE_MODEL,
-        DEFAULT_QDRANT_DIR,
+        add_qdrant_argument,
         build_dense_encoder,
         build_sparse_encoder,
         open_client,
@@ -163,7 +163,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("gold_file", type=Path)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--no-rerank", action="store_true")
-    parser.add_argument("--qdrant-path", type=Path, default=DEFAULT_QDRANT_DIR)
+    add_qdrant_argument(parser)
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
     # Eval reads the frozen crawl snapshot by default: a live increment written
@@ -205,7 +205,7 @@ def main(argv: list[str] | None = None) -> None:
 
         overridden = [
             name
-            for name in ("top_k", "no_rerank", "qdrant_path", "dense_model", "rerank_model", "live")
+            for name in ("top_k", "no_rerank", "qdrant", "dense_model", "rerank_model", "live")
             if getattr(args, name) != parser.get_default(name)
         ]
         if overridden:
@@ -243,7 +243,7 @@ def main(argv: list[str] | None = None) -> None:
     if ingest_source is None and args.ingest_source != parser.get_default("ingest_source"):
         logger.warning("--live on opens the filter; --ingest-source %s ignored", args.ingest_source)
 
-    client = open_client(args.qdrant_path)
+    client = open_client(args.qdrant)
     # An index without the pinned edition would score every slides question a
     # MISS and report a false 0/N; stop and say why, before the ~2.4GB of VRAM
     # the retrieval stack costs is spent on an index that cannot answer.

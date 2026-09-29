@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import logging
 import re
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
@@ -190,7 +189,7 @@ def main(argv: list[str] | None = None) -> None:
     from rag.index import (
         COLLECTION,
         DEFAULT_DENSE_MODEL,
-        DEFAULT_QDRANT_DIR,
+        add_qdrant_argument,
         build_dense_encoder,
         build_sparse_encoder,
         open_client,
@@ -207,7 +206,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--no-rerank", action="store_true")
-    parser.add_argument("--qdrant-path", type=Path, default=DEFAULT_QDRANT_DIR)
+    add_qdrant_argument(parser)
     parser.add_argument(
         "--collection",
         action="append",
@@ -225,7 +224,7 @@ def main(argv: list[str] | None = None) -> None:
     dense = build_dense_encoder(args.dense_model)
     sparse = build_sparse_encoder()
     reranker = None if args.no_rerank else build_reranker(args.rerank_model)
-    client = open_client(args.qdrant_path)
+    client = open_client(args.qdrant)
     hits = search(
         client,
         args.question,

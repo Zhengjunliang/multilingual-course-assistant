@@ -172,7 +172,7 @@ def test_cli_answers_end_to_end_with_sources(
     monkeypatch.setattr("rag.index.build_sparse_encoder", stub_sparse)
     monkeypatch.setattr("rag.answer.build_streamer", stub_streamer)
 
-    main(["django orm", "--qdrant-path", str(qdrant_path), "--no-rerank"])
+    main(["django orm", "--qdrant", str(qdrant_path), "--no-rerank"])
     out = capsys.readouterr().out
     assert "An ORM maps objects to tables" in out
     assert "Sources:\n  [deck.pdf p.1]" in out
