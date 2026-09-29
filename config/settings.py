@@ -35,7 +35,7 @@ ALLOWED_HOSTS = env.allowed_hosts
 # Application definition
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    "config.apps.AdminConfig",  # django.contrib.admin, with the superuser-only site
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

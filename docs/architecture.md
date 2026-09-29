@@ -22,7 +22,7 @@ The principle (2026-07-29): **the best open-source option available**. Two const
 | --- | --- | --- |
 | Language | Python 3.12, managed by uv | the ML ecosystem; Flask and Django are the supervisor's range |
 | Package manager | uv | a lockfile and built-in Python version management |
-| Web | Django 5.2 LTS (`django>=5.2,<6`) | the admin serves as the material back office, auth, ORM and i18n are built in, and the Celery integration is mature; LTS rather than 6.0 because it is supported until 2028-04 and DRF supports LTS most steadily |
+| Web | Django 5.2 LTS (`django>=5.2,<6`) | the admin is the superuser's back office, auth, ORM and i18n are built in, and the Celery integration is mature; LTS rather than 6.0 because it is supported until 2028-04 and DRF supports LTS most steadily |
 | API | DRF with SSE streaming | the question-answering API ships with the pages, and leaves room for external integrations after the thesis (M7) |
 | Frontend | React + TypeScript SPA (Vite) | the mainstream pairing; streaming answers and citation highlighting show best |
 | Background tasks | Celery + Redis | the supervisor's choice |
@@ -84,7 +84,7 @@ The dependency layer is reproducible through `uv.lock` and `--locked` in CI.
 
 - **Corpus**: the PPM course slides, PDFs in `data/corpus/PPM/` (gitignored: copyrighted material never enters git). Mostly English, some Italian or mixed; languages also mix inside one file, so `locale` is a chunk field, not a file field. Every document has a text layer, and one is mostly images. Naive extraction loses the spaces between words and keeps ligatures; Docling restores the spacing, and `rag/parse.py` normalises with NFKC. With Docling's defaults images and formulas are dropped, which motivates the adaptive routing and the picture-description ablation (`#28`). Counts and sizes are in [experiment-log.md](experiment-log.md), entries of 2026-07-31 and 2026-08-02. Past years' written exams as a corpus are `#47`.
 - **Capability boundary**: question answering over retrieved material. ⛔ Generating or grading exercises.
-- **Delivery**: the React SPA, the DRF API with SSE streaming, and the Django admin as the material back office, in **one repository** with the RAG core.
+- **Delivery**: the React SPA, the DRF API with SSE streaming, and the Django admin as the superuser's back office, in **one repository** with the RAG core.
 - **Data model** 🔶 programmes, courses and yearly editions are tables in `apps/catalog/`, entered through the admin, which switches a course's current edition from there (`apps/catalog/admin.py`); 🔜 M5: role scopes and content ownership — [data-model.md](data-model.md).
 - **Tenancy and authentication**: the campus knowledge base is one shared index with no per-user isolation on retrieval, on purpose, since the corpus is public; the deepening loop writing into it makes attribution a real question (`#17`). Writes that trigger growth are limited to accounts and throttled. UniFi single sign-on would go through IDEM GARR, the Italian universities' federation (SAML/Shibboleth); Django has ready service-provider libraries, but registering the application needs UniFi IT's approval, which a thesis project does not wait for: M5 uses Django accounts with pluggable authentication, and SSO is 🔜 M7 `#44`. ✅ Every route declares who may call it, and a route that leans on the global default fails the suite (`tests/test_route_permissions.py`).
 - **External knowledge sources** (MCP, Google Drive): 🔜 M7 `#45`.

@@ -54,7 +54,7 @@ OPEN: dict[str, str] = {
 
 # URL namespace -> what decides who may call the routes under it.
 DELEGATED: dict[str, str] = {
-    "admin": "the admin site checks is_staff on every view (AdminSite.has_permission)",
+    "admin": "SuperuserAdminSite.has_permission admits superusers only (config/admin.py)",
 }
 
 

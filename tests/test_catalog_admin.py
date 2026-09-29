@@ -1,10 +1,11 @@
 """The admin is how the catalogue is entered and how an edition is switched.
 
-These tests drive `apps/catalog/admin.py` through `admin_client`, the way a
-secretariat member would: HTTP POSTs to the add and change pages, and to the
+These tests drive `apps/catalog/admin.py` through `admin_client`, the way the
+superuser does: HTTP POSTs to the add and change pages, and to the
 `set_as_current` action on the changelist. They do not touch `set_current()`
 directly — `tests/test_catalog_editions.py` already owns that — the point
-here is that the admin wires read-only fields and the action to it correctly.
+here is that the admin wires read-only fields and the action to it correctly,
+and that it admits nobody but a superuser (config/admin.py).
 """
 
 from __future__ import annotations
@@ -34,20 +35,24 @@ def other_course() -> Course:
     return Course.objects.create(code="B003725", name="Intelligenza Artificiale")
 
 
-@pytest.mark.parametrize("case", ["one", "two", "view-only-user"])
-def test_set_as_current_action_needs_one_edition_and_the_change_permission(
+@pytest.mark.parametrize("case", ["one", "two", "staff-not-superuser"])
+def test_set_as_current_action_needs_one_edition_and_a_superuser(
     admin_client, client, course: Course, case: str
 ) -> None:
     first = CourseEdition.objects.create(course=course, academic_year="2024-2025")
     second = CourseEdition.objects.create(course=course, academic_year="2025-2026")
     pks = [first.pk, second.pk] if case == "two" else [first.pk]
     poster = admin_client
-    if case == "view-only-user":
-        viewer = User.objects.create_user(username="viewer", is_staff=True)
-        viewer.user_permissions.add(
-            Permission.objects.get(content_type__app_label="catalog", codename="view_courseedition")
+    if case == "staff-not-superuser":
+        # Even holding the change permission the action names: the site turns
+        # the account away before any model admin is asked.
+        staff = User.objects.create_user(username="staff", is_staff=True)
+        staff.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="catalog", codename="change_courseedition"
+            )
         )
-        client.force_login(viewer)
+        client.force_login(staff)
         poster = client
 
     response = poster.post(
@@ -64,12 +69,42 @@ def test_set_as_current_action_needs_one_edition_and_the_change_permission(
         return
     assert first.is_current is False
     assert second.is_current is False
-    page = response.content.decode()
     if case == "two":
-        assert "Select exactly one edition to switch." in page
+        assert "Select exactly one edition to switch." in response.content.decode()
     else:
-        assert response.status_code == 200
-        assert "Set as current edition" not in page
+        assert response.redirect_chain[0][0].startswith(reverse("admin:login"))
+
+
+@pytest.mark.parametrize(
+    ("who", "expected"),
+    [
+        pytest.param("superuser", (200, "", True), id="superuser"),
+        pytest.param("staff", (302, "/admin/login/", False), id="staff-not-superuser"),
+        pytest.param("user", (302, "/admin/login/", False), id="ordinary-user"),
+    ],
+)
+def test_the_admin_admits_superusers_only(
+    client, who: str, expected: tuple[int, str, bool]
+) -> None:
+    user = (
+        User.objects.create_superuser(username=who)
+        if who == "superuser"
+        else User.objects.create_user(username=who, is_staff=who == "staff")
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("admin:index"))
+
+    page = response.content.decode()
+    lists_both = all(
+        reverse(f"admin:{model}_changelist") in page
+        for model in ("catalog_courseedition", "roles_roleassignment")
+    )
+    assert (
+        response.status_code,
+        response.get("Location", "").split("?")[0],
+        lists_both,
+    ) == expected
 
 
 def test_admin_add_page_cannot_set_is_current(admin_client, course: Course) -> None:
