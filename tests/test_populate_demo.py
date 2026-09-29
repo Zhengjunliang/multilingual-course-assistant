@@ -186,9 +186,12 @@ def test_rows_of_its_own_are_kept_and_demo_accounts_made_the_files(
     ppm = Course.objects.create(code="B028451", name="PPM")
     CourseEdition.objects.create(course=ppm, academic_year="2025-2026", is_current=True)
     b047 = DegreeProgramme.objects.create(code="B047", name="Ingegneria Informatica")
-    # A demo account holding a role the file does not declare, and one that is not a demo account.
+    # A demo account holding a role the file does not declare, a demo account the file
+    # does not name, and one that is not a demo account.
     newcomer = User.objects.create_user(username="demo-teacher", is_superuser=True)
     RoleAssignment.objects.create(user=newcomer, role=Role.SECRETARIAT, programme=b047)
+    retired = User.objects.create_user(username="demo-staff")
+    RoleAssignment.objects.create(user=retired, role=Role.SECRETARIAT, programme=b047)
     staff = User.objects.create_user(username="mrossi")
     RoleAssignment.objects.create(user=staff, role=Role.SECRETARIAT, programme=b047)
 
@@ -202,11 +205,14 @@ def test_rows_of_its_own_are_kept_and_demo_accounts_made_the_files(
     ]
     assert (seen["roles"], seen["accounts"]) == (
         [*DEMO_ROLES, "mrossi · secretariat · B047"],
-        [*DEMO_ACCOUNTS, ("mrossi", False, False, False)],
+        sorted(
+            [*DEMO_ACCOUNTS, ("demo-staff", False, False, False), ("mrossi", False, False, False)]
+        ),
     )
     assert sorted(line for line in out.splitlines() if " role " in line) == [
         "added role demo-secretariat · secretariat · B047",
         "added role demo-teacher · teacher · B028451:2025-2026",
+        "removed role demo-staff · secretariat · B047",
         "removed role demo-teacher · secretariat · B047",
     ]
 
