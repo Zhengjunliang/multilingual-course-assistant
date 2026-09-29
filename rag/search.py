@@ -4,7 +4,8 @@ One query fans out into two prefetch branches — dense (Qwen3-Embedding, query
 prompt) and sparse (BM25) — fused with Reciprocal Rank Fusion, then optionally
 reordered by Qwen3-Reranker. Payload filters (`--locale`, `--scope`) must sit
 inside *each* prefetch branch: with fusion queries the embedded Qdrant ignores
-a top-level filter (verified empirically).
+a top-level filter (verified empirically). Equal fused scores rank by point id,
+so a question gets the same hits on every run (`hybrid_search`).
 
     uv run python -m rag.search "What is an ORM?"
     uv run python -m rag.search "What is an ORM?" --scope B028451:2025-2026
@@ -212,12 +213,18 @@ def hybrid_search(
             ),
         ],
         query=models.FusionQuery(fusion=models.Fusion.RRF),
-        limit=limit,
+        # The whole fused pool, at most one prefetch_limit per branch, cut to
+        # `limit` here rather than by the server: RRF gives equal scores to
+        # points at equal ranks, and a server that searches its segments in
+        # parallel returns equal scores in no fixed order, so the same question
+        # could keep a different point at the cut on every run.
+        limit=2 * prefetch_limit,
         with_payload=True,
     )
+    ranked = sorted(response.points, key=lambda point: (-point.score, str(point.id)))
     return [
         Hit(chunk=Chunk.model_validate(point.payload), score=point.score)
-        for point in response.points
+        for point in ranked[:limit]
     ]
 
 

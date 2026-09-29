@@ -8,19 +8,25 @@ import subprocess
 import sys
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
-from qdrant_client import QdrantClient
+from qdrant_client import QdrantClient, models
 from test_index import StubDense, StubSparse, make_chunk
 
 from rag.chunk import Chunk, EditionKey, chunk_id_of
 from rag.index import (
+    COLLECTION,
+    DENSE_VECTOR,
+    SPARSE_VECTOR,
     WEB_COLLECTION,
     DenseEncoder,
     SparseEncoder,
+    SparseVector,
     ensure_collection,
     index_chunks,
     open_client,
+    point_id_of,
 )
 from rag.search import (
     Hit,
@@ -106,6 +112,90 @@ def test_search_without_reranker_keeps_fusion_order(client: QdrantClient) -> Non
     hits = search(client, ORM_TEXT, StubDense(), StubSparse(), None, scope=None, limit=2)
     assert len(hits) <= 2
     assert hits[0].chunk.text == ORM_TEXT
+
+
+class FixedQuery:
+    """Encodes every query to the same vectors, so the test can place each
+    point at the rank it needs in each branch."""
+
+    def dimension(self) -> int:
+        return 4
+
+    def encode_documents(self, texts: Sequence[str]) -> list[list[float]]:
+        raise NotImplementedError
+
+    def encode_query(self, text: str) -> list[float]:
+        return [1.0, 0.0, 0.0, 0.0]
+
+
+class FixedSparseQuery:
+    def encode_documents(self, texts: Sequence[str]) -> list[SparseVector]:
+        raise NotImplementedError
+
+    def encode_query(self, text: str) -> SparseVector:
+        return ([1], [1.0])
+
+
+TIED = (make_chunk(0, ORM_TEXT), make_chunk(1, SORT_TEXT))
+
+
+@pytest.fixture
+def tied_client(tmp_path: Path) -> Iterator[QdrantClient]:
+    """Two points with one fused score, and a third below them: RRF scores
+    ranks, so a point first in one branch and second in the other ties with its
+    mirror image."""
+    qdrant = open_client(tmp_path / "qdrant")
+    ensure_collection(qdrant, FixedQuery().dimension())
+    vectors = [
+        # dense rank 1, sparse rank 2
+        (TIED[0], [1.0, 0.1, 0.0, 0.0], models.SparseVector(indices=[1], values=[1.0])),
+        # dense rank 2, sparse rank 1
+        (TIED[1], [1.0, 0.3, 0.0, 0.0], models.SparseVector(indices=[1], values=[2.0])),
+        # dense rank 3 only
+        (make_chunk(2), [0.0, 0.0, 1.0, 0.0], models.SparseVector(indices=[3], values=[1.0])),
+    ]
+    qdrant.upsert(
+        COLLECTION,
+        [
+            models.PointStruct(
+                id=point_id_of(chunk.chunk_id),
+                vector={DENSE_VECTOR: dense, SPARSE_VECTOR: sparse},
+                payload=chunk.model_dump(),
+            )
+            for chunk, dense, sparse in vectors
+        ],
+    )
+    yield qdrant
+    qdrant.close()
+
+
+def test_equal_fusion_scores_rank_by_point_id_whatever_order_the_index_returns(
+    tied_client: QdrantClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Qdrant server searching its segments in parallel returns equal scores
+    in no fixed order. The stand-in below returns them reversed and cut to the
+    limit it is asked for, the way such a server may: the hits must not move."""
+
+    def ranked(limit: int) -> list[str]:
+        hits = hybrid_search(
+            tied_client, "q", FixedQuery(), FixedSparseQuery(), scope=None, limit=limit
+        )
+        return [hit.chunk.chunk_id for hit in hits]
+
+    as_stored = ranked(1), ranked(3)
+    real = tied_client.query_points
+
+    def ties_reversed(*args: Any, limit: int, **kwargs: Any) -> Any:
+        response = real(*args, limit=100, **kwargs)
+        points = response.points
+        # Best score first, equal scores in the reverse of the index's order.
+        order = sorted(range(len(points)), key=lambda i: (-points[i].score, -i))
+        return response.model_copy(update={"points": [points[i] for i in order][:limit]})
+
+    monkeypatch.setattr(tied_client, "query_points", ties_reversed)
+    assert (ranked(1), ranked(3)) == as_stored
+    by_id = sorted(TIED, key=lambda chunk: point_id_of(chunk.chunk_id))
+    assert as_stored[1][:2] == [chunk.chunk_id for chunk in by_id]
 
 
 def test_search_with_reranker_promotes_its_ranking(client: QdrantClient) -> None:
