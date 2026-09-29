@@ -27,9 +27,10 @@ export class AskFailed extends Error {
     readonly retryAfter: number | null,
     /**
      * Present only on a 503. `busy` is a queue that clears on its own;
-     * `unavailable` is a model server that is not running and will not start
-     * because we asked again — the difference between a retry and a wait for a
-     * person to fix something.
+     * `unavailable` is a service the answer needs (the model server or the
+     * Qdrant service) that is not running and will not start because we asked
+     * again — the difference between a retry and a wait for a person to fix
+     * something.
      */
     readonly reason: Unavailability | null = null,
   ) {

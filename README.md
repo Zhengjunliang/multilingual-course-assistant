@@ -150,7 +150,7 @@ curl.exe -N -u <username>:<password> -X POST http://127.0.0.1:8000/api/ask `
 
 The stream is `start` (route and citations, once, before generation) → `token` (a fragment of the answer, many times) → `end` (the answer is complete), or `error` in place of `end`. The answer is the concatenation of every `token`'s `text`. Events, fields, and why "was this cited?" is the client's to compute are defined in [apps/qa/contract.py](apps/qa/contract.py), the single source.
 
-The first request takes about a minute while the models load into GPU memory. Answers are served one at a time — 8 GB cannot hold two concurrent rerank + generation passes — and a request that waits in the queue longer than 90 s gets a 503 with `Retry-After`. Closing the stream cancels the generation and frees the queue. A 503 carries `reason`: `busy` (worth retrying) or `unavailable` (the model server is down). Once the first event has gone out the status is 200 whatever happens, so a generation that dies midway is an `error` event.
+The first request takes about a minute while the models load into GPU memory. Answers are served one at a time — 8 GB cannot hold two concurrent rerank + generation passes — and a request that waits in the queue longer than 90 s gets a 503 with `Retry-After`. Closing the stream cancels the generation and frees the queue. A 503 carries `reason`: `busy` (worth retrying) or `unavailable` (the model server or the Qdrant service is down). Once the first event has gone out the status is 200 whatever happens, so a generation that dies midway is an `error` event.
 
 | Method and path | Does |
 | --------------- | ---- |

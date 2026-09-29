@@ -9,8 +9,8 @@
  *
  * A `busy` 503 is retried at most twice and then stopped, because an automatic
  * retry that never gives up is a page that looks like it is working while
- * nothing is. `unavailable` is not retried at all — a model server that is not
- * running does not start because we asked again.
+ * nothing is. `unavailable` is not retried at all — a model server or a Qdrant
+ * service that is not running does not start because we asked again.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

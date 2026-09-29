@@ -78,8 +78,9 @@ export interface ErrorEvent {
  *
  * `reason` separates the two failures that otherwise arrive identically:
  * `busy` is another question still being answered and clears on its own,
- * `unavailable` is a model server that is not running and will not start
- * because we asked again. Only the first is worth an automatic retry.
+ * `unavailable` is a service the answer needs (the model server or the Qdrant
+ * service) that is not running and will not start because we asked again.
+ * Only the first is worth an automatic retry.
  */
 export interface Unavailable {
   detail: string;

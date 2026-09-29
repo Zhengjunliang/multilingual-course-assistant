@@ -196,9 +196,10 @@ class Unavailable(BaseModel):
 
     `detail` keeps DRF's shape. `reason` is what makes the two collapsed cases
     tellable apart: `busy` is somebody else's question still being answered and
-    is worth retrying in a moment, `unavailable` is a model server that is not
-    running and will not become one by asking again. Without it a client counts
-    down and retries forever against an outage.
+    is worth retrying in a moment, `unavailable` is a service the answer needs —
+    the model server or the Qdrant service — that is not running and will not
+    start by asking again. Without it a client counts down and retries forever
+    against an outage.
     """
 
     model_config = ConfigDict(frozen=True)
