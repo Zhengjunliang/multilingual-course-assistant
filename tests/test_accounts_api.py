@@ -19,7 +19,10 @@ import pytest
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
+from apps.catalog.models import Course, CourseEdition, DegreeProgramme
 from apps.qa import engine as engine_module
+from apps.roles.models import RoleAssignment
+from apps.roles.registry import Role
 from rag.chunk import normalize_locale
 
 if TYPE_CHECKING:
@@ -84,6 +87,31 @@ def test_me_names_whoever_is_logged_in(student: User) -> None:
 
     assert body["authenticated"] is True
     assert body["user"]["username"] == USERNAME
+
+
+def test_me_names_the_scopes_a_user_holds_a_role_in(student: User) -> None:
+    """Where, not what: each scope by the key its URL takes, in a fixed order."""
+    programme = DegreeProgramme.objects.create(code="B047", name="Ingegneria Informatica")
+    course = Course.objects.create(code="B028451", name="Progettazione e Produzione Multimediale")
+    edition = CourseEdition.objects.create(course=course, academic_year="2025-2026")
+    RoleAssignment.objects.create(user=student, role=Role.SECRETARIAT, programme=programme)
+    RoleAssignment.objects.create(user=student, role=Role.TEACHER, edition=edition)
+
+    user = logged_in().get(ME_URL).json()["user"]
+
+    assert user["is_superuser"] is False
+    assert user["roles"] == [
+        {"role": "secretariat", "programme": "B047"},
+        {"role": "teacher", "edition": edition.pk},
+    ]
+
+
+def test_me_marks_the_superuser() -> None:
+    User.objects.create_superuser(username=USERNAME, password=PASSWORD)
+
+    user = logged_in().get(ME_URL).json()["user"]
+
+    assert (user["is_superuser"], user["roles"]) == (True, [])
 
 
 def test_registering_creates_an_account_and_signs_it_in() -> None:
@@ -202,14 +230,34 @@ def test_a_language_the_project_does_not_serve_is_refused(student: User) -> None
     assert "locale" in response.json()
 
 
-def test_the_username_cannot_be_changed_through_me(student: User) -> None:
-    """The endpoint exists to switch languages. A writable username here would
-    be an account takeover surface opened by accident."""
-    response = logged_in().patch(ME_URL, {"username": "somebody-else"}, format="json")
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("username", "somebody-else"),
+        ("is_superuser", True),
+        ("is_staff", True),
+        ("roles", [{"role": "secretariat", "programme": "B047"}]),
+    ],
+    ids=["username", "is_superuser", "is_staff", "roles"],
+)
+def test_only_the_language_can_be_changed_through_me(
+    student: User, field: str, value: object
+) -> None:
+    """The endpoint exists to switch languages. Any other writable field here
+    would be an account takeover or a privilege opened by accident."""
+    response = logged_in().patch(ME_URL, {field: value}, format="json")
     student.refresh_from_db()
 
     assert response.status_code == 200
-    assert student.username == USERNAME
+    assert response.json()["user"] == {
+        "id": student.pk,
+        "username": USERNAME,
+        "locale": student.locale,
+        "is_superuser": False,
+        "roles": [],
+    }
+    assert (student.username, student.is_superuser, student.is_staff) == (USERNAME, False, False)
+    assert not RoleAssignment.objects.exists()
 
 
 def test_changing_a_language_needs_a_login() -> None:

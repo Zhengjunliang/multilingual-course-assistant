@@ -126,7 +126,7 @@ Every endpoint needs a session except `GET /api/auth/me`, `login` and `register`
 
 | Method and path | Does |
 | --------------- | ---- |
-| `GET /api/auth/me` | who am I — **200 even when logged out**, with `{"authenticated": false}`; also sets the CSRF cookie |
+| `GET /api/auth/me` | who am I — **200 even when logged out**, with `{"authenticated": false}`; also sets the CSRF cookie. Logged in, the user carries `is_superuser` and `roles`, where the caller holds a staff role: `{"role": "teacher", "edition": <id>}` or `{"role": "secretariat", "programme": "<code>"}` |
 | `PATCH /api/auth/me` | change the interface language (`locale` is the only writable field) |
 | `POST /api/auth/login` | username + password → session cookie |
 | `POST /api/auth/logout` | end the session (204) |

@@ -11,11 +11,22 @@
 import type { UiLocale } from "@/i18n";
 import { request } from "./http";
 
+/**
+ * Where the caller holds a staff role: an edition by its id, a programme by its
+ * code. What the role allows there is answered per scope, never worked out
+ * from the role name here.
+ */
+export type RoleScope =
+  | { role: "teacher"; edition: number }
+  | { role: "secretariat"; programme: string };
+
 export interface Account {
   id: number;
   username: string;
   /** Django's spelling — `it`, `en`, `zh-hans` — which is also the interface language. */
   locale: UiLocale;
+  is_superuser: boolean;
+  roles: RoleScope[];
 }
 
 /** `authenticated: false` is an ordinary 200, not an error. */

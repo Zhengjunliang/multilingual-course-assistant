@@ -21,6 +21,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from apps.accounts.models import User
+from apps.roles.scopes import role_scopes
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -37,8 +38,15 @@ class UserSerializer(serializers.ModelSerializer[User]):
 
     `locale` is writable and nothing else is, which is what makes this serve
     `PATCH /api/auth/me` as well as `GET`. A second serializer for the update
-    would be the same two rules written twice, free to disagree.
+    would be the same two rules written twice, free to disagree. `is_superuser`
+    among the read-only fields is what keeps a `PATCH` from granting it.
+
+    `roles` names where the caller holds a staff role (apps/roles/scopes.py),
+    and only that: what a role allows on a scope is answered per scope, so the
+    SPA never works out a permission from a role name.
     """
+
+    roles = serializers.SerializerMethodField()
 
     # The suppression is unavoidable, not laziness: the stubs declare six
     # attributes on `ModelSerializer.Meta`, so any real `Meta` — which sets the
@@ -46,8 +54,11 @@ class UserSerializer(serializers.ModelSerializer[User]):
     # rule is right about the shape and wrong about this use of it.
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = User
-        fields = ("id", "username", "locale")
-        read_only_fields = ("id", "username")
+        fields = ("id", "username", "locale", "is_superuser", "roles")
+        read_only_fields = ("id", "username", "is_superuser")
+
+    def get_roles(self, user: User) -> list[dict[str, object]]:
+        return role_scopes(user)
 
 
 class RegisterSerializer(serializers.ModelSerializer[User]):
