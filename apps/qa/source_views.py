@@ -25,7 +25,7 @@ class SourceView(APIView):
     That is how Open WebUI and Onyx open a cited file: by id, behind a login, in
     the browser's viewer rather than one shipped with the page. Any logged-in
     account may read it (docs/decisions.md, 2026-09-29, *A slides citation opens
-    its whole PDF*).
+    its whole PDF, and a conversation is deleted outright*).
 
     Every miss is a 404, a key a sidecar points outside the corpus included: a
     sha256 names content, and a 404 does not confirm the content exists. The URL

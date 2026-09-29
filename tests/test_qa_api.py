@@ -28,6 +28,7 @@ would be testing nothing; CSRF, cookies and login live in
 tests/test_accounts_api.py against a real one.
 """
 
+import dataclasses
 import json
 from collections.abc import Iterator, Sequence
 from pathlib import Path
@@ -926,14 +927,76 @@ def test_reopening_a_conversation_returns_what_the_stream_delivered(
     assert answer_message["route"] == start_of(stream)["route"]
 
 
-def test_somebody_elses_conversation_is_not_there_to_open(index: QdrantClient) -> None:
+@pytest.mark.parametrize("method", ["get", "delete"], ids=["read", "delete"])
+def test_somebody_elses_conversation_is_not_there_to_open(method: str) -> None:
     """Missing rather than forbidden: a 403 would confirm the id names
-    something real."""
+    something real. A delete gets the same answer and deletes nothing."""
     stranger = User.objects.create_user(username="stranger")
     theirs = Conversation.objects.create(owner=stranger, locale="it")
 
-    assert client_for().get(f"{CONVERSATIONS_URL}/{theirs.pk}").status_code == 404
+    response = getattr(client_for(), method)(f"{CONVERSATIONS_URL}/{theirs.pk}")
+
+    assert response.status_code == 404
+    assert Conversation.objects.filter(pk=theirs.pk).exists()
 
 
-def test_the_conversation_api_needs_a_login() -> None:
-    assert client_for(anonymous=True).get(CONVERSATIONS_URL).status_code == 403
+@pytest.mark.parametrize(
+    ("method", "url"),
+    [("get", CONVERSATIONS_URL), ("delete", f"{CONVERSATIONS_URL}/1")],
+    ids=["list", "delete"],
+)
+def test_the_conversation_api_needs_a_login(method: str, url: str) -> None:
+    assert getattr(client_for(anonymous=True), method)(url).status_code == 403
+
+
+def test_a_student_deletes_their_own_conversation_and_its_messages() -> None:
+    """Deleting is hard and takes the messages with it; nothing edits a
+    conversation, since its title derives from the first question."""
+    mine = Conversation.objects.create(owner=student(), locale="it")
+    Message.objects.create(
+        conversation=mine, role=Message.Role.USER, text="?", locale="it", complete=True
+    )
+    Message.objects.create(
+        conversation=mine, role=Message.Role.ASSISTANT, text="!", locale="it", complete=True
+    )
+    url = f"{CONVERSATIONS_URL}/{mine.pk}"
+
+    assert client_for().patch(url, {"title": "x"}, format="json").status_code == 405
+    assert client_for().put(url, {"title": "x"}, format="json").status_code == 405
+    assert client_for().delete(url).status_code == 204
+    assert not Conversation.objects.filter(pk=mine.pk).exists()
+    assert not Message.objects.exists()
+
+
+class DeletingCompleter:
+    """A router that, while the question is being routed, sees the student
+    delete the conversation from another tab — the window in which a question
+    waits for the engine — and then routes as usual."""
+
+    def __init__(self, conversation_pk: int) -> None:
+        self.conversation_pk = conversation_pk
+
+    def complete(self, messages: Sequence[ChatMessage]) -> str:
+        Conversation.objects.filter(pk=self.conversation_pk).delete()
+        return SLIDES_ROUTE
+
+
+def test_a_conversation_deleted_while_its_question_waits_is_refused(
+    index: QdrantClient,
+) -> None:
+    """Refused before anything is written, and the answer slot is free after.
+
+    The lock check is an end state, not a proof of the view's `events.close()`:
+    on CPython the abandoned generator is also collected, and its `finally` run,
+    as soon as the request lets go of it. The close makes that explicit rather
+    than a property of the runtime."""
+    mine = Conversation.objects.create(owner=student(), locale="it")
+    engine = install_engine(index, SLIDES_ROUTE)
+    engine_module._HOLDER.engine = dataclasses.replace(engine, completer=DeletingCompleter(mine.pk))
+
+    response = ask(conversation_id=mine.pk)
+
+    assert response.status_code == 400
+    assert "No such conversation." in str(response.json()["conversation_id"])
+    assert engine_module._HOLDER.lock.locked() is False
+    assert not Message.objects.exists()

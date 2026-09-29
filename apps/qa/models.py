@@ -84,6 +84,9 @@ class Message(models.Model):
     incomplete. That is what the student saw, so it is what the next turn's
     history has to contain — and the fragments themselves are the raw material
     for M3's error taxonomy, which a delete-on-failure policy would throw away.
+    A student who deletes the conversation deletes them too (docs/decisions.md,
+    2026-09-29, *A slides citation opens its whole PDF, and a conversation is
+    deleted outright*).
 
     `locale` is the *rag* namespace here — a BCP-47 primary subtag, `zh` where
     `Conversation.locale` says `zh-hans` — because this is the language

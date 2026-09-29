@@ -29,6 +29,10 @@ if TYPE_CHECKING:
     from apps.qa.contract import StartEvent
 
 
+class ConversationGoneError(Exception):
+    """The conversation was deleted while its question waited for the engine."""
+
+
 def open_conversation(owner: User, existing: Conversation | None) -> Conversation:
     """The thread this question belongs to, started if it does not exist yet.
 
@@ -90,8 +94,18 @@ def record_exchange(conversation: Conversation, start: StartEvent) -> int:
     `citations` and `route` are stored now rather than at the end because now is
     when they exist: they arrive in the `start` event, which is not repeated.
     Reopening this conversation later replays it from these columns.
+
+    The question may have waited up to the queue timeout for the engine, and
+    the student may have deleted the conversation meanwhile — after Stop, or
+    from another tab. The row lock is the one the delete takes
+    (apps/qa/conversation_views.py): taken after the delete, the conversation
+    is gone and `ConversationGoneError` is raised before anything is written;
+    taken before it, the two rows are written and the delete, which waits,
+    removes them with the conversation.
     """
     with transaction.atomic():
+        if Conversation.objects.select_for_update().filter(pk=conversation.pk).first() is None:
+            raise ConversationGoneError(conversation.pk)
         Message.objects.create(
             conversation=conversation,
             role=Message.Role.USER,

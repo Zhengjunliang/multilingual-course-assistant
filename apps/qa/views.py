@@ -44,7 +44,9 @@ import logging
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from django.http import StreamingHttpResponse
+from django.utils.translation import gettext_lazy as _
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -58,7 +60,13 @@ from apps.qa.contract import (
     sse,
     sse_event,
 )
-from apps.qa.conversations import open_conversation, recent_turns, record_exchange, settle
+from apps.qa.conversations import (
+    ConversationGoneError,
+    open_conversation,
+    recent_turns,
+    record_exchange,
+    settle,
+)
 from apps.qa.engine import EngineBusyError, EngineUnavailableError, stream_answer
 from apps.qa.serializers import AskRequest
 
@@ -245,7 +253,13 @@ class AskView(APIView):
         #
         # The cast states what apps/qa/contract.py already does: a stream is one
         # `start`, then tokens, then a terminator.
-        answer_pk = record_exchange(conversation, cast("StartEvent", first))
+        try:
+            answer_pk = record_exchange(conversation, cast("StartEvent", first))
+        except ConversationGoneError:
+            # Closed here rather than left to garbage collection: closing is
+            # what runs the engine's `finally` and frees the one answer slot.
+            events.close()
+            raise ValidationError({"conversation_id": _("No such conversation.")}) from None
 
         return StreamingHttpResponse(
             _EventStream(first, events, answer_pk),
