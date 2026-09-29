@@ -2,7 +2,7 @@
 
 ## Purpose and owner
 
-This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisions.md](decisions.md), entries of 2026-09-25 and 2026-09-26, and the code and year formats and the rule that an AD code names one course by [decisions.md](decisions.md), 2026-09-28, *An AD code belongs to one course, and codes and years are written in ASCII*; the chunk field table by [docling-pipeline.md](docling-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
+This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisions.md](decisions.md), entries of 2026-09-25 and 2026-09-26, the role scopes by [decisions.md](decisions.md), 2026-09-29, *Staff permissions are a registry in code, answered by one backend; the admin is the superuser's*, and the code and year formats and the rule that an AD code names one course by [decisions.md](decisions.md), 2026-09-28, *An AD code belongs to one course, and codes and years are written in ASCII*; the chunk field table by [docling-pipeline.md](docling-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
 
 ## Entities and relationships
 

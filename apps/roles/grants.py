@@ -58,13 +58,21 @@ def grant(
     return assignment
 
 
-def revoke(actor: User, assignment: RoleAssignment) -> None:
-    """Take the role of `assignment` away from its user."""
+def revoke(actor: User, assignment: RoleAssignment) -> bool:
+    """Take the role of `assignment` away from its user; False when the row was gone already.
+
+    Deleted by primary key and logged only when a row went, so two requests
+    revoking one role at once remove it once and log it once: the second
+    waits on the first's row lock and then finds nothing to delete.
+    """
     line = (
         assignment.role,
         assignment.scope_label,
         assignment.user.get_username(),
         actor.get_username(),
     )
-    assignment.delete()
+    deleted, _ = RoleAssignment.objects.filter(pk=assignment.pk).delete()
+    if not deleted:
+        return False
     transaction.on_commit(lambda: logger.info("revoked %s on %s from %s by %s", *line))
+    return True

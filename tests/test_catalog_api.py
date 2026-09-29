@@ -4,8 +4,9 @@ What each caller gets is gathered into one mapping and compared whole, so a
 failure shows exactly which caller got what. A case that writes runs inside a
 transaction rolled back after it, so every case starts from the same world
 without building it again. Every caller logs in through `force_login`,
-which costs no password hash; the session, and with it the CSRF check a
-logged-in write goes through, is real.
+which costs no password hash, and the session is real. `APIClient` skips the
+CSRF check unless asked, and one test asks: a write without the token is
+refused.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from test_roles import everyone, label, world
 
 from apps.catalog.editions import SWITCH_NEEDS_BOTH
 from apps.catalog.models import CourseEdition
+from apps.roles.grants import revoke
 from apps.roles.models import RoleAssignment
 
 if TYPE_CHECKING:
@@ -303,6 +305,11 @@ def test_staff_requests_that_change_nothing(
         "student lists the teachers": (w.student, "get", new, None),
         "GET on a member": (w.secretariat, "get", f"{new}/newcomer", None),
         "DELETE on the collection": (w.secretariat, "delete", new, None),
+        # OPTIONS would describe a POST the caller may not make.
+        "OPTIONS on the collection": (w.continuing, "options", new, None),
+        # A key no programme or user can have is not looked up at all.
+        "a programme code with a NUL byte": (w.root, "get", secretariat("%00"), None),
+        "a username with a NUL byte": (w.root, "delete", f"{new}/%00", None),
     }
 
     seen: dict[str, object] = {}
@@ -312,10 +319,10 @@ def test_staff_requests_that_change_nothing(
     ):
         for case, (user, method, path, body) in requests.items():
             response = getattr(as_user(user), method)(path, body)
-            if response.status_code == 200:
+            if response.status_code == 200 and isinstance(response.json(), list):
                 seen[case] = (200, [member["username"] for member in response.json()])
-            elif response.status_code == 400:
-                seen[case] = (400, response.json())
+            elif response.status_code in (200, 400):
+                seen[case] = (response.status_code, response.json())
             else:
                 seen[case] = response.status_code
 
@@ -343,6 +350,48 @@ def test_staff_requests_that_change_nothing(
         "student lists the teachers": 404,
         "GET on a member": 405,
         "DELETE on the collection": 405,
+        "OPTIONS on the collection": 405,
+        "a programme code with a NUL byte": 404,
+        "a username with a NUL byte": 404,
     }
     assert RoleAssignment.objects.count() == rows
     assert grant_lines(caplog) == []
+
+
+def test_a_grant_is_logged_once_it_commits(
+    django_capture_on_commit_callbacks, caplog: pytest.LogCaptureFixture
+) -> None:
+    w = world()
+
+    with (
+        caplog.at_level("INFO", logger="apps.roles.grants"),
+        django_capture_on_commit_callbacks(execute=False) as callbacks,
+    ):
+        response = as_user(w.secretariat).post(teachers(w.ppm_new), {"username": "student"})
+    uncommitted = grant_lines(caplog)
+    with caplog.at_level("INFO", logger="apps.roles.grants"):
+        for callback in callbacks:
+            callback()
+
+    assert (response.status_code, uncommitted, len(callbacks)) == (201, [], 1)
+    assert grant_lines(caplog) == ["granted teacher on B028451:2025-2026 to student by secretariat"]
+
+
+def test_a_revocation_is_logged_once(
+    django_capture_on_commit_callbacks, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Two revocations of one row, as two requests racing would make them: one line."""
+    w = world()
+    row = RoleAssignment.objects.get(user=w.newcomer, edition=w.ppm_new)
+    stale = RoleAssignment.objects.get(pk=row.pk)
+
+    with (
+        caplog.at_level("INFO", logger="apps.roles.grants"),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        first, second = revoke(w.secretariat, row), revoke(w.secretariat, stale)
+
+    assert (first, second) == (True, False)
+    assert grant_lines(caplog) == [
+        "revoked teacher on B028451:2025-2026 from newcomer by secretariat"
+    ]

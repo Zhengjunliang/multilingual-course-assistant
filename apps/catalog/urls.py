@@ -1,6 +1,6 @@
 """URL map for the catalogue API; config/urls.py mounts it under `/api/catalog/`."""
 
-from django.urls import path
+from django.urls import path, register_converter
 
 from apps.catalog.staff_views import (
     EditionTeachersView,
@@ -10,18 +10,35 @@ from apps.catalog.staff_views import (
 )
 from apps.catalog.views import EditionListView, EditionSetCurrentView, ProgrammeListView
 
+
+class _Key:
+    """A programme code or a username: letters, digits and the marks Django's username validator
+    allows. Anything else, a NUL byte included, cannot name one, so it is a 404 before any query
+    rather than a value PostgreSQL refuses."""
+
+    regex = r"[\w.@+-]+"
+
+    def to_python(self, value: str) -> str:
+        return value
+
+    def to_url(self, value: str) -> str:
+        return value
+
+
+register_converter(_Key, "key")
+
 app_name = "catalog"
 
 urlpatterns = [
     # No trailing slash, matching the rest of the API (apps/qa/urls.py).
     path("programmes", ProgrammeListView.as_view(), name="programmes"),
     path(
-        "programmes/<str:code>/secretariat",
+        "programmes/<key:code>/secretariat",
         ProgrammeSecretariatView.as_view(),
         name="programme-secretariat",
     ),
     path(
-        "programmes/<str:code>/secretariat/<str:username>",
+        "programmes/<key:code>/secretariat/<key:username>",
         ProgrammeSecretariatMemberView.as_view(),
         name="programme-secretariat-member",
     ),
@@ -29,7 +46,7 @@ urlpatterns = [
     path("editions/<int:pk>/set-current", EditionSetCurrentView.as_view(), name="set-current"),
     path("editions/<int:pk>/teachers", EditionTeachersView.as_view(), name="edition-teachers"),
     path(
-        "editions/<int:pk>/teachers/<str:username>",
+        "editions/<int:pk>/teachers/<key:username>",
         EditionTeacherView.as_view(),
         name="edition-teacher",
     ),

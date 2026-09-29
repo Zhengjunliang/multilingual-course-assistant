@@ -1,8 +1,9 @@
 """Switching a course's current edition goes through `set_current()` alone.
 
 The switch is a service function rather than a model method, and these tests
-drive it the way the admin will: with an instance loaded earlier, which may no
-longer match the table by the time it is used. The concurrency test is the one
+drive it the way its callers do, the admin and the catalogue API: with an
+instance loaded earlier, which may no longer match the table by the time it
+is used, and, for the API, with a check on the edition it replaces. The concurrency test is the one
 test of the suite that runs with `transaction=True` — two threads switch the
 same course at once, each on a connection of its own.
 """

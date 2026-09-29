@@ -11,9 +11,9 @@ model is decided on paper before roles are built on it*, point 2). The
 administrator is Django's `is_superuser` and is not a role here.
 
 A permission is `<scope>.<action>` and applies to one kind of scope, a
-programme or an edition. A permission added for a new feature (`#97`, `#35`)
-is also a question of who may grant it: whoever holds a role can make others
-hold it.
+programme or an edition. A permission added to a role for a new feature
+(`#97`, `#35`) is also a question of who may grant it: whoever may grant the
+role (`GRANT_PERMISSION` below) hands out every permission the role carries.
 """
 
 from collections.abc import Mapping

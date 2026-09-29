@@ -5,8 +5,9 @@ any app is checked without anyone listing it here. A DRF view has said who may
 call it when the permission classes it ends up with are not the ones APIView
 falls back on, or when it decides them per request in `get_permissions()`.
 What it ends up with, not what its own class body spells: a base class may
-declare for its subclasses, and an undecorated `@api_view` or a view that only
-inherits the default has declared nothing. The default,
+declare for its subclasses, the URLconf may override both through `as_view()`,
+and an undecorated `@api_view` or a view that only inherits the default has
+declared nothing. The default,
 `DEFAULT_PERMISSION_CLASSES` in config/settings.py, stays as a safety net, but
 a route that leans on it is a finding.
 
@@ -14,8 +15,12 @@ A route anyone may call is listed in `OPEN` with the reason; so is a view that
 decides its permissions per request, since reading its code is the only way to
 see what it opens. Every other route must require a login, `IsAuthenticated`
 itself among its permission classes, so that `()`, an `OR` with `AllowAny` or
-an object check standing alone cannot pass for one. A subtree that answers
-for its own access is in `DELEGATED`.
+an object check standing alone cannot pass for one. A URL namespace that
+answers for its own access is in `DELEGATED`.
+
+What the guard cannot see is a view that overrides `initial()` or
+`check_permissions()` and skips the checks its classes name; such a view is
+read by a person, not by this file.
 
 No `django_db` marker, as in tests/test_spa.py: resolving the URL tree reads
 no database, and pytest-django refuses any query a test here would attempt.
@@ -23,7 +28,8 @@ no database, and pytest-django refuses any query a test here would attempt.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections import Counter
+from typing import TYPE_CHECKING, NamedTuple
 
 import pytest
 from django.http import HttpResponse
@@ -35,7 +41,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.roles.api import ScopedObjectView
-from apps.roles.registry import Permission
+from apps.roles.registry import Permission, roles_with
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -61,10 +67,14 @@ DELEGATED: dict[str, str] = {
 }
 
 
-def routes(
-    patterns: Sequence[URLPattern | URLResolver], namespace: str = ""
-) -> Iterator[tuple[str, Callable[..., object]]]:
-    """Every route as (its namespaced name, or its pattern when unnamed; its view)."""
+class Route(NamedTuple):
+    name: str  # namespaced, or the pattern itself when the route has no name
+    namespace: str
+    view: Callable[..., object]
+
+
+def routes(patterns: Sequence[URLPattern | URLResolver], namespace: str = "") -> Iterator[Route]:
+    """Every route, in the order Django resolves them."""
     for pattern in patterns:
         if isinstance(pattern, URLResolver):
             inner = pattern.namespace
@@ -72,7 +82,7 @@ def routes(
             yield from routes(pattern.url_patterns, nested)
         else:
             name = pattern.name or str(pattern.pattern)
-            yield (f"{namespace}:{name}" if namespace else name), pattern.callback
+            yield Route(f"{namespace}:{name}" if namespace else name, namespace, pattern.callback)
 
 
 def findings(
@@ -82,22 +92,26 @@ def findings(
 ) -> list[str]:
     """Each route that does not say who may call it, with what is wrong."""
     found: list[str] = []
-    for name, callback in routes(patterns):
-        if name.split(":")[0] in delegated:
+    for name, namespace, callback in routes(patterns):
+        if namespace.split(":")[0] in delegated:
             continue
         view = getattr(callback, "cls", None)
         if not (isinstance(view, type) and issubclass(view, APIView)):
             if name not in open_routes:
                 found.append(f"{name}: not a DRF view, and not in OPEN")
             continue
+        # What the URLconf passes to as_view() replaces the class attribute.
+        classes = getattr(callback, "initkwargs", {}).get(
+            "permission_classes", view.permission_classes
+        )
         per_request = view.get_permissions is not APIView.get_permissions
         if per_request:
             if name not in open_routes:
                 found.append(f"{name}: decides its permissions per request, and is not in OPEN")
-        elif view.permission_classes is APIView.permission_classes:
+        elif classes is APIView.permission_classes:
             found.append(f"{name}: declares no permission_classes")
         elif name not in open_routes and not any(
-            permission is IsAuthenticated for permission in view.permission_classes
+            permission is IsAuthenticated for permission in classes
         ):
             found.append(f"{name}: does not require a login, and is not in OPEN")
     return found
@@ -169,6 +183,14 @@ class _InheritsTheDeclaration(_DeclaredByItsBase):
         pytest.param(_ObjectCheckAlone.as_view(), False, True, id="object-check-alone"),
         pytest.param(_AllowAny.as_view(), False, True, id="AllowAny-not-in-OPEN"),
         pytest.param(_plain, False, True, id="plain-function-view"),
+        pytest.param(_PerRequest.as_view(), False, True, id="per-request-not-in-OPEN"),
+        # The URLconf may override what the class declares.
+        pytest.param(
+            _InheritsTheDeclaration.as_view(permission_classes=(AllowAny,)),
+            False,
+            True,
+            id="overridden-in-the-urlconf",
+        ),
         pytest.param(_PerRequest.as_view(), True, False, id="per-request-in-OPEN"),
         pytest.param(_InheritsTheDeclaration.as_view(), False, False, id="declared-by-its-base"),
     ],
@@ -183,9 +205,16 @@ def test_a_route_that_says_nothing_is_reported(
     assert [finding.split(":")[0] for finding in found] == (["route"] if reported else [])
 
 
+def test_a_delegated_namespace_is_matched_as_a_namespace() -> None:
+    """A route merely named like a delegated namespace is checked like any other."""
+    found = findings([path("admin", _OnlyAPIView.as_view())], {}, {"admin": "a reason"})
+
+    assert [finding.split(":")[0] for finding in found] == ["admin"]
+
+
 def test_the_walk_reaches_every_app() -> None:
     """Without this, a walk that stopped descending would find nothing wrong."""
-    reached = {name for name, _ in routes(get_resolver().url_patterns)}
+    reached = {route.name for route in routes(get_resolver().url_patterns)}
 
     assert reached >= {
         "accounts:me",
@@ -198,17 +227,29 @@ def test_the_walk_reaches_every_app() -> None:
 
 
 def test_every_exemption_names_a_route() -> None:
-    reached = {name for name, _ in routes(get_resolver().url_patterns)}
+    reached = Counter(route.name for route in routes(get_resolver().url_patterns))
+    namespaces = {route.namespace.split(":")[0] for route in routes(get_resolver().url_patterns)}
 
-    assert set(OPEN) <= reached
-    assert all(any(name.startswith(f"{space}:") for name in reached) for space in DELEGATED)
+    # Exactly once: a second route of the same name would share the exemption.
+    assert {name: reached[name] for name in OPEN} == dict.fromkeys(OPEN, 1)
+    assert set(DELEGATED) <= namespaces
+
+
+def scoped_views() -> dict[str, type[ScopedObjectView]]:
+    """The scoped views the URL tree mounts, by route name."""
+    return {
+        route.name: view
+        for route in routes(get_resolver().url_patterns)
+        if isinstance(view := getattr(route.view, "cls", None), type)
+        and issubclass(view, ScopedObjectView)
+    }
 
 
 def test_every_permission_guards_a_route() -> None:
     """No permission in the registry is dead: some routed view filters or checks by it."""
     guarded: set[object] = set()
-    for _, callback in routes(get_resolver().url_patterns):
-        view = getattr(callback, "cls", None)
+    for route in routes(get_resolver().url_patterns):
+        view = getattr(route.view, "cls", None)
         guarded.add(getattr(view, "visible_with", None))
         guarded |= set(getattr(view, "scope_map", {}).values())
 
@@ -217,18 +258,27 @@ def test_every_permission_guards_a_route() -> None:
 
 def test_each_scoped_view_maps_every_method_it_serves() -> None:
     """A method a scoped view serves but does not map would be refused to everyone."""
-    served: dict[str, set[str]] = {}
-    mapped: dict[str, set[str]] = {}
-    for name, callback in routes(get_resolver().url_patterns):
-        view = getattr(callback, "cls", None)
-        if isinstance(view, type) and issubclass(view, ScopedObjectView):
-            # HEAD follows GET and OPTIONS is DRF's own; both need GET's entry.
-            served[name] = {
-                method.upper()
-                for method in view.http_method_names
-                if method not in ("head", "options") and hasattr(view, method)
-            }
-            mapped[name] = set(view.scope_map)
+    views = scoped_views()
+    # HEAD follows GET, so it needs no entry of its own.
+    served = {
+        name: {m.upper() for m in view.http_method_names if m != "head" and hasattr(view, m)}
+        for name, view in views.items()
+    }
 
     assert served
-    assert served == mapped
+    assert served == {name: set(view.scope_map) for name, view in views.items()}
+
+
+def test_whoever_may_act_on_a_scope_may_see_it() -> None:
+    """Without this, a caller holding a write but not the view would get a 404 for a 403.
+
+    A scoped view hides what its caller may not see, so every role holding a
+    permission its `scope_map` names must hold the view permission too.
+    """
+    unseen = {
+        (name, permission): roles_with(permission) - roles_with(view.visible_with)
+        for name, view in scoped_views().items()
+        for permission in view.scope_map.values()
+    }
+
+    assert {cell: roles for cell, roles in unseen.items() if roles} == {}

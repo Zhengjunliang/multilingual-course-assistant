@@ -112,9 +112,10 @@ DATABASES = {
 # Swapped from the first migration: see apps/accounts/models.py.
 AUTH_USER_MODEL = "accounts.User"
 
-# Order matters. A session records the first backend that can load its user, and
-# only ModelBackend can: RoleBackend authenticates nobody and answers scoped
-# permissions from role rows alone (apps/roles/backends.py).
+# ModelBackend first. A login records the backend that authenticated the user,
+# but the test client's force_login() takes the first backend that has a
+# get_user(), and RoleBackend's loads nobody: it authenticates no one and
+# answers scoped permissions from role rows alone (apps/roles/backends.py).
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "apps.roles.backends.RoleBackend",

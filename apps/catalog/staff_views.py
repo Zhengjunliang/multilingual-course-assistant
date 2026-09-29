@@ -9,7 +9,8 @@ resolved, and checked, before anything else (apps/roles/api.py).
 Who may grant a role is the assign table, `GRANT_PERMISSION` in
 apps/roles/registry.py: holding its permission on the role's scope. A collection
 view serves `GET` and `POST` and a member view `DELETE` alone, so each view's
-methods are exactly the keys of its `scope_map`, and any other method is a 405.
+methods are exactly the keys of its `scope_map`; `HEAD` follows `GET`, and any
+other method, `OPTIONS` included, is a 405.
 """
 
 from __future__ import annotations
@@ -74,9 +75,8 @@ class _StaffList[M: (CourseEdition, DegreeProgramme)](_Staff[M]):
 class _StaffMember[M: (CourseEdition, DegreeProgramme)](_Staff[M]):
     def delete(self, request: Request, username: str, **kwargs: object) -> Response:
         row = self.rows().filter(user__username=username).first()
-        if row is None:
+        if row is None or not revoke(cast("User", request.user), row):
             raise Http404
-        revoke(cast("User", request.user), row)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
