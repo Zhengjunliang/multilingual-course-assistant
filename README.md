@@ -153,6 +153,12 @@ The stream is `start` (route and citations, once, before generation) → `token`
 
 The first request takes about a minute while the models load into GPU memory. Answers are served one at a time — 8 GB cannot hold two concurrent rerank + generation passes — and a request that waits in the queue longer than 90 s gets a 503 with `Retry-After`. Closing the stream cancels the generation and frees the queue. A 503 carries `reason`: `busy` (worth retrying) or `unavailable` (the model server is down). Once the first event has gone out the status is 200 whatever happens, so a generation that dies midway is an `error` event.
 
+| Method and path | Does |
+| --------------- | ---- |
+| `GET /api/sources/<sha256>` | the PDF a slides citation came from, inline, for any logged-in account; the key is the `source_sha256` a citation carries, looked up in the parse sidecars and never a path; a sidecar pointing outside `data/corpus/` is skipped, and every miss is a 404 ([apps/qa/sources.py](apps/qa/sources.py)) |
+
+🔜 M5 `#36`: it serves only the editions the caller's search reaches, through the same scope function — a consistency rule, not a protection, since the programme is self-declared ([docs/data-model.md](docs/data-model.md), scope invariant 3).
+
 ## Multi-turn conversations
 
 `POST /api/ask` takes an optional `conversation_id` to continue a conversation; without it a new one starts, and its id arrives in the `start` event.
@@ -176,7 +182,7 @@ The deepening loop is not in this endpoint: it fetches pages and writes to the s
 | ---- | -------- |
 | `config/` | Django project: `settings.py` (security headers conditional on `DEBUG` and `DJANGO_BEHIND_TLS`) · `urls.py` (with the SPA fallback) · `views.py` (the one non-API view, the SPA shell) · `env.py` (`.env` through pydantic-settings, shared by `rag/` and Django) · asgi/wsgi |
 | `apps/accounts/` | Accounts: custom `User` = `AbstractUser` + `locale` · serializers for register, login and the account · session login and the CSRF cookie in `views.py` · `urls.py` · `admin.py` |
-| `apps/qa/` | QA API: `contract.py` (SSE contract, single source) · `serializers.py` · `models.py` (`Conversation`, `Message`, history window) · `conversations.py` (the chain's only ORM access) · `engine.py` (process-wide models + serial `stream_answer()`, reusing `rag/`, zero queries) · `views.py` (HTTP, SSE framing, when the answer is stored) · `conversation_views.py` · `urls.py` · `admin.py` |
+| `apps/qa/` | QA API: `contract.py` (SSE contract, single source) · `serializers.py` · `models.py` (`Conversation`, `Message`, history window) · `conversations.py` (the chain's only ORM access) · `engine.py` (process-wide models + serial `stream_answer()`, reusing `rag/`, zero queries) · `views.py` (HTTP, SSE framing, when the answer is stored) · `conversation_views.py` · `sources.py` (which corpus PDF a sha256 names) · `source_views.py` · `urls.py` · `admin.py` |
 | `apps/catalog/` | The university catalogue: `models.py` (`DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`, and the database constraints that keep them consistent) · `editions.py` (`set_current()`, the one way to change a course's current edition) · `admin.py` (the four tables, and the `set_as_current` action that switches an edition through `set_current()`) · `migrations/` |
 | `rag/` | The RAG pipeline — **must never import Django**, so the thesis core runs and is evaluated without the web. `probe` · `parse` · `crawl` · `webparse` · `chunk` · `index` · `search` · `llm` (OpenAI-compatible client, pydantic JSON validation) · `answer` · `agent` (routing, read-only control flow) · `live` (query-time fetch, relevance gate, writes to the shared index, rollback) · `gold` · `golddraft` (drafts gold questions for human review) |
 | `frontend/` | React SPA: `src/api/` (contract mirror, SSE parser, CSRF-aware requests, account and conversation calls) · `src/auth/` (session context, route guard) · `src/routes/` (login, register, chat, styleguide) · `src/features/chat/` (question state machine, turn rendering) · `src/components/` (account dialog and menu; `ui/` shadcn-style primitives) · `src/lib/markers.ts` · `src/theme/` · `src/i18n/` (three catalogues) · `src/test/` · `scripts/` (catalogue and contrast gates) · `public/fonts/` |

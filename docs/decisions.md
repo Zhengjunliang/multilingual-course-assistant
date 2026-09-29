@@ -2,6 +2,12 @@
 
 This file owns the decisions taken without the supervisor that are in force: the date, what was decided, why, and what it costs. A reversed decision is removed, and the entry that replaces it says what it replaced; `git log -p --follow docs/decisions.md` keeps the old text. ⛔ Not here: the stack table and the state of each choice's verification, owned by [architecture.md](architecture.md); progress, blockers and deferred work, owned by GitHub issues (milestones M3 · M4 · M5 · M6 · M7).
 
+## 2026-09-29 — A slides citation opens its whole PDF
+
+1. **The PDF a slides citation came from is served whole and inline to any logged-in account, keyed by its sha256, and every miss is a 404.** `GET /api/sources/<sha256>` finds the file through the parse sidecars and serves it only from inside the corpus directory, never from a path the client sends (`apps/qa/sources.py`); the source card links it at `#page=N`, so the browser's own viewer opens the cited page.
+   **Why:** Open WebUI and Onyx open a cited file the same way — by id, behind authentication, in the browser's viewer (outside the repository: Open WebUI and Onyx source). An in-page viewer would ship pdf.js, whose worker alone is 374 kB gzipped, more than the whole first-load bundle. A 404 for a key the endpoint will not serve does not confirm the content exists; Onyx answers a file the caller may not read with a 404 for the same reason.
+   **The price:** registration is open, so anyone who registers can download whole decks, more than the excerpts `POST /api/ask` shows. `#36` makes this endpoint follow the scope function retrieval uses, which is consistency and not protection: the programme is self-declared ([data-model.md](data-model.md), scope invariant 3). What narrows the exposure is the registration policy and the roles of `#93`, and for uploaded material the visibility rules of `#35`. The sidecars record absolute paths, so the corpus is served only on the machine that parsed it.
+
 ## 2026-09-28 — Slides points carry their edition, and a re-index replaces a source file within it
 
 1. **`rag.parse` requires `--course` and `--academic-year` instead of inferring the course from the target directory name.** Both flags are `required=True`; `main()` checks the pair against `rag.chunk.edition_of` before touching a file and refuses through `parser.error` on a malformed one.
