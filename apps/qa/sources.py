@@ -42,7 +42,10 @@ def source_pdf(sha256: str) -> Path | None:
     for sidecar in sorted(PARSED_DIR.glob("*.meta.json")):
         try:
             meta = ParsedMeta.model_validate_json(sidecar.read_bytes())
-        except ValidationError:
+        # OSError too: a sidecar removed mid-scan, a file another process holds,
+        # a directory whose name ends in `.meta.json`. None of them is a reason
+        # for a 500 instead of the next sidecar.
+        except (ValidationError, OSError):
             logger.warning("skipping unreadable sidecar %s", sidecar.name)
             continue
         if meta.kind != "slides" or meta.source_sha256 != sha256:

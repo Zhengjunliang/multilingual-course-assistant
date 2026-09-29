@@ -43,8 +43,13 @@ class SourceView(APIView):
         path = source_pdf(sha256)
         if path is None:
             raise Http404
+        try:
+            handle = path.open("rb")
+        except OSError:
+            # Gone or locked since `source_pdf` looked: a miss like any other.
+            raise Http404 from None
         response = FileResponse(
-            path.open("rb"),
+            handle,
             content_type="application/pdf",
             as_attachment=False,
             filename=path.name,

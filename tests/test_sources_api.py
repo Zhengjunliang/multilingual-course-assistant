@@ -77,6 +77,9 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     page = corpus / "web" / "p602.pdf"
     page.write_bytes(WEB_PAGE)
     write_sidecar(parsed, "p602", page, WEB_SHA, kind="web")
+    # Matched by the sidecar glob and unreadable as a file: a key that scans
+    # every sidecar reaches it, and must get the 404 of any other miss.
+    (parsed / "zz-a-directory.meta.json").mkdir()
 
     monkeypatch.setattr(sources, "PARSED_DIR", parsed)
     monkeypatch.setattr(sources, "CORPUS_DIR", corpus)

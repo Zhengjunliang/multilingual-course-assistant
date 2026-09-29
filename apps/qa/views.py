@@ -259,7 +259,9 @@ class AskView(APIView):
             # Closed here rather than left to garbage collection: closing is
             # what runs the engine's `finally` and frees the one answer slot.
             events.close()
-            raise ValidationError({"conversation_id": _("No such conversation.")}) from None
+            # A list, as the serializer's own refusal of an unknown id has it
+            # (apps/qa/serializers.py): one error, one shape, whenever it is found.
+            raise ValidationError({"conversation_id": [_("No such conversation.")]}) from None
 
         return StreamingHttpResponse(
             _EventStream(first, events, answer_pk),

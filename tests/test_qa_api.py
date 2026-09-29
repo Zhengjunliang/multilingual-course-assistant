@@ -984,21 +984,31 @@ class DeletingCompleter:
 
 
 def test_a_conversation_deleted_while_its_question_waits_is_refused(
-    index: QdrantClient,
+    index: QdrantClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Refused before anything is written, and the answer slot is free after.
+    """Refused before anything is written, in the serializer's shape for an
+    unknown id, and with the answer slot freed by the view itself.
 
-    The lock check is an end state, not a proof of the view's `events.close()`:
-    on CPython the abandoned generator is also collected, and its `finally` run,
-    as soon as the request lets go of it. The close makes that explicit rather
-    than a property of the runtime."""
+    The test keeps a reference to the engine's generator. Without it, CPython
+    would collect the abandoned generator as the request ends and run its
+    `finally` anyway, so the lock check could not tell the view's
+    `events.close()` from the runtime's."""
     mine = Conversation.objects.create(owner=student(), locale="it")
     engine = install_engine(index, SLIDES_ROUTE)
     engine_module._HOLDER.engine = dataclasses.replace(engine, completer=DeletingCompleter(mine.pk))
+    kept = []
+
+    def keeping(*args: Any, **kwargs: Any) -> Any:
+        events = engine_module.stream_answer(*args, **kwargs)
+        kept.append(events)
+        return events
+
+    monkeypatch.setattr(views_module, "stream_answer", keeping)
 
     response = ask(conversation_id=mine.pk)
 
     assert response.status_code == 400
-    assert "No such conversation." in str(response.json()["conversation_id"])
+    assert response.json() == {"conversation_id": ["No such conversation."]}
+    assert len(kept) == 1
     assert engine_module._HOLDER.lock.locked() is False
     assert not Message.objects.exists()
