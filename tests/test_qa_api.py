@@ -53,6 +53,7 @@ from apps.qa import views as views_module
 from apps.qa.engine import Engine
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from apps.qa.serializers import MAX_QUESTION_CHARS
+from config.env import env
 from rag import index as rag_index
 from rag import search as rag_search
 from rag.chunk import Chunk
@@ -609,6 +610,23 @@ def test_a_failed_build_releases_the_index_and_is_not_cached(
     # Raises if the failed build left its client open.
     reopened = open_client(path)
     reopened.close()
+
+
+def test_a_qdrant_url_the_client_cannot_parse_is_a_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    """config/env.py checks only the scheme; qdrant-client parses the rest when
+    the client is built. A failure there is converted like any other build
+    failure, so no frame holding `env` reaches Django's debug page."""
+    monkeypatch.setattr(env, "qdrant_url", "http://127.0.0.1:65536")
+
+    def unreachable(*_: object, **__: object) -> object:
+        pytest.fail("the build went past the Qdrant client")
+
+    monkeypatch.setattr(rag_index, "cached_dense_encoder", unreachable)
+
+    response = ask()
+
+    assert response.status_code == 503
+    assert engine_module._HOLDER.engine is None
 
 
 def test_an_anonymous_question_is_refused(index: QdrantClient) -> None:

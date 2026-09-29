@@ -260,9 +260,12 @@ def build_engine() -> Engine:
     from rag.llm import build_completer, build_streamer
     from rag.search import DEFAULT_RERANK_MODEL, build_reranker
 
-    # QDRANT_URL (config/env.py): the server every process shares.
-    client = open_client()
+    client = None
     try:
+        # QDRANT_URL (config/env.py): the server every process shares. A URL
+        # the client cannot parse (a port past 65535) fails here, and is
+        # converted like any other build failure.
+        client = open_client()
         # Greedy decoding stated rather than inherited, matching the CLIs: the
         # same question must produce the same answer across two runs of a gate.
         return Engine(
@@ -284,7 +287,8 @@ def build_engine() -> Engine:
         # piling up with every retry. Converting the failure also matters on its
         # own: an exception escaping here carries a frame holding `env`, and
         # Django's debug page prints frame locals verbatim.
-        client.close()
+        if client is not None:
+            client.close()
         logger.exception("engine build failed")
         raise EngineUnavailableError(
             _("The question service could not start. See the server log.")
