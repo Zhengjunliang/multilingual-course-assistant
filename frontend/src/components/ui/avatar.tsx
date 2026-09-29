@@ -14,7 +14,7 @@
 
 import { cn } from "@/lib/utils";
 
-export interface AvatarProps {
+interface AvatarProps {
   /** Shown as its first letter, uppercased. An empty name renders no letter. */
   name: string;
   className?: string;

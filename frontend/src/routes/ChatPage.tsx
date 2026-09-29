@@ -29,6 +29,7 @@ import { ConversationSidebar } from "@/features/chat/ConversationSidebar";
 import { EmptyState } from "@/features/chat/EmptyState";
 import { TurnView } from "@/features/chat/TurnView";
 import { useAsk } from "@/features/chat/useAsk";
+import { scrollBehavior } from "@/lib/utils";
 
 export default function ChatPage() {
   const { t } = useTranslation();
@@ -104,7 +105,7 @@ export default function ChatPage() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: turns is the trigger
   useEffect(() => {
     if (waiting.phase === "streaming" || waiting.phase === "queued") {
-      bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      bottom.current?.scrollIntoView({ behavior: scrollBehavior(), block: "end" });
     }
   }, [waiting.phase, turns]);
 

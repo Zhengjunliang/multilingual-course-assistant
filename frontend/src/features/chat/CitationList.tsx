@@ -5,7 +5,7 @@ import type { Citation } from "@/api/contract";
 import { sourceHref } from "@/api/sources";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Badge } from "@/lib/markers";
-import { cn } from "@/lib/utils";
+import { cn, scrollBehavior } from "@/lib/utils";
 
 /**
  * How many source cards stand in the strip before the rest are folded away.
@@ -54,7 +54,7 @@ export function CitationList({
       if (!expanded) setExpanded(true);
       return;
     }
-    card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    card.scrollIntoView({ behavior: scrollBehavior(), block: "nearest", inline: "center" });
   }, [highlighted, expanded]);
 
   if (citations.length === 0) {

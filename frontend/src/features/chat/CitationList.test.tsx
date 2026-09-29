@@ -110,6 +110,30 @@ describe("the source strip", () => {
     unmount();
   });
 
+  it("scrolls to the highlighted card without animation when the reader asks for less motion", () => {
+    // jsdom answers every media query `false` (test/setup.ts) and does not
+    // scroll, so both are stood in for here, and put back whatever happens.
+    const matchMedia = window.matchMedia;
+    const scrollIntoView = Element.prototype.scrollIntoView;
+    const behaviors: (ScrollBehavior | undefined)[] = [];
+    try {
+      window.matchMedia = (query: string) =>
+        ({
+          ...matchMedia(query),
+          matches: query === "(prefers-reduced-motion: reduce)",
+        }) as MediaQueryList;
+      Element.prototype.scrollIntoView = (options?: boolean | ScrollIntoViewOptions) => {
+        behaviors.push(typeof options === "object" ? options.behavior : undefined);
+      };
+      mounted(CITATIONS, "[Excerpt 2]").unmount();
+    } finally {
+      window.matchMedia = matchMedia;
+      Element.prototype.scrollIntoView = scrollIntoView;
+    }
+
+    expect(behaviors).toEqual(["auto"]);
+  });
+
   it("fills the badge that opens a source", () => {
     expect(strip()).toContain("bg-mark");
   });
