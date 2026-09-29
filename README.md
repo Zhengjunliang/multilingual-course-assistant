@@ -157,7 +157,7 @@ The first request takes about a minute while the models load into GPU memory. An
 | --------------- | ---- |
 | `GET /api/sources/<sha256>` | the PDF a slides citation came from, inline, for any logged-in account; the key is the `source_sha256` a citation carries, looked up in the parse sidecars and never a path; a sidecar pointing outside `data/corpus/` is skipped, and every miss is a 404 ([apps/qa/sources.py](apps/qa/sources.py)) |
 
-🔜 M5 `#36`: it serves only the editions the caller's search reaches, through the same scope function — a consistency rule, not a protection, since the programme is self-declared ([docs/data-model.md](docs/data-model.md), scope invariant 3).
+🔜 M5 `#36`: it serves only the decks of courses in the caller's programme, past editions included — consistency with retrieval, not a protection, since the programme is self-declared ([docs/data-model.md](docs/data-model.md), scope invariant 3).
 
 ## Multi-turn conversations
 
