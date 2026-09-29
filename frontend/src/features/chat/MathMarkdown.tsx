@@ -20,9 +20,19 @@ import { AnswerMarkdown, type AnswerMarkdownProps } from "./AnswerMarkdown";
 // A formula KaTeX cannot parse is shown as its source in the text colour: the
 // default #cc0000 would be the only colour on an achromatic page. `trust` keeps
 // its default, false, so `\href` and `\includegraphics` in a model's formula do
-// nothing.
-const REHYPE: Options["rehypePlugins"] = [[rehypeKatex, { errorColor: "currentColor" }]];
+// nothing. `maxSize` bounds a rule or a space, which KaTeX leaves unbounded.
+const REHYPE: Options["rehypePlugins"] = [
+  [rehypeKatex, { errorColor: "currentColor", maxSize: 10 }],
+];
 
 export default function MathMarkdown(props: AnswerMarkdownProps) {
-  return <AnswerMarkdown {...props} rehypePlugins={REHYPE} />;
+  return (
+    // Painting stays inside the answer: a negative skip such as `\\[-30em]`
+    // is not bounded by `maxSize`, and would otherwise draw over the sources
+    // above. A display formula wider than the column scrolls on its own
+    // rather than widening the page.
+    <div className="min-w-0 contain-paint [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden">
+      <AnswerMarkdown {...props} rehypePlugins={REHYPE} />
+    </div>
+  );
 }

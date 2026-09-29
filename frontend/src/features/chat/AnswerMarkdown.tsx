@@ -28,6 +28,7 @@ import {
   Children,
   type ComponentProps,
   createContext,
+  type ReactElement,
   type ReactNode,
   useContext,
   useMemo,
@@ -37,7 +38,7 @@ import remarkCjkFriendly from "remark-cjk-friendly";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
-import { type Badge, remarkPills } from "@/lib/markers";
+import { type Badge, remarkPills, withoutPills } from "@/lib/markers";
 import { cn } from "@/lib/utils";
 
 interface Pills {
@@ -90,8 +91,11 @@ function CitationPill({ number }: { number?: string }) {
  */
 export function safeUrl(url: string): string | undefined {
   try {
-    const { protocol } = new URL(url);
-    return protocol === "http:" || protocol === "https:" ? url : undefined;
+    // The parsed form, not the text: `https:evil.example` parses to
+    // https://evil.example/ here, where there is no base, and would be a path
+    // of this site in the browser, which reads it against the page.
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : undefined;
   } catch {
     return undefined;
   }
@@ -164,17 +168,20 @@ function Link({ href, children, node }: ComponentProps<"a"> & ExtraProps) {
  *
  * The item keeps the model's single line breaks (`whitespace-pre-line`), and a
  * loose list puts a newline between its paragraphs, which would then show up as
- * an empty line.
+ * an empty line. Only those go: the space between two inline elements of a
+ * tight item, `**Prima rata** *30/09*`, is text.
  */
 function ListItem({ children }: ComponentProps<"li">) {
   const kept = Children.toArray(children).filter(
-    (child) => !(typeof child === "string" && child.trim() === ""),
+    (child) => !(typeof child === "string" && child.trim() === "" && child.includes("\n")),
   );
   return <li className="whitespace-pre-line">{kept}</li>;
 }
 
-function heading({ children }: { children?: ReactNode }) {
-  return <p className="font-semibold text-body text-ink">{children}</p>;
+// The class passes through: GFM labels a footnote section with a heading it
+// marks `sr-only`, in English whatever the interface language.
+function heading({ children, className }: { children?: ReactNode; className?: string }) {
+  return <p className={cn("font-semibold text-body text-ink", className)}>{children}</p>;
 }
 
 const COMPONENTS = {
@@ -245,18 +252,27 @@ export function AnswerMarkdown({ text, badges, onBadgeClick, rehypePlugins }: An
   );
   const pills = useMemo(() => ({ badges, onBadgeClick }), [badges, onBadgeClick]);
 
+  // Called as a function, not rendered as an element, so that a throw lands
+  // here. Parsing and tree building recurse, and an answer nested a few
+  // thousand quotes deep exhausts the stack; there is no error boundary above
+  // this, and the answer is stored, so a throw would blank the conversation
+  // every time it is reopened. Such an answer is shown as the text it is.
+  let body: ReactElement;
+  try {
+    body = Markdown({
+      children: text,
+      remarkPlugins,
+      rehypePlugins,
+      urlTransform: safeUrl,
+      components: COMPONENTS,
+    });
+  } catch {
+    body = <p className="whitespace-pre-wrap">{withoutPills(text, badges)}</p>;
+  }
+
   return (
     <PillContext value={pills}>
-      <div className="flex min-w-0 flex-col gap-snug text-ink leading-relaxed">
-        <Markdown
-          remarkPlugins={remarkPlugins}
-          rehypePlugins={rehypePlugins}
-          urlTransform={safeUrl}
-          components={COMPONENTS}
-        >
-          {text}
-        </Markdown>
-      </div>
+      <div className="flex min-w-0 flex-col gap-snug text-ink leading-relaxed">{body}</div>
     </PillContext>
   );
 }

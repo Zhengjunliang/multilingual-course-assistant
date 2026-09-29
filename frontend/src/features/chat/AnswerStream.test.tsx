@@ -86,6 +86,10 @@ describe("an answer", () => {
       `${SLIDES} Le tasse scadono.`,
       '<p class="whitespace-pre-line"><button',
     ],
+    // Two links micromark leaves alone and GFM's later pass finds, running to
+    // the next ASCII space: after full-width punctuation, and inside a `[`.
+    ["after a link found late", `详情见官网（www.unifi.it）${WEB}的说明。`, "</a><button"],
+    ["inside an open bracket", `[vedi https://x.it/a${SLIDES}]`, "</a><button"],
   ])("makes one pill of a marker %s, with no link inside it", (_, text, around) => {
     const html = answer(text);
 
@@ -98,9 +102,37 @@ describe("an answer", () => {
 
   it("leaves markers as text until the answer is complete", () => {
     const html = answer(`Le tasse scadono il 30 settembre ${SLIDES}.`, false);
+    // Sentinel characters a model wrote itself are not a pill either.
+    const spelled = answer(`Vedi ${PILL_OPEN}1${PILL_CLOSE}.`, false);
 
     expect(html).toContain(SLIDES);
     expect(html).not.toContain("<button");
+    expect(spelled).not.toContain("<button");
+  });
+
+  it("keeps the space between two inline elements of a list item", () => {
+    expect(answer("- **Prima rata** *30/09*")).toContain(
+      "<strong>Prima rata</strong> <em>30/09</em>",
+    );
+  });
+
+  it("hides the label GFM gives a footnote section", () => {
+    // It is English whatever the interface language; screen readers keep it.
+    expect(answer("Scade il 30[^1].\n\n[^1]: Regolamento.")).toMatch(
+      /class="[^"]*sr-only[^"]*"[^>]*>Footnotes/,
+    );
+  });
+
+  it("links to the URL it checked, not to a spelling the browser reads as relative", () => {
+    // `https:evil.example` parses to https://evil.example/ without a base, and
+    // to a path of this site with one: the href must be the first.
+    expect(answer("[login](https:evil.example)")).toContain('href="https://evil.example/"');
+  });
+
+  it("shows an answer nested too deep to draw as its plain text, markers included", () => {
+    // Thousands of nested quotes exhaust the parser's recursion. Thrown, that
+    // would blank the stored conversation every time it is reopened.
+    expect(answer(`${">".repeat(3000)} x ${SLIDES}`)).toContain(`x ${SLIDES}`);
   });
 
   it.each([
@@ -139,6 +171,18 @@ describe("an answer", () => {
     expect(after).toContain(`<annotation encoding="application/x-tex">${formula}</annotation>`);
   });
 
+  it("caps the size of what a formula may draw", async () => {
+    // A formula repeated from a hostile page could paint a block over the
+    // sources above it; KaTeX leaves sizes unbounded unless told otherwise.
+    await import("./MathMarkdown");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const html = answer(String.raw`Vedi $$\rule{60em}{30em}$$.`);
+    expect(html).toContain('class="katex"');
+    // The source stays in the annotation; the drawn rule is what is capped.
+    expect(html).not.toContain("width:60em");
+  });
+
   it("bolds Chinese text that ends in full-width punctuation", () => {
     expect(answer("**注意：**请按时缴费。")).toContain("<strong>注意：</strong>请按时缴费。");
   });
@@ -150,6 +194,12 @@ describe("an answer", () => {
     ["an image", "![grafico](https://attacker.example/p.png?q=1)", "grafico", "attacker.example"],
     ["a link with no host", "[x](https://)", ">x<", "<a"],
     ["a stray private-use character", `a ${PILL_OPEN} b &#xE000; c`, "a  b  c", "<button"],
+    [
+      "a pill spelled with character references",
+      "see &#xE000;1&#xE001; now",
+      "see 1 now",
+      "<button",
+    ],
   ])("keeps %s inert", (_, text, shown, absent) => {
     const html = answer(text);
 

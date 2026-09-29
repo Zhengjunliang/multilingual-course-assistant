@@ -128,7 +128,10 @@ export function citedMarkers(answer: string, badges: readonly Badge[]): Set<stri
  * BREAK is there for one parser rule. A GFM autolink runs until whitespace, and
  * a private-use character is not whitespace, so `https://x.it/a` followed by
  * OPEN would swallow the badge into the link. U+FEFF counts as whitespace to
- * micromark (it tests `/\s/`, as JavaScript does), so it ends the link.
+ * micromark (it tests `/\s/`, as JavaScript does), so it ends the link. GFM has
+ * a second pass for the links micromark leaves alone — after full-width
+ * punctuation, inside an open `[` — which stops only at an ASCII space; there
+ * `remarkPills` cuts the link where the badge begins.
  */
 export const PILL_OPEN = String.fromCharCode(0xe000);
 export const PILL_CLOSE = String.fromCharCode(0xe001);
@@ -136,6 +139,10 @@ export const PILL_BREAK = String.fromCharCode(0xfeff);
 
 const SENTINELS = new RegExp(`[${PILL_OPEN}${PILL_CLOSE}${PILL_BREAK}]`, "g");
 const PILL = new RegExp(`${PILL_OPEN}([0-9]+)${PILL_CLOSE}`, "g");
+const PILL_START = new RegExp(`[${PILL_BREAK}${PILL_OPEN}]`);
+// The sentinels written as character references, which the parser would decode
+// into sentinels after `withPills` had cleaned the answer.
+const SENTINEL_REFERENCES = /&#(?:x0*(?:e000|e001|feff)|0*(?:57344|57345|65279));/gi;
 const WHITESPACE = /\s/;
 
 /**
@@ -146,6 +153,12 @@ const WHITESPACE = /\s/;
  * needs the `**` to touch a non-space to open. A run that closes something,
  * `**Nota.**[m]`, gets BREAK: after punctuation, `**` closes only before
  * whitespace or punctuation, and a private-use character is neither.
+ *
+ * A run is taken to open only at the start or after whitespace, so a rarer
+ * spelling such as `(**[m] testo**)` keeps its asterisks, and `[m]_nota_` its
+ * underscores: what the marker stood for between the delimiters is no longer
+ * punctuation. Telling every opener from every closer would take the parser's
+ * own delimiter rules.
  */
 function needsBreak(text: string, at: number): boolean {
   let run = at;
@@ -157,12 +170,13 @@ function needsBreak(text: string, at: number): boolean {
 /**
  * A complete answer with each marker replaced by its sentinel, ready to parse.
  *
- * Any sentinel character already in the answer goes first: the characters are
- * this format's, and a stray one would read as half a badge. What comes before
+ * Any sentinel character already in the answer goes first, spelled out or as a
+ * character reference: the characters are this format's, and a stray one would
+ * read as half a badge, or as a badge the answer never cited. What comes before
  * a marker is read off that cleaned answer, the text the parser will see.
  */
 export function withPills(answer: string, badges: readonly Badge[]): string {
-  const clean = answer.replace(SENTINELS, "");
+  const clean = answer.replace(SENTINEL_REFERENCES, "").replace(SENTINELS, "");
   return segmentAnswer(clean, badges)
     .map((segment) => {
       if (segment.kind === "text") return segment.text;
@@ -183,8 +197,25 @@ export interface MdNode {
   type: string;
   value?: string;
   alt?: string | null;
+  url?: string;
   children?: MdNode[];
   data?: { hName?: string; hProperties?: Record<string, string> };
+}
+
+function numbered(badges: readonly Badge[]): Map<string, Badge> {
+  return new Map(badges.map((badge) => [String(badge.number), badge]));
+}
+
+/** Sentinels written back as the markers they stand for, and strays dropped. */
+function restored(value: string, byNumber: ReadonlyMap<string, Badge>): string {
+  return value
+    .replace(PILL, (_, number: string) => byNumber.get(number)?.marker ?? number)
+    .replace(SENTINELS, "");
+}
+
+/** A `withPills` answer as plain prose again, for when it cannot be drawn as Markdown. */
+export function withoutPills(text: string, badges: readonly Badge[]): string {
+  return restored(text, numbered(badges));
 }
 
 /** Where a sentinel is shown as the marker it stands for: text a badge cannot sit in. */
@@ -206,12 +237,9 @@ const IMAGES = new Set(["image", "imageReference"]);
  * stored, and a throw would blank the conversation every time it is reopened.
  */
 export function remarkPills(badges: readonly Badge[]) {
-  const byNumber = new Map(badges.map((badge) => [String(badge.number), badge]));
+  const byNumber = numbered(badges);
 
-  const literal = (value: string) =>
-    value
-      .replace(PILL, (_, number: string) => byNumber.get(number)?.marker ?? number)
-      .replace(SENTINELS, "");
+  const literal = (value: string) => restored(value, byNumber);
 
   const split = (value: string): MdNode[] => {
     const nodes: MdNode[] = [];
@@ -238,12 +266,34 @@ export function remarkPills(badges: readonly Badge[]) {
     return nodes;
   };
 
+  /**
+   * A link GFM found after parsing, run on into a badge: cut where the badge
+   * begins, and the rest back to prose. Only such an autolink has a URL that
+   * reaches a sentinel, and its one text child is the URL as written.
+   */
+  const cutLink = (link: MdNode): MdNode[] | null => {
+    const [only] = link.children ?? [];
+    const at = link.url?.search(PILL_START) ?? -1;
+    const textAt = only?.value?.search(PILL_START) ?? -1;
+    if (link.url === undefined || only?.value === undefined || at < 1 || textAt < 1) return null;
+    return [
+      {
+        ...link,
+        url: link.url.slice(0, at),
+        children: [{ ...only, value: only.value.slice(0, textAt) }],
+      },
+      ...split(only.value.slice(textAt)),
+    ];
+  };
+
   const visit = (node: MdNode, inLink: boolean) => {
     if (LITERAL_VALUES.has(node.type) && node.value !== undefined) node.value = literal(node.value);
     if (IMAGES.has(node.type) && typeof node.alt === "string") node.alt = literal(node.alt);
     if (node.children === undefined) return;
     const literalText = inLink || LINKS.has(node.type);
     node.children = node.children.flatMap((child) => {
+      const cut = child.type === "link" && child.children?.length === 1 ? cutLink(child) : null;
+      if (cut !== null) return cut;
       if (child.type !== "text" || child.value === undefined) {
         visit(child, literalText);
         return [child];
