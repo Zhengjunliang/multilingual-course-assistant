@@ -6,21 +6,28 @@ its rows are entered in the admin.
 `permissions` is how the SPA knows which buttons to offer, without working
 anything out from role names: it is `permissions_on()` (apps/roles/scopes.py)
 read from the marks the list query already put on each row, so a list costs
-the same number of queries however long it is. The rows must come from
-`editions_for` / `programmes_for`; a row read any other way has no marks, and
-the serializer fails on it rather than reporting an empty set.
+the same number of queries however long it is. An edition also says whether
+the caller may make it current, `can_set_current()` read from the same kind of
+mark, and who teaches it, from rows the list query prefetched. The rows must
+come from the catalogue views' querysets (apps/catalog/views.py); a row read
+any other way has no marks, and the serializer fails on it rather than
+reporting an empty set.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from apps.accounts.models import User
 from apps.catalog.models import Course, CourseEdition, DegreeProgramme
-from apps.roles.scopes import permissions_on
+from apps.roles.scopes import can_set_current, permissions_on
+
+# Where the catalogue views' edition queryset puts each edition's teacher rows
+# (apps/catalog/views.py).
+TEACHER_ROWS = "teacher_rows"
 
 
 # `ModelSerializer[...]` for the reason apps/accounts/serializers.py gives, and
@@ -44,19 +51,6 @@ class ProgrammeSerializer(serializers.ModelSerializer[DegreeProgramme]):
         return sorted(permissions_on(self.context["request"].user, programme))
 
 
-class EditionSerializer(serializers.ModelSerializer[CourseEdition]):
-    course = CourseSerializer(read_only=True)
-    permissions = serializers.SerializerMethodField()
-
-    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
-        model = CourseEdition
-        fields = ("id", "course", "academic_year", "is_current", "permissions")
-        read_only_fields = fields
-
-    def get_permissions(self, edition: CourseEdition) -> list[str]:
-        return sorted(permissions_on(self.context["request"].user, edition))
-
-
 class StaffMemberSerializer(serializers.Serializer):
     """A member of a scope's staff: shown by id and username, and named by username to add one.
 
@@ -73,3 +67,34 @@ class StaffMemberSerializer(serializers.Serializer):
         except User.DoesNotExist:
             raise serializers.ValidationError({"username": [_("No such user.")]}) from None
         return attrs
+
+
+class EditionSerializer(serializers.ModelSerializer[CourseEdition]):
+    course = CourseSerializer(read_only=True)
+    teachers = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
+    can_set_current = serializers.SerializerMethodField()
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        model = CourseEdition
+        fields = (
+            "id",
+            "course",
+            "academic_year",
+            "is_current",
+            "teachers",
+            "permissions",
+            "can_set_current",
+        )
+        read_only_fields = fields
+
+    def get_teachers(self, edition: CourseEdition) -> list[dict[str, Any]]:
+        users = [row.user for row in getattr(edition, TEACHER_ROWS)]
+        # A list at run time: the stubs type `.data` as a dict whatever `many` says.
+        return cast("list[dict[str, Any]]", StaffMemberSerializer(users, many=True).data)
+
+    def get_permissions(self, edition: CourseEdition) -> list[str]:
+        return sorted(permissions_on(self.context["request"].user, edition))
+
+    def get_can_set_current(self, edition: CourseEdition) -> bool:
+        return can_set_current(self.context["request"].user, edition)

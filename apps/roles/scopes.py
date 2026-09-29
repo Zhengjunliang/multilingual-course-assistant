@@ -10,7 +10,8 @@ and each item's `permissions` all read it, so the three cannot disagree.
 Each role is a boolean annotation on the scope rows. `Exists` rather than a
 join through the role rows: a user covering an edition twice — its teacher and
 its programme's secretariat — still yields one row, with no `distinct()`, and
-a list stays one query however many rows it holds.
+a list stays one query however many rows it holds. Whether a switch would
+pass is one more annotation of the same kind (`with_switch()`).
 
 A caller with no account, or a disabled one, covers nothing. An active
 superuser covers everything and holds every permission of each scope, as
@@ -27,6 +28,7 @@ from typing import TYPE_CHECKING, cast
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import Exists, OuterRef, Q, QuerySet
 
+from apps.catalog.editions import current_besides
 from apps.catalog.models import CourseEdition, DegreeProgramme
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import (
@@ -52,6 +54,8 @@ _EDITION_FLAGS: Mapping[Role, str] = MappingProxyType(
     {Role.TEACHER: "as_teacher", Role.SECRETARIAT: "as_secretariat"}
 )
 _PROGRAMME_FLAGS: Mapping[Role, str] = MappingProxyType({Role.SECRETARIAT: "as_secretariat"})
+# The mark `with_switch()` puts on an edition row.
+_MAY_REPLACE = "may_replace"
 
 
 def _active(user: Caller) -> User | None:
@@ -150,6 +154,40 @@ def permissions_on(user: Caller, scope: CourseEdition | DegreeProgramme) -> froz
         return scoped
     held: frozenset[Permission] = frozenset().union(*(ROLE_PERMISSIONS[r] for r in covering))
     return held & scoped
+
+
+def with_switch(editions: QuerySet[CourseEdition], user: Caller) -> QuerySet[CourseEdition]:
+    """`editions`, each marked with whether `user` may replace what a switch to it would clear.
+
+    That is the second of the two checks a switch makes (apps/catalog/views.py):
+    true when the course has no other current edition, or when `user` holds
+    `edition.set_current` on it. The other current edition is `current_besides()`,
+    the same filter `set_current()` clears by, and "holds on it" is
+    `editions_for()`, which tests/test_roles.py proves equal to `has_perm`, the
+    check the switch itself asks.
+    """
+    replaced = current_besides(OuterRef("course"), OuterRef("pk"))
+    return editions.annotate(
+        **{
+            _MAY_REPLACE: ~Exists(CourseEdition.objects.filter(replaced))
+            | Exists(editions_for(user, Permission.EDITION_SET_CURRENT).filter(replaced))
+        }
+    )
+
+
+def can_set_current(user: Caller, edition: CourseEdition) -> bool:
+    """Whether a switch by `user` to `edition` would pass, from the marks of its row.
+
+    Both ends: `edition.set_current` on the edition itself, and the replaced
+    edition's mark from `with_switch()`. Not whether the edition is current
+    already: a switch to the current edition changes nothing and passes, so
+    the flag stays exactly the switch's answer, and a page that hides the
+    action on the current row decides that for itself. A row read without
+    `with_switch()` raises `AttributeError` rather than passing for one that
+    may not switch.
+    """
+    may_replace: bool = getattr(edition, _MAY_REPLACE)
+    return may_replace and Permission.EDITION_SET_CURRENT in permissions_on(user, edition)
 
 
 def held_on(user: Caller, scope: CourseEdition | DegreeProgramme) -> frozenset[Permission]:
