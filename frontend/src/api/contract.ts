@@ -28,6 +28,11 @@ export interface Citation {
   text: string;
   heading_path: string[];
   course: string;
+  /**
+   * With `course`, the edition a slides excerpt came from; `null` for web.
+   * Absent from citations stored before it existed, so compare with `!= null`.
+   */
+  academic_year: string | null;
   locale: string;
   score: number;
   source_file: string;

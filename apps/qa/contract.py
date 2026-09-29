@@ -64,8 +64,10 @@ class Citation(BaseModel):
     citation also carries `source_sha256`, the key under which
     `GET /api/sources/<sha256>` serves its PDF (apps/qa/source_views.py); a web
     citation carries None there and adds `url` and `fetch_date`, the page a
-    student can open. A citation stored before a field existed lacks it
-    (docs/data-model.md, migration order).
+    student can open. With `course`, a slides citation's `academic_year` names
+    the edition the excerpt came from (`B028451`, `2025-2026`); None for web.
+    A citation stored before a field existed lacks it (docs/data-model.md,
+    migration order).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -75,6 +77,7 @@ class Citation(BaseModel):
     text: str
     heading_path: list[str]
     course: str
+    academic_year: str | None
     locale: str
     score: float
     source_file: str
@@ -92,6 +95,9 @@ class Citation(BaseModel):
             text=chunk.text,
             heading_path=chunk.heading_path,
             course=chunk.course,
+            # By kind, like `source_sha256`: an edition is a slides notion, and
+            # a web chunk that happens to carry a year names no edition.
+            academic_year=chunk.academic_year if chunk.kind == "slides" else None,
             locale=chunk.locale,
             score=hit.score,
             source_file=chunk.source_file,

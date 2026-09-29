@@ -26,6 +26,7 @@ function citation(marker: string, page: number): Citation {
     text: `Excerpt behind ${marker}.`,
     heading_path: [],
     course: "test",
+    academic_year: "2025-2026",
     locale: "it",
     score: 0.5,
     source_file: "deck.pdf",
@@ -130,9 +131,9 @@ describe("the source strip", () => {
   });
 
   it.each(["slides", "web", "legacy"])(
-    "offers the PDF page of a %s card only when it has one",
+    "offers the PDF page and the edition of a %s card only when it has them",
     (shape) => {
-      const slides = citation("[deck.pdf p.3]", 3);
+      const slides = { ...citation("[deck.pdf p.3]", 3), course: "B028451" };
       const card: Citation =
         shape === "slides"
           ? slides
@@ -141,12 +142,15 @@ describe("the source strip", () => {
                 ...slides,
                 kind: "web",
                 source_sha256: null,
+                academic_year: null,
                 url: "https://www.unifi.it/p602.html",
                 fetch_date: "2026-09-20",
               }
-            : // Stored before the key existed: the field is missing, not null.
+            : // Stored before the fields existed: missing, not null.
               (Object.fromEntries(
-                Object.entries(slides).filter(([field]) => field !== "source_sha256"),
+                Object.entries(slides).filter(
+                  ([field]) => field !== "source_sha256" && field !== "academic_year",
+                ),
               ) as unknown as Citation);
       const html = render(
         <CitationList
@@ -160,6 +164,7 @@ describe("the source strip", () => {
       const link = `href="/api/sources/${"ab".repeat(32)}#page=3"`;
 
       expect(html.includes(link)).toBe(shape === "slides");
+      expect(html.includes("B028451 · 2025-2026")).toBe(shape === "slides");
       if (shape === "slides") expect(html).toContain('target="_blank"');
     },
   );

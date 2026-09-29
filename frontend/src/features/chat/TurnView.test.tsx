@@ -33,6 +33,7 @@ function citation(marker: string, page: number): Citation {
     text: `Excerpt behind ${marker}.`,
     heading_path: [],
     course: "test",
+    academic_year: "2025-2026",
     locale: "it",
     score: 0.5,
     source_file: "deck.pdf",

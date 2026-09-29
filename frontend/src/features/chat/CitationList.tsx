@@ -140,6 +140,15 @@ export function CitationList({
                       )}
                       {unused ? ` · ${t("citations.uncited")}` : null}
                     </p>
+                    {/* The edition, as code and year: the way Open edX course
+                        runs and UniFi's Moodle titles name one, and identifiers
+                        that need no translation. A web card has none, and a
+                        card stored before the field existed shows nothing. */}
+                    {citation.kind === "slides" && citation.academic_year != null && (
+                      <p className="font-mono text-caption text-muted">
+                        {citation.course} · {citation.academic_year}
+                      </p>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {citation.url !== null && (

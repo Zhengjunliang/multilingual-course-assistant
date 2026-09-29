@@ -16,6 +16,7 @@ function cite(marker: string): Citation {
     text: "",
     heading_path: [],
     course: "PPM",
+    academic_year: "2025-2026",
     locale: "en",
     score: 0,
     source_file: "deck.pdf",

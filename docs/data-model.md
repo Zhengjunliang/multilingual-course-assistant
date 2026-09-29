@@ -64,4 +64,4 @@ erDiagram
 
 Student uploads visible only to their author are deferred (`#36`): they would add one nullable `owner` column on `CourseMaterial`, an additive change.
 
-④ is not a Django migration and reads no table: it needs only the course codes and years that ① records, not roles or content, so the issue that owns ① may run it before its own tables land. Stored history is not rewritten: `Message.citations[].course` keeps `"PPM"`.
+④ is not a Django migration and reads no table: it needs only the course codes and years that ① records, not roles or content, so the issue that owns ① may run it before its own tables land. Stored history is not rewritten: `Message.citations[].course` keeps `"PPM"`, and a citation stored before `source_sha256` and `academic_year` joined `Citation` (`apps/qa/contract.py`) has neither, so its card opens no PDF and shows no edition.
