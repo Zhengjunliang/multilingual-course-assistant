@@ -134,8 +134,8 @@ export const PILL_OPEN = String.fromCharCode(0xe000);
 export const PILL_CLOSE = String.fromCharCode(0xe001);
 export const PILL_BREAK = String.fromCharCode(0xfeff);
 
-const SENTINELS = /[﻿]/g;
-const PILL = /(\d+)/g;
+const SENTINELS = new RegExp(`[${PILL_OPEN}${PILL_CLOSE}${PILL_BREAK}]`, "g");
+const PILL = new RegExp(`${PILL_OPEN}([0-9]+)${PILL_CLOSE}`, "g");
 const WHITESPACE = /\s/;
 
 /**

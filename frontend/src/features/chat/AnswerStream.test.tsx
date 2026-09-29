@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { PILL_OPEN } from "@/lib/markers";
+import { PILL_BREAK, PILL_CLOSE, PILL_OPEN } from "@/lib/markers";
 import { render } from "@/test/render";
 import { AnswerStream } from "./AnswerStream";
 
@@ -37,7 +37,7 @@ function count(html: string, fragment: string): number {
   return html.split(fragment).length - 1;
 }
 
-const SENTINEL = /[﻿]/;
+const SENTINEL = new RegExp(`[${PILL_OPEN}${PILL_CLOSE}${PILL_BREAK}]`);
 
 describe("an answer", () => {
   it("renders the Markdown a model writes: lists, bold, tables, code and quotes", () => {
