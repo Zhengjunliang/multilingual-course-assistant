@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
+import i18n from "@/i18n";
 import { type Mounted, mount } from "@/test/mount";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
@@ -76,6 +77,11 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   const method = init.method ?? "GET";
   if (method === "GET" && path === "/api/conversations") return json(conversations);
   if (method === "GET" && path === "/api/conversations/7") return json(STORED);
+  if (method === "DELETE" && path.startsWith("/api/conversations/")) {
+    const id = Number(path.slice("/api/conversations/".length));
+    conversations = conversations.filter((row) => row.id !== id);
+    return new Response(null, { status: 204 });
+  }
   if (method === "POST" && path === "/api/ask") {
     const { question } = JSON.parse(String(init.body)) as { question: string };
     conversations = [
@@ -135,10 +141,34 @@ function askFromTheFrontDoor(container: HTMLElement) {
   act(() => container.querySelector<HTMLButtonElement>("main button")?.click());
 }
 
+/** Deletes a conversation from its sidebar row, through the confirmation dialog. */
+function deleting(title: string) {
+  return (container: HTMLElement) => {
+    const label = i18n.t("sidebar.delete", { title });
+    const row = [...container.querySelectorAll<HTMLButtonElement>("aside button")].find(
+      (button) => button.getAttribute("aria-label") === label,
+    );
+    act(() => row?.click());
+    // The dialog is portalled to the body, outside the container.
+    const confirm = [
+      ...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'),
+    ].find((button) => button.textContent === i18n.t("sidebar.deleteConfirm"));
+    act(() => confirm?.click());
+  };
+}
+
+const OTHER: ConversationSummary = {
+  id: 8,
+  locale: "it",
+  created_at: "2026-09-27T10:00:00Z",
+  title: "Quando scadono le tasse?",
+};
+
 describe("the chat page's address", () => {
   beforeEach(() => {
     conversations = [
       { id: STORED.id, locale: STORED.locale, created_at: STORED.created_at, title: STORED.title },
+      OTHER,
     ];
     vi.stubGlobal("fetch", fakeApi);
   });
@@ -150,7 +180,21 @@ describe("the chat page's address", () => {
   it.each([
     { name: "opening a new conversation", from: "/c/7", step: openNewConversation, lands: "/" },
     { name: "asking on / moves to /c/9", from: "/", step: askFromTheFrontDoor, lands: "/c/9" },
-  ])("$name lands on $lands, and stays there", async ({ from, step, lands }) => {
+    {
+      name: "deleting the open conversation",
+      from: "/c/7",
+      step: deleting(STORED.title),
+      lands: "/",
+      gone: "/c/7",
+    },
+    {
+      name: "deleting another conversation",
+      from: "/c/7",
+      step: deleting(OTHER.title),
+      lands: "/c/7",
+      gone: "/c/8",
+    },
+  ])("$name lands on $lands, and stays there", async ({ from, step, lands, gone }) => {
     const { container, unmount } = page(from);
     await settle();
 
@@ -160,9 +204,13 @@ describe("the chat page's address", () => {
     // A second round: a bounce is an effect reacting to the first landing.
     await settle();
     const stayed = pathname(container);
+    const row = gone === undefined ? null : container.querySelector(`aside a[href="${gone}"]`);
     unmount();
 
     expect(landed).toBe(lands);
     expect(stayed).toBe(lands);
+    // The deleted row is off the refreshed sidebar, which is also what proves
+    // the step found its button: a missed click would leave it there.
+    expect(row).toBeNull();
   });
 });

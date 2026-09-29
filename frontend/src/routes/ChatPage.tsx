@@ -20,7 +20,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { isRefusal } from "@/api/client";
 import type { ConversationSummary } from "@/api/conversations";
-import { listConversations, readConversation } from "@/api/conversations";
+import { deleteConversation, listConversations, readConversation } from "@/api/conversations";
 import { useSession } from "@/auth/useSession";
 import { AccountMenu } from "@/components/AccountMenu";
 import { ChatShell, type SidebarControls } from "@/features/chat/ChatShell";
@@ -112,9 +112,38 @@ export default function ChatPage() {
     void submit(question).then(refreshSidebar);
   };
 
+  // The URL is this component's, so leaving a deleted conversation is decided
+  // here, and only once the server has said it is gone: navigating first would
+  // show an empty page for a conversation that may still exist. `replace` so
+  // the back button does not lead to it.
+  const onDelete = useCallback(
+    async (id: number) => {
+      try {
+        await deleteConversation(id);
+      } catch (error) {
+        refused(error);
+        refreshSidebar();
+        return false;
+      }
+      if (conversationId === String(id)) void navigate("/", { replace: true });
+      refreshSidebar();
+      return true;
+    },
+    [conversationId, navigate, refreshSidebar, refused],
+  );
+
+  // The conversation an answer is being written into. `retrying` counts: the
+  // question is still on its way to the server.
+  const busy =
+    waiting.phase === "queued" || waiting.phase === "streaming" || waiting.phase === "retrying"
+      ? ask.conversationId
+      : null;
+
   const sidebar = ({ onNavigate, onCollapse }: SidebarControls) => (
     <ConversationSidebar
       conversations={conversations}
+      busy={busy}
+      onDelete={onDelete}
       onNavigate={onNavigate}
       onCollapse={onCollapse}
     />

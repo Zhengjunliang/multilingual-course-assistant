@@ -22,7 +22,14 @@
     "open": "Apri le conversazioni",
     "collapse": "Chiudi la barra laterale",
     "expand": "Apri la barra laterale",
-    "unreadable": "Questa conversazione non è disponibile."
+    "unreadable": "Questa conversazione non è disponibile.",
+    "delete": "Elimina «{{title}}»",
+    "deleteTitle": "Eliminare questa conversazione?",
+    "deleteBody": "«{{title}}» e le sue risposte vengono eliminate definitivamente.",
+    "deleteConfirm": "Elimina",
+    "cancel": "Annulla",
+    "deleteBusy": "Attendi che la risposta sia completa",
+    "deleteFailed": "Non è stato possibile eliminare la conversazione."
   },
   "account": {
     "title": "Account",

@@ -1,13 +1,25 @@
-import { MessageSquarePlus, PanelLeft } from "lucide-react";
+import { MessageSquarePlus, PanelLeft, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
 import type { ConversationSummary } from "@/api/conversations";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 interface ConversationSidebarProps {
   conversations: readonly ConversationSummary[];
+  /**
+   * The conversation whose answer is queued, streaming or retrying, which
+   * cannot be deleted until it settles; `null` when nothing is being answered.
+   */
+  busy: number | null;
+  /**
+   * Deletes a conversation and resolves to whether the server did. The page
+   * owns the URL, so leaving a deleted conversation is its job, not this one's.
+   */
+  onDelete: (id: number) => Promise<boolean>;
   /** Called after navigation so the narrow-screen drawer can close itself. */
   onNavigate?: () => void;
   /** Closes the wide-screen column. Absent on narrow screens, where the drawer wins. */
@@ -16,10 +28,35 @@ interface ConversationSidebarProps {
 
 export function ConversationSidebar({
   conversations,
+  busy,
+  onDelete,
   onNavigate,
   onCollapse,
 }: ConversationSidebarProps) {
   const { t } = useTranslation();
+  const [pending, setPending] = useState<ConversationSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const titleOf = (conversation: ConversationSummary) =>
+    conversation.title || t("sidebar.untitled");
+
+  const close = () => {
+    setPending(null);
+    setFailed(false);
+  };
+
+  // The dialog stays open until the server has answered: closing it first
+  // would say "deleted" about a conversation that may still be there.
+  const confirm = async () => {
+    if (pending === null) return;
+    setDeleting(true);
+    setFailed(false);
+    const deleted = await onDelete(pending.id);
+    setDeleting(false);
+    if (deleted) close();
+    else setFailed(true);
+  };
 
   return (
     // Its own colour, and the reason is that it is rendered in two places: the
@@ -74,13 +111,13 @@ export function ConversationSidebar({
         ) : (
           <ul className="flex flex-col gap-hair">
             {conversations.map((conversation) => (
-              <li key={conversation.id}>
+              <li key={conversation.id} className="group flex items-center gap-hair">
                 <NavLink
                   to={`/c/${conversation.id}`}
                   onClick={onNavigate}
                   className={({ isActive }) =>
                     cn(
-                      "block truncate rounded-md px-tight py-tight text-body transition-colors",
+                      "block min-w-0 flex-1 truncate rounded-md px-tight py-tight text-body transition-colors",
                       // The open conversation is where the reader *is*, not
                       // something they are about to do: ink and a quiet fill,
                       // the same rule the language switch follows.
@@ -90,13 +127,55 @@ export function ConversationSidebar({
                     )
                   }
                 >
-                  {conversation.title || t("sidebar.untitled")}
+                  {titleOf(conversation)}
                 </NavLink>
+                {/* Shown on hover or focus from `lg` up, where there is a
+                    pointer; always in the narrow drawer, where there is none.
+                    Disabled while this conversation's answer is being written:
+                    the question would be refused and the half answer lost. */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 lg:opacity-0 lg:focus-visible:opacity-100 lg:group-hover:opacity-100"
+                  aria-label={t("sidebar.delete", { title: titleOf(conversation) })}
+                  title={busy === conversation.id ? t("sidebar.deleteBusy") : undefined}
+                  disabled={busy === conversation.id}
+                  onClick={() => setPending(conversation)}
+                >
+                  <Trash2 aria-hidden className="size-icon" />
+                </Button>
               </li>
             ))}
           </ul>
         )}
       </nav>
+
+      <Dialog
+        open={pending !== null}
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
+        title={t("sidebar.deleteTitle")}
+        description={
+          pending === null ? undefined : t("sidebar.deleteBody", { title: titleOf(pending) })
+        }
+        closeLabel={t("sidebar.cancel")}
+      >
+        {failed && (
+          <p className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
+            {t("sidebar.deleteFailed")}
+          </p>
+        )}
+        <div className="flex justify-end gap-tight">
+          <Button type="button" variant="outline" onClick={close}>
+            {t("sidebar.cancel")}
+          </Button>
+          <Button type="button" disabled={deleting} onClick={() => void confirm()}>
+            {t("sidebar.deleteConfirm")}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

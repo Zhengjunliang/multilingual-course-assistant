@@ -22,7 +22,14 @@
     "open": "Open conversations",
     "collapse": "Close the sidebar",
     "expand": "Open the sidebar",
-    "unreadable": "That conversation is not available."
+    "unreadable": "That conversation is not available.",
+    "delete": "Delete \"{{title}}\"",
+    "deleteTitle": "Delete this conversation?",
+    "deleteBody": "\"{{title}}\" and its answers are deleted for good.",
+    "deleteConfirm": "Delete",
+    "cancel": "Cancel",
+    "deleteBusy": "Wait for the answer to finish",
+    "deleteFailed": "The conversation could not be deleted."
   },
   "account": {
     "title": "Account",

@@ -44,3 +44,8 @@ export function listConversations(): Promise<ConversationSummary[]> {
 export function readConversation(id: number): Promise<ConversationDetail> {
   return request<ConversationDetail>(`/api/conversations/${id}`);
 }
+
+/** Deletes the conversation and its messages for good; the server answers 204. */
+export function deleteConversation(id: number): Promise<void> {
+  return request<void>(`/api/conversations/${id}`, { method: "DELETE" });
+}
