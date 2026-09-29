@@ -113,3 +113,145 @@ export function segmentAnswer(answer: string, badges: readonly Badge[]): Segment
 export function citedMarkers(answer: string, badges: readonly Badge[]): Set<string> {
   return new Set(badges.filter((badge) => answer.includes(badge.marker)).map((b) => b.marker));
 }
+
+/*
+ * Markers through Markdown.
+ *
+ * A marker cannot go through the Markdown parser as itself: a web marker holds
+ * a URL, and GFM would autolink it and split the badge in two. So once the
+ * answer is complete each marker becomes a sentinel — OPEN, the badge number,
+ * CLOSE, all characters no model writes and no Markdown syntax reacts to — and
+ * `remarkPills` turns the sentinels back into badges in the parsed tree.
+ * LibreChat carries its citations through the parse the same way. Encoding and
+ * decoding live here together because they are one format.
+ *
+ * BREAK is there for one parser rule. A GFM autolink runs until whitespace, and
+ * a private-use character is not whitespace, so `https://x.it/a` followed by
+ * OPEN would swallow the badge into the link. U+FEFF counts as whitespace to
+ * micromark (it tests `/\s/`, as JavaScript does), so it ends the link.
+ */
+export const PILL_OPEN = String.fromCharCode(0xe000);
+export const PILL_CLOSE = String.fromCharCode(0xe001);
+export const PILL_BREAK = String.fromCharCode(0xfeff);
+
+const SENTINELS = /[﻿]/g;
+const PILL = /(\d+)/g;
+const WHITESPACE = /\s/;
+
+/**
+ * Whether the character before a marker needs BREAK between them.
+ *
+ * Only when that character could continue a URL. Not at the start or after
+ * whitespace, and not after an emphasis run that opens there — `**[m] text**`
+ * needs the `**` to touch a non-space to open. A run that closes something,
+ * `**Nota.**[m]`, gets BREAK: after punctuation, `**` closes only before
+ * whitespace or punctuation, and a private-use character is neither.
+ */
+function needsBreak(text: string, at: number): boolean {
+  let run = at;
+  while (run > 0 && (text[run - 1] === "*" || text[run - 1] === "_")) run -= 1;
+  const before = text[run - 1];
+  return before !== undefined && !WHITESPACE.test(before);
+}
+
+/**
+ * A complete answer with each marker replaced by its sentinel, ready to parse.
+ *
+ * Any sentinel character already in the answer goes first: the characters are
+ * this format's, and a stray one would read as half a badge. What comes before
+ * a marker is read off that cleaned answer, the text the parser will see.
+ */
+export function withPills(answer: string, badges: readonly Badge[]): string {
+  const clean = answer.replace(SENTINELS, "");
+  return segmentAnswer(clean, badges)
+    .map((segment) => {
+      if (segment.kind === "text") return segment.text;
+      const pill = `${PILL_OPEN}${segment.badge.number}${PILL_CLOSE}`;
+      return needsBreak(clean, segment.at) ? PILL_BREAK + pill : pill;
+    })
+    .join("");
+}
+
+/**
+ * The few fields of an mdast node this touches.
+ *
+ * A local shape rather than `@types/mdast`: that package reaches this project
+ * only through react-markdown, and importing it would lean on a dependency
+ * nobody declared.
+ */
+export interface MdNode {
+  type: string;
+  value?: string;
+  alt?: string | null;
+  children?: MdNode[];
+  data?: { hName?: string; hProperties?: Record<string, string> };
+}
+
+/** Where a sentinel is shown as the marker it stands for: text a badge cannot sit in. */
+const LITERAL_VALUES = new Set(["code", "inlineCode", "math", "inlineMath", "html"]);
+const LINKS = new Set(["link", "linkReference"]);
+const IMAGES = new Set(["image", "imageReference"]);
+
+/**
+ * Turns the sentinels of `withPills` back into badges, as a remark plugin.
+ *
+ * A badge becomes a `citation-pill` element, a name no Markdown, rehype plugin
+ * or KaTeX output can produce, so the component that draws it is the only one
+ * that can. Where a badge cannot sit — code, math, raw HTML, a link's text (the
+ * badge is a button, and a button inside a link is invalid), an image's alt —
+ * the sentinel is written back as the marker's own text.
+ *
+ * Nothing here throws, whatever the model wrote. A number with no badge behind
+ * it and a sentinel without its pair are dropped to plain text: the answer is
+ * stored, and a throw would blank the conversation every time it is reopened.
+ */
+export function remarkPills(badges: readonly Badge[]) {
+  const byNumber = new Map(badges.map((badge) => [String(badge.number), badge]));
+
+  const literal = (value: string) =>
+    value
+      .replace(PILL, (_, number: string) => byNumber.get(number)?.marker ?? number)
+      .replace(SENTINELS, "");
+
+  const split = (value: string): MdNode[] => {
+    const nodes: MdNode[] = [];
+    let cursor = 0;
+    const text = (slice: string) => {
+      const cleaned = slice.replace(SENTINELS, "");
+      if (cleaned !== "") nodes.push({ type: "text", value: cleaned });
+    };
+    for (const match of value.matchAll(PILL)) {
+      const number = match[1] ?? "";
+      text(value.slice(cursor, match.index));
+      if (byNumber.has(number)) {
+        nodes.push({
+          type: "citationPill",
+          children: [],
+          data: { hName: "citation-pill", hProperties: { number } },
+        });
+      } else {
+        text(number);
+      }
+      cursor = match.index + match[0].length;
+    }
+    text(value.slice(cursor));
+    return nodes;
+  };
+
+  const visit = (node: MdNode, inLink: boolean) => {
+    if (LITERAL_VALUES.has(node.type) && node.value !== undefined) node.value = literal(node.value);
+    if (IMAGES.has(node.type) && typeof node.alt === "string") node.alt = literal(node.alt);
+    if (node.children === undefined) return;
+    const literalText = inLink || LINKS.has(node.type);
+    node.children = node.children.flatMap((child) => {
+      if (child.type !== "text" || child.value === undefined) {
+        visit(child, literalText);
+        return [child];
+      }
+      if (literalText) return [{ ...child, value: literal(child.value) }];
+      return split(child.value);
+    });
+  };
+
+  return (tree: MdNode) => visit(tree, false);
+}

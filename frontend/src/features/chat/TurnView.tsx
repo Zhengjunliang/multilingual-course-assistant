@@ -11,9 +11,15 @@
  * while the answer is still being written — which is the whole difference
  * between waiting at a blank screen and watching work happen. Underneath the
  * answer they were a footnote to something already read.
+ *
+ * `memo` because a settled turn has nothing to redraw while another one
+ * streams, and parsing its Markdown on every token would be most of the work on
+ * screen. Shallow comparison is enough: `useAsk` replaces only the turn being
+ * answered and keeps every other turn object as it was.
  */
 
 import { Search } from "lucide-react";
+import { memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { badgesOf, citedMarkers, resolveExcerptRefs } from "@/lib/markers";
@@ -54,9 +60,17 @@ function Thinking() {
   );
 }
 
-export function TurnView({ turn, live, thinking, highlighted, onHighlight }: TurnViewProps) {
+export const TurnView = memo(function TurnView({
+  turn,
+  live,
+  thinking,
+  highlighted,
+  onHighlight,
+}: TurnViewProps) {
   const { t } = useTranslation();
-  const badges = badgesOf(turn.citations);
+  // Kept by identity: the answer's badges hang off this array, and a new one on
+  // every render would redraw them.
+  const badges = useMemo(() => badgesOf(turn.citations), [turn.citations]);
   // Resolution waits for `complete` for the same reason marker matching does:
   // "[Excerpt 2]" is routinely split across two token events.
   const answer = turn.complete ? resolveExcerptRefs(turn.answer, turn.citations) : turn.answer;
@@ -119,4 +133,4 @@ export function TurnView({ turn, live, thinking, highlighted, onHighlight }: Tur
       </div>
     </article>
   );
-}
+});

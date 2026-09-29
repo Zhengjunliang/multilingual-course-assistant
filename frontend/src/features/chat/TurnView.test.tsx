@@ -14,6 +14,7 @@
  * that by naming the tag; a mounted turn answers it with `closest`.
  */
 
+import { act, useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import type { Citation, RouteDecision } from "@/api/contract";
@@ -130,5 +131,40 @@ describe("the order of a turn", () => {
 
     expect(html).toContain("Fonti");
     expect(html).toContain("Sto cercando");
+  });
+});
+
+/** The page's wiring of the highlight (ChatPage.tsx), around one turn. */
+function Highlighting({ of }: { of: Turn }) {
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  return (
+    <TurnView
+      turn={of}
+      live={false}
+      thinking={false}
+      highlighted={highlighted}
+      onHighlight={setHighlighted}
+    />
+  );
+}
+
+describe("a badge in the answer", () => {
+  it("rings the source of the pill a reader clicks, and keeps focus on the pill", () => {
+    const { container, unmount } = mount(<Highlighting of={turn()} />);
+    const pill = container.querySelector<HTMLButtonElement>('button[title="[Excerpt 1]"]');
+    if (pill === null) throw new Error("the answer has no badge for [Excerpt 1]");
+
+    act(() => {
+      pill.focus();
+      pill.click();
+    });
+    const card = container.querySelector('[data-marker="[Excerpt 1]"] > *');
+    // The same element, not merely a focused one: a badge rebuilt by the
+    // re-render would leave focus on the body.
+    const focused = document.activeElement;
+    unmount();
+
+    expect(card?.className).toContain("ring-ink");
+    expect(focused).toBe(pill);
   });
 });
