@@ -185,10 +185,14 @@ describe("the source strip", () => {
           onSelect={() => {}}
         />,
       );
-      const link = `href="/api/sources/${"ab".repeat(32)}#page=3"`;
-
-      expect(html.includes(link)).toBe(shape === "slides");
-      expect(html.includes("B028451 · 2025-2026")).toBe(shape === "slides");
+      // Prefixes, so a card built from a missing field — `/api/sources/undefined`,
+      // `B028451 · ` — counts as offered and fails the other two shapes.
+      expect(html.includes('href="/api/sources/')).toBe(shape === "slides");
+      expect(html.includes("B028451 ·")).toBe(shape === "slides");
+      if (shape === "slides") {
+        expect(html).toContain(`href="/api/sources/${"ab".repeat(32)}#page=3"`);
+        expect(html).toContain("B028451 · 2025-2026");
+      }
       if (shape === "slides") expect(html).toContain('target="_blank"');
     },
   );

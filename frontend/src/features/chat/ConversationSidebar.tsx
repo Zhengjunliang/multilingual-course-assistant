@@ -46,8 +46,15 @@ export function ConversationSidebar({
     setFailed(false);
   };
 
-  // The dialog stays open until the server has answered: closing it first
-  // would say "deleted" about a conversation that may still be there.
+  const ask = (conversation: ConversationSummary) => {
+    setFailed(false);
+    setPending(conversation);
+  };
+
+  // The dialog stays open until the server has answered, and cannot be
+  // dismissed meanwhile: closing it first would say "deleted" about a
+  // conversation that may still be there, and a late answer would land in the
+  // next dialog opened.
   const confirm = async () => {
     if (pending === null) return;
     setDeleting(true);
@@ -129,19 +136,19 @@ export function ConversationSidebar({
                 >
                   {titleOf(conversation)}
                 </NavLink>
-                {/* Shown on hover or focus from `lg` up, where there is a
-                    pointer; always in the narrow drawer, where there is none.
+                {/* Shown on hover or focus where there is a fine pointer to
+                    hover with; always on a touch screen, whatever its width.
                     Disabled while this conversation's answer is being written:
                     the question would be refused and the half answer lost. */}
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="shrink-0 lg:opacity-0 lg:focus-visible:opacity-100 lg:group-hover:opacity-100"
+                  className="shrink-0 pointer-fine:opacity-0 pointer-fine:focus-visible:opacity-100 pointer-fine:group-hover:opacity-100"
                   aria-label={t("sidebar.delete", { title: titleOf(conversation) })}
                   title={busy === conversation.id ? t("sidebar.deleteBusy") : undefined}
                   disabled={busy === conversation.id}
-                  onClick={() => setPending(conversation)}
+                  onClick={() => ask(conversation)}
                 >
                   <Trash2 aria-hidden className="size-icon" />
                 </Button>
@@ -154,7 +161,7 @@ export function ConversationSidebar({
       <Dialog
         open={pending !== null}
         onOpenChange={(open) => {
-          if (!open) close();
+          if (!open && !deleting) close();
         }}
         title={t("sidebar.deleteTitle")}
         description={
@@ -168,7 +175,7 @@ export function ConversationSidebar({
           </p>
         )}
         <div className="flex justify-end gap-tight">
-          <Button type="button" variant="outline" onClick={close}>
+          <Button type="button" variant="outline" disabled={deleting} onClick={close}>
             {t("sidebar.cancel")}
           </Button>
           <Button type="button" disabled={deleting} onClick={() => void confirm()}>

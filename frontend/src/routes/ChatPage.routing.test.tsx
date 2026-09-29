@@ -51,6 +51,8 @@ const STORED: ConversationDetail = {
 
 /** What `GET /api/conversations` answers; a question on `/` adds to it, as the server does. */
 let conversations: ConversationSummary[] = [];
+/** Whether `DELETE` fails, as a server error would. */
+let deleteFails = false;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -78,7 +80,9 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   if (method === "GET" && path === "/api/conversations") return json(conversations);
   if (method === "GET" && path === "/api/conversations/7") return json(STORED);
   if (method === "DELETE" && path.startsWith("/api/conversations/")) {
+    if (deleteFails) return json({ detail: "Server error." }, 500);
     const id = Number(path.slice("/api/conversations/".length));
+    if (!conversations.some((row) => row.id === id)) return json({ detail: "Not found." }, 404);
     conversations = conversations.filter((row) => row.id !== id);
     return new Response(null, { status: 204 });
   }
@@ -170,6 +174,7 @@ describe("the chat page's address", () => {
       { id: STORED.id, locale: STORED.locale, created_at: STORED.created_at, title: STORED.title },
       OTHER,
     ];
+    deleteFails = false;
     vi.stubGlobal("fetch", fakeApi);
   });
 
@@ -177,8 +182,30 @@ describe("the chat page's address", () => {
     vi.unstubAllGlobals();
   });
 
-  it.each([
+  interface Case {
+    name: string;
+    from: string;
+    step: (container: HTMLElement) => void;
+    lands: string;
+    /** Act before the opened conversation has come back from the server. */
+    early?: boolean;
+    /** The server refuses the delete. */
+    failing?: boolean;
+    /** Deleted on the server, from another tab, after this page listed it. */
+    deletedElsewhere?: number;
+    /** A sidebar row that must be gone afterwards. */
+    gone?: string;
+  }
+
+  it.each<Case>([
     { name: "opening a new conversation", from: "/c/7", step: openNewConversation, lands: "/" },
+    {
+      name: "leaving a conversation before it loaded",
+      from: "/c/7",
+      step: openNewConversation,
+      lands: "/",
+      early: true,
+    },
     { name: "asking on / moves to /c/9", from: "/", step: askFromTheFrontDoor, lands: "/c/9" },
     {
       name: "deleting the open conversation",
@@ -194,9 +221,29 @@ describe("the chat page's address", () => {
       lands: "/c/7",
       gone: "/c/8",
     },
-  ])("$name lands on $lands, and stays there", async ({ from, step, lands, gone }) => {
+    {
+      name: "a delete the server refuses",
+      from: "/c/7",
+      step: deleting(STORED.title),
+      lands: "/c/7",
+      failing: true,
+    },
+    {
+      name: "deleting a conversation another tab deleted",
+      from: "/c/7",
+      step: deleting(STORED.title),
+      lands: "/",
+      deletedElsewhere: 7,
+      gone: "/c/7",
+    },
+  ])("$name lands on $lands, and stays there", async (scenario) => {
+    const { from, step, lands, early, failing, deletedElsewhere, gone } = scenario;
+    deleteFails = failing === true;
     const { container, unmount } = page(from);
-    await settle();
+    if (!early) await settle();
+    if (deletedElsewhere !== undefined) {
+      conversations = conversations.filter((listed) => listed.id !== deletedElsewhere);
+    }
 
     step(container);
     await settle();
@@ -204,13 +251,21 @@ describe("the chat page's address", () => {
     // A second round: a bounce is an effect reacting to the first landing.
     await settle();
     const stayed = pathname(container);
-    const row = gone === undefined ? null : container.querySelector(`aside a[href="${gone}"]`);
+    const row = (href: string) => container.querySelector(`aside a[href="${href}"]`);
+    const goneRow = gone === undefined ? null : row(gone);
+    const keptRow = row(from);
+    const saidFailed = document.body.textContent?.includes(i18n.t("sidebar.deleteFailed"));
     unmount();
 
     expect(landed).toBe(lands);
     expect(stayed).toBe(lands);
     // The deleted row is off the refreshed sidebar, which is also what proves
     // the step found its button: a missed click would leave it there.
-    expect(row).toBeNull();
+    expect(goneRow).toBeNull();
+    if (failing) {
+      // The dialog says so, which a missed click would not, and nothing moved.
+      expect(saidFailed).toBe(true);
+      expect(keptRow).not.toBeNull();
+    }
   });
 });

@@ -21,6 +21,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { isRefusal } from "@/api/client";
 import type { ConversationSummary } from "@/api/conversations";
 import { deleteConversation, listConversations, readConversation } from "@/api/conversations";
+import { ApiError } from "@/api/http";
 import { useSession } from "@/auth/useSession";
 import { AccountMenu } from "@/components/AccountMenu";
 import { ChatShell, type SidebarControls } from "@/features/chat/ChatShell";
@@ -77,10 +78,18 @@ export default function ChatPage() {
       reset();
       return;
     }
+    // A reply is used only while the URL still names it: a reader who moved on
+    // before it arrived would otherwise be pulled back into the old thread.
     readConversation(Number(wanted))
-      .then(adopt)
+      .then((conversation) => {
+        if (loaded.current === wanted) adopt(conversation);
+      })
       .catch((error: unknown) => {
+        if (loaded.current !== wanted) return;
         refused(error);
+        // Deleted, or never this reader's. What the page held before must go
+        // with it, or a question asked here would land in that conversation.
+        reset();
         setUnreadable(true);
       });
   }, [conversationId, adopt, reset, refused]);
@@ -122,9 +131,14 @@ export default function ChatPage() {
       try {
         await deleteConversation(id);
       } catch (error) {
-        refused(error);
-        refreshSidebar();
-        return false;
+        // A 404 is a conversation already gone — deleted from another tab —
+        // which is the outcome that was asked for.
+        const gone = error instanceof ApiError && error.status === 404;
+        if (!gone) {
+          refused(error);
+          refreshSidebar();
+          return false;
+        }
       }
       if (conversationId === String(id)) void navigate("/", { replace: true });
       refreshSidebar();
@@ -198,7 +212,9 @@ export default function ChatPage() {
               <div ref={bottom} />
             </div>
           </main>
-          {composer}
+          {/* No composer under "not available": a question here would start a
+              conversation the URL does not name. The sidebar offers a new one. */}
+          {!unreadable && composer}
         </>
       )}
     </ChatShell>
