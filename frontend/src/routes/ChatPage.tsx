@@ -9,7 +9,9 @@
  * That has one consequence worth naming: when the first question of a new
  * conversation gets its id, this navigates to `/c/<id>` while the answer is
  * still arriving. `loaded` is what stops that navigation from being read as
- * "open a different thread" and refetching over a stream in progress.
+ * "open a different thread" and refetching over a stream in progress. The
+ * reverse must not be read as a new id either: leaving `/c/7` for `/` renders
+ * once with the URL at `/` and the hook still holding 7, before the reset lands.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -41,6 +43,7 @@ export default function ChatPage() {
   const ask = useAsk();
   const { turns, waiting, submit, adopt, reset, stop } = ask;
   const loaded = useRef<string | null>(null);
+  const previousId = useRef<number | null>(null);
   const bottom = useRef<HTMLDivElement | null>(null);
 
   const refused = useCallback(
@@ -83,9 +86,13 @@ export default function ChatPage() {
 
   // A new conversation becomes a place as soon as it has an id. `replace` so
   // that the back button leaves the chat rather than stepping through one
-  // question's worth of history.
+  // question's worth of history. Only the step from no id to an id counts:
+  // that is `start` naming a conversation it just created. An id that was
+  // there before is the conversation being left, not one being made.
   useEffect(() => {
-    if (ask.conversationId === null || conversationId !== undefined) return;
+    const before = previousId.current;
+    previousId.current = ask.conversationId;
+    if (before !== null || ask.conversationId === null || conversationId !== undefined) return;
     loaded.current = String(ask.conversationId);
     void navigate(`/c/${ask.conversationId}`, { replace: true });
     refreshSidebar();

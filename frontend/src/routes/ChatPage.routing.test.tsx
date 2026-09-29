@@ -1,0 +1,168 @@
+// @vitest-environment jsdom
+
+/**
+ * Where the chat page leaves the reader, asked of the whole application.
+ *
+ * The URL is the page's state (ChatPage.tsx says why), and the bugs worth
+ * catching live between two effects that both read it in the same commit — no
+ * test of one component in isolation sees them. So this mounts `App` behind a
+ * memory router and fakes the network at `fetch`, the HTTP boundary, with a
+ * small in-memory server. The assertions are about what a reader sees: the
+ * path, and which conversations the sidebar lists.
+ */
+
+import { act } from "react";
+import { MemoryRouter, useLocation } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import App from "@/App";
+import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
+import { SessionContext } from "@/auth/SessionProvider";
+import { type Mounted, mount } from "@/test/mount";
+import { ThemeProvider } from "@/theme/ThemeProvider";
+
+const STORED: ConversationDetail = {
+  id: 7,
+  locale: "it",
+  created_at: "2026-09-28T10:00:00Z",
+  title: "Che cos'è un ORM?",
+  messages: [
+    {
+      id: 1,
+      role: "user",
+      text: "Che cos'è un ORM?",
+      locale: "it",
+      complete: true,
+      citations: [],
+      route: null,
+    },
+    {
+      id: 2,
+      role: "assistant",
+      text: "Un ORM mappa le tabelle in classi.",
+      locale: "it",
+      complete: true,
+      citations: [],
+      route: null,
+    },
+  ],
+};
+
+/** What `GET /api/conversations` answers; a question on `/` adds to it, as the server does. */
+let conversations: ConversationSummary[] = [];
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/** An answer stream in the framing `api/sse.ts` reads: `start`, then `end`. */
+function answerStream(conversationId: number, question: string): Response {
+  const start = {
+    question,
+    conversation_id: conversationId,
+    locale: "it",
+    route: { target: "unifi_web", query: question, fresh: false, reason: "campus question" },
+    citations: [],
+  };
+  const body = `event: start\ndata: ${JSON.stringify(start)}\n\nevent: end\ndata: {}\n\n`;
+  return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+}
+
+async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const path = String(input);
+  const method = init.method ?? "GET";
+  if (method === "GET" && path === "/api/conversations") return json(conversations);
+  if (method === "GET" && path === "/api/conversations/7") return json(STORED);
+  if (method === "POST" && path === "/api/ask") {
+    const { question } = JSON.parse(String(init.body)) as { question: string };
+    conversations = [
+      { id: 9, locale: "it", created_at: "2026-09-29T09:00:00Z", title: question },
+      ...conversations,
+    ];
+    return answerStream(9, question);
+  }
+  return json({ detail: "Not found." }, 404);
+}
+
+function Pathname() {
+  return <output>{useLocation().pathname}</output>;
+}
+
+function page(path: string): Mounted {
+  return mount(
+    <ThemeProvider>
+      <SessionContext
+        value={{
+          account: { id: 1, username: "junliang", locale: "it" },
+          logIn: async () => {},
+          register: async () => {},
+          logOut: async () => {},
+          chooseLocale: async () => {},
+          forget: () => {},
+        }}
+      >
+        <MemoryRouter initialEntries={[path]}>
+          <App />
+          <Pathname />
+        </MemoryRouter>
+      </SessionContext>
+    </ThemeProvider>,
+  );
+}
+
+/** Lets every pending fetch, body read and state update land. */
+async function settle() {
+  for (let turn = 0; turn < 3; turn += 1) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+}
+
+function pathname(container: HTMLElement) {
+  return container.querySelector("output")?.textContent;
+}
+
+function openNewConversation(container: HTMLElement) {
+  act(() => container.querySelector<HTMLAnchorElement>('a[href="/"]')?.click());
+}
+
+/** A suggestion chip asks its question at once, which is the shortest way to ask. */
+function askFromTheFrontDoor(container: HTMLElement) {
+  act(() => container.querySelector<HTMLButtonElement>("main button")?.click());
+}
+
+describe("the chat page's address", () => {
+  beforeEach(() => {
+    conversations = [
+      { id: STORED.id, locale: STORED.locale, created_at: STORED.created_at, title: STORED.title },
+    ];
+    vi.stubGlobal("fetch", fakeApi);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    { name: "opening a new conversation", from: "/c/7", step: openNewConversation, lands: "/" },
+    { name: "asking on / moves to /c/9", from: "/", step: askFromTheFrontDoor, lands: "/c/9" },
+  ])("$name lands on $lands, and stays there", async ({ from, step, lands }) => {
+    const { container, unmount } = page(from);
+    await settle();
+
+    step(container);
+    await settle();
+    const landed = pathname(container);
+    // A second round: a bounce is an effect reacting to the first landing.
+    await settle();
+    const stayed = pathname(container);
+    unmount();
+
+    expect(landed).toBe(lands);
+    expect(stayed).toBe(lands);
+  });
+});
