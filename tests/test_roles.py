@@ -1,9 +1,14 @@
-"""Role rows: a role fits its scope, a grant is stored once, and it goes with its scope.
+"""Role rows and what they grant.
 
-A refusal the database makes is asserted by the name of the constraint
-PostgreSQL reports, as in tests/test_catalog_models.py. `world()` is the one
-set of people and scopes these tests share: every user is created without a
-password, so none of them costs a password hash.
+The rows: a role fits its scope, a grant is stored once, and it goes with its
+scope. A refusal the database makes is asserted by the name of the constraint
+PostgreSQL reports, as in tests/test_catalog_models.py. What they grant: one
+`has_perm` truth table over every user, scope and permission, compared whole,
+so a failure prints the cells that differ; and the lists of apps/roles/scopes.py
+checked against it cell by cell.
+
+`world()` is the one set of people and scopes these tests share: every user is
+created without a password, so none of them costs a password hash.
 """
 
 from __future__ import annotations
@@ -11,13 +16,21 @@ from __future__ import annotations
 from typing import NamedTuple
 
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, transaction
 from test_catalog_models import violation
 
 from apps.accounts.models import User
 from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
 from apps.roles.models import RoleAssignment
-from apps.roles.registry import Role
+from apps.roles.registry import EDITION_PERMISSIONS, PROGRAMME_PERMISSIONS, Role
+from apps.roles.scopes import (
+    editions_for,
+    permissions_on,
+    programmes_for,
+    with_edition_roles,
+    with_programme_roles,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -108,6 +121,24 @@ def world() -> World:
     )
 
 
+def everyone(w: World) -> tuple[User, ...]:
+    return (
+        w.continuing,
+        w.newcomer,
+        w.secretariat,
+        w.other_secretariat,
+        w.dual,
+        w.student,
+        w.root,
+        w.inactive,
+    )
+
+
+def label(scope: CourseEdition | DegreeProgramme) -> str:
+    """A scope the way the command line spells it: CODE:YEAR, or a programme's code."""
+    return str(scope) if isinstance(scope, CourseEdition) else scope.code
+
+
 @pytest.mark.parametrize(
     ("role", "on_edition", "on_programme"),
     [
@@ -166,3 +197,102 @@ def test_deleting_a_scope_or_a_user_deletes_its_role_rows() -> None:
         "inactive · secretariat · B047",
         "secretariat · secretariat · B047",
     ]
+
+
+TEACHES = {"edition.view", "edition.set_current"}
+RUNS_EDITION = {"edition.view", "edition.set_current", "edition.assign_teacher"}
+RUNS_PROGRAMME = {"programme.view"}
+
+
+def test_who_holds_what_where() -> None:
+    w = world()
+    cells = [(edition, EDITION_PERMISSIONS) for edition in (w.ppm_old, w.ppm_new, w.ia, w.shared)]
+    cells += [(programme, PROGRAMME_PERMISSIONS) for programme in (w.b047, w.l031)]
+
+    held = {
+        (user.username, label(scope)): {p for p in permissions if user.has_perm(p, scope)}
+        for user in everyone(w)
+        for scope, permissions in cells
+    }
+
+    ppm_old, ppm_new = "B028451:2024-2025", "B028451:2025-2026"
+    ia, shared, b047, l031 = "B003725:2025-2026", "B000001:2025-2026", "B047", "L031"
+    expected = {(user.username, label(scope)): set() for user in everyone(w) for scope, _ in cells}
+    expected |= {
+        ("continuing", ppm_old): TEACHES,
+        ("continuing", ppm_new): TEACHES,
+        ("newcomer", ppm_new): TEACHES,
+        # A programme's secretariat covers every edition of every course it
+        # offers, the shared course included, and nothing of another programme.
+        ("secretariat", ppm_old): RUNS_EDITION,
+        ("secretariat", ppm_new): RUNS_EDITION,
+        ("secretariat", shared): RUNS_EDITION,
+        ("secretariat", b047): RUNS_PROGRAMME,
+        ("other_secretariat", ia): RUNS_EDITION,
+        ("other_secretariat", shared): RUNS_EDITION,
+        ("other_secretariat", l031): RUNS_PROGRAMME,
+        # Two roles add up, each on its own scope.
+        ("dual", ia): TEACHES,
+        ("dual", ppm_old): RUNS_EDITION,
+        ("dual", ppm_new): RUNS_EDITION,
+        ("dual", shared): RUNS_EDITION,
+        ("dual", b047): RUNS_PROGRAMME,
+        ("root", ppm_old): RUNS_EDITION,
+        ("root", ppm_new): RUNS_EDITION,
+        ("root", ia): RUNS_EDITION,
+        ("root", shared): RUNS_EDITION,
+        ("root", b047): {"programme.view", "programme.assign_secretariat"},
+        ("root", l031): {"programme.view", "programme.assign_secretariat"},
+    }
+    assert held == expected
+
+    # Past the table: a permission asked of the wrong kind of scope, of no
+    # scope, or by a name the registry does not have. The superuser's yes is
+    # Django's: `User.has_perm` answers an active superuser before any backend.
+    edge = {
+        "programme permission on an edition": w.secretariat.has_perm("programme.view", w.ppm_new),
+        "edition permission on a programme": w.secretariat.has_perm("edition.view", w.b047),
+        "no scope": w.secretariat.has_perm("edition.view"),
+        "unknown permission": w.secretariat.has_perm("edition.delete", w.ppm_new),
+        "superuser, no scope": w.root.has_perm("edition.view"),
+        "superuser, unknown permission": w.root.has_perm("edition.delete", w.ppm_new),
+    }
+    assert edge == {
+        "programme permission on an edition": False,
+        "edition permission on a programme": False,
+        "no scope": False,
+        "unknown permission": False,
+        "superuser, no scope": True,
+        "superuser, unknown permission": True,
+    }
+
+
+def test_lists_and_permissions_agree_with_has_perm() -> None:
+    w = world()
+    editions = list(CourseEdition.objects.all())
+    programmes = list(DegreeProgramme.objects.all())
+
+    for user in everyone(w):
+        # What has_perm answers, asked once per cell; the lists and the
+        # per-row permissions must say the same.
+        on_edition = {
+            e.pk: {p for p in EDITION_PERMISSIONS if user.has_perm(p, e)} for e in editions
+        }
+        on_programme = {
+            g.pk: {p for p in PROGRAMME_PERMISSIONS if user.has_perm(p, g)} for g in programmes
+        }
+        for p in EDITION_PERMISSIONS:
+            listed = sorted(e.pk for e in editions_for(user, p))
+            assert listed == sorted(pk for pk, held in on_edition.items() if p in held), (user, p)
+        for p in PROGRAMME_PERMISSIONS:
+            listed = sorted(g.pk for g in programmes_for(user, p))
+            assert listed == sorted(pk for pk, held in on_programme.items() if p in held), (user, p)
+        for edition in with_edition_roles(CourseEdition.objects.all(), user):
+            assert permissions_on(user, edition) == on_edition[edition.pk], (user, edition)
+        for programme in with_programme_roles(DegreeProgramme.objects.all(), user):
+            assert permissions_on(user, programme) == on_programme[programme.pk], (user, programme)
+
+    for p in EDITION_PERMISSIONS:
+        assert not editions_for(AnonymousUser(), p).exists()
+    for p in PROGRAMME_PERMISSIONS:
+        assert not programmes_for(AnonymousUser(), p).exists()

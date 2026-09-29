@@ -53,10 +53,10 @@ class ConversationDetailView(RetrieveDestroyAPIView):
     one — a 403 would confirm that the id names something real.
 
     Deleting is hard: the messages go with the conversation (`CASCADE`), as
-    they do in Open WebUI, LibreChat, vercel/chatbot and LobeChat (docs/decisions.md,
-    2026-09-29, *A slides citation opens its whole PDF, and a conversation is
-    deleted outright*). There is no update: titles derive from the first
-    question and are never stored.
+    they do in Open WebUI, LibreChat, vercel/chatbot and LobeChat
+    (docs/decisions.md, 2026-09-29, *A slides citation opens its whole PDF, and
+    a conversation is deleted outright*). There is no update: titles derive
+    from the first question and are never stored.
     """
 
     serializer_class = ConversationDetailSerializer
