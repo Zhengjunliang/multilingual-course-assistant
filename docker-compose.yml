@@ -55,6 +55,10 @@ services:
       # The loop is offline (docs/architecture.md); the server's usage
       # statistics would be its one outbound call.
       QDRANT__TELEMETRY_DISABLED: "true"
+      # The image answers any origin's CORS preflight, so a web page open in
+      # this host's browser could call the loopback port, deletes included.
+      # Every client here is a process, and the dashboard is same-origin.
+      QDRANT__SERVICE__ENABLE_CORS: "false"
     ports:
       # Loopback only: the server has no API key, and every client runs on this
       # host. A containerised app reaches it as http://qdrant:6333 instead.
@@ -65,9 +69,9 @@ services:
       - qdrant-data:/qdrant/storage
     healthcheck:
       # The image has no curl or wget (upstream qdrant/qdrant#4250), but its
-      # debian:13-slim base has bash, whose /dev/tcp is enough to ask /readyz.
-      # /readyz answers 200 once the collections are loaded; an open port alone
-      # would report healthy while 30k points are still being read from disk.
+      # debian:13-slim base has bash, whose /dev/tcp is enough to ask /readyz,
+      # the endpoint Qdrant documents for readiness. A single node loads its
+      # collections before it listens, so here it answers 200 with the port.
       test:
         - CMD
         - bash
@@ -76,7 +80,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-      # Loading the collections takes a while; failures before then do not count.
+      # Probes that fail while the server starts do not count.
       start_period: 30s
     restart: unless-stopped
 
