@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Citation } from "@/api/contract";
+import { sourceHref } from "@/api/sources";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Badge } from "@/lib/markers";
 import { cn } from "@/lib/utils";
@@ -116,9 +117,27 @@ export function CitationList({
                       </span>
                     </CardTitle>
                     <p className="text-caption text-muted">
-                      {citation.kind === "web" && citation.fetch_date !== null
-                        ? t("citations.fetched", { date: citation.fetch_date })
-                        : t("citations.page", { page: citation.page })}
+                      {citation.kind === "web" && citation.fetch_date !== null ? (
+                        t("citations.fetched", { date: citation.fetch_date })
+                      ) : citation.kind === "slides" && citation.source_sha256 != null ? (
+                        // The page a slides excerpt came from, in the browser's
+                        // own viewer. A card stored before the key existed has
+                        // nothing to open and keeps the plain label.
+                        <a
+                          href={sourceHref(citation.source_sha256, citation.page)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={t("citations.openPage", {
+                            page: citation.page,
+                            file: citation.source_file,
+                          })}
+                          className="underline decoration-muted underline-offset-2 hover:text-ink hover:decoration-ink"
+                        >
+                          {t("citations.page", { page: citation.page })}
+                        </a>
+                      ) : (
+                        t("citations.page", { page: citation.page })
+                      )}
                       {unused ? ` · ${t("citations.uncited")}` : null}
                     </p>
                   </CardHeader>

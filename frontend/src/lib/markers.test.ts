@@ -5,8 +5,8 @@ import { badgesOf, resolveExcerptRefs, segmentAnswer } from "@/lib/markers";
 /**
  * A citation with only the field these functions read spelled out.
  *
- * The other ten are required by the contract and read by nothing here, so they
- * are filled once rather than at every call: a fixture that restated all eleven
+ * The rest are required by the contract and read by nothing here, so they are
+ * filled once rather than at every call: a fixture that restated every field
  * at each use would bury the one that matters.
  */
 function cite(marker: string): Citation {
@@ -19,6 +19,7 @@ function cite(marker: string): Citation {
     locale: "en",
     score: 0,
     source_file: "deck.pdf",
+    source_sha256: "ab".repeat(32),
     page: 1,
     url: null,
     fetch_date: null,

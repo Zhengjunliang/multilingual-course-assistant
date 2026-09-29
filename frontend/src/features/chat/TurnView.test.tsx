@@ -36,6 +36,7 @@ function citation(marker: string, page: number): Citation {
     locale: "it",
     score: 0.5,
     source_file: "deck.pdf",
+    source_sha256: "ab".repeat(32),
     page,
     url: null,
     fetch_date: null,

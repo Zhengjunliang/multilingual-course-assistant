@@ -71,6 +71,7 @@
     "empty": "Nessun estratto recuperato per questa domanda.",
     "uncited": "recuperata, non citata",
     "page": "pagina {{page}}",
+    "openPage": "Apri la pagina {{page}} di {{file}} in una nuova scheda",
     "fetched": "recuperata il {{date}}",
     "more": "+{{count}}"
   },

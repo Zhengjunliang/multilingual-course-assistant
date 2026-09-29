@@ -60,9 +60,12 @@ class Citation(BaseModel):
     the check is therefore only meaningful once the whole stream has been
     joined — which is exactly where the client already stands.
 
-    `text` is carried because a slides citation has nothing to click: the PDF is
-    not served, so the excerpt itself is its readable form. A web citation adds
-    `url` and `fetch_date`, which is the page a student can actually open.
+    `text` is the excerpt itself, readable without leaving the answer. A slides
+    citation also carries `source_sha256`, the key under which
+    `GET /api/sources/<sha256>` serves its PDF (apps/qa/source_views.py); a web
+    citation carries None there and adds `url` and `fetch_date`, the page a
+    student can open. A citation stored before a field existed lacks it
+    (docs/data-model.md, migration order).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -75,6 +78,7 @@ class Citation(BaseModel):
     locale: str
     score: float
     source_file: str
+    source_sha256: str | None
     page: int
     url: str | None
     fetch_date: str | None
@@ -91,6 +95,9 @@ class Citation(BaseModel):
             locale=chunk.locale,
             score=hit.score,
             source_file=chunk.source_file,
+            # A web chunk has a sha too, of its crawled page; only a slides one
+            # names a file the sources endpoint serves.
+            source_sha256=chunk.source_sha256 if chunk.kind == "slides" else None,
             page=chunk.page,
             url=chunk.url,
             fetch_date=chunk.fetch_date,

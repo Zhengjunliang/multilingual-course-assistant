@@ -342,6 +342,7 @@ def test_a_web_citation_carries_the_page_a_student_can_open(index: QdrantClient)
     assert citation["kind"] == "web"
     assert citation["url"] == TASSE_URL
     assert citation["fetch_date"] == FETCH_DATE
+    assert citation["source_sha256"] is None
 
 
 def test_a_slides_citation_cites_the_file_and_page(index: QdrantClient) -> None:
@@ -349,6 +350,7 @@ def test_a_slides_citation_cites_the_file_and_page(index: QdrantClient) -> None:
     citation = start_of(events(ask()))["citations"][0]
     assert citation["marker"] == SLIDES_MARKER
     assert citation["kind"] == "slides"
+    assert citation["source_sha256"] == "ab" * 32
     assert citation["url"] is None
     assert citation["fetch_date"] is None
 

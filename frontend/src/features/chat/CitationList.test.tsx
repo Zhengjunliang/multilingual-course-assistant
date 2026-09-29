@@ -29,6 +29,7 @@ function citation(marker: string, page: number): Citation {
     locale: "it",
     score: 0.5,
     source_file: "deck.pdf",
+    source_sha256: "ab".repeat(32),
     page,
     url: null,
     fetch_date: null,
@@ -127,6 +128,41 @@ describe("the source strip", () => {
     expect(html).toContain("overflow-x-auto");
     expect(html).toContain("shrink-0");
   });
+
+  it.each(["slides", "web", "legacy"])(
+    "offers the PDF page of a %s card only when it has one",
+    (shape) => {
+      const slides = citation("[deck.pdf p.3]", 3);
+      const card: Citation =
+        shape === "slides"
+          ? slides
+          : shape === "web"
+            ? {
+                ...slides,
+                kind: "web",
+                source_sha256: null,
+                url: "https://www.unifi.it/p602.html",
+                fetch_date: "2026-09-20",
+              }
+            : // Stored before the key existed: the field is missing, not null.
+              (Object.fromEntries(
+                Object.entries(slides).filter(([field]) => field !== "source_sha256"),
+              ) as unknown as Citation);
+      const html = render(
+        <CitationList
+          citations={[card]}
+          badges={badgesOf([card])}
+          cited={null}
+          highlighted={null}
+          onSelect={() => {}}
+        />,
+      );
+      const link = `href="/api/sources/${"ab".repeat(32)}#page=3"`;
+
+      expect(html.includes(link)).toBe(shape === "slides");
+      if (shape === "slides") expect(html).toContain('target="_blank"');
+    },
+  );
 
   it("keeps the excerpt short until there is width for it", () => {
     // The card moved above the answer in this stage. Five lines of excerpt at

@@ -31,6 +31,11 @@ export interface Citation {
   locale: string;
   score: number;
   source_file: string;
+  /**
+   * The key the PDF is served under (`api/sources.ts`), for slides only. Absent
+   * from citations stored before it existed, so compare with `!= null`.
+   */
+  source_sha256: string | null;
   page: number;
   url: string | null;
   fetch_date: string | null;

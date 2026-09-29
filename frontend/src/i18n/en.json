@@ -71,6 +71,7 @@
     "empty": "No excerpts were retrieved for this question.",
     "uncited": "retrieved, not cited",
     "page": "page {{page}}",
+    "openPage": "Open page {{page}} of {{file}} in a new tab",
     "fetched": "fetched on {{date}}",
     "more": "+{{count}}"
   },
