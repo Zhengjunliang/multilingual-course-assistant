@@ -150,7 +150,7 @@ def test_the_edition_list_narrows_to_a_programme() -> None:
         course=w.ppm_old.course,
         curriculum="TECNICO SCIENTIFICO",
         year_of_study=3,
-        ad_code="B028451",
+        ad_code="B003712",
     )
     asked = {
         "secretariat, their programme": (w.secretariat, "B047"),

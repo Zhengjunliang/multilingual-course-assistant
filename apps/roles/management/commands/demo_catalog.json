@@ -1,0 +1,1066 @@
+{
+  "source": {
+    "url": "https://unifi.coursecatalogue.cineca.it/corsi/2024/458?annoOrdinamento=2010 https://unifi.coursecatalogue.cineca.it/corsi/2024/817?annoOrdinamento=2016",
+    "read": "2026-09-29",
+    "cohort": "2024/2025"
+  },
+  "rules": [
+    "Two programmes: B047 (both curricula) and the UniFi bachelor's programme whose study plan shares the most AD codes with B047's.",
+    "Every teaching of the study plan that is taught, mandatory or a named option; no prova finale, tirocinio, free-choice placeholder or idoneità without a teaching.",
+    "One course per teaching; a teaching listed in two curricula, or shared by the two programmes under one AD code, is one course with an entry in each.",
+    "Course code: the AD code of the Moodle course that holds the material (docs/decisions.md, 2026-09-25, PPM read from Moodle and Cineca, point 1), read from the course summaries Moodle shows without a login; where no single Moodle course holds the material, as for an integrated course (C.I.), the course says code_source cineca-only and takes the code its curricula list.",
+    "Entry AD code: the one the curriculum lists; of two, the one listed only in that curriculum (the same entry, point 2). A course already in the database keeps its row.",
+    "Two editions per course, one per academic year below; a course with no current edition gets the first one, through set_current()."
+  ],
+  "academic_years": [
+    "2024-2025",
+    "2025-2026"
+  ],
+  "programmes": [
+    {
+      "code": "B047",
+      "name": "INGEGNERIA INFORMATICA",
+      "locale": "it"
+    },
+    {
+      "code": "B222",
+      "name": "INGEGNERIA GESTIONALE",
+      "locale": "it"
+    }
+  ],
+  "courses": [
+    {
+      "code": "B000023",
+      "name": "ANALISI MATEMATICA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B000023"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 1,
+          "ad_code": "B000023"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B000023"
+        }
+      ]
+    },
+    {
+      "code": "B000060",
+      "name": "GESTIONE DELLA QUALITA'-SISTEMI DI GESTIONE AMBIENTALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B000060"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 3,
+          "ad_code": "B000060"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B000060"
+        }
+      ]
+    },
+    {
+      "code": "B000066",
+      "name": "CHIMICA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B000066"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 1,
+          "ad_code": "B000066"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B000066"
+        }
+      ]
+    },
+    {
+      "code": "B000068",
+      "name": "FONDAMENTI DI INFORMATICA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B000068"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 1,
+          "ad_code": "B000068"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B000068"
+        }
+      ]
+    },
+    {
+      "code": "B000069",
+      "name": "MECCANICA RAZIONALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 2,
+          "ad_code": "B000069"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 2,
+          "ad_code": "B000069"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 2,
+          "ad_code": "B000069"
+        }
+      ]
+    },
+    {
+      "code": "B000072",
+      "name": "FONDAMENTI DI RICERCA OPERATIVA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B000072"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B000072"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B000072"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B000072"
+        }
+      ]
+    },
+    {
+      "code": "B000073",
+      "name": "TECNOLOGIE E STUDI DI FABBRICAZIONE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 2,
+          "ad_code": "B000073"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 2,
+          "ad_code": "B000073"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 2,
+          "ad_code": "B000073"
+        }
+      ]
+    },
+    {
+      "code": "B000077",
+      "name": "GESTIONE DELLA PRODUZIONE INDUSTRIALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B000077"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 3,
+          "ad_code": "B000077"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B000077"
+        }
+      ]
+    },
+    {
+      "code": "B002348",
+      "name": "FONDAMENTI DI AUTOMATICA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B002348"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B002348"
+        }
+      ]
+    },
+    {
+      "code": "B003271",
+      "name": "GEOMETRIA E ALGEBRA LINEARE/CALCOLO NUMERICO C.I.",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B003271"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B003271"
+        }
+      ],
+      "code_source": "cineca-only"
+    },
+    {
+      "code": "B003368",
+      "name": "ALGORITMI E STRUTTURE DATI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B003368"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B003368"
+        }
+      ]
+    },
+    {
+      "code": "B003370",
+      "name": "SISTEMI OPERATIVI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B003370"
+        }
+      ]
+    },
+    {
+      "code": "B003372",
+      "name": "INGEGNERIA DEL SOFTWARE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003372"
+        }
+      ]
+    },
+    {
+      "code": "B003376",
+      "name": "BASI DI DATI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003376"
+        }
+      ]
+    },
+    {
+      "code": "B003423",
+      "name": "TEORIA DEI CIRCUITI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B003423"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B003423"
+        }
+      ]
+    },
+    {
+      "code": "B003725",
+      "name": "INTELLIGENZA ARTIFICIALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B014959"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003725"
+        }
+      ]
+    },
+    {
+      "code": "B003779",
+      "name": "ELETTRONICA DIGITALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B003779"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003779"
+        }
+      ]
+    },
+    {
+      "code": "B006853",
+      "name": "FISICA I",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B006853"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B006853"
+        }
+      ]
+    },
+    {
+      "code": "B014955",
+      "name": "INFORMATICA INDUSTRIALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B014955"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003719"
+        }
+      ]
+    },
+    {
+      "code": "B014964",
+      "name": "SISTEMI DISTRIBUITI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B014964"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003734"
+        }
+      ]
+    },
+    {
+      "code": "B015801",
+      "name": "GEOMETRIA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B015801"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 1,
+          "ad_code": "B015801"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B015801"
+        }
+      ]
+    },
+    {
+      "code": "B019481",
+      "name": "ANALISI MATEMATICA I",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B019481"
+        }
+      ]
+    },
+    {
+      "code": "B024249",
+      "name": "ANALISI MATEMATICA II E PROBABILITA'",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B024249"
+        }
+      ]
+    },
+    {
+      "code": "B024250",
+      "name": "METODI MATEMATICI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B024250"
+        }
+      ]
+    },
+    {
+      "code": "B024251",
+      "name": "FISICA II",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B024251"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B024251"
+        }
+      ]
+    },
+    {
+      "code": "B024253",
+      "name": "BASI DI DATI/ INGEGNERIA DEL SOFTWARE C.I.",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B024253"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B024253"
+        }
+      ],
+      "code_source": "cineca-only"
+    },
+    {
+      "code": "B024256",
+      "name": "CALCOLATORI/ SISTEMI OPERATIVI C.I.",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B024256"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B024256"
+        }
+      ],
+      "code_source": "cineca-only"
+    },
+    {
+      "code": "B024259",
+      "name": "INFORMATICA TEORICA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B010474"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B029535"
+        }
+      ]
+    },
+    {
+      "code": "B024260",
+      "name": "LABORATORIO DI PROGRAMMAZIONE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B024260"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B024260"
+        }
+      ]
+    },
+    {
+      "code": "B024279",
+      "name": "FONDAMENTI DI INFORMATICA/PROGRAMMAZIONE C.I.",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B024279"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B024279"
+        }
+      ],
+      "code_source": "cineca-only"
+    },
+    {
+      "code": "B024762",
+      "name": "MATEMATICA DISCRETA E CODICI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B024762"
+        }
+      ]
+    },
+    {
+      "code": "B024767",
+      "name": "FONDAMENTI DI RETI DI TELECOMUNICAZIONI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B024767"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B024767"
+        }
+      ]
+    },
+    {
+      "code": "B025500",
+      "name": "STATISTICA INDUSTRIALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 2,
+          "ad_code": "B025500"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 2,
+          "ad_code": "B025500"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 2,
+          "ad_code": "B025500"
+        }
+      ]
+    },
+    {
+      "code": "B025502",
+      "name": "LABORATORIO DI CONVERSIONE DELL'ENERGIA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 2,
+          "ad_code": "B025502"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 2,
+          "ad_code": "B025502"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 2,
+          "ad_code": "B025502"
+        }
+      ]
+    },
+    {
+      "code": "B025506",
+      "name": "LABORATORIO DI PROGETTAZIONE INDUSTRIALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 2,
+          "ad_code": "B025506"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 2,
+          "ad_code": "B025506"
+        }
+      ]
+    },
+    {
+      "code": "B025551",
+      "name": "TEORIA DEI SISTEMI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B025551"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B025551"
+        }
+      ]
+    },
+    {
+      "code": "B025559",
+      "name": "LABORATORIO DI PROCESSI AZIENDALI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B025559"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 3,
+          "ad_code": "B025559"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B025559"
+        }
+      ]
+    },
+    {
+      "code": "B025563",
+      "name": "IMPIANTI E LOGISTICA INDUSTRIALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B025563"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 3,
+          "ad_code": "B025563"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B025563"
+        }
+      ]
+    },
+    {
+      "code": "B025574",
+      "name": "ECONOMIA E ORGANIZZAZIONE AZIENDALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B025574"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 1,
+          "ad_code": "B025574"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B025574"
+        }
+      ]
+    },
+    {
+      "code": "B026220",
+      "name": "PROGRAMMAZIONE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B026220"
+        }
+      ]
+    },
+    {
+      "code": "B026221",
+      "name": "CALCOLATORI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B026221"
+        }
+      ]
+    },
+    {
+      "code": "B026228",
+      "name": "FONDAMENTI DI SEGNALI E TRASMISSIONE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B026228"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B026228"
+        }
+      ]
+    },
+    {
+      "code": "B027622",
+      "name": "LABORATORIO DI PROGETTAZIONE DEI SISTEMI INFORMATIVI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 2,
+          "ad_code": "B027622"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 2,
+          "ad_code": "B027622"
+        }
+      ]
+    },
+    {
+      "code": "B028450",
+      "name": "ELEMENTI DI ANALISI MATEMATICA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B028450"
+        }
+      ]
+    },
+    {
+      "code": "B028451",
+      "name": "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B028451"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003712"
+        }
+      ]
+    },
+    {
+      "code": "B028767",
+      "name": "STRATEGIA D'IMPRESA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B028767"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 3,
+          "ad_code": "B028767"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 3,
+          "ad_code": "B028767"
+        }
+      ]
+    },
+    {
+      "code": "B029082",
+      "name": "FISICA GENERALE C.I.",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B029082"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 1,
+          "ad_code": "B029082"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B029082"
+        }
+      ],
+      "code_source": "cineca-only"
+    },
+    {
+      "code": "B030592",
+      "name": "STATISTICA",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B030592"
+        }
+      ]
+    },
+    {
+      "code": "B032662",
+      "name": "SCIENZA E TECNOLOGIA DEI MATERIALI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B222",
+          "curriculum": "INFORMATICO INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B032662"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROFESSIONALIZZANTE",
+          "year_of_study": 1,
+          "ad_code": "B032662"
+        },
+        {
+          "programme": "B222",
+          "curriculum": "PROGETTUALE INDUSTRIALE",
+          "year_of_study": 1,
+          "ad_code": "B032662"
+        }
+      ]
+    },
+    {
+      "code": "B033621",
+      "name": "LABORATORIO DI CALCOLATORI",
+      "locale": "it",
+      "entries": [
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B033621"
+        },
+        {
+          "programme": "B047",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B033621"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "username": "demo-admin",
+      "superuser": true
+    },
+    {
+      "username": "demo-secretariat",
+      "roles": [
+        {
+          "role": "secretariat",
+          "programme": "B047"
+        }
+      ]
+    },
+    {
+      "username": "demo-secretariat-b222",
+      "roles": [
+        {
+          "role": "secretariat",
+          "programme": "B222"
+        }
+      ]
+    },
+    {
+      "username": "demo-teacher",
+      "roles": [
+        {
+          "role": "teacher",
+          "edition": "B028451:2025-2026"
+        }
+      ]
+    },
+    {
+      "username": "demo-student"
+    }
+  ]
+}

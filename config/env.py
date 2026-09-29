@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     llm_api_key: str = "unused"
     llm_model: str = "qwen3:4b-instruct-2507-q4_K_M"
 
+    # The password every demo- account gets from `manage.py populate_demo`
+    # (apps/roles/management/commands/populate_demo.py), the way Django's
+    # `createsuperuser --noinput` reads DJANGO_SUPERUSER_PASSWORD. None, the
+    # default, leaves new demo accounts with no usable password: a password
+    # written in the repository would open them wherever the repository lands.
+    demo_password: SecretStr | None = None
+
     @field_validator("qdrant_url")
     @classmethod
     def _qdrant_is_a_server(cls, value: str) -> str:

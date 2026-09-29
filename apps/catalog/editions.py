@@ -14,7 +14,9 @@ it replaces, so a caller can have the second checked too: `may_replace` is
 asked about the replaced edition inside the lock, so the row it approves is
 the row that gets cleared. The catalogue API checks both ends
 (apps/catalog/views.py); the admin, which admits the superuser alone, passes
-nothing.
+nothing, and so does the demo seed, which makes an edition current only for a
+course with none, where nothing is replaced
+(apps/roles/management/commands/populate_demo.py).
 """
 
 from __future__ import annotations
