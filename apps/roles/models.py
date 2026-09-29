@@ -76,8 +76,12 @@ class RoleAssignment(models.Model):
     def __str__(self) -> str:
         # getattr, not self.user: an unsaved row with no user raises
         # RelatedObjectDoesNotExist, a subclass of AttributeError getattr catches.
-        # A scope is spelt the way the command line spells it: CODE:YEAR for an
-        # edition, the code for a programme.
         user = getattr(self, "user", None)
-        scope = self.edition or (self.programme.code if self.programme else "?")
-        return f"{user.get_username() if user else '?'} · {self.role} · {scope}"
+        return f"{user.get_username() if user else '?'} · {self.role} · {self.scope_label}"
+
+    @property
+    def scope_label(self) -> str:
+        """The scope as the command line spells it: CODE:YEAR, or a programme's code."""
+        if self.edition is not None:
+            return str(self.edition)
+        return self.programme.code if self.programme is not None else "?"

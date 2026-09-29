@@ -1,4 +1,7 @@
-"""The catalogue as the API shows it: read-only, each scope with what the caller holds on it.
+"""The catalogue as the API shows it, and the staff members of a scope.
+
+The catalogue is read-only here, each scope with what the caller holds on it;
+its rows are entered in the admin.
 
 `permissions` is how the SPA knows which buttons to offer, without working
 anything out from role names: it is `permissions_on()` (apps/roles/scopes.py)
@@ -10,8 +13,12 @@ the serializer fails on it rather than reporting an empty set.
 
 from __future__ import annotations
 
+from typing import Any
+
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from apps.accounts.models import User
 from apps.catalog.models import Course, CourseEdition, DegreeProgramme
 from apps.roles.scopes import permissions_on
 
@@ -48,3 +55,21 @@ class EditionSerializer(serializers.ModelSerializer[CourseEdition]):
 
     def get_permissions(self, edition: CourseEdition) -> list[str]:
         return sorted(permissions_on(self.context["request"].user, edition))
+
+
+class StaffMemberSerializer(serializers.Serializer):
+    """A member of a scope's staff: shown by id and username, and named by username to add one.
+
+    A plain serializer, not a `ModelSerializer[User]`: that would validate the
+    username as a new, unique one, and refuse every user who exists.
+    """
+
+    id = serializers.IntegerField(read_only=True)
+    username = serializers.CharField(max_length=150)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        try:
+            attrs["user"] = User.objects.get(username=attrs["username"])
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"username": [_("No such user.")]}) from None
+        return attrs

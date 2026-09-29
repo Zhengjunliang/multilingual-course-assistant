@@ -59,3 +59,16 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = MappingProxyType(
 def roles_with(permission: Permission) -> frozenset[Role]:
     """The roles that hold `permission` on the scopes they cover."""
     return frozenset(role for role, held in ROLE_PERMISSIONS.items() if permission in held)
+
+
+# The assign table: holding this permission on a role's scope is what lets a
+# caller grant or revoke that role there, as Moodle's role_allow_assign and
+# Open edX's _check_caller_authority decide it. Secretariat staff assign
+# teachers in their programme's editions; no role holds the permission that
+# assigns secretariat staff, so only the superuser does.
+GRANT_PERMISSION: Mapping[Role, Permission] = MappingProxyType(
+    {
+        Role.TEACHER: Permission.EDITION_ASSIGN_TEACHER,
+        Role.SECRETARIAT: Permission.PROGRAMME_ASSIGN_SECRETARIAT,
+    }
+)

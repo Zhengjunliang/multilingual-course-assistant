@@ -72,6 +72,16 @@ class EditionView(ScopedObjectView[CourseEdition]):
         return editions_for(self.request.user, self.visible_with).select_related("course")
 
 
+class ProgrammeView(ScopedObjectView[DegreeProgramme]):
+    """A view on one programme, named in the URL by its code."""
+
+    lookup_field = "code"
+    visible_with = Permission.PROGRAMME_VIEW
+
+    def get_queryset(self) -> QuerySet[DegreeProgramme]:
+        return programmes_for(self.request.user, self.visible_with)
+
+
 class EditionSetCurrentView(EditionView):
     """`POST` makes the edition its course's current one and answers with the edition."""
 
