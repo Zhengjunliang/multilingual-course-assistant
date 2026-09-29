@@ -86,5 +86,79 @@
     "title": "La risposta non è stata completata",
     "incomplete": "La risposta si è interrotta prima della fine.",
     "retryAfter": "Il servizio ha chiesto di riprovare tra {{seconds}} secondi."
+  },
+  "staff": {
+    "area": "Area staff",
+    "cancel": "Annulla",
+    "breadcrumb": "Percorso",
+    "loadFailed": "Impossibile caricare la pagina. Riprova.",
+    "nav": {
+      "label": "Area staff",
+      "editions": "Edizioni",
+      "programmes": "Corsi di laurea",
+      "admin": "Amministrazione",
+      "chat": "Torna alla chat"
+    },
+    "editions": {
+      "title": "Edizioni dei corsi",
+      "ofProgramme": "Insegnamenti offerti da {{programme}}.",
+      "caption": "Edizioni di tua competenza",
+      "empty": "Nessuna edizione corrisponde.",
+      "filter": "Filtra per insegnamento o docente",
+      "allYears": "Tutti gli anni",
+      "course": "Insegnamento",
+      "year": "Anno accademico",
+      "status": "Stato",
+      "teachers": "Docenti",
+      "actions": "Azioni",
+      "current": "Corrente",
+      "setCurrent": "Rendi corrente"
+    },
+    "setCurrent": {
+      "action": "Rendi corrente {{course}} {{year}}",
+      "title": "Rendere corrente {{new}}?",
+      "body": "{{new}} diventa l'edizione corrente di {{course}}; {{old}} non lo sarà più.",
+      "bodyAlone": "{{new}} diventa l'edizione corrente di {{course}}.",
+      "confirm": "Rendi corrente",
+      "done": "{{new}} è l'edizione corrente di {{course}}."
+    },
+    "members": {
+      "teachers": "Docenti",
+      "secretariat": "Segreteria",
+      "username": "Aggiungi per nome utente esatto",
+      "add": "Aggiungi",
+      "remove": "Rimuovi {{username}}",
+      "removeTitle": "Rimuovere {{username}}?",
+      "removeBody": "{{username}} non farà più parte di {{group}} di {{scope}}.",
+      "removeConfirm": "Rimuovi",
+      "empty": "nessuno.",
+      "added": "{{username}} aggiunto.",
+      "removed": "{{username}} rimosso.",
+      "gone": "{{username}} era già stato rimosso altrove; l'elenco è aggiornato."
+    },
+    "programmes": {
+      "title": "Corsi di laurea",
+      "caption": "Corsi di laurea di tua competenza",
+      "empty": "Nessun corso di laurea di tua competenza.",
+      "code": "Codice",
+      "name": "Nome",
+      "editions": "Edizioni degli insegnamenti di questo corso di laurea"
+    },
+    "notFound": {
+      "title": "Non trovato",
+      "body": "Qui non c'è nulla, oppure è fuori dalla tua competenza.",
+      "back": "Torna alle edizioni"
+    },
+    "error": {
+      "no_such_user": "Nessun account ha questo nome utente.",
+      "already_held": "Questo utente ha già questo ruolo qui.",
+      "switch_needs_both": "Non puoi sostituire l'edizione corrente: chiedi alla segreteria di cambiarla.",
+      "required": "Inserisci un nome utente.",
+      "blank": "Inserisci un nome utente.",
+      "not_authenticated": "La sessione è scaduta. Accedi di nuovo.",
+      "permission_denied": "Non hai il permesso di farlo.",
+      "not_found": "Non esiste più.",
+      "unknown": "Qualcosa è andato storto. Riprova."
+    }
   }
 }

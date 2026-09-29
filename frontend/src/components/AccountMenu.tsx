@@ -13,10 +13,12 @@
  * menu to finish makes the order explicit.
  */
 
-import { LogOut, UserRound } from "lucide-react";
+import { Briefcase, LogOut, UserRound } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
+import { isStaff } from "@/auth/staff";
 import { useSession } from "@/auth/useSession";
 import { AccountDialog } from "@/components/AccountDialog";
 import { Avatar } from "@/components/ui/avatar";
@@ -27,8 +29,22 @@ export function AccountMenu() {
   const { account, logOut } = useSession();
   const [dialogOpen, setDialogOpen] = useState(false);
   const wantsDialog = useRef(false);
+  const navigate = useNavigate();
 
   if (account === null) return null;
+
+  // The staff area's one entry, as Open WebUI puts its admin panel in the user
+  // menu (outside the repository: Open WebUI source), and only for whoever may open it.
+  const staff = isStaff(account)
+    ? [
+        {
+          key: "staff",
+          icon: Briefcase,
+          label: t("staff.area"),
+          onSelect: () => navigate("/staff"),
+        },
+      ]
+    : [];
 
   return (
     <>
@@ -42,6 +58,7 @@ export function AccountMenu() {
           setDialogOpen(true);
         }}
         entries={[
+          ...staff,
           {
             key: "account",
             icon: UserRound,

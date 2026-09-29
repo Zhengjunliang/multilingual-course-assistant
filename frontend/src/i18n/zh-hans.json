@@ -86,5 +86,79 @@
     "title": "回答没有完成",
     "incomplete": "回答在结束之前中断了。",
     "retryAfter": "服务要求 {{seconds}} 秒后重试。"
+  },
+  "staff": {
+    "area": "教职工区",
+    "cancel": "取消",
+    "breadcrumb": "路径",
+    "loadFailed": "页面加载失败，请重试。",
+    "nav": {
+      "label": "教职工区",
+      "editions": "课程版本",
+      "programmes": "专业",
+      "admin": "管理后台",
+      "chat": "返回聊天"
+    },
+    "editions": {
+      "title": "课程版本",
+      "ofProgramme": "{{programme}} 开设的课程。",
+      "caption": "你负责范围内的课程版本",
+      "empty": "没有匹配的版本。",
+      "filter": "按课程或老师筛选",
+      "allYears": "全部学年",
+      "course": "课程",
+      "year": "学年",
+      "status": "状态",
+      "teachers": "老师",
+      "actions": "操作",
+      "current": "当前",
+      "setCurrent": "设为当前"
+    },
+    "setCurrent": {
+      "action": "将 {{course}} {{year}} 设为当前",
+      "title": "将 {{new}} 设为当前？",
+      "body": "{{new}} 成为 {{course}} 的当前版本；{{old}} 将不再是。",
+      "bodyAlone": "{{new}} 成为 {{course}} 的当前版本。",
+      "confirm": "设为当前",
+      "done": "{{new}} 现为 {{course}} 的当前版本。"
+    },
+    "members": {
+      "teachers": "老师",
+      "secretariat": "教务秘书",
+      "username": "按准确的用户名添加",
+      "add": "添加",
+      "remove": "移除 {{username}}",
+      "removeTitle": "移除 {{username}}？",
+      "removeBody": "{{username}} 将不再是 {{scope}} 的{{group}}。",
+      "removeConfirm": "移除",
+      "empty": "暂无。",
+      "added": "已添加 {{username}}。",
+      "removed": "已移除 {{username}}。",
+      "gone": "{{username}} 已在别处被移除；列表已更新。"
+    },
+    "programmes": {
+      "title": "专业",
+      "caption": "你负责范围内的专业",
+      "empty": "你负责的范围内没有专业。",
+      "code": "代码",
+      "name": "名称",
+      "editions": "本专业所开课程的版本"
+    },
+    "notFound": {
+      "title": "未找到",
+      "body": "这里什么也没有，或者不在你的负责范围内。",
+      "back": "返回课程版本"
+    },
+    "error": {
+      "no_such_user": "没有使用此用户名的账号。",
+      "already_held": "该用户在这里已有此角色。",
+      "switch_needs_both": "当前版本不归你替换：请联系教务秘书切换。",
+      "required": "请输入用户名。",
+      "blank": "请输入用户名。",
+      "not_authenticated": "会话已结束，请重新登录。",
+      "permission_denied": "你没有权限执行此操作。",
+      "not_found": "它已经不存在了。",
+      "unknown": "出错了，请重试。"
+    }
   }
 }

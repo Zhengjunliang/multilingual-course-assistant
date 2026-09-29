@@ -86,5 +86,79 @@
     "title": "The answer was not completed",
     "incomplete": "The answer stopped before it was finished.",
     "retryAfter": "The service asked us to retry in {{seconds}} seconds."
+  },
+  "staff": {
+    "area": "Staff area",
+    "cancel": "Cancel",
+    "breadcrumb": "Breadcrumb",
+    "loadFailed": "This page could not be loaded. Try again.",
+    "nav": {
+      "label": "Staff area",
+      "editions": "Editions",
+      "programmes": "Degree programmes",
+      "admin": "Admin",
+      "chat": "Back to the chat"
+    },
+    "editions": {
+      "title": "Course editions",
+      "ofProgramme": "Courses offered by {{programme}}.",
+      "caption": "Editions in your scope",
+      "empty": "No edition matches.",
+      "filter": "Filter by course or teacher",
+      "allYears": "All years",
+      "course": "Course",
+      "year": "Academic year",
+      "status": "Status",
+      "teachers": "Teachers",
+      "actions": "Actions",
+      "current": "Current",
+      "setCurrent": "Make current"
+    },
+    "setCurrent": {
+      "action": "Make {{course}} {{year}} current",
+      "title": "Make {{new}} current?",
+      "body": "{{new}} becomes the current edition of {{course}}; {{old}} will no longer be.",
+      "bodyAlone": "{{new}} becomes the current edition of {{course}}.",
+      "confirm": "Make current",
+      "done": "{{new}} is the current edition of {{course}}."
+    },
+    "members": {
+      "teachers": "Teachers",
+      "secretariat": "Secretariat staff",
+      "username": "Add by exact username",
+      "add": "Add",
+      "remove": "Remove {{username}}",
+      "removeTitle": "Remove {{username}}?",
+      "removeBody": "{{username}} will no longer be among the {{group}} of {{scope}}.",
+      "removeConfirm": "Remove",
+      "empty": "nobody.",
+      "added": "{{username}} added.",
+      "removed": "{{username}} removed.",
+      "gone": "{{username}} had been removed elsewhere; the list is up to date."
+    },
+    "programmes": {
+      "title": "Degree programmes",
+      "caption": "Degree programmes in your scope",
+      "empty": "No degree programme in your scope.",
+      "code": "Code",
+      "name": "Name",
+      "editions": "Editions of the courses this programme offers"
+    },
+    "notFound": {
+      "title": "Not found",
+      "body": "There is nothing here, or it is outside your scope.",
+      "back": "Back to the editions"
+    },
+    "error": {
+      "no_such_user": "No account has this username.",
+      "already_held": "This user already holds this role here.",
+      "switch_needs_both": "The current edition is not yours to replace: ask the secretariat to switch it.",
+      "required": "Enter a username.",
+      "blank": "Enter a username.",
+      "not_authenticated": "Your session has ended. Sign in again.",
+      "permission_denied": "You are not allowed to do this.",
+      "not_found": "This is no longer there.",
+      "unknown": "Something went wrong. Try again."
+    }
   }
 }
