@@ -92,6 +92,20 @@ def test_point_ids_are_deterministic_uuids() -> None:
     assert point_id_of("abcd:classic:0000") == "47bd6dc5-6b06-58ba-8be7-f555c43eea5f"
 
 
+@pytest.mark.parametrize(
+    "location",
+    ["", "localhost:6333", "grpc://localhost:6334"],
+    ids=["empty", "host-port", "other-scheme"],
+)
+def test_open_client_refuses_what_is_neither_a_url_nor_a_directory(location: str) -> None:
+    # Opened as directories, these would create an embedded index somewhere
+    # nobody meant, and the process would hold its lock instead of sharing the
+    # server. The URL branch has no test here: a remote client checks the
+    # server's version on a thread of its own, which warns when CI has no server.
+    with pytest.raises(ValueError, match="not a Qdrant location"):
+        open_client(location)
+
+
 def test_indexing_is_idempotent_across_reruns(client: QdrantClient) -> None:
     """Re-indexing the same corpus snapshot must overwrite, not duplicate."""
     chunks = [make_chunk(0), make_chunk(1, "Quick sort picks a pivot.")]

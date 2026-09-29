@@ -4,7 +4,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from django.core.management import call_command
+from pydantic import SecretStr, ValidationError
+
+from config.env import Settings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -24,3 +28,14 @@ def test_rag_package_stays_free_of_django() -> None:
         check=True,
     )
     assert probe.stdout.strip() == "False"
+
+
+@pytest.mark.parametrize("value", ["", "data/qdrant"], ids=["empty", "directory"])
+def test_qdrant_url_takes_a_server_url_only(value: str) -> None:
+    """A directory in QDRANT_URL would bring back the embedded lock for every
+    process that reads the default, and an empty value would guess; both stop
+    the settings from loading instead."""
+    with pytest.raises(ValidationError, match="--qdrant"):
+        Settings(
+            django_secret_key=SecretStr("x"), django_db_password=SecretStr("x"), qdrant_url=value
+        )

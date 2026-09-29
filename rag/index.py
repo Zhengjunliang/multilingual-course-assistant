@@ -1,10 +1,10 @@
 """Step 3 of the ingest pipeline: chunk JSONL -> Qdrant hybrid index.
 
 Consumes the JSONL files written by `rag.chunk` and upserts every chunk into a
-local (embedded, serverless) Qdrant collection with two named vectors: `dense`
-(Qwen3-Embedding over `embed_text`) and `sparse` (BM25 over raw `text`). The
-full `Chunk` payload rides along so retrieval can filter and cite without ever
-reopening the source artifacts.
+Qdrant collection (the compose service by default, `open_client`) with two
+named vectors: `dense` (Qwen3-Embedding over `embed_text`) and `sparse` (BM25
+over raw `text`). The full `Chunk` payload rides along so retrieval can filter
+and cite without ever reopening the source artifacts.
 
 A directory holds the whole set of files of each edition it contains: indexing
 a directory also drops, within those editions, the points of files that left
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
@@ -40,6 +41,25 @@ SPARSE_VECTOR = "sparse"
 
 DEFAULT_QDRANT_DIR = Path(__file__).resolve().parent.parent / "data" / "qdrant"
 DEFAULT_DENSE_MODEL = "Qwen/Qwen3-Embedding-0.6B"
+
+# A location that starts with one of these is the Qdrant server; config/env.py
+# holds QDRANT_URL to the same test.
+SERVER_SCHEMES = ("http://", "https://")
+# "localhost:6333": a server URL that lost its scheme, never a directory name.
+_HOST_PORT = re.compile(r"[\w.-]+:\d+")
+
+# Every field a filter in rag/ reads (rag/search.py payload_filter, and the
+# deletes and counts below). A server needs a keyword index on each to plan a
+# filtered search; local mode keeps none.
+PAYLOAD_INDEXES = (
+    "course",
+    "academic_year",
+    "source_file",
+    "url",
+    "ingest_source",
+    "ingest_run_id",
+    "locale",
+)
 
 # (indices, values) — the neutral shape both the fastembed encoder and the test
 # stubs produce, so nothing outside the builders imports fastembed types.
@@ -144,10 +164,27 @@ def build_sparse_encoder() -> SparseEncoder:
     return _Bm25Sparse()
 
 
-def open_client(path: Path = DEFAULT_QDRANT_DIR) -> QdrantClient:
+def open_client(location: str | Path | None = None) -> QdrantClient:
+    """Open the index at `location`. An http:// or https:// URL is the Qdrant
+    server every process shares; any other value is a directory opened as an
+    embedded index, which one process holds at a time (the tests, the source of
+    a migration). `None` is the server named by QDRANT_URL (config/env.py).
+
+    An empty value, or anything that looks like a URL without being one, is an
+    error: neither kind ever falls back to the other.
+    """
     from qdrant_client import QdrantClient
 
-    return QdrantClient(path=str(path))
+    if location is None:
+        from config.env import env
+
+        location = env.qdrant_url
+    text = str(location)
+    if text.startswith(SERVER_SCHEMES):
+        return QdrantClient(url=text)
+    if not text.strip() or "://" in text or _HOST_PORT.fullmatch(text):
+        raise ValueError(f"not a Qdrant location: {text!r}; pass an http(s) URL or a directory")
+    return QdrantClient(path=text)
 
 
 def point_id_of(chunk_id: str) -> str:
@@ -162,17 +199,41 @@ def ensure_collection(
 ) -> None:
     from qdrant_client import models
 
-    if client.collection_exists(collection):
-        return
-    client.create_collection(
-        collection_name=collection,
-        vectors_config={
-            DENSE_VECTOR: models.VectorParams(size=dense_dimension, distance=models.Distance.COSINE)
-        },
-        sparse_vectors_config={
-            SPARSE_VECTOR: models.SparseVectorParams(modifier=models.Modifier.IDF)
-        },
-    )
+    if not client.collection_exists(collection):
+        client.create_collection(
+            collection_name=collection,
+            vectors_config={
+                DENSE_VECTOR: models.VectorParams(
+                    size=dense_dimension, distance=models.Distance.COSINE
+                )
+            },
+            sparse_vectors_config={
+                SPARSE_VECTOR: models.SparseVectorParams(modifier=models.Modifier.IDF)
+            },
+        )
+    ensure_payload_indexes(client, collection)
+
+
+def ensure_payload_indexes(client: QdrantClient, collection: str = COLLECTION) -> list[str]:
+    """Create the keyword indexes of PAYLOAD_INDEXES that `collection` lacks, and
+    return the fields created. Idempotent, and it runs on collections that
+    already exist, because `migrate()` copies none (local mode has none to copy).
+
+    An embedded index is skipped: qdrant-client warns that payload indexes have
+    no effect there, and does nothing.
+    """
+    from qdrant_client import models
+
+    options = client.init_options
+    if options.get("path") is not None or options.get("location") == ":memory:":
+        return []
+    existing = client.get_collection(collection).payload_schema
+    created = [field for field in PAYLOAD_INDEXES if field not in existing]
+    for field in created:
+        client.create_payload_index(
+            collection, field, field_schema=models.PayloadSchemaType.KEYWORD
+        )
+    return created
 
 
 def load_chunks(path: Path) -> list[Chunk]:
