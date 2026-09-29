@@ -2,6 +2,7 @@
 is all that retrieval will ever have. All tests run offline — stub encoders and
 an embedded Qdrant under tmp_path stand in for the real models and store."""
 
+import argparse
 import subprocess
 import sys
 import zlib
@@ -20,6 +21,7 @@ from rag.index import (
     DenseEncoder,
     SparseEncoder,
     SparseVector,
+    add_qdrant_argument,
     build_dense_encoder,
     cached_dense_encoder,
     collect_chunk_files,
@@ -94,16 +96,26 @@ def test_point_ids_are_deterministic_uuids() -> None:
 
 @pytest.mark.parametrize(
     "location",
-    ["", "localhost:6333", "grpc://localhost:6334"],
-    ids=["empty", "host-port", "other-scheme"],
+    ["", "localhost:6333", "127.0.0.1:6333/", "grpc://localhost:6334"],
+    ids=["empty", "host-port", "host-port-path", "other-scheme"],
 )
-def test_open_client_refuses_what_is_neither_a_url_nor_a_directory(location: str) -> None:
+def test_open_client_refuses_what_is_neither_a_url_nor_a_directory(
+    location: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Opened as directories, these would create an embedded index somewhere
     # nobody meant, and the process would hold its lock instead of sharing the
-    # server. The URL branch has no test here: a remote client checks the
-    # server's version on a thread of its own, which warns when CI has no server.
+    # server; the working directory is tmp_path so a regression writes there.
+    # The URL branch has no test here: a remote client checks the server's
+    # version on a thread of its own, which warns when CI has no server.
+    monkeypatch.chdir(tmp_path)
     with pytest.raises(ValueError, match="not a Qdrant location"):
         open_client(location)
+    # Every rag command refuses it while parsing, before a model loads.
+    parser = argparse.ArgumentParser()
+    add_qdrant_argument(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--qdrant", location])
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_indexing_is_idempotent_across_reruns(client: QdrantClient) -> None:

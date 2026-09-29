@@ -44,8 +44,9 @@ DEFAULT_DENSE_MODEL = "Qwen/Qwen3-Embedding-0.6B"
 # A location that starts with one of these is the Qdrant server; config/env.py
 # holds QDRANT_URL to the same test.
 SERVER_SCHEMES = ("http://", "https://")
-# "localhost:6333": a server URL that lost its scheme, never a directory name.
-_HOST_PORT = re.compile(r"[\w.-]+:\d+")
+# "localhost:6333" or "127.0.0.1:6333/": a server URL that lost its scheme,
+# never a directory name. A drive letter ("C:/x") has no digits after its colon.
+_HOST_PORT = re.compile(r"[\w.-]+:\d+(?:/.*)?")
 
 # Every field a filter in rag/ reads (rag/search.py payload_filter, and the
 # deletes and counts below). A server needs a keyword index on each to plan a
@@ -163,14 +164,24 @@ def build_sparse_encoder() -> SparseEncoder:
     return _Bm25Sparse()
 
 
+def qdrant_location(text: str) -> str:
+    """`text` unchanged if it can name an index: an http:// or https:// URL, or
+    anything else a directory could be called. An empty value, or anything that
+    looks like a URL without being one, is an error: neither kind ever falls
+    back to the other."""
+    if not text.startswith(SERVER_SCHEMES) and (
+        not text.strip() or "://" in text or _HOST_PORT.fullmatch(text)
+    ):
+        raise ValueError(f"not a Qdrant location: {text!r}; pass an http(s) URL or a directory")
+    return text
+
+
 def open_client(location: str | Path | None = None) -> QdrantClient:
     """Open the index at `location`. An http:// or https:// URL is the Qdrant
     server every process shares; any other value is a directory opened as an
-    embedded index, which one process holds at a time (the tests, the source of
-    a migration). `None` is the server named by QDRANT_URL (config/env.py).
-
-    An empty value, or anything that looks like a URL without being one, is an
-    error: neither kind ever falls back to the other.
+    embedded index, which one process holds at a time (the tests, a machine
+    without the service). `None` is the server named by QDRANT_URL
+    (config/env.py). What `qdrant_location` refuses is an error here too.
     """
     from qdrant_client import QdrantClient
 
@@ -178,19 +189,20 @@ def open_client(location: str | Path | None = None) -> QdrantClient:
         from config.env import env
 
         location = env.qdrant_url
-    text = str(location)
+    text = qdrant_location(str(location))
     if text.startswith(SERVER_SCHEMES):
         return QdrantClient(url=text)
-    if not text.strip() or "://" in text or _HOST_PORT.fullmatch(text):
-        raise ValueError(f"not a Qdrant location: {text!r}; pass an http(s) URL or a directory")
     return QdrantClient(path=text)
 
 
 def add_qdrant_argument(parser: argparse.ArgumentParser) -> None:
-    """The one --qdrant of every rag command, read by `open_client`."""
+    """The one --qdrant of every rag command, read by `open_client`. A value
+    that names no index is a usage error while the arguments are parsed, before
+    any model loads."""
     parser.add_argument(
         "--qdrant",
         metavar="URL|DIR",
+        type=qdrant_location,
         default=None,
         help="the Qdrant server's http(s) URL, or a directory to open as an embedded "
         "index that one process holds at a time (default: QDRANT_URL)",
@@ -224,10 +236,11 @@ def ensure_collection(
     ensure_payload_indexes(client, collection)
 
 
-def ensure_payload_indexes(client: QdrantClient, collection: str = COLLECTION) -> list[str]:
-    """Create the keyword indexes of PAYLOAD_INDEXES that `collection` lacks, and
-    return the fields created. Idempotent, and it runs on collections that
-    already exist, because `migrate()` copies none (local mode has none to copy).
+def ensure_payload_indexes(client: QdrantClient, collection: str = COLLECTION) -> None:
+    """Create the keyword indexes of PAYLOAD_INDEXES that `collection` lacks.
+    Idempotent, and it runs on collections that already exist: a collection
+    copied from an embedded index (local mode keeps none), or created before a
+    field joined PAYLOAD_INDEXES, lacks them.
 
     An embedded index is skipped: qdrant-client warns that payload indexes have
     no effect there, and does nothing.
@@ -236,14 +249,13 @@ def ensure_payload_indexes(client: QdrantClient, collection: str = COLLECTION) -
 
     options = client.init_options
     if options.get("path") is not None or options.get("location") == ":memory:":
-        return []
+        return
     existing = client.get_collection(collection).payload_schema
-    created = [field for field in PAYLOAD_INDEXES if field not in existing]
-    for field in created:
-        client.create_payload_index(
-            collection, field, field_schema=models.PayloadSchemaType.KEYWORD
-        )
-    return created
+    for field in PAYLOAD_INDEXES:
+        if field not in existing:
+            client.create_payload_index(
+                collection, field, field_schema=models.PayloadSchemaType.KEYWORD
+            )
 
 
 def load_chunks(path: Path) -> list[Chunk]:
