@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.qa",
     "apps.catalog",
+    "apps.roles",
 ]
 
 # One entry that must never be added here: `GZipMiddleware`. It compresses a

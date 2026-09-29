@@ -21,7 +21,7 @@ Each of these is the only guard of what it protects. One that meets a criterion 
 
 | What it protects | Where |
 | ---------------- | ----- |
-| The scope invariants of [data-model.md](data-model.md) | `tests/test_catalog_models.py` |
+| The scope invariants of [data-model.md](data-model.md) | `tests/test_catalog_models.py`; `tests/test_roles.py` for invariant 3 |
 | `rag/` runs without Django | `tests/test_smoke.py` |
 | The TypeScript mirror of `apps/qa/contract.py` | `tests/test_qa_contract.py` |
 | Login, logout, sessions, CSRF and the login throttle | `tests/test_accounts_api.py`, and the cases of `tests/test_qa_api.py` that refuse an anonymous caller |
