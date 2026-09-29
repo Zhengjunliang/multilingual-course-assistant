@@ -181,6 +181,10 @@ def test_logging_out_ends_the_session(student: User) -> None:
     assert client.get(ME_URL).json()["authenticated"] is False
 
 
+def test_logging_out_needs_a_login() -> None:
+    assert APIClient().post(LOGOUT_URL).status_code == 403
+
+
 def test_a_student_can_change_the_interface_language(student: User) -> None:
     response = logged_in().patch(ME_URL, {"locale": "zh-hans"}, format="json")
     student.refresh_from_db()

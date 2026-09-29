@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 from django.db import transaction
 from rest_framework.generics import ListAPIView, RetrieveDestroyAPIView
+from rest_framework.permissions import IsAuthenticated
 
 from apps.qa.models import Conversation
 from apps.qa.serializers import ConversationDetailSerializer, ConversationSerializer
@@ -37,6 +38,7 @@ class ConversationListView(ListAPIView):
     Not listing what has no messages costs one join and is true by construction.
     """
 
+    permission_classes = (IsAuthenticated,)
     serializer_class = ConversationSerializer
 
     def get_queryset(self) -> QuerySet[Conversation]:
@@ -59,6 +61,7 @@ class ConversationDetailView(RetrieveDestroyAPIView):
     from the first question and are never stored.
     """
 
+    permission_classes = (IsAuthenticated,)
     serializer_class = ConversationDetailSerializer
 
     def get_queryset(self) -> QuerySet[Conversation]:

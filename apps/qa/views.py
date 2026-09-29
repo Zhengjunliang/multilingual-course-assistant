@@ -47,6 +47,7 @@ from django.http import StreamingHttpResponse
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -198,6 +199,7 @@ class AskView(APIView):
     # `Accept: */*`, which is what curl sends — gets plain JSON for the error
     # bodies; the SSE framing is for whoever explicitly asked for the stream.
     renderer_classes = (JSONRenderer, ServerSentEventRenderer)
+    permission_classes = (IsAuthenticated,)
 
     # Its own bucket, separate from the login endpoints': what limits this one
     # is a GPU that answers about two questions a minute, and what limits those
