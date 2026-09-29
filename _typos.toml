@@ -9,6 +9,8 @@ extend-exclude = [
   # The Italian and Chinese interface catalogues; en.json stays checked.
   "frontend/src/i18n/it.json",
   "frontend/src/i18n/zh-hans.json",
+  # Italian course and programme names, transcribed from the Cineca catalogue.
+  "apps/roles/management/commands/demo_catalog.json",
   # Generated, and full of package names.
   "uv.lock",
   "frontend/package-lock.json",

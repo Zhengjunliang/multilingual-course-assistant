@@ -6,7 +6,9 @@ revocation made here is logged once its transaction commits, so a write that
 is rolled back leaves no line, the way Moodle's `role_assign()` fires its
 `role_assigned` event; a grant the user already holds changes nothing and logs
 nothing. The superuser's changes in the admin do not come through here and
-stay in the admin's own history.
+stay in the admin's own history; neither do the demo seed's
+(apps/roles/management/commands/populate_demo.py), which prints each role row
+it adds or removes.
 """
 
 from __future__ import annotations
