@@ -117,8 +117,9 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         # Signed in on the way out. The alternative is a second form asking for
-        # the two fields just typed, and `login` resolves the single configured
-        # authentication backend by itself — it only needs telling when there
-        # is more than one to choose from.
-        login(request, user)
+        # the two fields just typed. A user that did not come through
+        # `authenticate` carries no backend, and with two configured `login`
+        # has to be told which one vouches for them: `ModelBackend`, the one
+        # that checks passwords.
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         return Response(session_body(user), status=status.HTTP_201_CREATED)
