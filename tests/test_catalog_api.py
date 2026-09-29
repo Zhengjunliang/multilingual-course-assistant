@@ -11,7 +11,7 @@ refused.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from django.db import connection, transaction
@@ -20,9 +20,10 @@ from rest_framework.test import APIClient
 from test_roles import everyone, label, world
 
 from apps.catalog.editions import SWITCH_NEEDS_BOTH
-from apps.catalog.models import CourseEdition
+from apps.catalog.models import CourseEdition, CurriculumEntry
 from apps.roles.grants import revoke
 from apps.roles.models import RoleAssignment
+from apps.roles.registry import Role
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -50,52 +51,119 @@ def switch_url(edition: CourseEdition) -> str:
     return f"/api/catalog/editions/{edition.pk}/set-current"
 
 
+def row_label(row: dict[str, Any]) -> str:
+    """An edition as the API lists it, spelt CODE:YEAR like `label()`."""
+    return f"{row['course']['code']}:{row['academic_year']}"
+
+
 def test_each_caller_lists_their_own_scope() -> None:
     w = world()
+    reads = {label(e): f"{EDITIONS_URL}/{e.pk}" for e in (w.ppm_old, w.ppm_new, w.ia, w.shared)}
+    reads |= {p.code: f"{PROGRAMMES_URL}/{p.code}" for p in (w.b047, w.l031)}
 
     seen: dict[str, object] = {}
+    teachers: dict[str, set[tuple[str, ...]]] = {}
+    # Reading one scope answers what the list says of it, and 404 for what it leaves out.
+    unlike_the_list: dict[str, list[str]] = {}
     for user in (*everyone(w), None):
         client = as_user(user)
         editions, programmes = client.get(EDITIONS_URL), client.get(PROGRAMMES_URL)
         name = user.username if user is not None else "anonymous"
+        read = {key: client.get(url) for key, url in reads.items()}
         if editions.status_code != 200:
-            seen[name] = (editions.status_code, programmes.status_code)
+            statuses = sorted({response.status_code for response in read.values()})
+            seen[name] = (editions.status_code, programmes.status_code, statuses)
             continue
+        rows = {row_label(e): e for e in editions.json()} | {
+            p["code"]: p for p in programmes.json()
+        }
+        answered = {
+            key: response.json() if response.status_code == 200 else response.status_code
+            for key, response in read.items()
+        }
+        if differ := sorted(key for key in reads if answered[key] != rows.get(key, 404)):
+            unlike_the_list[name] = differ
+        for e in editions.json():
+            teachers.setdefault(row_label(e), set()).add(
+                tuple(t["username"] for t in e["teachers"])
+            )
         seen[name] = (
-            {
-                f"{e['course']['code']}:{e['academic_year']}": e["permissions"]
-                for e in editions.json()
-            },
+            {row_label(e): (e["permissions"], e["can_set_current"]) for e in editions.json()},
             {p["code"]: p["permissions"] for p in programmes.json()},
         )
 
     ppm_old, ppm_new, ia, shared = OLD, NEW, "B003725:2025-2026", "B000001:2025-2026"
+    teaches, runs = (TEACHES, True), (RUNS_EDITION, True)
     assert seen == {
-        "continuing": ({ppm_old: TEACHES, ppm_new: TEACHES}, {}),
-        "newcomer": ({ppm_new: TEACHES}, {}),
+        "continuing": ({ppm_old: teaches, ppm_new: teaches}, {}),
+        # The switch to the new year would replace last year's edition, which
+        # this teacher does not teach (test_switching_the_current_edition).
+        "newcomer": ({ppm_new: (TEACHES, False)}, {}),
         "secretariat": (
-            {ppm_old: RUNS_EDITION, ppm_new: RUNS_EDITION, shared: RUNS_EDITION},
+            {ppm_old: runs, ppm_new: runs, shared: runs},
             {"B047": ["programme.view"]},
         ),
         "other_secretariat": (
-            {ia: RUNS_EDITION, shared: RUNS_EDITION},
+            {ia: runs, shared: runs},
             {"L031": ["programme.view"]},
         ),
         "dual": (
-            {ia: TEACHES, ppm_old: RUNS_EDITION, ppm_new: RUNS_EDITION, shared: RUNS_EDITION},
+            {ia: teaches, ppm_old: runs, ppm_new: runs, shared: runs},
             {"B047": ["programme.view"]},
         ),
         "student": ({}, {}),
         "root": (
-            {ppm_old: RUNS_EDITION, ppm_new: RUNS_EDITION, ia: RUNS_EDITION, shared: RUNS_EDITION},
+            {ppm_old: runs, ppm_new: runs, ia: runs, shared: runs},
             {
                 "B047": ["programme.assign_secretariat", "programme.view"],
                 "L031": ["programme.assign_secretariat", "programme.view"],
             },
         ),
         # A disabled account has no session, whatever it held.
-        "inactive": (403, 403),
-        "anonymous": (403, 403),
+        "inactive": (403, 403, [403]),
+        "anonymous": (403, 403, [403]),
+    }
+    assert unlike_the_list == {}
+    # Whoever lists an edition sees the same teachers on it.
+    assert teachers == {
+        ppm_old: {("continuing",)},
+        ppm_new: {("continuing", "newcomer")},
+        ia: {("dual",)},
+        shared: {()},
+    }
+
+
+def test_the_edition_list_narrows_to_a_programme() -> None:
+    w = world()
+    # PPM in B047's second curriculum too: two entries, still one row per edition.
+    CurriculumEntry.objects.create(
+        programme=w.b047,
+        course=w.ppm_old.course,
+        curriculum="TECNICO SCIENTIFICO",
+        year_of_study=3,
+        ad_code="B028451",
+    )
+    asked = {
+        "secretariat, their programme": (w.secretariat, "B047"),
+        # The shared course is L031's too, which this caller may not be told.
+        "secretariat, another programme": (w.secretariat, "L031"),
+        "superuser, a programme": (w.root, "L031"),
+        "superuser, an unknown code": (w.root, "X999"),
+        # A teacher views no programme, so no code narrows their list to anything.
+        "teacher, their course's programme": (w.continuing, "B047"),
+    }
+
+    seen = {
+        case: [row_label(e) for e in as_user(user).get(EDITIONS_URL, {"programme": code}).json()]
+        for case, (user, code) in asked.items()
+    }
+
+    assert seen == {
+        "secretariat, their programme": ["B000001:2025-2026", NEW, OLD],
+        "secretariat, another programme": [],
+        "superuser, a programme": ["B000001:2025-2026", "B003725:2025-2026"],
+        "superuser, an unknown code": [],
+        "teacher, their course's programme": [],
     }
 
 
@@ -149,6 +217,44 @@ def test_switching_the_current_edition() -> None:
         "GET": (405, OLD, None),
     }
 
+    # The flag every listed row carries is the switch's own answer: each row is
+    # posted for real, in a transaction rolled back, once as the world is and
+    # once with PPM's current edition cleared, where a switch replaces nothing.
+    # A row a caller does not list is a 404 to them, pinned above.
+    def flags_and_answers() -> dict[tuple[str, str], tuple[bool, int]]:
+        cells: dict[tuple[str, str], tuple[bool, int]] = {}
+        for user in everyone(w):
+            if not user.is_active:
+                continue
+            client = as_user(user)
+            for row in client.get(EDITIONS_URL).json():
+                answer = rolled_back(
+                    lambda client=client, row=row: (
+                        client.post(f"{EDITIONS_URL}/{row['id']}/set-current").status_code
+                    )
+                )
+                cells[(user.username, row_label(row))] = (row["can_set_current"], answer)
+        return cells
+
+    def without_a_current_ppm_edition() -> dict[tuple[str, str], tuple[bool, int]]:
+        # Not through set_current(), which only ever moves the flag.
+        CourseEdition.objects.filter(pk=w.ppm_old.pk).update(is_current=False)
+        return flags_and_answers()
+
+    variants = {
+        "as the world is": flags_and_answers(),
+        "no current PPM edition": rolled_back(without_a_current_ppm_edition),
+    }
+    cells = {
+        (variant, *cell): pair
+        for variant, found in variants.items()
+        for cell, pair in found.items()
+    }
+    assert {cell: pair for cell, pair in cells.items() if pair[0] != (pair[1] == 200)} == {}
+    assert {cell for cell, (flag, _) in cells.items() if not flag} == {
+        ("as the world is", "newcomer", NEW)
+    }
+
 
 def test_a_write_without_the_csrf_token_is_refused() -> None:
     w = world()
@@ -171,8 +277,11 @@ def test_the_edition_list_costs_the_same_for_more_editions() -> None:
         return listed, len(captured.captured_queries)
 
     few = queries()
+    # More editions, and teachers on editions that had none.
     for year in ("2022-2023", "2023-2024"):
-        CourseEdition.objects.create(course=w.ppm_old.course, academic_year=year)
+        edition = CourseEdition.objects.create(course=w.ppm_old.course, academic_year=year)
+        RoleAssignment.objects.create(user=w.newcomer, role=Role.TEACHER, edition=edition)
+    RoleAssignment.objects.create(user=w.student, role=Role.TEACHER, edition=w.shared)
     more = queries()
 
     assert (few[0], more[0]) == (3, 5)

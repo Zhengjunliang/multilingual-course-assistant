@@ -8,7 +8,13 @@ from apps.catalog.staff_views import (
     ProgrammeSecretariatMemberView,
     ProgrammeSecretariatView,
 )
-from apps.catalog.views import EditionListView, EditionSetCurrentView, ProgrammeListView
+from apps.catalog.views import (
+    EditionDetailView,
+    EditionListView,
+    EditionSetCurrentView,
+    ProgrammeDetailView,
+    ProgrammeListView,
+)
 
 
 class _Key:
@@ -32,6 +38,7 @@ app_name = "catalog"
 urlpatterns = [
     # No trailing slash, matching the rest of the API (apps/qa/urls.py).
     path("programmes", ProgrammeListView.as_view(), name="programmes"),
+    path("programmes/<key:code>", ProgrammeDetailView.as_view(), name="programme"),
     path(
         "programmes/<key:code>/secretariat",
         ProgrammeSecretariatView.as_view(),
@@ -43,6 +50,7 @@ urlpatterns = [
         name="programme-secretariat-member",
     ),
     path("editions", EditionListView.as_view(), name="editions"),
+    path("editions/<int:pk>", EditionDetailView.as_view(), name="edition"),
     path("editions/<int:pk>/set-current", EditionSetCurrentView.as_view(), name="set-current"),
     path("editions/<int:pk>/teachers", EditionTeachersView.as_view(), name="edition-teachers"),
     path(

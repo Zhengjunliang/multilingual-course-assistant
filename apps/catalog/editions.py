@@ -23,15 +23,31 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Q
 
 from apps.catalog.models import CourseEdition
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from django.db.models import OuterRef
+
+    from apps.catalog.models import Course
+
 # One fixed sentence, so a page can tell this refusal from a plain lack of
 # permission on the edition itself without being told which edition is current.
 SWITCH_NEEDS_BOTH = "Switching also needs edition.set_current on the course's current edition."
+
+
+def current_besides(course: Course | OuterRef, pk: int | OuterRef) -> Q:
+    """The edition a switch to edition `pk` of `course` replaces: the course's other current one.
+
+    The one definition of it. `set_current()` clears what it matches, and
+    the catalogue lists ask it of each row through `OuterRef`s to tell the
+    caller whether a switch would pass (`with_switch()`, apps/roles/scopes.py),
+    so the flag a page reads and the check a switch makes cannot disagree.
+    """
+    return Q(course=course, is_current=True) & ~Q(pk=pk)
 
 
 def _anyone(replaced: CourseEdition) -> bool:
@@ -69,7 +85,7 @@ def set_current(
             )
         # Clear first: the one-current constraint is not deferrable, so setting
         # the new flag while the old one stands would violate it on the spot.
-        stale = CourseEdition.objects.filter(course=course, is_current=True).exclude(pk=edition.pk)
+        stale = CourseEdition.objects.filter(current_besides(course, edition.pk))
         # At most one, by the one-current constraint; order_by() drops the
         # Meta ordering's join, as above.
         replaced = stale.order_by().first()
