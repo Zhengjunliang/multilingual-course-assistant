@@ -80,7 +80,7 @@ A framework pays off when many data sources are switched at will, or when a work
 | `DocumentLoader` | `DocumentConverter().convert()` in `rag/parse.py` |
 | `TextSplitter` | `HybridChunker` in `rag/chunk.py` |
 | `Embeddings` | Qwen3-Embedding, run locally with sentence-transformers (`rag/index.py`) |
-| `VectorStore` / `Retriever` | `qdrant-client`, embedded (a Qdrant service is 🔜 M5 `#33`) |
+| `VectorStore` / `Retriever` | `qdrant-client` against the Qdrant service (`docker-compose.yml`); embedded only in tests and with `--qdrant DIR` |
 | `Chain` / LCEL | a plain Python function |
 | `Graph` / `StateGraph` | the explicit loop `deepen()` in `rag/agent.py` |
 | `Callbacks` / tracing | Langfuse (🔜 M3 `#26`) |

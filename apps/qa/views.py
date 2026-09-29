@@ -80,8 +80,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Every 503 here is transient by construction: a stopped model server, an index
-# another process is holding, a question still being answered. A minute is long
+# Every 503 here is transient by construction: a stopped model server, a
+# stopped Qdrant service, a question still being answered. A minute is long
 # enough that a retry is not simply requeued behind the same work.
 RETRY_AFTER_SECONDS = 60
 

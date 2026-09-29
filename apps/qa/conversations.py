@@ -9,7 +9,7 @@ what crosses into `rag/` is `Turn`, two strings on a frozen model.
 **Where the writes happen matters more than what they write.** Both rows are
 created after the engine's first event has been pulled, never before. Until that
 `next()` returns, the question can still fail into a 503 — a stopped model
-server, an index another process is holding — and a question that was refused
+server, a stopped Qdrant service — and a question that was refused
 before it was ever asked should leave nothing behind. Created earlier, every
 503 would deposit a question with no answer under it, and the next turn's
 history would be built around the hole.

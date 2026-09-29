@@ -40,7 +40,9 @@ from django.core.cache import cache
 from django.core.signals import request_finished
 from django.db import close_old_connections
 from openai import APIConnectionError, NotFoundError
-from qdrant_client import QdrantClient
+from pydantic import ValidationError
+from qdrant_client import QdrantClient, models
+from qdrant_client.http.exceptions import ResponseHandlingException
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 from test_agent import ScriptedCompleter
 from test_index import StubDense, StubSparse, make_chunk
@@ -502,33 +504,47 @@ def test_an_unbuilt_index_becomes_503(tmp_path: Path) -> None:
     assert "rag.index" in response.json()["detail"]
 
 
-# Verbatim from qdrant-client, reproduced by opening one embedded client on a
-# directory another already holds — which is exactly what a `rag.index` running
-# in a terminal does to the site. Injected rather than staged for real, because
-# a client whose constructor raises never closes its lock file, and the
-# ResourceWarning that leaks from it fails whichever test the GC happens to
-# reach it in (`filterwarnings = ["error"]`). The leak is upstream's; loosening
-# the warning gate for the whole suite to accommodate it is the worse trade.
-HELD_INDEX_ERROR = (
-    "Storage folder data/qdrant is already accessed by another instance of "
-    "Qdrant client. If you require concurrent access, use Qdrant server instead."
+def unparsable_reply() -> ValidationError:
+    """What qdrant-client wraps when a 200 reply has another schema: the answer
+    to `collection_exists` without its `exists` field."""
+    try:
+        models.CollectionExistence.model_validate({})
+    except ValidationError as exc:
+        return exc
+    raise AssertionError("an empty reply validated")
+
+
+@pytest.mark.parametrize(
+    ("source", "is_503"),
+    [
+        # What qdrant-client wraps when nothing listens on the port, in the
+        # wording Windows gives a refused connection.
+        (httpx.ConnectError("[WinError 10061] connection refused"), True),
+        (unparsable_reply(), False),
+    ],
+    ids=["unreachable", "schema-drift"],
 )
+def test_an_index_server_that_fails_is_a_503_only_when_unreachable(
+    index: QdrantClient, monkeypatch: pytest.MonkeyPatch, source: Exception, is_503: bool
+) -> None:
+    """qdrant-client raises one exception class for both: a stopped Qdrant
+    service is an outage the caller can wait out, while a reply the client
+    cannot parse is a client and server of mismatched versions — a defect,
+    which must reach the log with its traceback rather than pass for an outage."""
 
+    def fail(collection_name: str) -> bool:
+        raise ResponseHandlingException(source)
 
-def test_an_index_held_by_another_process_becomes_503(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The everyday conflict, and the only route into `build_engine`'s error
-    branch: the autouse fixture leaves the slot empty, so the view really does
-    try to build an engine here."""
+    install_engine(index, SLIDES_ROUTE)
+    monkeypatch.setattr(index, "collection_exists", fail)
 
-    def refuse(path: Path) -> QdrantClient:
-        raise RuntimeError(HELD_INDEX_ERROR)
-
-    monkeypatch.setattr(rag_index, "open_client", refuse)
-
+    if not is_503:
+        with pytest.raises(ResponseHandlingException):
+            ask()
+        return
     response = ask()
-
     assert response.status_code == 503
-    assert "another process" in response.json()["detail"]
+    assert "Qdrant service" in response.json()["detail"]
 
 
 def test_a_router_the_server_refuses_becomes_503(index: QdrantClient) -> None:
@@ -569,14 +585,15 @@ def test_a_failed_build_releases_the_index_and_is_not_cached(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A build that dies after opening the index — a first-run model download,
-    an out-of-memory card — must not strand the directory lock.
+    an out-of-memory card — must close the client it opened.
 
-    Left held, it would be this process colliding with itself on every later
-    request, under a message telling the caller to stop a terminal command that
-    was never running. Reopening the same path is what proves it was released.
+    The failed build is not cached, so every later request opens a client of
+    its own; one left open on each retry is a leak. An embedded index stands in
+    for the server because it shows the leak: reopening the same directory
+    raises while the first client still holds it.
     """
     path = tmp_path / "qdrant"
-    monkeypatch.setattr(rag_index, "DEFAULT_QDRANT_DIR", path)
+    monkeypatch.setattr(rag_index, "open_client", lambda location=None: open_client(path))
     monkeypatch.setattr(rag_index, "cached_dense_encoder", lambda *_, **__: StubDense())
     monkeypatch.setattr(rag_index, "build_sparse_encoder", StubSparse)
 
@@ -589,7 +606,7 @@ def test_a_failed_build_releases_the_index_and_is_not_cached(
 
     assert response.status_code == 503
     assert engine_module._HOLDER.engine is None
-    # Raises if the failed build kept the lock.
+    # Raises if the failed build left its client open.
     reopened = open_client(path)
     reopened.close()
 

@@ -130,7 +130,7 @@ def test_a_stream_nobody_reads_takes_no_lock() -> None:
 
 
 def test_answers_never_overlap() -> None:
-    """The serialisation is the whole design — one card, one embedded index —
+    """The serialisation is the whole design — one 8GB card, one answer at a time —
     and nothing in the HTTP tests would notice if the lock were deleted.
 
     Driven through `stream_answer` rather than HTTP: the claim is about the

@@ -186,7 +186,7 @@ A repeated page header is recognised as a heading (`HTML &amp; CSS`, on most pag
 | 0. Probe | ✅ `rag/probe.py` | PDF → profile → parse configuration | signals and thresholds (section 2.4) | an enrichment left off → content lost for good |
 | 1. Parse | ✅ `rag/parse.py` | PDF → DoclingDocument JSON | classic against VLM | garbled text, wrong column order, collapsed tables |
 | 2. Chunk | ✅ `rag/chunk.py` | document → chunks with payload, contextualized | HybridChunker with a matching tokenizer; heading chain with furniture removed (section 3.7) | chunks truncated when too large, context lost when too small |
-| 3. Index | ✅ `rag/index.py` | text → dense vectors; vectors, text and payload into Qdrant | Qwen3-Embedding-0.6B locally, `embed_text` to dense and `text` to sparse; embedded Qdrant with two named vectors (dense, and sparse fastembed BM25 with the IDF modifier); idempotent upsert by `uuid5(chunk_id)` | filter fields missing; languages misaligned across the dense space |
+| 3. Index | ✅ `rag/index.py` | text → dense vectors; vectors, text and payload into Qdrant | Qwen3-Embedding-0.6B locally, `embed_text` to dense and `text` to sparse; Qdrant with two named vectors (dense, and sparse fastembed BM25 with the IDF modifier); idempotent upsert by `uuid5(chunk_id)` | filter fields missing; languages misaligned across the dense space |
 
 ## 4. The query pipeline step by step
 

@@ -39,7 +39,6 @@ WEB_COLLECTION = "unifi_web"
 DENSE_VECTOR = "dense"
 SPARSE_VECTOR = "sparse"
 
-DEFAULT_QDRANT_DIR = Path(__file__).resolve().parent.parent / "data" / "qdrant"
 DEFAULT_DENSE_MODEL = "Qwen/Qwen3-Embedding-0.6B"
 
 # A location that starts with one of these is the Qdrant server; config/env.py

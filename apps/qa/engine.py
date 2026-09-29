@@ -11,13 +11,10 @@ The sparse encoder, the reranker, the Qdrant client and the two LLM clients are
 this process's own: nothing in `rag/` caches them, and nothing in `rag/`
 should, because a CLI that loads one and exits has nothing to share.
 
-**Questions are answered one at a time.** The lock is not only about the
-embedded Qdrant's exclusive directory lock: an 8GB card cannot host two
-concurrent rerank-plus-generate passes either, so the serialisation outlives
-the move to a Qdrant server. What that move does remove is the collision with
-the terminal — while this process holds the embedded index, an
-`uv run python -m rag.index` in another window cannot open it, and that
-collision arrives here as `EngineUnavailableError`.
+**Questions are answered one at a time.** An 8GB card cannot host two
+concurrent rerank-plus-generate passes, so this process serialises them; the
+index is the Qdrant service, which the terminal and the worker query at the
+same time (docker-compose.yml).
 
 Retrieval and generation logic is not reimplemented here. This module routes
 through `rag.agent.route`, retrieves through `rag.search.search` and generates
@@ -76,6 +73,11 @@ LLM_DOWN = _(
     "The generation endpoint did not respond. Check that the model server is "
     "running (Ollama by default)."
 )
+
+# The index is the compose service every process shares (docker-compose.yml);
+# naming the service, not a command, keeps server commands out of what the
+# caller reads.
+INDEX_DOWN = _("The search index did not respond. Check that the Qdrant service is running.")
 
 
 class EngineUnavailableError(Exception):
@@ -150,9 +152,12 @@ class Engine:
         lazily alongside the tokens. After it, the only way to report a failure
         is to describe it inside the stream.
         """
-        # Lazy on purpose: `rag/` imports the OpenAI SDK inside the functions
-        # that need it, and Django's startup should not pay for it either.
+        # Lazy on purpose: `rag/` imports the OpenAI SDK and qdrant-client inside
+        # the functions that need them, and Django's startup should not pay for
+        # them either.
         from openai import APIError
+        from pydantic import ValidationError
+        from qdrant_client.http.exceptions import ResponseHandlingException
 
         answer_locale = locale or detect_locale(question)
 
@@ -171,41 +176,53 @@ class Engine:
             logger.warning("routing failed: %s", exc)
             raise EngineUnavailableError(LLM_DOWN) from exc
 
-        # `both` is also what the router falls back to, so a question can be
-        # aimed at a collection this index never built: a fresh checkout follows
-        # the README, runs `rag.index` under its default `--collection slides`,
-        # and has no `unifi_web` at all. Dropping what is absent keeps such a
-        # question answerable from the half that exists, instead of turning a
-        # perfectly good slides corpus into a 503.
-        available = tuple(
-            name for name in collections_for(decision) if self.client.collection_exists(name)
-        )
-        if not available:
-            raise EngineUnavailableError(
-                _(
-                    "The search index cannot answer yet. Build it with "
-                    "`uv run python -m rag.index data/chunks`."
-                )
+        try:
+            # `both` is also what the router falls back to, so a question can be
+            # aimed at a collection this index never built: a fresh checkout
+            # follows the README, runs `rag.index` under its default
+            # `--collection slides`, and has no `unifi_web` at all. Dropping what
+            # is absent keeps such a question answerable from the half that
+            # exists, instead of turning a perfectly good slides corpus into a 503.
+            available = tuple(
+                name for name in collections_for(decision) if self.client.collection_exists(name)
             )
+            if not available:
+                raise EngineUnavailableError(
+                    _(
+                        "The search index cannot answer yet. Build it with "
+                        "`uv run python -m rag.index data/chunks`."
+                    )
+                )
 
-        # No `except ValueError` around this: with the collections checked
-        # above, the remaining ones are payload drift and mismatched reranker
-        # output — real defects, which deserve a traceback in the log rather
-        # than a 503 telling the caller to rebuild an index that is fine.
-        hits = search(
-            self.client,
-            # Retrieval runs on the rewritten query; generation below keeps
-            # the student's original wording, which is what must be answered.
-            decision.query,
-            self.dense,
-            self.sparse,
-            self.reranker,
-            # `None`: every edition; the caller's scope, computed from their
-            # programme, is `#36` (docs/data-model.md).
-            scope=None,
-            limit=TOP_K,
-            collections=available,
-        )
+            # No `except ValueError` around this: with the collections checked
+            # above, the remaining ones are payload drift and mismatched reranker
+            # output — real defects, which deserve a traceback in the log rather
+            # than a 503 telling the caller to rebuild an index that is fine.
+            hits = search(
+                self.client,
+                # Retrieval runs on the rewritten query; generation below keeps
+                # the student's original wording, which is what must be answered.
+                decision.query,
+                self.dense,
+                self.sparse,
+                self.reranker,
+                # `None`: every edition; the caller's scope, computed from their
+                # programme, is `#36` (docs/data-model.md).
+                scope=None,
+                limit=TOP_K,
+                collections=available,
+            )
+        except ResponseHandlingException as exc:
+            # qdrant-client wraps two failures in this one class: the transport
+            # (the server is down or unreachable) and a 200 reply it could not
+            # parse. The second is a client and server of mismatched versions, a
+            # defect that keeps its traceback, as does an HTTP error status
+            # (`UnexpectedResponse`, never caught here) — the line drawn above
+            # for ValueError.
+            if isinstance(exc.source, ValidationError):
+                raise
+            logger.warning("index unreachable: %s", exc)
+            raise EngineUnavailableError(INDEX_DOWN) from exc
 
         yield StartEvent(
             question=question,
@@ -234,32 +251,17 @@ class Engine:
 def build_engine() -> Engine:
     """Load this process's copy of the pipeline.
 
-    The index is opened first, before ~2.4GB of encoders: opening is where the
-    expected failure lives (another process holding the embedded directory),
-    and spending half a minute on model loads only to fail on a lock would make
-    every retry cost that half minute again.
+    The Qdrant client connects on first use, so an unreachable server surfaces
+    on the first question, as a 503 from `Engine.stream`, and a server that
+    comes back needs no rebuild.
     """
     from config.env import env
-    from rag.index import (
-        DEFAULT_QDRANT_DIR,
-        build_sparse_encoder,
-        cached_dense_encoder,
-        open_client,
-    )
+    from rag.index import build_sparse_encoder, cached_dense_encoder, open_client
     from rag.llm import build_completer, build_streamer
     from rag.search import DEFAULT_RERANK_MODEL, build_reranker
 
-    try:
-        client = open_client(DEFAULT_QDRANT_DIR)
-    except RuntimeError as exc:
-        logger.warning("index unavailable: %s", exc)
-        raise EngineUnavailableError(
-            _(
-                "The search index is held by another process. Stop any `rag.index`, "
-                "`rag.search` or `rag.agent` command running in a terminal, then retry."
-            )
-        ) from exc
-
+    # QDRANT_URL (config/env.py): the server every process shares.
+    client = open_client()
     try:
         # Greedy decoding stated rather than inherited, matching the CLIs: the
         # same question must produce the same answer across two runs of a gate.
@@ -276,14 +278,12 @@ def build_engine() -> Engine:
             ),
         )
     except Exception as exc:
-        # The lock this client holds is released by `close()` and by nothing
-        # else. A model load that fails — a first-run download, an out-of-memory
-        # card — would otherwise strand it: the slot stays empty by design, so
-        # the next request builds again, collides with *this process's own*
-        # lock, and is told to stop a terminal command that was never running.
-        # Converting the failure also matters on its own: an exception escaping
-        # here carries a frame holding `env`, and Django's debug page prints
-        # frame locals verbatim.
+        # A failed build is not cached, so the next request opens a client of
+        # its own; closing this one — after a first-run download or an
+        # out-of-memory card fails a model load — keeps its connections from
+        # piling up with every retry. Converting the failure also matters on its
+        # own: an exception escaping here carries a frame holding `env`, and
+        # Django's debug page prints frame locals verbatim.
         client.close()
         logger.exception("engine build failed")
         raise EngineUnavailableError(
