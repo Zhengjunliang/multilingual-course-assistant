@@ -145,7 +145,7 @@ function askFromTheFrontDoor(container: HTMLElement) {
   act(() => container.querySelector<HTMLButtonElement>("main button")?.click());
 }
 
-/** Deletes a conversation from its sidebar row, through the confirmation dialog. */
+/** Deletes a conversation from its sidebar row, through the confirmation alert dialog. */
 function deleting(title: string) {
   return (container: HTMLElement) => {
     const label = i18n.t("sidebar.delete", { title });
@@ -155,7 +155,7 @@ function deleting(title: string) {
     act(() => row?.click());
     // The dialog is portalled to the body, outside the container.
     const confirm = [
-      ...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'),
+      ...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
     ].find((button) => button.textContent === i18n.t("sidebar.deleteConfirm"));
     act(() => confirm?.click());
   };

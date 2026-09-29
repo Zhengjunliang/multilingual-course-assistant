@@ -7,6 +7,7 @@
  * survives someone being in a hurry.
  */
 
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import { componentFiles, sourceOf, valueExportsOf } from "@/test/componentLayer";
@@ -17,6 +18,15 @@ function everyComponentName(): string[] {
   return componentFiles().flatMap((file) => valueExportsOf(sourceOf(file)));
 }
 
+/** In a router, as the application mounts it: a breadcrumb's links need one. */
+function page(): string {
+  return render(
+    <MemoryRouter>
+      <StyleguidePage />
+    </MemoryRouter>,
+  );
+}
+
 describe("the component catalogue", () => {
   it("knows which components exist", () => {
     // Without this, an empty directory listing would make the next test pass
@@ -25,7 +35,7 @@ describe("the component catalogue", () => {
   });
 
   it("names every component of the layer", () => {
-    const html = render(<StyleguidePage />);
+    const html = page();
     const missing = everyComponentName().filter((name) => !html.includes(name));
 
     expect(missing).toEqual([]);
@@ -34,7 +44,7 @@ describe("the component catalogue", () => {
   it("shows both themes at once", () => {
     // A toggle would show one theme at a time, which is how a component ends up
     // right in one and wrong in the other. Both panels are on the page together.
-    const html = render(<StyleguidePage />);
+    const html = page();
 
     expect(html).toContain('data-theme="light"');
     expect(html).toContain('data-theme="dark"');

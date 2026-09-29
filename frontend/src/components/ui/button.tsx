@@ -11,6 +11,10 @@ const buttonVariants = cva(
         default: "bg-accent text-accent-ink hover:opacity-90",
         outline: "border border-line bg-surface text-ink hover:bg-mark",
         ghost: "text-muted hover:bg-mark hover:text-ink",
+        // The one variant with a hue: it confirms an action that destroys
+        // something, and the hue is the one index.css keeps for that and for a
+        // failure (docs/decisions.md).
+        destructive: "bg-warn-ink text-accent-ink hover:opacity-90",
       },
       size: {
         default: "h-control px-gutter py-tight",

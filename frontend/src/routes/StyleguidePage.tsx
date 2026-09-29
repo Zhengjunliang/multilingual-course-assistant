@@ -21,7 +21,10 @@
 import { LogOut, UserRound } from "lucide-react";
 import { useState } from "react";
 
+import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -29,7 +32,17 @@ import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { Sheet } from "@/components/ui/sheet";
+import { Status } from "@/components/ui/status";
 import { Suggestion, Suggestions } from "@/components/ui/suggestion";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
 function Specimen({
@@ -60,10 +73,14 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
     >
       <h2 className="font-semibold text-ink text-title">{theme}</h2>
 
-      <Specimen name="Button" note="Three variants, three sizes. The default fill is the accent.">
+      <Specimen
+        name="Button"
+        note="Four variants, three sizes. The default fill is the accent; destructive is the one with a hue, and only confirms destroying something."
+      >
         <Button>default</Button>
         <Button variant="outline">outline</Button>
         <Button variant="ghost">ghost</Button>
+        <Button variant="destructive">destructive</Button>
         <Button size="sm">sm</Button>
         <Button size="icon" aria-label="icon">
           ●
@@ -130,6 +147,60 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
       </Specimen>
 
       <Specimen
+        name="Badge"
+        note="A word for a state, on the citation pill's fill: text, so it reads the same without colour."
+      >
+        <Badge>Corrente</Badge>
+      </Specimen>
+
+      <Specimen
+        name="Table"
+        note="Native table markup named by its caption: TableCaption, TableHeader, TableBody, TableRow, TableHead, TableCell. It scrolls inside its own frame on a narrow screen; a row under the pointer wears --mark."
+      >
+        <Table>
+          <TableCaption>Edizioni</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Corso</TableHead>
+              <TableHead>Anno</TableHead>
+              <TableHead>Stato</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow>
+              <TableCell>B028451 Progettazione e Produzione Multimediale</TableCell>
+              <TableCell>2025-2026</TableCell>
+              <TableCell />
+            </TableRow>
+            <TableRow>
+              <TableCell>B028451 Progettazione e Produzione Multimediale</TableCell>
+              <TableCell>2024-2025</TableCell>
+              <TableCell>
+                <Badge>Corrente</Badge>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </Specimen>
+
+      <Specimen
+        name="Breadcrumb"
+        note="The pages above this one, each a link, and this one marked as the current page."
+      >
+        <Breadcrumb
+          label="Percorso"
+          crumbs={[{ label: "Edizioni", to: "/staff/editions" }, { label: "B028451 2025-2026" }]}
+        />
+      </Specimen>
+
+      <Specimen
+        name="Status"
+        note="A polite live region, on the page before anything is said in it; the result of the last action stays until the next replaces it."
+      >
+        <Status message="mrossi aggiunto." />
+      </Specimen>
+
+      <Specimen
         name="Sheet"
         note="A drawer over the whole page, so it cannot be shown inside this panel. It is open in the specimen below, outside the two themes."
       />
@@ -137,6 +208,11 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
       <Specimen
         name="Dialog"
         note="A window in the middle of the page. Portalled like the drawer, and shown below for the same reason."
+      />
+
+      <Specimen
+        name="AlertDialog"
+        note="A question before an action that destroys or replaces something. Focus opens on Cancel; it closes only once the action is done. Portalled, and shown below."
       />
 
       <Specimen
@@ -158,6 +234,7 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 export default function StyleguidePage() {
   const [drawer, setDrawer] = useState(false);
   const [dialog, setDialog] = useState(false);
+  const [alert, setAlert] = useState(false);
 
   return (
     <div className="min-h-full bg-canvas p-gutter">
@@ -206,6 +283,20 @@ export default function StyleguidePage() {
               long body cannot push the close button off a short screen.
             </p>
           </Dialog>
+
+          <Button className="self-start" onClick={() => setAlert(true)}>
+            Open the AlertDialog
+          </Button>
+          <AlertDialog
+            open={alert}
+            onOpenChange={setAlert}
+            title="AlertDialog specimen"
+            description="Removing mrossi from B028451 2025-2026 cannot be undone from here."
+            cancelLabel="Cancel"
+            confirmLabel="Remove"
+            onConfirm={async () => true}
+            destructive
+          />
         </div>
       </div>
     </div>
