@@ -2,6 +2,87 @@
 
 What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; every number is reproducible with the commands in its entry's *Reproducibility* section. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
+## 2026-09-29 — The index moves to the Qdrant service whole, and retrieval does not move
+
+### 1. What moved
+
+`rag/migrate.py` at `ec3cb1a` copies the embedded index at `data/qdrant/` to the Qdrant service of `docker-compose.yml` (server 1.19.1, client 1.19.0) with qdrant-client's `QdrantClient.migrate()`, then checks the copy; the decision and the three gates are [decisions.md](decisions.md), 2026-08-24, *Order of work*, point 2, and 2026-08-25, *Where measurements run*, point 3. Before the run the index was copied to `data/backup/33/qdrant`, and the copy was opened and compared with the source: the counts and the (`url`, `ingest_source`) pairs of both collections equal.
+
+The source held 1234 `slides` points and 29098 `unifi_web` points, every one from the crawl snapshot (26047 from `crawl-20260822-143647`, 3051 from `crawl-20260822-164843`) and none fetched live: at the time of the move no page existed only in the index. Opening the source took 5.8 s, `migrate()` moved both collections in 44.3 s, and the whole run, checks included, took 125 s.
+
+`migrate()` creates each collection with the configuration the source reports, and local mode reports placeholders. Against a probe collection created by `ensure_collection` on the same server, both collections differed in two optimizer settings: `indexing_threshold` 20000 KB where the server gives 10000, and `max_optimization_threads` 1 where the server chooses automatically. With 29098 vectors of 1024 dimensions over 8 segments, about 14.2 MiB each, the copied threshold would have kept `unifi_web` from ever getting an HNSW index. Both settings were set to the probe's values; the collection parameters, the HNSW settings, quantization and the WAL (32 MB, no segment ahead) matched the probe as copied. The seven keyword payload indexes (`course`, `academic_year`, `source_file`, `url`, `ingest_source`, `ingest_run_id`, `locale`) were created on both collections, and a second call created none.
+
+Once the optimizer had finished, the server's telemetry (`GET /telemetry?details_level=4`, read per segment) showed:
+
+| Collection | Points | Segments | Dense index |
+| --- | --- | --- | --- |
+| `slides` | 1234 | 8 | plain in all 8: exact by construction |
+| `unifi_web` | 29098 | 8 | HNSW in 7, 29098 vectors indexed; the eighth segment is empty |
+
+These two columns are the reference for the M3 gold runs: automatic growth adds points to `unifi_web`, and a change in the segment count or the dense index type is the signal to measure recall again with the method of section 3.
+
+### 2. Every point, compared
+
+Every source point was read back from the server by id:
+
+- the counts are equal (1234 = 1234, 29098 = 29098), and so are the 941 (`url`, `ingest_source`) pairs, counted on both sides the way `count_web_versions` counts them;
+- 1234/1234 and 29098/29098 points are identical: the payload equal; the dense vector equal in direction, within 1e-5 per component once both sides are normalised (the server stores a Cosine vector normalised, local mode keeps it raw), with a largest difference of 1.42e-08; the sparse vector equal index for index, its values equal bit for bit on 841 points and within 1.1e-07 relative on the others, the precision of float32.
+
+The dense tolerance sits between two scales: float32 rounding is about 6e-8, while two distinct 1024-dimensional embeddings differ by at least about 1e-3 in some component.
+
+### 3. Approximate search against exact search
+
+For each question of `gold/smoke.jsonl` and `gold/campus.jsonl`, the dense branch's top 20 (`PREFETCH_LIMIT`) with the product's search parameters was compared with an exact search (`exact=True`) under the filter `rag.gold` applies (the evaluation scope on `slides`, the crawl snapshot on `unifi_web`), the method of Qdrant's *Measuring ANN Recall* (outside the repository).
+
+| Collection | Dense index | Questions | Mean recall@20 | Min | Below 1.00 | Gate |
+| --- | --- | --- | --- | --- | --- | --- |
+| `slides` | plain | 40 | 1.000 | 1.000 | none | exact by construction |
+| `unifi_web` | HNSW | 32 | 1.000 | 1.000 | none | pass (target 0.99) |
+
+The default `hnsw_ef` reaches the target, so the product's search parameters are unchanged.
+
+### 4. The gold sets before and after
+
+Both gold sets ran on the embedded index before the move and on the server after it, with the reranker (the product path, the gate) and without it (the M3 no-rerank arm), with the code of `f274169`:
+
+| Set | Path | Embedded | Server | Per question |
+| --- | --- | --- | --- | --- |
+| smoke | rerank | 38/40, MISS `q018` `q028` | 38/40 | identical; `top:` column identical |
+| campus | rerank | 28/32, MISS `c003` `c011` `c012` `c034` | 28/32 | identical, en 11/12, it 11/13, zh 6/7 on both; `top:` differs on 6 questions |
+| smoke | no rerank | 37/40, MISS `q015` `q035` `q036` | 37/40 | identical; `top:` column identical |
+| campus | no rerank | 22/32 | 21/32 | `c034` HIT on the embedded index, MISS on the server |
+
+The rerank rows repeat the first comparison, run at `ec3cb1a` before the change below: the same HIT or MISS on every question, and the same totals as the entry of 2026-09-28 and the campus baseline.
+
+**The six `top:` differences of the rerank path are one page under two addresses.** In each (`c006`, `c008`, `c024`, `c026`, `c031`, `c032`) the two top URLs hold identical chunk text: the crawl stored the same page twice, such as `ingegneria.unifi.it/p365.html` and `vp-365-organi.html`, or an `unifi.it/en/node/…` path and its Italian alias. The reranker scores the two copies equally, and which leads depends on the fusion order.
+
+**Equal fused scores had no fixed order on the server.** The first no-rerank comparison, at `ec3cb1a`, gave campus 23/32 on the embedded index and 22/32 on the server, the difference on `c035`. Repeated 30 times on the server, the same `c035` search kept its wanted page at the fifth place 19 times and lost it 11 times: RRF gives equal scores to points at equal ranks (0.25 and 0.25 at the cut), and a server searching its 8 segments in parallel returns equal scores in no fixed order, where the single-threaded local mode returned them in one order every time. `f274169` fetches the whole fused pool and ranks equal fused scores by point id before cutting it (`rag/search.py`); afterwards the fused top 5 and top 20 of all 72 gold questions were identical over 10 runs each on the server. The tie-break itself turns `c035` into a MISS on both backends, which is why the embedded no-rerank baseline reads 22/32 in the table.
+
+**The no-rerank difference that remains comes from the scores, not from lost points.** The dense branch's top 20 is the same set on both backends for 72/72 questions, scores within 1e-6. The sparse branch's top 20 is the same set for 68/72, but the server scores the same points 0.08% to 1.6% lower (ratio 0.9842 to 0.9992): the server computes the BM25 IDF of `Modifier.IDF` itself, where the embedded index used the client's local mode. On `c034` a third factor decides: `unifi.it/en/node/12045` and `…/tasse-isee-e-agevolazioni/prestiti-donore` are one page under two addresses, tied in the dense branch at ranks 19 and 20, and the two engines order that tie differently. On the server the English copy takes rank 19, its fused score reaches 0.25, the score of the wanted page, and the point id puts it fifth. The rerank path, which the gate reads, is unaffected; the M3 no-rerank arm is measured on the server, the one backend every M3 baseline uses ([decisions.md](decisions.md), 2026-08-24, *Order of work*, point 1).
+
+### Reproducibility
+
+```bash
+# Git Bash; the backup, opened and compared before the run
+cp -r data/qdrant data/backup/33/qdrant
+
+# at ec3cb1a: dry run, then the move and gates 1 and 2 (server empty before it)
+.venv/Scripts/python.exe -m rag.migrate --from data/qdrant --dry-run
+.venv/Scripts/python.exe -m rag.migrate --from data/qdrant
+
+# at f274169: gate 3 and the no-rerank arm, embedded then server
+for set in smoke campus; do
+  .venv/Scripts/python.exe -m rag.gold gold/$set.jsonl --qdrant data/qdrant > $set-embedded.txt
+  .venv/Scripts/python.exe -m rag.gold gold/$set.jsonl > $set-server.txt
+  .venv/Scripts/python.exe -m rag.gold gold/$set.jsonl --no-rerank --qdrant data/qdrant > $set-embedded-norerank.txt
+  .venv/Scripts/python.exe -m rag.gold gold/$set.jsonl --no-rerank > $set-server-norerank.txt
+done
+col() { grep -E '^[qc][0-9]{3} (HIT |MISS)' "$1" | cut -c1-9; }
+diff <(col smoke-embedded.txt) <(col smoke-server.txt)
+```
+
+Rollback point: `data/backup/33/qdrant`, kept until the Qdrant volume has snapshots. Run outputs: `data/migrate-33/` (`run.log` of the move, the gold outputs of both comparisons). `rag/migrate.py` at `ec3cb1a` is a one-off script, deleted in the commit that records this entry.
+
 ## 2026-09-28 — The slides points move to their edition key without re-embedding
 
 ### 1. What moved
@@ -26,7 +107,7 @@ Three runs of `gold/smoke.jsonl` (40 questions, rerank path) isolate the relabel
 | mid | the same forced-`None` run, on the relabelled index | the relabel alone (scope disabled in both) | 38/40 (95%) |
 | after | branch head, scope pinned to `B028451:2025-2026` | the scope filter alone (relabel applied in both) | 38/40 (95%) |
 
-`before` and `mid` were meant to compare the pre-scope commit against the relabelled index; forcing `EVAL_SCOPE` to `None` for one run reproduces that comparison without leaving the branch. The per-question HIT/MISS columns and the `top:` column are identical before→mid (the relabel changed nothing the ranking depends on) and mid→after (the scope filter changed nothing, because every point belongs to the one edition it names). Both misses are `q028` in all three runs (`4.2 Docker.pdf` p.11 wanted, `4.1 Docker.pdf` p.58 returned), unrelated to `#96`.
+`before` and `mid` were meant to compare the pre-scope commit against the relabelled index; forcing `EVAL_SCOPE` to `None` for one run reproduces that comparison without leaving the branch. The per-question HIT/MISS columns and the `top:` column are identical before→mid (the relabel changed nothing the ranking depends on) and mid→after (the scope filter changed nothing, because every point belongs to the one edition it names). The misses are `q018` and `q028` in all three runs (`q028`: `4.2 Docker.pdf` p.11 wanted, `4.1 Docker.pdf` p.58 returned), unrelated to `#96`.
 
 The scope filter was also checked directly on the relabelled index: `rag.search "Cosa sono le migrazioni?" --scope B028451:2025-2026 --no-rerank` returns slides (top: `2-orm_django_2025.pdf` p.24); the same question with `--scope B028451:2024-2025` — an edition the corpus does not hold — returns none.
 
