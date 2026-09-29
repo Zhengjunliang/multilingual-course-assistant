@@ -34,6 +34,9 @@ from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.roles.api import ScopedObjectView
+from apps.roles.registry import Permission
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping, Sequence
 
@@ -199,3 +202,33 @@ def test_every_exemption_names_a_route() -> None:
 
     assert set(OPEN) <= reached
     assert all(any(name.startswith(f"{space}:") for name in reached) for space in DELEGATED)
+
+
+def test_every_permission_guards_a_route() -> None:
+    """No permission in the registry is dead: some routed view filters or checks by it."""
+    guarded: set[object] = set()
+    for _, callback in routes(get_resolver().url_patterns):
+        view = getattr(callback, "cls", None)
+        guarded.add(getattr(view, "visible_with", None))
+        guarded |= set(getattr(view, "scope_map", {}).values())
+
+    assert guarded - {None} == set(Permission)
+
+
+def test_each_scoped_view_maps_every_method_it_serves() -> None:
+    """A method a scoped view serves but does not map would be refused to everyone."""
+    served: dict[str, set[str]] = {}
+    mapped: dict[str, set[str]] = {}
+    for name, callback in routes(get_resolver().url_patterns):
+        view = getattr(callback, "cls", None)
+        if isinstance(view, type) and issubclass(view, ScopedObjectView):
+            # HEAD follows GET and OPTIONS is DRF's own; both need GET's entry.
+            served[name] = {
+                method.upper()
+                for method in view.http_method_names
+                if method not in ("head", "options") and hasattr(view, method)
+            }
+            mapped[name] = set(view.scope_map)
+
+    assert served
+    assert served == mapped
