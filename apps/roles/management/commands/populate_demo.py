@@ -19,7 +19,9 @@ on one holding rows of its own:
   (docs/data-model.md, invariant 2); a course with one keeps it.
 - Accounts: `demo-` ones only, and the file may name no other. A declared
   account's superuser flag and role rows are made the file's, rows it does not
-  declare removed; an account the file does not name is never touched.
+  declare removed; a `demo-` account the file does not name keeps the account
+  and loses its role rows, so the demo holds exactly the roles the file shows.
+  An account outside `demo-` is never touched.
 - Passwords: with `DEMO_PASSWORD` set (config/env.py), every declared account
   gets it, on every run. Without it a new account gets no usable password, and a
   declared account that already has a usable one stops the run: anyone may
@@ -74,6 +76,13 @@ class Command(BaseCommand):
             self._catalogue(demo)
             for account in demo["accounts"]:
                 self._account(account, password)
+            declared = [a["username"] for a in demo["accounts"]]
+            undeclared = RoleAssignment.objects.filter(user__username__startswith=PREFIX).exclude(
+                user__username__in=declared
+            )
+            for row in undeclared.select_related("user", "programme", "edition__course"):
+                row.delete()
+                self.stdout.write(f"removed role {row}")
         made = ", ".join(f"{count} {name}" for name, count in self.created.items()) or "nothing"
         self.stdout.write(f"created {made}")
 
