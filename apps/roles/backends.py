@@ -3,8 +3,9 @@
 Django's hook for per-object permissions is a backend whose permission methods
 take the object; django-guardian and django-rules plug in the same way. This
 one authenticates nobody (`BaseBackend.authenticate` and `get_user` return
-None), so it sits after `ModelBackend` in `AUTHENTICATION_BACKENDS`: a session
-records the first backend that can load its user, and it must be that one.
+None), so it sits after `ModelBackend` in `AUTHENTICATION_BACKENDS`: the test
+client's `force_login()` records the first backend that has a `get_user()`,
+and a session recorded against this one would load nobody.
 
 Only `get_user_permissions` is overridden. `has_perm`, `ahas_perm` and
 `get_all_permissions` come from `BaseBackend`, which derives each from it, so

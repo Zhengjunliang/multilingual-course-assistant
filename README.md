@@ -38,7 +38,7 @@ uv run python manage.py createsuperuser
 
 A test is added, changed or deleted by the criteria of [docs/testing.md](docs/testing.md), which also lists the tests kept whatever the criteria say.
 
-**Changing a model** means regenerating the app's migration and rebuilding the local database, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`). Until a database has to keep its data, each app has one migration, `0001_initial.py`, rewritten on every change rather than followed by a `0002` ([docs/decisions.md](docs/decisions.md), 2026-09-26). Save the data **before** editing the model — `dumpdata` reads every column the model declares, so it fails once the model is ahead of the database — then run the rest one line at a time, stopping at the first that fails: the third line deletes the local database.
+**Changing a model** means regenerating the app's migration and rebuilding the local database, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`). Until a database has to keep its data, each app has one migration, `0001_initial.py`, rewritten on every change rather than followed by a `0002` ([docs/decisions.md](docs/decisions.md), 2026-09-26). Save the data **before** editing the model — `dumpdata` reads every column the model declares, so it fails once the model is ahead of the database — then run the rest one line at a time, stopping at the first that fails: the `docker compose rm` line deletes the local database.
 
 ```powershell
 # before editing models.py; -X utf8 because Windows would write the file in cp1252
@@ -180,7 +180,7 @@ The deepening loop is not in this endpoint: it fetches pages and writes to the s
 
 ## Catalogue API
 
-What staff see and change, each within the scopes their roles cover ([apps/roles/registry.py](apps/roles/registry.py)): a teacher their editions, secretariat staff their programme and every edition of every course it offers, the superuser everything. Every item carries `permissions`, what the caller holds on it, which is what a page reads to decide what to offer.
+What staff see and change, each within the scopes their roles cover ([apps/roles/scopes.py](apps/roles/scopes.py)): a teacher their editions, secretariat staff their programme and every edition of every course it offers, the superuser everything; what each role may do there is [apps/roles/registry.py](apps/roles/registry.py). Every programme and edition carries `permissions`, what the caller holds on it, which is what a page reads to decide what to offer.
 
 | Method and path | Does |
 | --------------- | ---- |
@@ -194,9 +194,9 @@ What staff see and change, each within the scopes their roles cover ([apps/roles
 | `POST /api/catalog/programmes/<code>/secretariat` | makes a user secretariat staff of the programme (201); needs `programme.assign_secretariat`, which only the superuser holds |
 | `DELETE /api/catalog/programmes/<code>/secretariat/<username>` | revokes it (204) |
 
-- Status codes: 403 not logged in · 404 outside the caller's scope, whether or not it exists · 403 inside it without the permission · then 400 for the body. The scope is looked up before the permission and the permission before the body, so a refusal says nothing the caller may not see.
+- Status codes: 403 not logged in · 404 outside the caller's scope, whether or not it exists · 403 inside it without the permission · then 400 for the body's fields · 405 for a method the route does not serve, `OPTIONS` included. The scope is looked up before the permission and the permission before the fields, so a refusal says nothing the caller may not see; only a body that is not JSON at all is refused first, since the CSRF check reads it.
 - Switching needs `edition.set_current` on the new edition and, when the course has another current edition, on that one too; a refusal for the second reason carries the `detail` `"Switching also needs edition.set_current on the course's current edition."` ([docs/decisions.md](docs/decisions.md), 2026-09-29, *Staff permissions are a registry in code, answered by one backend; the admin is the superuser's*, point 4).
-- Assigning: an unknown username, or a role the user holds on that scope, is a 400, and each grant and revocation made here writes one `INFO` line to the `apps.roles.grants` logger. To revoke every role of one person, the superuser filters the role assignments by username in the admin.
+- Assigning: an unknown username, or a role the user holds on that scope, is a 400, and each grant and revocation made here writes one `INFO` line to the `apps.roles.grants` logger. To revoke every role of one person, the superuser searches the role assignments for their exact username in the admin.
 
 ## Code layout
 
