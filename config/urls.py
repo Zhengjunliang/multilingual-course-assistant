@@ -19,6 +19,7 @@ from config.views import spa
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.accounts.urls")),
+    path("api/catalog/", include("apps.catalog.urls")),
     path("api/", include("apps.qa.urls")),
     re_path(r"^(?!api/|admin/|static/).*$", spa, name="spa"),
 ]

@@ -8,24 +8,48 @@ function therefore takes the course's edition rows under a row lock before it
 writes anything: a second switch waits for the first to commit, then works on
 what the first left behind.
 
-Who may switch an edition is not decided here. Roles belong to `#93`, and the
-caller that knows the user checks them before calling.
+Who may switch an edition is the caller's to decide, since only the caller
+knows the user. A switch changes two rows, the edition made current and the one
+it replaces, so a caller can have the second checked too: `may_replace` is
+asked about the replaced edition inside the lock, so the row it approves is
+the row that gets cleared. The catalogue API checks both ends
+(apps/catalog/views.py); the admin, which admits the superuser alone, passes
+nothing.
 """
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 
 from apps.catalog.models import CourseEdition
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-def set_current(edition: CourseEdition) -> None:
+# One fixed sentence, so a page can tell this refusal from a plain lack of
+# permission on the edition itself without being told which edition is current.
+SWITCH_NEEDS_BOTH = "Switching also needs edition.set_current on the course's current edition."
+
+
+def _anyone(replaced: CourseEdition) -> bool:
+    return True
+
+
+def set_current(
+    edition: CourseEdition, *, may_replace: Callable[[CourseEdition], bool] = _anyone
+) -> None:
     """Make `edition` the current edition of its course, and no other one.
 
     Raises `CourseEdition.DoesNotExist`, changing nothing, when the row is gone
     by the time the lock is taken — deleted from a page opened earlier, or by a
-    delete that committed while this switch waited. On return the instance
-    passed in reads `is_current` the way the row does.
+    delete that committed while this switch waited. Raises `PermissionDenied`
+    with `SWITCH_NEEDS_BOTH`, changing nothing, when the course has another
+    current edition and `may_replace` refuses it; with no other current
+    edition `may_replace` is not asked. On return the instance passed in reads
+    `is_current` the way the row does.
     """
     course = edition.course
     with transaction.atomic():
@@ -46,6 +70,11 @@ def set_current(edition: CourseEdition) -> None:
         # Clear first: the one-current constraint is not deferrable, so setting
         # the new flag while the old one stands would violate it on the spot.
         stale = CourseEdition.objects.filter(course=course, is_current=True).exclude(pk=edition.pk)
+        # At most one, by the one-current constraint; order_by() drops the
+        # Meta ordering's join, as above.
+        replaced = stale.order_by().first()
+        if replaced is not None and not may_replace(replaced):
+            raise PermissionDenied(SWITCH_NEEDS_BOTH)
         stale.update(is_current=False)
         CourseEdition.objects.filter(pk=edition.pk).update(is_current=True)
     edition.is_current = True

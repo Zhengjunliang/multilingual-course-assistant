@@ -1,7 +1,9 @@
 """Admin for the catalogue: degree programmes, courses, editions and curricula.
 
-Entering PPM's rows (docs/decisions.md, 2026-09-25, *PPM read from Moodle and
-Cineca*) and switching a course's current edition both go through here. The
+The superuser's, as the whole admin is (config/admin.py): entering PPM's rows
+(docs/decisions.md, 2026-09-25, *PPM read from Moodle and Cineca*) goes
+through here, and so can a switch of a course's current edition, which staff
+make through `/api/catalog/` instead (apps/catalog/views.py). The
 admin never writes `is_current` itself: the flag is read-only on every form,
 and the only way to flip it is the `set_as_current` action, which calls
 `set_current()` (`apps/catalog/editions.py`) so the switch runs under the row
