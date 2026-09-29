@@ -5,7 +5,7 @@ prompt) and sparse (BM25) — fused with Reciprocal Rank Fusion, then optionally
 reordered by Qwen3-Reranker. Payload filters (`--locale`, `--scope`) must sit
 inside *each* prefetch branch: with fusion queries the embedded Qdrant ignores
 a top-level filter (verified empirically). Equal fused scores rank by point id,
-so a question gets the same hits on every run (`hybrid_search`).
+not in whatever order a server returns them (`hybrid_search`).
 
     uv run python -m rag.search "What is an ORM?"
     uv run python -m rag.search "What is an ORM?" --scope B028451:2025-2026

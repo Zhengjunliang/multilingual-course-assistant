@@ -8,7 +8,7 @@ What was measured, on which data and with which command, and the problems met al
 
 `rag/migrate.py` at `ec3cb1a` copies the embedded index at `data/qdrant/` to the Qdrant service of `docker-compose.yml` (server 1.19.1, client 1.19.0) with qdrant-client's `QdrantClient.migrate()`, then checks the copy; the decision and the three gates are [decisions.md](decisions.md), 2026-08-24, *Order of work*, point 2, and 2026-08-25, *Where measurements run*, point 3. Before the run the index was copied to `data/backup/33/qdrant`, and the copy was opened and compared with the source: the counts and the (`url`, `ingest_source`) pairs of both collections equal.
 
-The source held 1234 `slides` points and 29098 `unifi_web` points, every one from the crawl snapshot (26047 from `crawl-20260822-143647`, 3051 from `crawl-20260822-164843`) and none fetched live: at the time of the move no page existed only in the index. Opening the source took 5.8 s, `migrate()` moved both collections in 44.3 s, and the whole run, checks included, took 125 s.
+The source held 1234 `slides` points and 29098 `unifi_web` points, every one from the crawl snapshot (26047 from `crawl-20260822-143647`, 3051 from `crawl-20260822-164843`) and none fetched live: at the time of the move no page existed only in the index. Opening the source took 5.8 s, `migrate()` moved both collections in 44.3 s, comparing every point took 34.7 s and the recall gate 20.3 s.
 
 `migrate()` creates each collection with the configuration the source reports, and local mode reports placeholders. Against a probe collection created by `ensure_collection` on the same server, both collections differed in two optimizer settings: `indexing_threshold` 20000 KB where the server gives 10000, and `max_optimization_threads` 1 where the server chooses automatically. With 29098 vectors of 1024 dimensions over 8 segments, about 14.2 MiB each, the copied threshold would have kept `unifi_web` from ever getting an HNSW index. Both settings were set to the probe's values; the collection parameters, the HNSW settings, quantization and the WAL (32 MB, no segment ahead) matched the probe as copied. The seven keyword payload indexes (`course`, `academic_year`, `source_file`, `url`, `ingest_source`, `ingest_run_id`, `locale`) were created on both collections, and a second call created none.
 
@@ -26,7 +26,7 @@ These two columns are the reference for the M3 gold runs: automatic growth adds 
 Every source point was read back from the server by id:
 
 - the counts are equal (1234 = 1234, 29098 = 29098), and so are the 941 (`url`, `ingest_source`) pairs, counted on both sides the way `count_web_versions` counts them;
-- 1234/1234 and 29098/29098 points are identical: the payload equal; the dense vector equal in direction, within 1e-5 per component once both sides are normalised (the server stores a Cosine vector normalised, local mode keeps it raw), with a largest difference of 1.42e-08; the sparse vector equal index for index, its values equal bit for bit on 841 points and within 1.1e-07 relative on the others, the precision of float32.
+- 1234/1234 and 29098/29098 points are identical: the payload equal; the dense vector equal in direction, within 1e-5 per component once both sides are normalised (the server stores a Cosine vector normalised, local mode keeps it raw), with a largest difference of 1.42e-08; the sparse vector equal index for index, its values equal bit for bit on 841 of the 30332 points and within the script's relative tolerance of 1e-6 on the others, about eight times the relative precision of float32 (1.2e-7).
 
 The dense tolerance sits between two scales: float32 rounding is about 6e-8, while two distinct 1024-dimensional embeddings differ by at least about 1e-3 in some component.
 
@@ -43,7 +43,7 @@ The default `hnsw_ef` reaches the target, so the product's search parameters are
 
 ### 4. The gold sets before and after
 
-Both gold sets ran on the embedded index before the move and on the server after it, with the reranker (the product path, the gate) and without it (the M3 no-rerank arm), with the code of `f274169`:
+Both gold sets ran on the embedded index, the source the move reads without changing it, and on the server, with the reranker (the product path, the gate) and without it (the M3 no-rerank arm), with the code of `f274169`:
 
 | Set | Path | Embedded | Server | Per question |
 | --- | --- | --- | --- | --- |
@@ -58,13 +58,15 @@ The rerank rows repeat the first comparison, run at `ec3cb1a` before the change 
 
 **Equal fused scores had no fixed order on the server.** The first no-rerank comparison, at `ec3cb1a`, gave campus 23/32 on the embedded index and 22/32 on the server, the difference on `c035`. Repeated 30 times on the server, the same `c035` search kept its wanted page at the fifth place 19 times and lost it 11 times: RRF gives equal scores to points at equal ranks (0.25 and 0.25 at the cut), and a server searching its 8 segments in parallel returns equal scores in no fixed order, where the single-threaded local mode returned them in one order every time. `f274169` fetches the whole fused pool and ranks equal fused scores by point id before cutting it (`rag/search.py`); afterwards the fused top 5 and top 20 of all 72 gold questions were identical over 10 runs each on the server. The tie-break itself turns `c035` into a MISS on both backends, which is why the embedded no-rerank baseline reads 22/32 in the table.
 
-**The no-rerank difference that remains comes from the scores, not from lost points.** The dense branch's top 20 is the same set on both backends for 72/72 questions, scores within 1e-6. The sparse branch's top 20 is the same set for 68/72, but the server scores the same points 0.08% to 1.6% lower (ratio 0.9842 to 0.9992): the server computes the BM25 IDF of `Modifier.IDF` itself, where the embedded index used the client's local mode. On `c034` a third factor decides: `unifi.it/en/node/12045` and `…/tasse-isee-e-agevolazioni/prestiti-donore` are one page under two addresses, tied in the dense branch at ranks 19 and 20, and the two engines order that tie differently. On the server the English copy takes rank 19, its fused score reaches 0.25, the score of the wanted page, and the point id puts it fifth. The rerank path, which the gate reads, is unaffected; the M3 no-rerank arm is measured on the server, the one backend every M3 baseline uses ([decisions.md](decisions.md), 2026-08-24, *Order of work*, point 1).
+**The no-rerank difference comes from equal and shifted scores, not from lost points.** Queried branch by branch after the service had been restarted, the dense top 20 is the same set on both backends for 70 of the 72 questions, scores within 2e-7; on `c008` and `c024` the two sets differ only among points with equal scores at the cut. The sparse top 20 is the same set for 65 of 72, and the other seven differ only at the cut: the server computes the BM25 IDF of `Modifier.IDF` itself, where the embedded index used the client's local mode, and scores the same points 0.9842 to 0.9992 times the embedded score. On `c034`, `unifi.it/en/node/12045` and `…/tasse-isee-e-agevolazioni/prestiti-donore` are one page under two addresses, with equal dense scores at ranks 19 and 20, and the server keeps no fixed order for equal scores inside a branch. In the comparison of the table it put the English copy at rank 19, where its fused score reaches 0.25, the score of the wanted page, and the point id put it fifth; after the restart it ranked the two as the embedded index does, and campus without the reranker read 22/32 on the server too, `c034` a HIT. `f274169` orders equal fused scores; equal scores inside one branch keep the server's order. The rerank path, which the gate reads, gave the same HIT or MISS on every question in both comparisons and again after the restart (38/40, 28/32). The M3 no-rerank arm is measured on the server, the one backend every M3 baseline uses ([decisions.md](decisions.md), 2026-08-24, *Order of work*, point 1), where a question decided by such a tie can change between two runs with a restart between them.
 
 ### Reproducibility
 
 ```bash
 # Git Bash; the backup, opened and compared before the run
-cp -r data/qdrant data/backup/33/qdrant
+mkdir -p data/backup/33 && cp -r data/qdrant data/backup/33/qdrant
+# data/qdrant is deleted once #33 is merged: to rerun the embedded side, copy
+# data/backup/33/qdrant back to data/qdrant first
 
 # at ec3cb1a: dry run, then the move and gates 1 and 2 (server empty before it)
 .venv/Scripts/python.exe -m rag.migrate --from data/qdrant --dry-run
@@ -81,7 +83,9 @@ col() { grep -E '^[qc][0-9]{3} (HIT |MISS)' "$1" | cut -c1-9; }
 diff <(col smoke-embedded.txt) <(col smoke-server.txt)
 ```
 
-Rollback point: `data/backup/33/qdrant`, kept until the Qdrant volume has snapshots. Run outputs: `data/migrate-33/` (`run.log` of the move, the gold outputs of both comparisons). `rag/migrate.py` at `ec3cb1a` is a one-off script, deleted in the commit that records this entry.
+The backup check opens the copy and the source and compares, per collection, the point count and the count of every (`url`, `ingest_source`) pair. The branch comparison of section 4 queries each branch alone on both backends: `query_points` with the question's dense or sparse vector, `using` that branch, `limit` 20 and the filter `rag.gold` applies. The repeat checks call `hybrid_search` on the server for every gold question, ten times each at `f274169`, and thirty times for `c035` at `ec3cb1a`.
+
+Rollback point: `data/backup/33/qdrant`, kept until the Qdrant volume has snapshots (`#122`). Run outputs: `data/migrate-33/` (`run.log` of the move, the gold outputs of both comparisons; `v3/` the branch comparison, the repeat check and the gold runs after the restart, with their scripts). `rag/migrate.py` at `ec3cb1a` is a one-off script, deleted in the commit that records this entry.
 
 ## 2026-09-28 — The slides points move to their edition key without re-embedding
 
