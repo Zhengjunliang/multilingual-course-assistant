@@ -53,7 +53,8 @@
  *
  * The palette is achromatic on purpose. Every token below has zero chroma
  * except the three `--warn*`, which are the one colour left in the interface —
- * spent on a failure, never on a preference. `scripts/check-contrast.mjs` reads
+ * spent on a failure and on the button that confirms destroying something,
+ * never on a preference (docs/decisions.md). `scripts/check-contrast.mjs` reads
  * these very declarations and holds the neutral tokens to a chroma *ceiling*,
  * so a tint cannot creep back in unnoticed.
  *

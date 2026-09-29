@@ -69,6 +69,7 @@ const PAIRS = [
   { front: "accent", back: "canvas", min: SHAPE, where: "button.tsx:7 focus outline" },
   { front: "accent", back: "surface", min: SHAPE, where: "input.tsx:9 focus outline" },
   { front: "warn-ink", back: "warn", min: TEXT, where: "TurnView.tsx:110 failure box" },
+  { front: "accent-ink", back: "warn-ink", min: TEXT, where: "button.tsx destructive variant" },
 ];
 
 /**

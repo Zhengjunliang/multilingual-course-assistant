@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
 import type { ConversationSummary } from "@/api/conversations";
+import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 interface ConversationSidebarProps {
@@ -35,7 +35,6 @@ export function ConversationSidebar({
 }: ConversationSidebarProps) {
   const { t } = useTranslation();
   const [pending, setPending] = useState<ConversationSummary | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [failed, setFailed] = useState(false);
 
   const titleOf = (conversation: ConversationSummary) =>
@@ -52,17 +51,14 @@ export function ConversationSidebar({
   };
 
   // The dialog stays open until the server has answered, and cannot be
-  // dismissed meanwhile: closing it first would say "deleted" about a
-  // conversation that may still be there, and a late answer would land in the
-  // next dialog opened.
+  // dismissed meanwhile (ui/alert-dialog.tsx): closing it first would say
+  // "deleted" about a conversation that may still be there.
   const confirm = async () => {
-    if (pending === null) return;
-    setDeleting(true);
+    if (pending === null) return false;
     setFailed(false);
     const deleted = await onDelete(pending.id);
-    setDeleting(false);
-    if (deleted) close();
-    else setFailed(true);
+    setFailed(!deleted);
+    return deleted;
   };
 
   return (
@@ -158,31 +154,24 @@ export function ConversationSidebar({
         )}
       </nav>
 
-      <Dialog
+      <AlertDialog
         open={pending !== null}
         onOpenChange={(open) => {
-          if (!open && !deleting) close();
+          if (!open) close();
         }}
         title={t("sidebar.deleteTitle")}
-        description={
-          pending === null ? undefined : t("sidebar.deleteBody", { title: titleOf(pending) })
-        }
-        closeLabel={t("sidebar.cancel")}
+        description={pending === null ? "" : t("sidebar.deleteBody", { title: titleOf(pending) })}
+        cancelLabel={t("sidebar.cancel")}
+        confirmLabel={t("sidebar.deleteConfirm")}
+        onConfirm={confirm}
+        destructive
       >
         {failed && (
           <p className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
             {t("sidebar.deleteFailed")}
           </p>
         )}
-        <div className="flex justify-end gap-tight">
-          <Button type="button" variant="outline" disabled={deleting} onClick={close}>
-            {t("sidebar.cancel")}
-          </Button>
-          <Button type="button" disabled={deleting} onClick={() => void confirm()}>
-            {t("sidebar.deleteConfirm")}
-          </Button>
-        </div>
-      </Dialog>
+      </AlertDialog>
     </div>
   );
 }
