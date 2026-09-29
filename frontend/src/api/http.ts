@@ -12,13 +12,22 @@
 
 const JSON_TYPE = "application/json";
 
-/** A request that came back with a status, and the server's own words for it. */
+/**
+ * A request that came back with a status, the server's own words for it, and
+ * the codes a page translates it by when the view gives codes
+ * (config/exceptions.py: the staff endpoints do; every endpoint doing so is
+ * #91's).
+ */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly detail: string,
     /** Field name -> messages, when the server rejected specific fields. */
     readonly fields: Record<string, string[]> = {},
+    /** The code of `detail`, or null when the server gave none. */
+    readonly code: string | null = null,
+    /** Field name -> codes, in the order of `fields`. */
+    readonly fieldCodes: Record<string, string[]> = {},
   ) {
     super(detail);
     this.name = "ApiError";
@@ -51,18 +60,30 @@ export function writeHeaders(): Record<string, string> {
   return headers;
 }
 
-function messagesOf(value: unknown): string[] {
-  if (typeof value === "string") return [value];
-  if (Array.isArray(value)) return value.filter((item) => typeof item === "string");
-  return [];
+/** One message of an error body, with its code when the view gives one. */
+interface Leaf {
+  message: string;
+  code: string | null;
+}
+
+function leafOf(item: unknown): Leaf | null {
+  if (typeof item === "string") return { message: item, code: null };
+  if (typeof item !== "object" || item === null) return null;
+  const { message, code } = item as Record<string, unknown>;
+  return typeof message === "string" && typeof code === "string" ? { message, code } : null;
+}
+
+function leavesOf(value: unknown): Leaf[] {
+  return (Array.isArray(value) ? value : [value]).flatMap((item) => leafOf(item) ?? []);
 }
 
 /**
  * DRF speaks two error shapes and both matter here.
  *
- * A permission or throttle failure is `{"detail": "..."}`; a serializer
- * rejection is `{"field": ["..."], ...}`, which is what a registration form has
- * to show next to the field that was wrong.
+ * A permission or throttle failure is `{"detail": ...}`; a serializer
+ * rejection is `{"field": [...], ...}`, which is what a form has to show next
+ * to the field that was wrong. Each message is a string, or, from a view that
+ * gives codes, `{"message", "code"}` — the shape of DRF's `get_full_details()`.
  */
 async function failureOf(response: Response): Promise<ApiError> {
   let body: unknown = null;
@@ -77,17 +98,28 @@ async function failureOf(response: Response): Promise<ApiError> {
 
   const record = body as Record<string, unknown>;
   const fields: Record<string, string[]> = {};
+  const fieldCodes: Record<string, string[]> = {};
+  let firstOfAField: Leaf | undefined;
   for (const [key, value] of Object.entries(record)) {
     if (key === "detail") continue;
-    const messages = messagesOf(value);
-    if (messages.length > 0) fields[key] = messages;
+    const leaves = leavesOf(value);
+    if (leaves.length === 0) continue;
+    firstOfAField ??= leaves[0];
+    fields[key] = leaves.map((leaf) => leaf.message);
+    const codes = leaves.flatMap((leaf) => leaf.code ?? []);
+    if (codes.length > 0) fieldCodes[key] = codes;
   }
 
-  const detail =
-    typeof record.detail === "string"
-      ? record.detail
-      : (Object.values(fields)[0]?.[0] ?? `HTTP ${response.status}`);
-  return new ApiError(response.status, detail, fields);
+  // `detail` and `code` name the same message: the whole request's, or else
+  // the first field's.
+  const lead = leavesOf(record.detail)[0] ?? firstOfAField;
+  return new ApiError(
+    response.status,
+    lead?.message ?? `HTTP ${response.status}`,
+    fields,
+    lead?.code ?? null,
+    fieldCodes,
+  );
 }
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

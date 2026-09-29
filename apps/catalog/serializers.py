@@ -22,6 +22,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from apps.accounts.models import User
+from apps.catalog.errors import StaffError
 from apps.catalog.models import Course, CourseEdition, DegreeProgramme
 from apps.roles.scopes import can_set_current, permissions_on
 
@@ -65,7 +66,9 @@ class StaffMemberSerializer(serializers.Serializer):
         try:
             attrs["user"] = User.objects.get(username=attrs["username"])
         except User.DoesNotExist:
-            raise serializers.ValidationError({"username": [_("No such user.")]}) from None
+            raise serializers.ValidationError(
+                {"username": [_("No such user.")]}, code=StaffError.NO_SUCH_USER
+            ) from None
         return attrs
 
 

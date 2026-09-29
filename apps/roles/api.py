@@ -16,7 +16,9 @@ runs, and handlers read `self.scope`. DRF only checks object permissions inside
 check without anyone noticing.
 
 Which permission a method needs is the view's `scope_map`, as in Sentry's
-`OrganizationPermission.scope_map`.
+`OrganizationPermission.scope_map`. Every refusal a scoped view answers names
+itself with a code (`CodedErrors`, config/exceptions.py), for whichever staff
+page reads it.
 """
 
 from __future__ import annotations
@@ -27,6 +29,8 @@ from typing import TYPE_CHECKING, Any, cast
 from django.db.models import Model
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import BasePermission, IsAuthenticated
+
+from config.exceptions import CodedErrors
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -55,7 +59,7 @@ class HasScopedPermission(BasePermission):
         return permission is not None and cast("User", request.user).has_perm(permission, obj)
 
 
-class ScopedObjectView[M: Model](GenericAPIView[M]):
+class ScopedObjectView[M: Model](CodedErrors, GenericAPIView[M]):
     """A view on one scope, resolved before any handler runs.
 
     Subclasses give `get_queryset()` — the scopes the caller may see — and

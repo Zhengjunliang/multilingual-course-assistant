@@ -24,6 +24,7 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from apps.catalog.errors import StaffError
 from apps.catalog.models import CourseEdition, DegreeProgramme
 from apps.catalog.serializers import StaffMemberSerializer
 from apps.catalog.views import EditionView, ProgrammeView
@@ -67,7 +68,8 @@ class _StaffList[M: (CourseEdition, DegreeProgramme)](_Staff[M]):
             grant(cast("User", request.user), user, self.role, self.scope)
         except AlreadyHeldError:
             raise ValidationError(
-                {"username": [_("This user already holds this role here.")]}
+                {"username": [_("This user already holds this role here.")]},
+                code=StaffError.ALREADY_HELD,
             ) from None
         return Response(StaffMemberSerializer(user).data, status=status.HTTP_201_CREATED)
 

@@ -14,7 +14,10 @@ edition alone would let last year's teacher move the course back to their
 year. The switch also asks it of the edition being replaced, inside
 `set_current()`'s lock (docs/decisions.md, 2026-09-29, *Staff permissions are
 a registry in code, answered by one backend; the admin is the superuser's*,
-point 4).
+point 4), and a refusal there carries its own code.
+
+Every view here names each refusal with a code (`CodedErrors`,
+config/exceptions.py; the codes: apps/catalog/errors.py).
 """
 
 from __future__ import annotations
@@ -22,19 +25,23 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
+from django.core.exceptions import PermissionDenied
 from django.db.models import Exists, OuterRef, Prefetch
 from django.http import Http404
+from rest_framework import exceptions
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.catalog.editions import set_current
+from apps.catalog.editions import SWITCH_NEEDS_BOTH, set_current
+from apps.catalog.errors import StaffError
 from apps.catalog.models import CourseEdition, CurriculumEntry, DegreeProgramme
 from apps.catalog.serializers import TEACHER_ROWS, EditionSerializer, ProgrammeSerializer
 from apps.roles.api import ScopedObjectView
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Permission, Role
 from apps.roles.scopes import editions_for, programmes_for, with_switch
+from config.exceptions import CodedErrors
 
 if TYPE_CHECKING:
     from django.contrib.auth.base_user import AbstractBaseUser
@@ -70,7 +77,7 @@ def _editions(
     )
 
 
-class ProgrammeListView(ListAPIView[DegreeProgramme]):
+class ProgrammeListView(CodedErrors, ListAPIView[DegreeProgramme]):
     permission_classes = (IsAuthenticated,)
     serializer_class = ProgrammeSerializer
     visible_with = Permission.PROGRAMME_VIEW
@@ -79,7 +86,7 @@ class ProgrammeListView(ListAPIView[DegreeProgramme]):
         return programmes_for(self.request.user, self.visible_with)
 
 
-class EditionListView(ListAPIView[CourseEdition]):
+class EditionListView(CodedErrors, ListAPIView[CourseEdition]):
     permission_classes = (IsAuthenticated,)
     serializer_class = EditionSerializer
     visible_with = Permission.EDITION_VIEW
@@ -143,6 +150,10 @@ class EditionSetCurrentView(EditionView):
             )
         except CourseEdition.DoesNotExist as exc:
             raise Http404 from exc
+        except PermissionDenied:
+            raise exceptions.PermissionDenied(
+                SWITCH_NEEDS_BOTH, code=StaffError.SWITCH_NEEDS_BOTH
+            ) from None
         # Read again: the row changed, and its marks come with the query.
         return Response(self.get_serializer(self.get_object()).data)
 

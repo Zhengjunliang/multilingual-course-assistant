@@ -3,7 +3,8 @@
  *
  * The shapes mirror apps/catalog/serializers.py, which is the single source;
  * tests/test_catalog_contract.py fails when a field is added or renamed on one
- * side only, or when a permission name differs from apps/roles/registry.py.
+ * side only, or when a permission name or an error code differs from the
+ * Python side.
  * What the caller may do is read from each row — `permissions` and
  * `can_set_current` — and never worked out from a role name here.
  */
@@ -52,6 +53,21 @@ export interface Edition {
    */
   can_set_current: boolean;
 }
+
+/**
+ * The codes a staff page has words for (apps/catalog/errors.py): this
+ * project's own, a closed set, and the few of DRF's the pages name. DRF's codes
+ * are not a closed set, so any other one gets a general sentence.
+ */
+export type StaffErrorCode =
+  | "no_such_user"
+  | "already_held"
+  | "switch_needs_both"
+  | "required"
+  | "blank"
+  | "not_authenticated"
+  | "permission_denied"
+  | "not_found";
 
 /** Where staff members belong: an edition's teachers, or a programme's secretariat. */
 export type MemberScope = { kind: "edition"; id: number } | { kind: "programme"; code: string };
