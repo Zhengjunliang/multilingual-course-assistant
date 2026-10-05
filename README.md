@@ -12,13 +12,13 @@ cd multilingual-course-assistant
 uv sync
 npm ci --prefix frontend
 npm run build --prefix frontend
-cp .env.example .env               # set DJANGO_SECRET_KEY and DJANGO_DB_PASSWORD; the file has the commands
-docker compose up -d               # PostgreSQL and Qdrant
+cp .env.example .env               # set DJANGO_SECRET_KEY (the file has the command) and a DJANGO_DB_PASSWORD of your choice
+docker compose up -d --wait        # PostgreSQL and Qdrant, healthy
 uv run python manage.py migrate
 uv run python manage.py createsuperuser
 uv run python manage.py runserver  # http://127.0.0.1:8000/
 ```
 
-The site answers once it has an index and a model. Course PDFs are not part of the repository, so you index your own, and generation calls any OpenAI-compatible server, a local Ollama by default. Both steps, the GPU set-up and the development loop are in [docs/development.md](docs/development.md); the HTTP API is in [docs/api.md](docs/api.md).
+The site answers once it has an index and a model. Course PDFs are not part of the repository, so you index your own, and generation calls any OpenAI-compatible server, a local Ollama by default. Both steps and the development loop are in [docs/development.md](docs/development.md); the HTTP API is in [docs/api.md](docs/api.md).
 
 Progress, milestones and blockers live in GitHub issues (milestones M3 · M4 · M5 · M6 · M7); decisions in force in [docs/decisions.md](docs/decisions.md); the architecture and the supervisor's constraints in [docs/architecture.md](docs/architecture.md); measured results in [docs/experiment-log.md](docs/experiment-log.md).

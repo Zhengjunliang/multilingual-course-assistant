@@ -4,7 +4,7 @@ This file owns working on the repository: setting it up for development, the dai
 
 ## Setup
 
-The first screen of [README.md](../README.md) installs and runs the site: uv brings its own Python 3.12 and leaves the system interpreter untouched, Node's version is in `frontend/.nvmrc`, `.env.example` holds the commands that generate `DJANGO_SECRET_KEY` and `DJANGO_DB_PASSWORD`, and `docker compose` needs the Docker Desktop engine running. To develop, two more commands in the clone:
+The first screen of [README.md](../README.md) installs and runs the site: uv brings its own Python 3.12 and leaves the system interpreter untouched, Node's version is in `frontend/.nvmrc`, `.env.example` holds the command that generates `DJANGO_SECRET_KEY` and leaves `DJANGO_DB_PASSWORD` for you to pick, and `docker compose` needs the Docker Desktop engine running. To develop, two more commands in the clone:
 
 ```powershell
 uv run pre-commit install        # the commit and commit-message hooks; rerun it in a clone from before 2026-09-28
