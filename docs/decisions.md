@@ -155,12 +155,13 @@ This file owns the decisions taken without the supervisor that are in force: the
    **Status:** 🔶 the code keeps what the gate passes (`rag/live.py`); the confirmation step is `#48`, which has no milestone.
 2. **The interface is graded.** The reading of 2026-07-30 that PPM set no requirement on the interface was wrong: its appearance counts toward the course grade. The interface work has its own milestone, M4 — Interface (`#49`, `#85`), reusing the number left free when cross-language work joined the core on 2026-08-21.
 
-## 2026-09-14 — Two CVEs are accepted risks, not fixes
+## 2026-09-14 — Three CVEs are accepted risks, not fixes
 
-`pip-audit` in CI's `audit` job reports two advisories. Neither is fixed, for different reasons, and the thesis records both as identified, graded and explained — never as fixed.
+`pip-audit` in CI's `audit` job reports three advisories. None is fixed, for two different reasons, and the thesis records each as identified, graded and explained — never as fixed.
 
 1. **`accelerate` PYSEC-2026-3804 is accepted without an end date.** Upstream has no fixed version, and it is a required transitive dependency of `docling`. Why it cannot be removed, why it is unreachable and why the real control is `#10` is written next to `--ignore-vuln` in the `audit` step of [ci.yml](../.github/workflows/ci.yml); `#7` records it.
 2. **`transformers` PYSEC-2026-3929 is accepted until `#55` closes.** A fixed version exists (5.10.0) but is out of reach: a platform this project never runs (darwin) caps the resolution for Windows and Linux. The one decision recorded here is that the lockfile is not restricted by platform in passing: an `environments` line would unblock it, but it narrows what the lockfile promises and does not belong in a CVE fix. The other way, a major docling upgrade, re-runs ingest and re-verifies the gold sets (38/40 and 28/32), which belongs to an M3 remeasurement. Both ways and their costs are `#55` (M3).
+3. **`transformers` PYSEC-2026-4174 (CVE-2026-80047), reported on 2026-10-05, is accepted until `#55` closes, as point 2 is.** Its fix lies above the same ceiling. The flaw caches a repository's custom generate code before the `trust_remote_code` check, and this repository never reaches it: nothing passes `trust_remote_code`, and nothing calls `generate()`; the reasoning is beside the flag in [ci.yml](../.github/workflows/ci.yml), and `#145` records it.
 
 ## 2026-09-14 — Progress moves into GitHub issues
 
