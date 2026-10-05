@@ -2,8 +2,10 @@
 # here for exactly the shape PYSEC-2026-3929 had — a fixed version sat upstream
 # and nothing in this repository said so until pip-audit turned the build red.
 #
-# Alerts are a separate switch, in the repository settings rather than in this
-# file. This file only schedules version updates and names their label.
+# Alerts and security updates are switches in the repository settings rather
+# than in this file. This file schedules version updates, but its `labels` and
+# `ignore` apply to security updates as well: the packages held back below get
+# an alert and a red audit, never a pull request.
 #
 # Every ecosystem below carries `labels: ["dependencies"]`, the one label of the
 # account's label manifest (Zhengjunliang/.github, labels/labels.json) meant for

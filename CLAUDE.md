@@ -68,7 +68,7 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 | `docs/decisions.md` | Decisions in force: the date, what was decided, why; a reversal replaces what it reverses |
 | `docs/*.md` | One topic per file, created only when the topic exists |
 | `gold/README.md` | Gold set schema, id prefixes, writing rules and acceptance thresholds |
-| `.github/` | What GitHub reads besides the code: `SECURITY.md` (how to report; the review is `docs/security.md`), the workflows and `dependabot.yml`. The code of conduct, the contributing guide, the issue forms and the pull request template are the account's defaults, from the Zhengjunliang/.github repository (outside the repository) |
+| `.github/` | What GitHub reads besides the code, and what it inherits from the account: `docs/development.md`, section "Code layout" |
 
 **Progress is owned by GitHub issues, never by a markdown file**: milestone checklists, blockers and deferred work live only in issues; documents say *what* and *why*, never *not yet*.
 
