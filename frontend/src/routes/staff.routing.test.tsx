@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "@/App";
 import type { Account } from "@/api/account";
-import type { Programme, StudyPlanCourse } from "@/api/catalog";
+import type { Course, Edition, Programme, StudyPlanCourse } from "@/api/catalog";
 import type { ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
 import { type Mounted, mount } from "@/test/mount";
@@ -57,6 +57,61 @@ const PLAN: StudyPlanCourse[] = [
     },
     current_edition: { id: 5, academic_year: "2025-2026", teachers: [] },
   },
+];
+
+const NAME_B047 = { code: "B047", name: B047.name, locale: "it" };
+const NAME_B222 = { code: "B222", name: B222.name, locale: "it" };
+/** PPM: two codes in B047's two curricula. */
+const PPM: Course = {
+  ...(PLAN[0]?.course as Course),
+  entries: [
+    {
+      programme: NAME_B047,
+      curriculum: "TECNICO APPLICATIVO",
+      year_of_study: 3,
+      ad_code: "B028451",
+    },
+    {
+      programme: NAME_B047,
+      curriculum: "TECNICO SCIENTIFICO",
+      year_of_study: 3,
+      ad_code: "B003712",
+    },
+  ],
+};
+/** A course both programmes list. */
+const SHARED: Course = {
+  code: "B000001",
+  name: "ANALISI MATEMATICA I",
+  locale: "it",
+  code_source: "moodle",
+  entries: [
+    {
+      programme: NAME_B047,
+      curriculum: "TECNICO APPLICATIVO",
+      year_of_study: 1,
+      ad_code: "B000001",
+    },
+    { programme: NAME_B222, curriculum: "", year_of_study: 1, ad_code: "B000001" },
+  ],
+};
+
+function edition(id: number, year: string, current: boolean, teachers: string[]): Edition {
+  return {
+    id,
+    course: PPM,
+    academic_year: year,
+    is_current: current,
+    teachers: teachers.map((username, index) => ({ id: index + 10, username })),
+    permissions: ["edition.set_current", "edition.view"],
+    can_set_current: true,
+  };
+}
+
+/** PPM's editions, the newer first as the server lists them; the teacher teaches both. */
+const EDITIONS = [
+  edition(5, "2025-2026", false, ["demo-colleague", "demo-teacher"]),
+  edition(4, "2024-2025", true, ["demo-teacher"]),
 ];
 
 function account(username: string, superuser: boolean, roles: Account["roles"]): Account {
@@ -133,6 +188,19 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return endlessAnswer(init.signal);
   }
   if (path === "/api/catalog/programmes") return json(scope);
+  // A teacher views no programme, so no course.
+  const course = [PPM, SHARED].find((c) => path === `/api/catalog/courses/${c.code}`);
+  if (course !== undefined && scope.length > 0) return json(course);
+  if (path === "/api/catalog/editions") return json(EDITIONS);
+  if (path.startsWith("/api/catalog/editions?course=")) {
+    return json(EDITIONS.filter((e) => path.endsWith(`=${e.course.code}`)));
+  }
+  const one = EDITIONS.find((e) => path === `/api/catalog/editions/${e.id}`);
+  if (one !== undefined) {
+    // Secretariat staff may assign a teacher; the teacher may not.
+    const assigns = scope.length > 0 ? ["edition.assign_teacher"] : [];
+    return json({ ...one, permissions: [...assigns, ...one.permissions] });
+  }
   if (programme !== undefined && path.endsWith("/courses")) return json(PLAN);
   if (programme !== undefined) return json(programme);
   return json({ detail: { message: "Not found.", code: "not_found" } }, 404);
@@ -212,8 +280,7 @@ afterEach(() => {
 describe("the Gestione group and /staff", () => {
   it.each<[string, Account, string[][], string]>([
     ["a student", STUDENT, [], "/"],
-    // "I miei insegnamenti" arrives with the teacher's own page.
-    ["a teacher", TEACHER, [], "/"],
+    ["a teacher", TEACHER, [["I miei insegnamenti", "/staff/mine"]], "/staff/mine"],
     [
       "one programme's secretariat",
       SECRETARIAT,
@@ -276,7 +343,9 @@ describe("the programme pages", () => {
       title: text(container.querySelector("main h1")),
       columns: [...container.querySelectorAll("main th")].map(text),
       links: [...container.querySelectorAll("main tbody a")].map((a) => a.getAttribute("href")),
-      rows: [...container.querySelectorAll<HTMLTableRowElement>("main tbody tr")].map((tr) => text(tr.cells[4])),
+      rows: [...container.querySelectorAll<HTMLTableRowElement>("main tbody tr")].map((tr) =>
+        text(tr.cells[4]),
+      ),
       crumbs: crumbs(container),
     };
     unmount();
@@ -344,6 +413,137 @@ describe("the programme pages", () => {
       back: ["Torna all'inizio", "/staff/programmes/B047"],
       crumbs: ["Non trovato (current)"],
     });
+  });
+});
+
+describe("a course, an edition, and a teacher's own courses", () => {
+  it("shows a course's study plans and editions, reached through a programme", async () => {
+    reader = SECRETARIAT;
+    const { container, unmount } = page("/staff/courses/B028451?programme=B047");
+    await settle();
+    const seen = {
+      title: text(container.querySelector("main h1")),
+      cards: [...container.querySelectorAll("main h3")].map(text),
+      note: (container.textContent ?? "").includes(
+        "Due codici, un solo insegnamento: ogni edizione vale per entrambi i curriculum.",
+      ),
+      editions: [...container.querySelectorAll<HTMLTableRowElement>("main tbody tr")].map((tr) => [
+        tr.querySelector("a")?.getAttribute("href"),
+        text(tr.cells[1]),
+      ]),
+      crumbs: crumbs(container),
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      title: "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE",
+      cards: ["INGEGNERIA INFORMATICAB047"],
+      note: true,
+      editions: [
+        ["/staff/editions/5?programme=B047", "—"],
+        ["/staff/editions/4?programme=B047", "Corrente"],
+      ],
+      crumbs: [
+        "Corso di laurea",
+        "B047 · INGEGNERIA INFORMATICA →",
+        "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE (current)",
+      ],
+    });
+  });
+
+  it("says who else manages a course two programmes list", async () => {
+    reader = SECRETARIAT;
+    const { container, unmount } = page("/staff/courses/B000001");
+    await settle();
+    const seen = {
+      cards: [...container.querySelectorAll("main h3")].map(text),
+      shared: (container.textContent ?? "").includes(
+        "Lo gestiscono le segreterie di entrambi i corsi di laurea.",
+      ),
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      cards: ["INGEGNERIA INFORMATICAB047", "INGEGNERIA GESTIONALEB222"],
+      shared: true,
+    });
+  });
+
+  it("lists a teacher's own courses, newest year first", async () => {
+    reader = TEACHER;
+    const { container, unmount } = page("/staff");
+    await settle();
+    const seen = {
+      path: text(container.querySelector("output")),
+      cards: [...container.querySelectorAll("main h2")].map(text),
+      rows: [...container.querySelectorAll("main li")].map((li) => [
+        li.querySelector("a")?.getAttribute("href"),
+        text(li),
+      ]),
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      path: "/staff/mine",
+      cards: ["PROGETTAZIONE E PRODUZIONE MULTIMEDIALE"],
+      rows: [
+        ["/staff/editions/5", "2025-2026demo-colleague, demo-teacher"],
+        ["/staff/editions/4", "2024-2025Correntedemo-teacher"],
+      ],
+    });
+  });
+
+  it.each([
+    [
+      "its teacher, who reads it under their own courses",
+      TEACHER,
+      "/staff/editions/5",
+      ["I miei insegnamenti →", "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026 (current)"],
+      true,
+    ],
+    [
+      "secretariat staff, who may assign, through their programme",
+      SECRETARIAT,
+      "/staff/editions/5?programme=B047",
+      [
+        "Corso di laurea",
+        "B047 · INGEGNERIA INFORMATICA →",
+        "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE →",
+        "2025-2026 (current)",
+      ],
+      false,
+    ],
+  ])("shows an edition's teachers to %s", async (_, who, path, trail, footnote) => {
+    reader = who;
+    const { container, unmount } = page(path);
+    await settle();
+    const seen = {
+      people: [...container.querySelectorAll("main ul li")].map(text),
+      crumbs: crumbs(container),
+      footnote: (container.textContent ?? "").includes(
+        "Solo la segreteria didattica e l'amministratore assegnano i docenti.",
+      ),
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      // The reader is marked as themselves.
+      people:
+        who === TEACHER ? ["demo-colleague", "demo-teachertu"] : ["demo-colleague", "demo-teacher"],
+      crumbs: trail,
+      footnote,
+    });
+  });
+
+  it("sends a teacher who opens a course page back to their own courses", async () => {
+    reader = TEACHER;
+    const { container, unmount } = page("/staff/courses/B028451");
+    await settle();
+    const back = container.querySelector("main a");
+    const seen = [text(container.querySelector("main h1")), text(back), back?.getAttribute("href")];
+    unmount();
+
+    expect(seen).toEqual(["Non trovato", "Torna ai miei insegnamenti", "/staff/mine"]);
   });
 });
 

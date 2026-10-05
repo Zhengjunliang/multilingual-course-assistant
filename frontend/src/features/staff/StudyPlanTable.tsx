@@ -6,12 +6,15 @@
  * page while its courses scroll under it, where the screen is wide enough for
  * the table to need no frame of its own (ui/table.tsx). The curriculum filter
  * is a group of toggle buttons, one pressed, rather than a select: there are
- * two or three curricula, and all of them stay in sight.
+ * two or three curricula, and all of them stay in sight. A row opens its
+ * course, reached through this programme; the course's name is the row's one
+ * link, stretched over it.
  */
 
-import { Search } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import type { Programme, StudyPlanCourse } from "@/api/catalog";
 import { Input } from "@/components/ui/input";
@@ -24,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { coursePath } from "./crumbs";
 import { PeopleInline } from "./people";
 import { type PlanRow, studyPlan } from "./studyPlan";
 
@@ -131,13 +135,16 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
               <TableHead>{t("staff.plan.entries")}</TableHead>
               <TableHead>{t("staff.plan.current")}</TableHead>
               <TableHead>{t("staff.plan.teachers")}</TableHead>
+              <TableHead>
+                <span className="sr-only">{t("staff.open")}</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           {groups.map((group) => (
             <TableBody key={group.year}>
               <tr>
                 <th
-                  colSpan={4}
+                  colSpan={5}
                   scope="colgroup"
                   className="sticky top-0 z-10 border-line border-b bg-canvas px-tight py-tight text-left font-semibold text-body text-ink"
                 >
@@ -148,9 +155,14 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
                 </th>
               </tr>
               {group.rows.map((row) => (
-                <TableRow key={row.course.code}>
+                <TableRow key={row.course.code} className="relative cursor-pointer">
                   <TableCell>
-                    <span className="block font-medium uppercase">{row.course.name}</span>
+                    <Link
+                      to={coursePath(row.course.code, programme)}
+                      className="block font-medium uppercase after:absolute after:inset-0 focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      {row.course.name}
+                    </Link>
                     {row.course.code_source === "cineca-only" && (
                       <span className={NOTE}>{t("staff.plan.integrated")}</span>
                     )}
@@ -179,6 +191,9 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
                         {t("staff.plan.noTeacher")}
                       </span>
                     )}
+                  </TableCell>
+                  <TableCell className="text-muted">
+                    <ChevronRight aria-hidden className="size-icon" />
                   </TableCell>
                 </TableRow>
               ))}

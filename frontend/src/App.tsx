@@ -3,7 +3,10 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireSession } from "@/auth/RequireSession";
 import { RequireStaff } from "@/auth/RequireStaff";
 import ChatPage from "@/routes/ChatPage";
+import CoursePage from "@/routes/CoursePage";
+import EditionPage from "@/routes/EditionPage";
 import LoginPage from "@/routes/LoginPage";
+import MinePage from "@/routes/MinePage";
 import ProgrammePage from "@/routes/ProgrammePage";
 import ProgrammesPage from "@/routes/ProgrammesPage";
 import RegisterPage from "@/routes/RegisterPage";
@@ -28,7 +31,7 @@ import StyleguidePage from "@/routes/StyleguidePage";
  * the staff pages share its sidebar, whose "Gestione" group opens the staff
  * pages. `/staff/*` is open to an account holding a role or the superuser
  * (`RequireStaff`); `/staff` lands on the account's first Gestione item, and
- * the pages are objects — programmes, their courses — not roles.
+ * the pages are objects — programmes, courses, editions — not roles.
  */
 export default function App() {
   return (
@@ -56,6 +59,9 @@ export default function App() {
           <Route index element={<StaffLanding />} />
           <Route path="programmes" element={<ProgrammesPage />} />
           <Route path="programmes/:code" element={<ProgrammePage />} />
+          <Route path="courses/:code" element={<CoursePage />} />
+          <Route path="editions/:id" element={<EditionPage />} />
+          <Route path="mine" element={<MinePage />} />
           <Route path="*" element={<StaffNotFound />} />
         </Route>
       </Route>

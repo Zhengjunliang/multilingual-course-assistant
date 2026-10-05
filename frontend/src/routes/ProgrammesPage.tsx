@@ -57,7 +57,7 @@ export default function ProgrammesPage() {
                 <TableHead className="text-right">{t("staff.programmes.courses")}</TableHead>
                 <TableHead>{t("staff.programmes.secretariat")}</TableHead>
                 <TableHead>
-                  <span className="sr-only">{t("staff.programmes.open")}</span>
+                  <span className="sr-only">{t("staff.open")}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>

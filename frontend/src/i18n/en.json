@@ -95,11 +95,8 @@
     "nav": {
       "programmes": "Degree programmes",
       "management": "Management",
-      "programme": "Degree programme"
-    },
-    "editions": {
-      "title": "Course editions",
-      "current": "Current"
+      "programme": "Degree programme",
+      "mine": "My courses"
     },
     "setCurrent": {
       "title": "Make {{new}} current?",
@@ -107,19 +104,6 @@
       "bodyAlone": "{{new}} becomes the current edition of {{course}}.",
       "confirm": "Make current",
       "done": "{{new}} is the current edition of {{course}}."
-    },
-    "members": {
-      "teachers": "Teachers",
-      "username": "Add by exact username",
-      "add": "Add",
-      "remove": "Remove {{username}}",
-      "removeTitle": "Remove {{username}}?",
-      "removeBody": "{{username}} will no longer be among the {{group}} of {{scope}}.",
-      "removeConfirm": "Remove",
-      "empty": "nobody.",
-      "added": "{{username}} added.",
-      "removed": "{{username}} removed.",
-      "gone": "{{username}} had been removed elsewhere; the list is up to date."
     },
     "programmes": {
       "title": "Degree programmes",
@@ -132,8 +116,7 @@
       "courses": "Courses",
       "secretariat": "Teaching secretariat",
       "none": "Nobody",
-      "footnote": "A course in the study plan of several degree programmes counts in each.",
-      "open": "Open"
+      "footnote": "A course in the study plan of several degree programmes counts in each."
     },
     "error": {
       "no_such_user": "No account has this username.",
@@ -184,7 +167,33 @@
     "refusal": {
       "notFound": "Not found",
       "notFoundBody": "This page does not exist or is not visible to your account.",
-      "home": "Back to the start"
+      "home": "Back to the start",
+      "mine": "Back to my courses"
+    },
+    "open": "Open",
+    "current": "Current",
+    "course": {
+      "inPlan": "In the study plan of",
+      "twoCodesBoth": "Two codes, one course: each edition counts for both curricula.",
+      "twoCodesAll": "Two codes, one course: each edition counts for every curriculum.",
+      "sharedBoth": "The secretariats of both degree programmes manage it.",
+      "sharedAll": "The secretariats of all {{count}} degree programmes manage it.",
+      "editions": "Editions",
+      "editionsSub": "A course has at most one current edition.",
+      "year": "Academic year",
+      "status": "Status"
+    },
+    "edition": {
+      "sub": "Edition {{year}} · {{programmes}}",
+      "teachers": "The edition's teachers",
+      "empty": "No teacher is assigned to this edition.",
+      "onlyStaff": "Only the teaching secretariat and the administrator assign teachers."
+    },
+    "mine": {
+      "title": "My courses",
+      "sub": "The editions you are assigned to as a teacher.",
+      "empty": "No course assigned.",
+      "note": "A course has at most one current edition; changing it takes the permission on both editions."
     }
   }
 }

@@ -112,7 +112,8 @@ export default function ShellLayout() {
     () => (account === null ? [] : managementItems(account, programmes.data)),
     [account, programmes.data],
   );
-  const homeLabel = t("staff.refusal.home");
+  // A teacher's start is their own courses, and the way back says so.
+  const homeLabel = t(items[0]?.key === "mine" ? "staff.refusal.mine" : "staff.refusal.home");
   const shell = useMemo<Shell>(
     () => ({
       programmes: programmes.data,

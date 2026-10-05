@@ -139,6 +139,13 @@ export function readCourse(code: string): Promise<Course> {
   return request<Course>(`${CATALOG}/courses/${encodeURIComponent(code)}`);
 }
 
+/** Every edition in the caller's scope, or only one course's. */
+export function listEditions(filter: { course?: string } = {}): Promise<Edition[]> {
+  const query =
+    filter.course === undefined ? "" : `?${new URLSearchParams({ course: filter.course })}`;
+  return request<Edition[]>(`${CATALOG}/editions${query}`);
+}
+
 export function readEdition(id: number): Promise<Edition> {
   return request<Edition>(`${CATALOG}/editions/${id}`);
 }
@@ -148,14 +155,11 @@ export function setCurrent(id: number): Promise<Edition> {
   return request<Edition>(`${CATALOG}/editions/${id}/set-current`, { method: "POST" });
 }
 
+/** Where a scope's members are added; they are read on the scope itself, `teachers` or `secretariat`. */
 function membersPath(scope: MemberScope): string {
   return scope.kind === "edition"
     ? `${CATALOG}/editions/${scope.id}/teachers`
     : `${CATALOG}/programmes/${encodeURIComponent(scope.code)}/secretariat`;
-}
-
-export function listMembers(scope: MemberScope): Promise<StaffMember[]> {
-  return request<StaffMember[]>(membersPath(scope));
 }
 
 /** Names an existing user by their exact username; the server answers 201 with the member. */

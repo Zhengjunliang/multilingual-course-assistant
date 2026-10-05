@@ -8,9 +8,12 @@ resolved, and checked, before anything else (apps/roles/api.py).
 
 Who may grant a role is the assign table, `GRANT_PERMISSION` in
 apps/roles/registry.py: holding its permission on the role's scope. A collection
-view serves `GET` and `POST` and a member view `DELETE` alone, so each view's
-methods are exactly the keys of its `scope_map`; `HEAD` follows `GET`, and any
-other method, `OPTIONS` included, is a 405.
+view serves `POST` alone and a member view `DELETE` alone, so each view's
+methods are exactly the keys of its `scope_map`, and any other method,
+`OPTIONS` and `GET` included, is a 405. Members are read on the scope's own
+row, an edition's `teachers` and a programme's `secretariat`
+(apps/catalog/serializers.py): one read of the scope, and no second endpoint
+answering the same question.
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ from apps.catalog.views import EditionView, ProgrammeView
 from apps.roles.api import ScopedObjectView
 from apps.roles.grants import AlreadyHeldError, grant, revoke
 from apps.roles.models import RoleAssignment
-from apps.roles.registry import GRANT_PERMISSION, Permission, Role
+from apps.roles.registry import GRANT_PERMISSION, Role
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -56,10 +59,6 @@ class _Staff[M: (CourseEdition, DegreeProgramme)](ScopedObjectView[M]):
 
 
 class _StaffList[M: (CourseEdition, DegreeProgramme)](_Staff[M]):
-    def get(self, request: Request, **kwargs: object) -> Response:
-        members = [row.user for row in self.rows().order_by("user__username")]
-        return Response(StaffMemberSerializer(members, many=True).data)
-
     def post(self, request: Request, **kwargs: object) -> Response:
         serializer = StaffMemberSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -84,9 +83,7 @@ class _StaffMember[M: (CourseEdition, DegreeProgramme)](_Staff[M]):
 
 class EditionTeachersView(_StaffList[CourseEdition], EditionView):
     role = Role.TEACHER
-    scope_map = MappingProxyType(
-        {"GET": Permission.EDITION_VIEW, "POST": GRANT_PERMISSION[Role.TEACHER]}
-    )
+    scope_map = MappingProxyType({"POST": GRANT_PERMISSION[Role.TEACHER]})
 
 
 class EditionTeacherView(_StaffMember[CourseEdition], EditionView):
@@ -96,9 +93,7 @@ class EditionTeacherView(_StaffMember[CourseEdition], EditionView):
 
 class ProgrammeSecretariatView(_StaffList[DegreeProgramme], ProgrammeView):
     role = Role.SECRETARIAT
-    scope_map = MappingProxyType(
-        {"GET": Permission.PROGRAMME_VIEW, "POST": GRANT_PERMISSION[Role.SECRETARIAT]}
-    )
+    scope_map = MappingProxyType({"POST": GRANT_PERMISSION[Role.SECRETARIAT]})
 
 
 class ProgrammeSecretariatMemberView(_StaffMember[DegreeProgramme], ProgrammeView):
