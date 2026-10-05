@@ -33,7 +33,7 @@ repos:
   # The one place ruff runs, so a commit and CI cannot judge a file with two
   # different versions of it.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
+    rev: f12be1ebaa5351c1fc76472de98db2c3446c8253 # frozen: v0.16.10
     hooks:
       - id: ruff-check
         args: [--fix]
