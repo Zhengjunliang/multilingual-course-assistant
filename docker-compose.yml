@@ -14,7 +14,7 @@
 # so there is one place to change a credential.
 
 # Fixed, so the volume names below do not depend on the checkout's directory
-# name (README's commands name them).
+# name (the commands of docs/development.md name them).
 name: multilingual-course-assistant
 
 services:
