@@ -35,6 +35,7 @@ from apps.roles.registry import (
     roles_with,
 )
 from apps.roles.scopes import (
+    courses_for,
     editions_for,
     permissions_on,
     programmes_for,
@@ -309,6 +310,50 @@ def test_lists_and_permissions_agree_with_has_perm() -> None:
         assert not editions_for(AnonymousUser(), p).exists()
     for p in PROGRAMME_PERMISSIONS:
         assert not programmes_for(AnonymousUser(), p).exists()
+
+
+def test_a_course_is_read_where_its_editions_are_run() -> None:
+    """`courses_for` against the secretariat mark of `with_edition_roles`, course by course.
+
+    A course is read through a programme that lists it, and a programme's
+    secretariat runs every edition of every course it lists; so a course with
+    an edition is readable exactly where one of its editions is marked as run
+    by the secretariat. The teacher mark does not count: teaching IA opens no
+    course of L031. A course with no edition has no mark to compare, so the
+    one below is checked on its own.
+    """
+    w = world()
+    planned = Course.objects.create(code="B000002", name="Fisica")
+    CurriculumEntry.objects.create(
+        programme=w.b047, course=planned, year_of_study=2, ad_code="B000002"
+    )
+
+    readable = {
+        user.username: set(
+            courses_for(user, Permission.PROGRAMME_VIEW).values_list("code", flat=True)
+        )
+        for user in everyone(w)
+    }
+
+    def run_by(user: User) -> set[str]:
+        if not user.is_active:
+            return set()
+        editions = with_edition_roles(CourseEdition.objects.all(), user)
+        if not user.is_superuser:
+            editions = editions.filter(as_secretariat=True)
+        return set(editions.values_list("course__code", flat=True))
+
+    run = {user.username: run_by(user) for user in everyone(w)}
+
+    assert {name: codes - {planned.code} for name, codes in readable.items()} == run
+    assert {name for name, codes in readable.items() if planned.code in codes} == {
+        "secretariat",
+        "dual",
+        "root",
+    }
+    assert not courses_for(AnonymousUser(), Permission.PROGRAMME_VIEW).exists()
+    # A permission no programme carries opens no course, as `programmes_for` answers.
+    assert not courses_for(w.root, Permission.EDITION_VIEW).exists()
 
 
 def test_the_admin_enters_a_role_and_refuses_a_misfit(client: Client) -> None:

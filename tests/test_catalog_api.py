@@ -20,7 +20,7 @@ from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 from test_roles import everyone, label, world
 
-from apps.catalog.models import CourseEdition, CurriculumEntry
+from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
 from apps.roles.grants import revoke
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Role
@@ -36,6 +36,7 @@ pytestmark = pytest.mark.django_db
 
 EDITIONS_URL = "/api/catalog/editions"
 PROGRAMMES_URL = "/api/catalog/programmes"
+COURSES_URL = "/api/catalog/courses"
 OLD, NEW = "B028451:2024-2025", "B028451:2025-2026"  # PPM's editions; the old one is current
 
 TEACHES = ["edition.set_current", "edition.view"]
@@ -65,8 +66,20 @@ def row_label(row: dict[str, Any]) -> str:
     return f"{row['course']['code']}:{row['academic_year']}"
 
 
+def usernames(members: list[dict[str, Any]]) -> list[str]:
+    return [member["username"] for member in members]
+
+
 def test_each_caller_lists_their_own_scope() -> None:
     w = world()
+    # PPM in B047's second curriculum too: two entries, one course in the count.
+    CurriculumEntry.objects.create(
+        programme=w.b047,
+        course=w.ppm_old.course,
+        curriculum="TECNICO SCIENTIFICO",
+        year_of_study=3,
+        ad_code="B003712",
+    )
     reads = {label(e): f"{EDITIONS_URL}/{e.pk}" for e in (w.ppm_old, w.ppm_new, w.ia, w.shared)}
     reads |= {p.code: f"{PROGRAMMES_URL}/{p.code}" for p in (w.b047, w.l031)}
 
@@ -98,11 +111,24 @@ def test_each_caller_lists_their_own_scope() -> None:
             )
         seen[name] = (
             {row_label(e): (e["permissions"], e["can_set_current"]) for e in editions.json()},
-            {p["code"]: p["permissions"] for p in programmes.json()},
+            {
+                p["code"]: (
+                    p["permissions"],
+                    p["curricula"],
+                    p["course_count"],
+                    usernames(p["secretariat"]),
+                )
+                for p in programmes.json()
+            },
         )
 
     ppm_old, ppm_new, ia, shared = OLD, NEW, "B003725:2025-2026", "B000001:2025-2026"
     teaches, runs = (TEACHES, True), (RUNS_EDITION, True)
+    # Curricula, course count, secretariat: an empty curriculum is no name, and
+    # a disabled account still holds its row until someone revokes it.
+    b047 = (["TECNICO SCIENTIFICO"], 2, ["dual", "inactive", "secretariat"])
+    l031 = ([], 2, ["other_secretariat"])
+    views, assigns = ["programme.view"], ["programme.assign_secretariat", "programme.view"]
     assert seen == {
         "continuing": ({ppm_old: teaches, ppm_new: teaches}, {}),
         # The switch to the new year would replace last year's edition, which
@@ -110,23 +136,20 @@ def test_each_caller_lists_their_own_scope() -> None:
         "newcomer": ({ppm_new: (TEACHES, False)}, {}),
         "secretariat": (
             {ppm_old: runs, ppm_new: runs, shared: runs},
-            {"B047": ["programme.view"]},
+            {"B047": (views, *b047)},
         ),
         "other_secretariat": (
             {ia: runs, shared: runs},
-            {"L031": ["programme.view"]},
+            {"L031": (views, *l031)},
         ),
         "dual": (
             {ia: teaches, ppm_old: runs, ppm_new: runs, shared: runs},
-            {"B047": ["programme.view"]},
+            {"B047": (views, *b047)},
         ),
         "student": ({}, {}),
         "root": (
             {ppm_old: runs, ppm_new: runs, ia: runs, shared: runs},
-            {
-                "B047": ["programme.assign_secretariat", "programme.view"],
-                "L031": ["programme.assign_secretariat", "programme.view"],
-            },
+            {"B047": (assigns, *b047), "L031": (assigns, *l031)},
         ),
         # A disabled account has no session, whatever it held.
         "inactive": (403, 403, [403]),
@@ -173,6 +196,127 @@ def test_the_edition_list_narrows_to_a_programme() -> None:
         "superuser, a programme": ["B000001:2025-2026", "B003725:2025-2026"],
         "superuser, an unknown code": [],
         "teacher, their course's programme": [],
+    }
+
+
+def test_each_caller_reads_courses_and_study_plans() -> None:
+    w = world()
+    # A course B047 lists with no edition yet: a row of its study plan all the same.
+    planned = Course.objects.create(code="B000002", name="Fisica")
+    CurriculumEntry.objects.create(
+        programme=w.b047, course=planned, year_of_study=2, ad_code="B000002"
+    )
+    urls = {
+        "PPM": f"{COURSES_URL}/B028451",
+        "shared": f"{COURSES_URL}/B000001",
+        "IA": f"{COURSES_URL}/B003725",
+        "B047 plan": f"{PROGRAMMES_URL}/B047/courses",
+        "L031 plan": f"{PROGRAMMES_URL}/L031/courses",
+    }
+
+    seen: dict[str, dict[str, object]] = {}
+    read: dict[str, dict[str, Any]] = {}
+    for user in (*everyone(w), None):
+        client = as_user(user)
+        name = user.username if user is not None else "anonymous"
+        answers = {key: client.get(url) for key, url in urls.items()}
+        read[name] = {key: r.json() for key, r in answers.items() if r.status_code == 200}
+        # A study plan by the codes of its courses, a course by its status.
+        seen[name] = {
+            key: [row["course"]["code"] for row in read[name][key]]
+            if key in read[name] and key.endswith("plan")
+            else r.status_code
+            for key, r in answers.items()
+        }
+
+    hidden, refused = dict.fromkeys(urls, 404), dict.fromkeys(urls, 403)
+    b047_plan, l031_plan = ["B000001", "B000002", "B028451"], ["B000001", "B003725"]
+    b047_staff = {"PPM": 200, "shared": 200, "IA": 404, "B047 plan": b047_plan, "L031 plan": 404}
+    assert seen == {
+        # A teacher views no programme, so no course: their editions are in the edition list.
+        "continuing": hidden,
+        "newcomer": hidden,
+        "secretariat": b047_staff,
+        "other_secretariat": {
+            "PPM": 404,
+            "shared": 200,
+            "IA": 200,
+            "B047 plan": 404,
+            "L031 plan": l031_plan,
+        },
+        # Teaching IA opens no course of L031: only the programme they run does.
+        "dual": b047_staff,
+        "student": hidden,
+        "root": {
+            "PPM": 200,
+            "shared": 200,
+            "IA": 200,
+            "B047 plan": b047_plan,
+            "L031 plan": l031_plan,
+        },
+        "inactive": refused,
+        "anonymous": refused,
+    }
+
+    b047 = {"code": "B047", "name": "Ingegneria Informatica", "locale": "it"}
+    l031 = {"code": "L031", "name": "Informatica", "locale": "it"}
+
+    def course(code: str, name: str, *entries: tuple[dict[str, str], int]) -> dict[str, Any]:
+        return {
+            "code": code,
+            "name": name,
+            "locale": "it",
+            "code_source": "moodle",
+            "entries": [
+                {"programme": programme, "curriculum": "", "year_of_study": year, "ad_code": code}
+                for programme, year in entries
+            ],
+        }
+
+    assert read["secretariat"]["B047 plan"] == [
+        {
+            "course": course("B000001", "Analisi Matematica I", (b047, 1), (l031, 1)),
+            "current_edition": {"id": w.shared.pk, "academic_year": "2025-2026", "teachers": []},
+        },
+        {"course": course("B000002", "Fisica", (b047, 2)), "current_edition": None},
+        {
+            "course": course("B028451", "Progettazione e Produzione Multimediale", (b047, 3)),
+            "current_edition": {
+                "id": w.ppm_old.pk,
+                "academic_year": "2024-2025",
+                "teachers": [{"id": w.continuing.pk, "username": "continuing"}],
+            },
+        },
+    ]
+    # A course reads as its row of the study plan shows it.
+    assert read["secretariat"]["shared"] == read["secretariat"]["B047 plan"][0]["course"]
+    # The shared course names L031, a public fact; L031's staff stays behind
+    # L031's own scope, whose page and study plan are a 404 above.
+    assert "other_secretariat" not in str(read["secretariat"])
+
+
+def test_the_edition_list_narrows_to_a_course() -> None:
+    w = world()
+    asked = {
+        "secretariat, a course of their programme": (w.secretariat, "B028451"),
+        "secretariat, a course of another programme": (w.secretariat, "B003725"),
+        "superuser, an unknown code": (w.root, "X999"),
+        "superuser, a NUL byte": (w.root, "B028451\x00"),
+        # A teacher gets the editions they teach, and no other of the course.
+        "teacher of the new year": (w.newcomer, "B028451"),
+    }
+
+    seen = {
+        case: [row_label(e) for e in as_user(user).get(EDITIONS_URL, {"course": code}).json()]
+        for case, (user, code) in asked.items()
+    }
+
+    assert seen == {
+        "secretariat, a course of their programme": [NEW, OLD],
+        "secretariat, a course of another programme": [],
+        "superuser, an unknown code": [],
+        "superuser, a NUL byte": [],
+        "teacher of the new year": [NEW],
     }
 
 
@@ -275,24 +419,71 @@ def test_a_write_without_the_csrf_token_is_refused() -> None:
     assert CourseEdition.objects.get(pk=w.ppm_old.pk).is_current
 
 
-def test_the_edition_list_costs_the_same_for_more_editions() -> None:
+@pytest.mark.parametrize(
+    ("url", "rows"),
+    [
+        pytest.param(EDITIONS_URL, (3, 6), id="editions"),
+        pytest.param(PROGRAMMES_URL, (1, 2), id="programmes"),
+        pytest.param(f"{PROGRAMMES_URL}/B047/courses", (2, 3), id="study-plan"),
+        # A course's rows are its entries.
+        pytest.param(f"{COURSES_URL}/B000001", (2, 3), id="course"),
+    ],
+)
+def test_each_read_costs_the_same_for_more_rows(url: str, rows: tuple[int, int]) -> None:
     w = world()
     client = as_user(w.secretariat)
 
     def queries() -> tuple[int, int]:
         with CaptureQueriesContext(connection) as captured:
-            listed = len(client.get(EDITIONS_URL).json())
-        return listed, len(captured.captured_queries)
+            body = client.get(url).json()
+        return len(body if isinstance(body, list) else body["entries"]), len(
+            captured.captured_queries
+        )
 
     few = queries()
-    # More editions, and teachers on editions that had none.
+    # More editions, and teachers on editions that had none; a second programme
+    # this caller runs, with its staff and an entry for the shared course; and
+    # a new course in two of B047's curricula, current and taught.
     for year in ("2022-2023", "2023-2024"):
         edition = CourseEdition.objects.create(course=w.ppm_old.course, academic_year=year)
         RoleAssignment.objects.create(user=w.newcomer, role=Role.TEACHER, edition=edition)
     RoleAssignment.objects.create(user=w.student, role=Role.TEACHER, edition=w.shared)
+    b046 = DegreeProgramme.objects.create(code="B046", name="Ingegneria Elettronica")
+    physics = Course.objects.create(code="B000002", name="Fisica")
+    CurriculumEntry.objects.bulk_create(
+        [
+            CurriculumEntry(
+                programme=b046, course=w.shared.course, year_of_study=1, ad_code="B000001"
+            ),
+            CurriculumEntry(
+                programme=w.b047,
+                course=physics,
+                curriculum="TECNICO APPLICATIVO",
+                year_of_study=2,
+                ad_code="B000002",
+            ),
+            CurriculumEntry(
+                programme=w.b047,
+                course=physics,
+                curriculum="TECNICO SCIENTIFICO",
+                year_of_study=2,
+                ad_code="B000003",
+            ),
+        ]
+    )
+    current = CourseEdition.objects.create(
+        course=physics, academic_year="2025-2026", is_current=True
+    )
+    RoleAssignment.objects.bulk_create(
+        [
+            RoleAssignment(user=w.secretariat, role=Role.SECRETARIAT, programme=b046),
+            RoleAssignment(user=w.student, role=Role.SECRETARIAT, programme=b046),
+            RoleAssignment(user=w.student, role=Role.TEACHER, edition=current),
+        ]
+    )
     more = queries()
 
-    assert (few[0], more[0]) == (3, 5)
+    assert (few[0], more[0]) == rows
     assert few[1] == more[1]
 
 

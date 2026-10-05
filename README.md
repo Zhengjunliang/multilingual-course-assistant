@@ -185,9 +185,11 @@ What staff see and change, each within the scopes their roles cover ([apps/roles
 
 | Method and path | Does |
 | --------------- | ---- |
-| `GET /api/catalog/programmes` | the programmes the caller may view: `code`, `name`, `locale`, `permissions`; a student gets `[]` |
+| `GET /api/catalog/programmes` | the programmes the caller may view: `code`, `name`, `locale`, `curricula` (names, sorted), `course_count` (each course once), `secretariat` (`[{"id", "username"}]` by username), `permissions`; a student gets `[]` |
 | `GET /api/catalog/programmes/<code>` | one programme, as the list shows it |
-| `GET /api/catalog/editions` | the editions the caller may view: `id`, `course` (`code`, `name`, `locale`), `academic_year`, `is_current`, `teachers` (`[{"id", "username"}]` by username), `permissions`, `can_set_current`; `?programme=<code>` keeps the courses that programme offers, and gives `[]` for a code the caller may not view |
+| `GET /api/catalog/programmes/<code>/courses` | the programme's study plan, one row per course it lists, with or without an edition: `course`, and `current_edition` (`id`, `academic_year`, `teachers`) or `null` |
+| `GET /api/catalog/courses/<code>` | one course a programme the caller may view lists: `code`, `name`, `locale`, `code_source` (`moodle` or `cineca-only`), `entries` (`programme` as `code`, `name`, `locale`; `curriculum`, `year_of_study`, `ad_code`), in every programme that lists it; 404 for any other course, a teacher's included |
+| `GET /api/catalog/editions` | the editions the caller may view: `id`, `course` (as `courses/<code>` reads it), `academic_year`, `is_current`, `teachers` (`[{"id", "username"}]` by username), `permissions`, `can_set_current`; `?course=<code>` keeps one course's, and `?programme=<code>` the courses that programme offers, each giving `[]` for a code the caller may not view |
 | `GET /api/catalog/editions/<id>` | one edition, as the list shows it |
 | `POST /api/catalog/editions/<id>/set-current` | makes the edition its course's current one and answers with it (200) |
 | `GET /api/catalog/editions/<id>/teachers` | the edition's teachers, `[{"id", "username"}]` by username |
