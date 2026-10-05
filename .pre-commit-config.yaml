@@ -53,7 +53,7 @@ repos:
   # pyproject.toml and uv.lock must move together; CI's `uv sync --locked` would
   # catch the drift anyway, but catching it before the commit exists is cheaper.
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 8ff2449591c8de025b17661ba76d60237a1ae62b # frozen: 0.12.1
+    rev: 0f4b65a503cc866b9b5e62dda2020f7943b01a65 # frozen: 0.12.22
     hooks:
       - id: uv-lock
 
