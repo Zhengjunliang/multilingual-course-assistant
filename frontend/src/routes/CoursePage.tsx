@@ -28,6 +28,7 @@ import {
 import { useSetCurrent } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine, programmesOf } from "@/features/staff/crumbs";
+import { isNotFound } from "@/features/staff/errors";
 import { Code, Note, PageHead, Section } from "@/features/staff/page";
 import { PeopleInline } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
@@ -85,7 +86,7 @@ export default function CoursePage() {
       ? null
       : contextProgramme(course.entries, search.get("programme"), programmes ?? []);
   useCrumbs(
-    page.error !== null
+    isNotFound(page.error)
       ? { kind: "notFound" }
       : course === null
         ? null

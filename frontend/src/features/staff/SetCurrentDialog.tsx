@@ -30,7 +30,7 @@ interface SetCurrentDialogProps {
   replaced: Edition | null;
   onClose: () => void;
   /** Reads the page again: every row's flags may have changed. */
-  onChanged: () => Promise<void>;
+  onChanged: () => Promise<unknown>;
   onCloseAutoFocus?: (event: Event) => void;
 }
 

@@ -16,8 +16,9 @@ interface ConversationSidebarProps {
    */
   busy: number | null;
   /**
-   * Deletes a conversation and resolves to whether the server did. The page
-   * owns the URL, so leaving a deleted conversation is its job, not this one's.
+   * Deletes a conversation and resolves to whether the server did. The layout
+   * route (routes/ShellLayout.tsx) owns the URL, so leaving a deleted
+   * conversation is its job, not this one's.
    */
   onDelete: (id: number) => Promise<boolean>;
   /** Called after navigation so the narrow-screen drawer can close itself. */
@@ -198,7 +199,10 @@ export function ConversationSidebar({
         }}
       >
         {failed && (
-          <p className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
+          <p
+            role="alert"
+            className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink"
+          >
             {t("sidebar.deleteFailed")}
           </p>
         )}

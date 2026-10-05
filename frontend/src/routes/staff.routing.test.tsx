@@ -11,8 +11,8 @@
  * Gestione link closes, the answer that leaving the chat stops.
  */
 
-import { act } from "react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { act, type ReactNode, useState } from "react";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "@/App";
@@ -129,19 +129,28 @@ const BOTH = account("demo-both", false, [
   { role: "secretariat", programme: "B222" },
 ]);
 const ADMIN = account("demo-admin", true, []);
+/** Secretariat staff who also teach. */
+const DUAL = account("demo-dual", false, [
+  { role: "secretariat", programme: "B047" },
+  { role: "teacher", edition: 5 },
+]);
 
 /** What `GET /api/catalog/programmes` answers each account. */
 const SCOPE: Record<string, Programme[]> = {
   "demo-teacher": [],
   "demo-secretariat": [B047],
   "demo-both": [B047, B222],
+  "demo-dual": [B047],
   "demo-admin": [
     { ...B047, permissions: ["programme.assign_secretariat", "programme.view"] },
     { ...B222, permissions: ["programme.assign_secretariat", "programme.view"] },
   ],
 };
 
-let reader: Account = STUDENT;
+/** Who is signed in when the page opens; null for a visitor. */
+let reader: Account | null = STUDENT;
+/** Who a visitor becomes on signing in. */
+let signsInAs: Account = SECRETARIAT;
 let conversations: ConversationSummary[] = [];
 const asked: string[] = [];
 /** Whether the answer stream was told to stop. */
@@ -150,6 +159,17 @@ let stopped = false;
 const revoked = new Set<string>();
 /** Reads of the programme list that fail before one succeeds, as a server error would. */
 let failures = 0;
+/** Whether a switch by the reader would pass, as `can_set_current` says per edition. */
+let switchable = true;
+
+/** An edition as the server would answer it now. */
+function served(e: Edition): Edition {
+  return {
+    ...e,
+    can_set_current: e.can_set_current && switchable,
+    teachers: e.teachers.filter((t) => !revoked.has(t.username)),
+  };
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -185,7 +205,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   const path = String(input);
   const method = init.method ?? "GET";
   asked.push(`${method} ${path}`);
-  const scope = SCOPE[reader.username] ?? [];
+  const scope = SCOPE[reader?.username ?? ""] ?? [];
   const programme = scope.find((p) => path.startsWith(`/api/catalog/programmes/${p.code}`));
   if (method === "GET" && path === "/api/conversations") return json(conversations);
   if (method === "POST" && path === "/api/ask") {
@@ -202,15 +222,19 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   // A teacher views no programme, so no course.
   const course = [PPM, SHARED].find((c) => path === `/api/catalog/courses/${c.code}`);
   if (course !== undefined && scope.length > 0) return json(course);
-  if (path === "/api/catalog/editions") return json(EDITIONS);
+  if (path === "/api/catalog/editions") return json(EDITIONS.map(served));
   if (path.startsWith("/api/catalog/editions?course=")) {
-    return json(EDITIONS.filter((e) => path.endsWith(`=${e.course.code}`)));
+    return json(EDITIONS.filter((e) => path.endsWith(`=${e.course.code}`)).map(served));
+  }
+  if (method === "DELETE" && path.startsWith("/api/catalog/editions/")) {
+    revoked.add(path.slice(path.lastIndexOf("/") + 1));
+    return new Response(null, { status: 204 });
   }
   const one = EDITIONS.find((e) => path === `/api/catalog/editions/${e.id}`);
   if (one !== undefined) {
     // Secretariat staff may assign a teacher; the teacher may not.
     const assigns = scope.length > 0 ? ["edition.assign_teacher"] : [];
-    return json({ ...one, permissions: [...assigns, ...one.permissions] });
+    return json({ ...served(one), permissions: [...assigns, ...one.permissions] });
   }
   if (programme !== undefined && path.endsWith("/courses")) return json(PLAN);
   if (method === "DELETE" && programme !== undefined) {
@@ -224,28 +248,43 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   return json({ detail: { message: "Not found.", code: "not_found" } }, 404);
 }
 
+/** Moves the router as the history would, without a link on the page. */
+let go: (path: string) => void = () => {};
+
 function Pathname() {
-  return <output>{useLocation().pathname}</output>;
+  go = useNavigate();
+  const { pathname, search } = useLocation();
+  return <output data-search={search}>{pathname}</output>;
+}
+
+/** The session, which a visitor's sign-in fills with `signsInAs`. */
+function Session({ children }: { children: ReactNode }) {
+  const [account, setAccount] = useState(reader);
+  return (
+    <SessionContext
+      value={{
+        account,
+        logIn: async () => setAccount(signsInAs),
+        register: async () => {},
+        logOut: async () => {},
+        chooseLocale: async () => {},
+        forget: () => {},
+      }}
+    >
+      {children}
+    </SessionContext>
+  );
 }
 
 function page(path: string): Mounted {
   return mount(
     <ThemeProvider>
-      <SessionContext
-        value={{
-          account: reader,
-          logIn: async () => {},
-          register: async () => {},
-          logOut: async () => {},
-          chooseLocale: async () => {},
-          forget: () => {},
-        }}
-      >
+      <Session>
         <MemoryRouter initialEntries={[path]}>
           <App />
           <Pathname />
         </MemoryRouter>
-      </SessionContext>
+      </Session>
     </ThemeProvider>,
   );
 }
@@ -290,6 +329,7 @@ beforeEach(() => {
   stopped = false;
   revoked.clear();
   failures = 0;
+  switchable = true;
   vi.stubGlobal("fetch", fakeApi);
 });
 
@@ -314,6 +354,16 @@ describe("the Gestione group and /staff", () => {
       "/staff/programmes",
     ],
     ["the superuser", ADMIN, [["Corsi di laurea", "/staff/programmes"]], "/staff/programmes"],
+    // The programme first, and `/staff` waits for the list to know it.
+    [
+      "secretariat staff who teach",
+      DUAL,
+      [
+        ["Corso di laurea", "/staff/programmes/B047"],
+        ["I miei insegnamenti", "/staff/mine"],
+      ],
+      "/staff/programmes/B047",
+    ],
   ])("for %s", async (_, who, items, lands) => {
     reader = who;
     const { container, unmount } = page("/staff");
@@ -351,6 +401,30 @@ describe("the Gestione group and /staff", () => {
     unmount();
 
     expect(following).toEqual([true, true]);
+  });
+});
+
+describe("signing in", () => {
+  it.each([
+    // The staff page asked for, its programme included.
+    ["a staff page", "/staff/editions/5?programme=B047", "/staff/editions/5?programme=B047"],
+    // Signing in from the login page lands on the chat, never on Gestione.
+    ["the login page", "/login", "/"],
+  ])("from %s", async (_, start, lands) => {
+    reader = null;
+    signsInAs = SECRETARIAT;
+    const { container, unmount } = page(start);
+    await settle();
+    const output = () => container.querySelector("output");
+    const asked = text(output());
+    act(() => {
+      container.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true }));
+    });
+    await settle();
+    const landed = `${text(output())}${output()?.dataset.search ?? ""}`;
+    unmount();
+
+    expect([asked, landed]).toEqual(["/login", lands]);
   });
 });
 
@@ -450,8 +524,13 @@ describe("a course, an edition, and a teacher's own courses", () => {
       editions: [...container.querySelectorAll<HTMLTableRowElement>("main tbody tr")].map((tr) => [
         tr.querySelector("a")?.getAttribute("href"),
         text(tr.cells[1]),
+        text(tr.cells[2]),
       ]),
       crumbs: crumbs(container),
+      // The Gestione item the course is under, not the page itself.
+      current: [...container.querySelectorAll('nav[aria-label="Gestione"] a')].map((a) =>
+        a.getAttribute("aria-current"),
+      ),
     };
     unmount();
 
@@ -460,14 +539,15 @@ describe("a course, an edition, and a teacher's own courses", () => {
       cards: ["INGEGNERIA INFORMATICAB047"],
       note: true,
       editions: [
-        ["/staff/editions/5?programme=B047", "—"],
-        ["/staff/editions/4?programme=B047", "Corrente"],
+        ["/staff/editions/5?programme=B047", "—", "demo-colleague, demo-teacher"],
+        ["/staff/editions/4?programme=B047", "Corrente", "demo-teacher"],
       ],
       crumbs: [
         "Corso di laurea",
         "B047 · INGEGNERIA INFORMATICA →",
         "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE (current)",
       ],
+      current: ["true"],
     });
   });
 
@@ -511,6 +591,30 @@ describe("a course, an edition, and a teacher's own courses", () => {
         ["/staff/editions/4", "2024-2025Correntedemo-teacher"],
       ],
     });
+  });
+
+  it("offers no switch the server would refuse", async () => {
+    reader = TEACHER;
+    switchable = false;
+    const { container, unmount } = page("/staff/mine");
+    await settle();
+    const offered = (container.textContent ?? "").includes("Imposta come corrente");
+    unmount();
+
+    expect(offered).toBe(false);
+  });
+
+  it("says so when the teacher teaches nothing", async () => {
+    reader = account("demo-new", false, [{ role: "teacher", edition: 99 }]);
+    const { container, unmount } = page("/staff/mine");
+    await settle();
+    const seen = [
+      container.querySelectorAll("main h2").length,
+      (container.textContent ?? "").includes("Nessun insegnamento assegnato."),
+    ];
+    unmount();
+
+    expect(seen).toEqual([0, true]);
   });
 
   it.each([
@@ -557,6 +661,24 @@ describe("a course, an edition, and a teacher's own courses", () => {
     });
   });
 
+  it("shows nothing of one edition while the next is read", async () => {
+    reader = SECRETARIAT;
+    const { container, unmount } = page("/staff/editions/5?programme=B047");
+    await settle();
+    const before = crumbs(container).at(-1);
+    act(() => go("/staff/editions/4?programme=B047"));
+    const during = [text(container.querySelector("main h1")), crumbs(container).at(-1)];
+    await settle();
+    const after = crumbs(container).at(-1);
+    unmount();
+
+    expect({ before, during, after }).toEqual({
+      before: "2025-2026 (current)",
+      during: [null, undefined],
+      after: "2024-2025 (current)",
+    });
+  });
+
   it("sends a teacher who opens a course page back to their own courses", async () => {
     reader = TEACHER;
     const { container, unmount } = page("/staff/courses/B028451");
@@ -577,6 +699,8 @@ describe("a read that fails", () => {
     const { container, unmount } = page("/staff/programmes");
     await settle();
     const said = text(container.querySelector('main [role="alert"]'));
+    // A failed read is not a page that does not exist.
+    const trail = crumbs(container);
     const retry = [...container.querySelectorAll<HTMLButtonElement>("main button")].find(
       (button) => button.textContent === "Riprova",
     );
@@ -585,7 +709,11 @@ describe("a read that fails", () => {
     const title = text(container.querySelector("main h1"));
     unmount();
 
-    expect([said, title]).toEqual([`${i18n.t("staff.loadFailed")}Riprova`, "Corsi di laurea"]);
+    expect([said, trail, title]).toEqual([
+      `${i18n.t("staff.loadFailed")}Riprova`,
+      ["Corsi di laurea (current)"],
+      "Corsi di laurea",
+    ]);
   });
 });
 
@@ -613,6 +741,45 @@ describe("a write from a page", () => {
     expect(seen).toEqual([null, true]);
   });
 
+  it.each([
+    [
+      "the next row's Revoca",
+      "/staff/editions/5?programme=B047",
+      "demo-colleague",
+      "Revoca demo-teacher",
+      false,
+    ],
+    [
+      "the assign button, with nobody left",
+      "/staff/editions/4?programme=B047",
+      "demo-teacher",
+      "Assegna docente",
+      true,
+    ],
+  ])("revokes a teacher and hands focus to %s", async (_, path, revoking, focus, empty) => {
+    reader = SECRETARIAT;
+    const { container, unmount } = page(path);
+    await settle();
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>(`button[aria-label="Revoca ${revoking}"]`)
+        ?.click(),
+    );
+    const confirm = [
+      ...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+    ].find((candidate) => candidate.textContent === "Revoca");
+    act(() => confirm?.click());
+    await settle();
+    const active = document.activeElement;
+    const seen = {
+      focused: active?.getAttribute("aria-label") ?? active?.textContent?.trim(),
+      empty: (container.textContent ?? "").includes("Nessun docente assegnato a questa edizione."),
+    };
+    unmount();
+
+    expect(seen).toEqual({ focused: focus, empty });
+  });
+
   it("revokes the last secretariat member, says so, and hands focus to the assign button", async () => {
     reader = ADMIN;
     const { container, unmount } = page("/staff/programmes/B047");
@@ -631,10 +798,21 @@ describe("a write from a page", () => {
       left: (container.textContent ?? "").includes("Nessun membro della segreteria didattica."),
       toast: (document.body.textContent ?? "").includes("Ruolo revocato"),
       focused: document.activeElement?.textContent?.trim(),
+      // The toast goes with the shell, so signing in again does not show it.
+      again: false,
     };
     unmount();
+    const next = page("/staff/programmes/B047");
+    await settle();
+    seen.again = (document.body.textContent ?? "").includes("Ruolo revocato");
+    next.unmount();
 
-    expect(seen).toEqual({ left: true, toast: true, focused: "Assegna segreteria" });
+    expect(seen).toEqual({
+      left: true,
+      toast: true,
+      focused: "Assegna segreteria",
+      again: false,
+    });
   });
 });
 

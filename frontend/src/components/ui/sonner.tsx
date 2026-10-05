@@ -10,15 +10,20 @@
  * variables Sonner styles itself with, and its theme follows the one painted;
  * outside a `ThemeProvider`, as on /styleguide, which paints both themes
  * itself, it follows the system.
+ *
+ * Sonner keeps its toasts in one store for the whole page and shows those
+ * still open to the next Toaster that mounts, so this one dismisses them as it
+ * goes: a toast shown just before signing out would greet the next sign-in.
  */
 
-import { type CSSProperties, useContext } from "react";
-import { Toaster as Sonner } from "sonner";
+import { type CSSProperties, useContext, useEffect } from "react";
+import { Toaster as Sonner, toast } from "sonner";
 
 import { ThemeContext } from "@/theme/ThemeProvider";
 
 export function Toaster() {
   const theme = useContext(ThemeContext);
+  useEffect(() => () => void toast.dismiss(), []);
   return (
     <Sonner
       theme={theme?.resolved ?? "system"}

@@ -5,7 +5,9 @@
  * Its items are landing.ts's. Each link closes the narrow-screen drawer as a
  * conversation link does, through the same `onNavigate`, so both mounts of the
  * sidebar behave alike. The item the reader is inside — on its page or any
- * page below it — is marked as the current one.
+ * page below it — is marked as the current one: `aria-current="page"` on its
+ * own page, `"true"` below it, where the breadcrumb names the page itself
+ * (outside the repository: WAI-ARIA 1.2, `aria-current`).
  */
 
 import { BookOpen, GraduationCap, type LucideIcon } from "lucide-react";
@@ -44,7 +46,7 @@ export function ManagementNav({ items, onNavigate }: ManagementNavProps) {
             key={item.key}
             to={item.to}
             onClick={onNavigate}
-            aria-current={inside ? "page" : undefined}
+            aria-current={pathname === item.to ? "page" : inside ? "true" : undefined}
             className={cn(
               "flex items-center gap-tight rounded-md px-tight py-tight text-body transition-colors",
               inside ? "bg-mark font-medium text-ink" : "text-muted hover:bg-mark hover:text-ink",

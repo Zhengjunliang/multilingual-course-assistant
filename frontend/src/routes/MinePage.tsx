@@ -17,6 +17,7 @@ import { Card } from "@/components/ui/card";
 import { useSetCurrent } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { programmeLine } from "@/features/staff/crumbs";
+import { isNotFound } from "@/features/staff/errors";
 import { Note, PageHead } from "@/features/staff/page";
 import { PeopleInline } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
@@ -40,7 +41,7 @@ export default function MinePage() {
   const { back } = useShell();
   const editions = useLoad(listEditions);
   const switching = useSetCurrent({ editions: editions.data ?? [], reload: editions.reload });
-  useCrumbs(editions.error === null ? { kind: "mine" } : { kind: "notFound" });
+  useCrumbs(isNotFound(editions.error) ? { kind: "notFound" } : { kind: "mine" });
 
   if (editions.error !== null)
     return (
