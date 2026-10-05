@@ -1,56 +1,75 @@
 /**
- * `/staff/editions/:id`: one edition and its teachers. An edition outside the
- * caller's scope is a 404 from the server and "not found" here.
+ * `/staff/editions/:id`: one academic year of a course, and who teaches it.
+ *
+ * An edition outside the caller's scope is a 404, and the page says "not
+ * found". Who may assign a teacher here is the edition's `permissions`; anyone
+ * else reads who teaches it and why they cannot change that. The path it was
+ * reached through is `?programme=`, or the teacher's own courses when no
+ * programme the reader may view lists it (features/staff/crumbs.ts).
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
-import { type MemberScope, readEdition } from "@/api/catalog";
+import { readEdition } from "@/api/catalog";
 import { Badge } from "@/components/ui/badge";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Card } from "@/components/ui/card";
 import { useLoad } from "@/features/staff/context";
-import { MembersPanel } from "@/features/staff/MembersPanel";
+import { contextProgramme, programmeLine } from "@/features/staff/crumbs";
+import { Note, PageHead } from "@/features/staff/page";
+import { StaffList } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
-import { useShell } from "./shell";
+import { useCrumbs, useShell } from "./shell";
 
 export default function EditionPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
+  const [search] = useSearchParams();
+  const { back, programmes } = useShell();
   const load = useCallback(() => readEdition(Number(id)), [id]);
   const edition = useLoad(load);
-  const { back } = useShell();
-  const scope = useMemo<MemberScope>(() => ({ kind: "edition", id: Number(id) }), [id]);
+  const data = edition.data;
+  const through =
+    data === null
+      ? null
+      : contextProgramme(data.course.entries, search.get("programme"), programmes ?? []);
+  useCrumbs(
+    edition.error !== null
+      ? { kind: "notFound" }
+      : data === null
+        ? null
+        : { kind: "edition", course: data.course, year: data.academic_year, programme: through },
+  );
 
   if (edition.error !== null) return <LoadFailure error={edition.error} back={back} />;
-  if (edition.data === null) return null;
-  const { course, academic_year: year } = edition.data;
+  if (data === null) return null;
+  const { course, academic_year: year } = data;
+  const assigns = data.permissions.includes("edition.assign_teacher");
 
   return (
-    <section className="flex flex-col gap-gutter">
-      <Breadcrumb
-        label={t("staff.breadcrumb")}
-        crumbs={[
-          { label: t("staff.editions.title"), to: "/staff/editions" },
-          { label: `${course.code} ${year}` },
-        ]}
+    <>
+      <PageHead
+        eyebrow={
+          <>
+            <span className="font-mono">{`${course.code} · ${year}`}</span>
+            {data.is_current && <Badge>{t("staff.current")}</Badge>}
+          </>
+        }
+        title={course.name}
+        caps
+        sub={t("staff.edition.sub", {
+          year,
+          programmes: programmeLine(course.entries, i18n.language),
+        })}
       />
-      <header className="flex flex-col gap-hair">
-        <h1 className="font-semibold text-ink text-title">
-          <span className="font-mono text-muted">{course.code}</span> {course.name}
-        </h1>
-        <p className="flex items-center gap-tight text-body text-muted">
-          {year}
-          {edition.data.is_current && <Badge>{t("staff.editions.current")}</Badge>}
-        </p>
-      </header>
-      <MembersPanel
-        scope={scope}
-        title={t("staff.members.teachers")}
-        scopeName={`${course.code} ${year}`}
-        canManage={edition.data.permissions.includes("edition.assign_teacher")}
-      />
-    </section>
+      <Card className="overflow-hidden shadow-none">
+        <h2 className="border-line border-b px-snug py-tight font-semibold text-body text-ink">
+          {t("staff.edition.teachers")}
+        </h2>
+        <StaffList people={data.teachers} empty={t("staff.edition.empty")} />
+        {!assigns && <Note foot>{t("staff.edition.onlyStaff")}</Note>}
+      </Card>
+    </>
   );
 }

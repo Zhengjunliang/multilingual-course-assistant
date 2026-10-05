@@ -8,7 +8,7 @@
  * page below it — is marked as the current one.
  */
 
-import { GraduationCap, type LucideIcon } from "lucide-react";
+import { BookOpen, GraduationCap, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 
@@ -18,6 +18,7 @@ import type { ManagementItem, ManagementKey } from "./landing";
 const ICON: Record<ManagementKey, LucideIcon> = {
   programmes: GraduationCap,
   programme: GraduationCap,
+  mine: BookOpen,
 };
 
 interface ManagementNavProps {

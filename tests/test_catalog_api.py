@@ -574,9 +574,11 @@ def test_staff_requests_that_change_nothing(
         "teacher revokes": (w.continuing, "delete", f"{new}/newcomer", None),
         "secretariat revokes a non-member": (w.secretariat, "delete", f"{new}/student", None),
         "secretariat revokes their own row": (w.secretariat, "delete", f"{b047}/secretariat", None),
-        "teacher lists the teachers": (w.continuing, "get", new, None),
-        "secretariat lists the secretariat": (w.secretariat, "get", b047, None),
-        "student lists the teachers": (w.student, "get", new, None),
+        # Members are read on the scope's own row, so no collection answers a GET,
+        # whoever asks: the method is refused before any scope is looked up.
+        "teacher reads the teachers": (w.continuing, "get", new, None),
+        "student reads the teachers": (w.student, "get", new, None),
+        "secretariat reads the secretariat": (w.secretariat, "get", b047, None),
         "GET on a member": (w.secretariat, "get", f"{new}/newcomer", None),
         "DELETE on the collection": (w.secretariat, "delete", new, None),
         # OPTIONS would describe a POST the caller may not make.
@@ -593,9 +595,7 @@ def test_staff_requests_that_change_nothing(
     ):
         for case, (user, method, path, body) in requests.items():
             response = getattr(as_user(user), method)(path, body)
-            if response.status_code == 200 and isinstance(response.json(), list):
-                seen[case] = (200, [member["username"] for member in response.json()])
-            elif response.status_code == 400:
+            if response.status_code == 400:
                 seen[case] = (400, response.json())
             else:
                 seen[case] = (response.status_code, code_of(response))
@@ -627,9 +627,9 @@ def test_staff_requests_that_change_nothing(
         "teacher revokes": (403, "permission_denied"),
         "secretariat revokes a non-member": (404, "not_found"),
         "secretariat revokes their own row": (403, "permission_denied"),
-        "teacher lists the teachers": (200, ["continuing", "newcomer"]),
-        "secretariat lists the secretariat": (200, ["dual", "inactive", "secretariat"]),
-        "student lists the teachers": (404, "not_found"),
+        "teacher reads the teachers": (405, "method_not_allowed"),
+        "student reads the teachers": (405, "method_not_allowed"),
+        "secretariat reads the secretariat": (405, "method_not_allowed"),
         "GET on a member": (405, "method_not_allowed"),
         "DELETE on the collection": (405, "method_not_allowed"),
         "OPTIONS on the collection": (405, "method_not_allowed"),

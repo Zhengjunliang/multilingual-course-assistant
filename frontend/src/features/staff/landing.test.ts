@@ -29,8 +29,15 @@ const SECRETARIAT: RoleScope = { role: "secretariat", programme: "B047" };
 describe("the Gestione group", () => {
   it.each<[string, Account, Programme[] | null, string[], string | null]>([
     ["a student", account([]), [], [], null],
-    // A teacher views no programme; their page arrives with "I miei insegnamenti".
-    ["a teacher", account([{ role: "teacher", edition: 3 }]), [], [], null],
+    ["a teacher", account([{ role: "teacher", edition: 3 }]), [], ["mine"], "/staff/mine"],
+    // Both items, and the programme first: where the account lands.
+    [
+      "secretariat staff who teach",
+      account([SECRETARIAT, { role: "teacher", edition: 3 }]),
+      [B047],
+      ["programme", "mine"],
+      "/staff/programmes/B047",
+    ],
     [
       "one programme's secretariat",
       account([SECRETARIAT]),

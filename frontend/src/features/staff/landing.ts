@@ -7,7 +7,10 @@
  * get the list of programmes; whoever views exactly one goes straight to it,
  * since a list of one is a page with nothing to choose. That is the
  * prototype's shape (its secretariat opens on its programme), carried over to
- * staff of several programmes.
+ * staff of several programmes. A teacher also gets their own courses, after
+ * any programme item, so an account that runs a programme lands on it.
+ * An edition's page counts as inside the programme item when there is one,
+ * and inside the teacher's own courses otherwise.
  *
  * `programmes` is `null` until the list arrives: the superuser's item does not
  * wait for it, and nobody else's can be known before it.
@@ -15,8 +18,9 @@
 
 import type { Account } from "@/api/account";
 import type { Programme } from "@/api/catalog";
+import { teaches } from "@/auth/staff";
 
-export type ManagementKey = "programmes" | "programme";
+export type ManagementKey = "programmes" | "programme" | "mine";
 
 export interface ManagementItem {
   key: ManagementKey;
@@ -26,21 +30,26 @@ export interface ManagementItem {
 }
 
 const LIST = "/staff/programmes";
+const MINE = "/staff/mine";
 
 export function managementItems(
   account: Account,
   programmes: readonly Programme[] | null,
 ): ManagementItem[] {
   const below = ["/staff/courses", "/staff/editions"];
-  if (account.is_superuser || (programmes !== null && programmes.length > 1)) {
-    return [{ key: "programmes", to: LIST, within: [LIST, ...below] }];
-  }
+  const items: ManagementItem[] = [];
   const only = programmes?.length === 1 ? programmes[0] : undefined;
-  if (only !== undefined) {
+  if (account.is_superuser || (programmes !== null && programmes.length > 1)) {
+    items.push({ key: "programmes", to: LIST, within: [LIST, ...below] });
+  } else if (only !== undefined) {
     const to = `${LIST}/${encodeURIComponent(only.code)}`;
-    return [{ key: "programme", to, within: [to, ...below] }];
+    items.push({ key: "programme", to, within: [to, ...below] });
   }
-  return [];
+  if (teaches(account)) {
+    const editions = items.length === 0 ? ["/staff/editions"] : [];
+    items.push({ key: "mine", to: MINE, within: [MINE, ...editions] });
+  }
+  return items;
 }
 
 /** Where `/staff` sends the account: its first Gestione item, or nowhere when it has none. */

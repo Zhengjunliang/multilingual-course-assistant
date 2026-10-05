@@ -95,11 +95,8 @@
     "nav": {
       "programmes": "专业",
       "management": "管理",
-      "programme": "学位专业"
-    },
-    "editions": {
-      "title": "课程版本",
-      "current": "当前"
+      "programme": "学位专业",
+      "mine": "我的课程"
     },
     "setCurrent": {
       "title": "将 {{new}} 设为当前？",
@@ -107,19 +104,6 @@
       "bodyAlone": "{{new}} 成为 {{course}} 的当前版本。",
       "confirm": "设为当前",
       "done": "{{new}} 现为 {{course}} 的当前版本。"
-    },
-    "members": {
-      "teachers": "老师",
-      "username": "按准确的用户名添加",
-      "add": "添加",
-      "remove": "移除 {{username}}",
-      "removeTitle": "移除 {{username}}？",
-      "removeBody": "{{username}} 将不再是 {{scope}} 的{{group}}。",
-      "removeConfirm": "移除",
-      "empty": "暂无。",
-      "added": "已添加 {{username}}。",
-      "removed": "已移除 {{username}}。",
-      "gone": "{{username}} 已在别处被移除；列表已更新。"
     },
     "programmes": {
       "title": "专业",
@@ -132,8 +116,7 @@
       "courses": "课程",
       "secretariat": "教学秘书处",
       "none": "无",
-      "footnote": "同时列在多个专业学习计划里的课程, 在每个专业各计一次。",
-      "open": "打开"
+      "footnote": "同时列在多个专业学习计划里的课程, 在每个专业各计一次。"
     },
     "error": {
       "no_such_user": "没有使用此用户名的账号。",
@@ -184,7 +167,33 @@
     "refusal": {
       "notFound": "未找到",
       "notFoundBody": "此页面不存在, 或你的账号看不到它。",
-      "home": "返回首页"
+      "home": "返回首页",
+      "mine": "返回我的课程"
+    },
+    "open": "打开",
+    "current": "当前",
+    "course": {
+      "inPlan": "所在学习计划",
+      "twoCodesBoth": "两个代码, 同一门课: 每个版本对两个方向都有效。",
+      "twoCodesAll": "两个代码, 同一门课: 每个版本对所有方向都有效。",
+      "sharedBoth": "两个学位专业的秘书处都管理这门课。",
+      "sharedAll": "全部 {{count}} 个学位专业的秘书处都管理这门课。",
+      "editions": "版本",
+      "editionsSub": "一门课程最多有一个当前版本。",
+      "year": "学年",
+      "status": "状态"
+    },
+    "edition": {
+      "sub": "{{year}} 版本 · {{programmes}}",
+      "teachers": "本版本的教师",
+      "empty": "本版本没有指派教师。",
+      "onlyStaff": "只有教学秘书和管理员能指派教师。"
+    },
+    "mine": {
+      "title": "我的课程",
+      "sub": "你作为教师被指派的版本。",
+      "empty": "没有指派的课程。",
+      "note": "一门课程最多有一个当前版本; 更换它需要对两个版本都有权限。"
     }
   }
 }

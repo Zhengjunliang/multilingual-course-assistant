@@ -95,11 +95,8 @@
     "nav": {
       "programmes": "Corsi di laurea",
       "management": "Gestione",
-      "programme": "Corso di laurea"
-    },
-    "editions": {
-      "title": "Edizioni dei corsi",
-      "current": "Corrente"
+      "programme": "Corso di laurea",
+      "mine": "I miei insegnamenti"
     },
     "setCurrent": {
       "title": "Rendere corrente {{new}}?",
@@ -107,19 +104,6 @@
       "bodyAlone": "{{new}} diventa l'edizione corrente di {{course}}.",
       "confirm": "Rendi corrente",
       "done": "{{new}} è l'edizione corrente di {{course}}."
-    },
-    "members": {
-      "teachers": "Docenti",
-      "username": "Aggiungi per nome utente esatto",
-      "add": "Aggiungi",
-      "remove": "Rimuovi {{username}}",
-      "removeTitle": "Rimuovere {{username}}?",
-      "removeBody": "{{username}} non farà più parte di {{group}} di {{scope}}.",
-      "removeConfirm": "Rimuovi",
-      "empty": "nessuno.",
-      "added": "{{username}} aggiunto.",
-      "removed": "{{username}} rimosso.",
-      "gone": "{{username}} era già stato rimosso altrove; l'elenco è aggiornato."
     },
     "programmes": {
       "title": "Corsi di laurea",
@@ -132,8 +116,7 @@
       "courses": "Insegnamenti",
       "secretariat": "Segreteria didattica",
       "none": "Nessuno",
-      "footnote": "Un insegnamento nel piano di studi di più corsi di laurea conta in ciascuno.",
-      "open": "Apri"
+      "footnote": "Un insegnamento nel piano di studi di più corsi di laurea conta in ciascuno."
     },
     "error": {
       "no_such_user": "Nessun account ha questo nome utente.",
@@ -184,7 +167,33 @@
     "refusal": {
       "notFound": "Non trovato",
       "notFoundBody": "Questa pagina non esiste o non è visibile al tuo account.",
-      "home": "Torna all'inizio"
+      "home": "Torna all'inizio",
+      "mine": "Torna ai miei insegnamenti"
+    },
+    "open": "Apri",
+    "current": "Corrente",
+    "course": {
+      "inPlan": "Nel piano di studi di",
+      "twoCodesBoth": "Due codici, un solo insegnamento: ogni edizione vale per entrambi i curriculum.",
+      "twoCodesAll": "Due codici, un solo insegnamento: ogni edizione vale per tutti i curriculum.",
+      "sharedBoth": "Lo gestiscono le segreterie di entrambi i corsi di laurea.",
+      "sharedAll": "Lo gestiscono le segreterie di tutti i {{count}} corsi di laurea.",
+      "editions": "Edizioni",
+      "editionsSub": "Un insegnamento ha al massimo un'edizione corrente.",
+      "year": "Anno accademico",
+      "status": "Stato"
+    },
+    "edition": {
+      "sub": "Edizione {{year}} · {{programmes}}",
+      "teachers": "Docenti dell'edizione",
+      "empty": "Nessun docente assegnato a questa edizione.",
+      "onlyStaff": "Solo la segreteria didattica e l'amministratore assegnano i docenti."
+    },
+    "mine": {
+      "title": "I miei insegnamenti",
+      "sub": "Le edizioni a cui sei assegnato come docente.",
+      "empty": "Nessun insegnamento assegnato.",
+      "note": "Un insegnamento ha al massimo un'edizione corrente; cambiarla richiede il permesso su entrambe le edizioni."
     }
   }
 }
