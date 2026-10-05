@@ -7,7 +7,8 @@
  * get the list of programmes; whoever views exactly one goes straight to it,
  * since a list of one is a page with nothing to choose. That is the
  * prototype's shape (its secretariat opens on its programme), carried over to
- * staff of several programmes. A teacher also gets their own courses, after
+ * staff of several programmes (docs/decisions.md, 2026-10-05, *The staff
+ * pages live in the chat shell*, point 1). A teacher also gets their own courses, after
  * any programme item, so an account that runs a programme lands on it.
  * An edition's page counts as inside the programme item when there is one,
  * and inside the teacher's own courses otherwise.

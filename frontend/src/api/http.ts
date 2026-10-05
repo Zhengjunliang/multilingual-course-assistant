@@ -16,7 +16,7 @@ const JSON_TYPE = "application/json";
  * A request that came back with a status, the server's own words for it, and
  * the codes a page translates it by when the view gives codes
  * (config/exceptions.py: the staff endpoints do; every endpoint doing so is
- * #91's).
+ * #143's).
  */
 export class ApiError extends Error {
   constructor(
