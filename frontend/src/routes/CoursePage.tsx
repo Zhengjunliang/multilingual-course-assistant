@@ -28,9 +28,10 @@ import {
 import { useSetCurrent } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine, programmesOf } from "@/features/staff/crumbs";
-import { Note, PageHead, Section } from "@/features/staff/page";
+import { Code, Note, PageHead, Section } from "@/features/staff/page";
 import { PeopleInline } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
+import { cn } from "@/lib/utils";
 import { useCrumbs, useShell } from "./shell";
 
 /** One programme's card: the course's entries in its study plan. */
@@ -51,7 +52,7 @@ function PlanCard({ entries }: { entries: readonly CurriculumEntry[] }) {
             className="flex flex-wrap items-baseline gap-x-snug px-snug py-tight text-body"
           >
             <span className="min-w-0 flex-1 text-ink">{entry.curriculum || "—"}</span>
-            <span className="font-mono text-ink">{entry.ad_code}</span>
+            <Code>{entry.ad_code}</Code>
             <span className="text-muted">
               {t("staff.plan.year", { year: entry.year_of_study })}
             </span>
@@ -102,7 +103,7 @@ export default function CoursePage() {
       <PageHead
         eyebrow={
           <>
-            <span className="font-mono">{course.code}</span>
+            <Code>{course.code}</Code>
             {course.code_source === "cineca-only" && <span>{t("staff.plan.integrated")}</span>}
           </>
         }
@@ -112,7 +113,7 @@ export default function CoursePage() {
         source
       />
       <Section title={t("staff.course.inPlan")}>
-        <div className="grid gap-snug md:grid-cols-2">
+        <div className={cn("grid gap-snug", listing.length > 1 && "md:grid-cols-2")}>
           {listing.map((programme) => (
             <PlanCard
               key={programme.code}
@@ -129,7 +130,7 @@ export default function CoursePage() {
         )}
       </Section>
       <Section title={t("staff.course.editions")} sub={t("staff.course.editionsSub")}>
-        <Table>
+        <Table frameClassName="rounded-lg border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0">
           <TableHeader>
             <TableRow>
               <TableHead>{t("staff.course.year")}</TableHead>

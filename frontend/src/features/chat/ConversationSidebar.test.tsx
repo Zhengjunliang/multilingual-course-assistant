@@ -7,9 +7,11 @@
  * on the whole application in routes/ChatPage.routing.test.tsx. What that test
  * cannot stage is an answer in progress: the one state in which a row must not
  * offer its delete, since the question would be refused and the half answer
- * lost. That takes a `busy` prop, so it is asserted here.
+ * lost. That takes a `busy` prop, so it is asserted here, beside where focus
+ * goes when the question is cancelled.
  */
 
+import { act } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
@@ -43,5 +45,30 @@ describe("the conversation sidebar", () => {
     unmount();
 
     expect(disabled).toEqual([true, false]);
+  });
+
+  it("hands focus back to the delete button when the question is cancelled", async () => {
+    const { unmount } = mount(
+      <MemoryRouter>
+        <ConversationSidebar conversations={ROWS} busy={null} onDelete={async () => true} />
+      </MemoryRouter>,
+    );
+    const trigger = deleteButton("Che cos'è un ORM?");
+    act(() => {
+      trigger?.focus();
+      trigger?.click();
+    });
+    const cancel = [
+      ...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+    ].find((button) => button.textContent === i18n.t("sidebar.cancel"));
+    act(() => cancel?.click());
+    // Radix moves focus on closing in a task of its own.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const back = document.activeElement === trigger;
+    unmount();
+
+    expect(back).toBe(true);
   });
 });

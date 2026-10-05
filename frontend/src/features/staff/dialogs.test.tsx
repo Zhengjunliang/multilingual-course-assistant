@@ -132,6 +132,7 @@ describe("assigning a member", () => {
       <AssignDialog
         scope={scope}
         object="PPM · 2025-2026"
+        description="PPM · 2025-2026"
         onClose={onClose}
         onChanged={onChanged}
       />,

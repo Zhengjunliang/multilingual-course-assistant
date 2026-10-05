@@ -560,6 +560,29 @@ describe("a course, an edition, and a teacher's own courses", () => {
 });
 
 describe("a write from a page", () => {
+  it("hands focus back to the button that opened a dialog", async () => {
+    reader = ADMIN;
+    const { container, unmount } = page("/staff/programmes/B047");
+    await settle();
+    const assign = container.querySelector<HTMLButtonElement>("main [data-assign]");
+    act(() => {
+      assign?.focus();
+      assign?.click();
+    });
+    const cancel = [
+      ...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'),
+    ].find((candidate) => candidate.textContent === "Annulla");
+    act(() => cancel?.click());
+    await settle();
+    const seen = [
+      document.body.querySelector('[role="dialog"]'),
+      document.activeElement === assign,
+    ];
+    unmount();
+
+    expect(seen).toEqual([null, true]);
+  });
+
   it("revokes the last secretariat member, says so, and hands focus to the assign button", async () => {
     reader = ADMIN;
     const { container, unmount } = page("/staff/programmes/B047");

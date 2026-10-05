@@ -27,14 +27,24 @@ import { Forbidden } from "./Refusal";
 interface AssignDialogProps {
   /** Where to assign; null while the dialog is closed. */
   scope: MemberScope | null;
-  /** What is assigned to, as the dialog and the toast name it: an edition, or a programme. */
+  /** What is assigned to, as the toast names it: an edition, or a programme's code. */
   object: string;
+  /** The same, under the dialog's title. */
+  description: string;
   onClose: () => void;
   /** Reads the page again after the assignment, or after the scope turned out gone. */
   onChanged: () => Promise<void>;
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
-export function AssignDialog({ scope, object, onClose, onChanged }: AssignDialogProps) {
+export function AssignDialog({
+  scope,
+  object,
+  description,
+  onClose,
+  onChanged,
+  onCloseAutoFocus,
+}: AssignDialogProps) {
   const { t } = useTranslation();
   const fail = useFailure();
   const fieldId = useId();
@@ -95,8 +105,9 @@ export function AssignDialog({ scope, object, onClose, onChanged }: AssignDialog
         if (!open && !running) close();
       }}
       title={t(teacher ? "staff.assign.teacher" : "staff.assign.secretariat")}
-      description={object}
+      description={description}
       closeLabel={t("staff.cancel")}
+      onCloseAutoFocus={onCloseAutoFocus}
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-room">
         <div className="flex flex-col gap-hair">

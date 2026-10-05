@@ -1,5 +1,5 @@
 import { MessageSquarePlus, PanelLeft, Trash2 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
@@ -51,7 +51,15 @@ export function ConversationSidebar({
     setFailed(false);
   };
 
-  const ask = (conversation: ConversationSummary) => {
+  // The delete button the dialog was opened from, and the link focus falls
+  // back to once a deletion has taken that button's row away. Radix returns
+  // focus only to a `Trigger` of its own, which this dialog, opened from
+  // state, does not have.
+  const askedFrom = useRef<HTMLElement | null>(null);
+  const newConversation = useRef<HTMLAnchorElement>(null);
+
+  const ask = (conversation: ConversationSummary, from: HTMLElement) => {
+    askedFrom.current = from;
     setFailed(false);
     setPending(conversation);
   };
@@ -105,6 +113,7 @@ export function ConversationSidebar({
           dent rather than a control. The border carries it, and the hover fill
           is the same `--mark` the conversation rows use. */}
       <NavLink
+        ref={newConversation}
         to="/"
         end
         onClick={onNavigate}
@@ -160,7 +169,7 @@ export function ConversationSidebar({
                     aria-label={t("sidebar.delete", { title: titleOf(conversation) })}
                     title={busy === conversation.id ? t("sidebar.deleteBusy") : undefined}
                     disabled={busy === conversation.id}
-                    onClick={() => ask(conversation)}
+                    onClick={(event) => ask(conversation, event.currentTarget)}
                   >
                     <Trash2 aria-hidden className="size-icon" />
                   </Button>
@@ -182,6 +191,11 @@ export function ConversationSidebar({
         confirmLabel={t("sidebar.deleteConfirm")}
         onConfirm={confirm}
         destructive
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          const back = askedFrom.current?.isConnected ? askedFrom.current : newConversation.current;
+          back?.focus();
+        }}
       >
         {failed && (
           <p className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">

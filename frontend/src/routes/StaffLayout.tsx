@@ -12,7 +12,7 @@ import { Outlet } from "react-router-dom";
 export default function StaffLayout() {
   return (
     <main className="min-h-0 flex-1 overflow-y-auto px-gutter pb-room">
-      <div className="mx-auto flex max-w-6xl flex-col gap-room pt-snug">
+      <div className="mx-auto flex max-w-5xl flex-col gap-room pt-snug">
         <Outlet />
       </div>
     </main>
