@@ -34,7 +34,10 @@ export default function ProgrammesPage() {
   const programmes = useLoad(listProgrammes);
   useCrumbs(programmes.error === null ? { kind: "programmes" } : { kind: "notFound" });
 
-  if (programmes.error !== null) return <LoadFailure error={programmes.error} back={back} />;
+  if (programmes.error !== null)
+    return (
+      <LoadFailure error={programmes.error} back={back} onRetry={() => void programmes.reload()} />
+    );
   if (programmes.data === null) return null;
 
   return (

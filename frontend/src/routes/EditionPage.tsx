@@ -67,7 +67,8 @@ export default function EditionPage() {
         : { kind: "edition", course: data.course, year: data.academic_year, programme: through },
   );
 
-  if (edition.error !== null) return <LoadFailure error={edition.error} back={back} />;
+  if (edition.error !== null)
+    return <LoadFailure error={edition.error} back={back} onRetry={() => void edition.reload()} />;
   if (data === null) return null;
   const { course, academic_year: year } = data;
 

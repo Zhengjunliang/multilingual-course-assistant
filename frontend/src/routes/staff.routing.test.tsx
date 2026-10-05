@@ -20,6 +20,7 @@ import type { Account } from "@/api/account";
 import type { Course, Edition, Programme, StudyPlanCourse } from "@/api/catalog";
 import type { ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
+import i18n from "@/i18n";
 import { type Mounted, mount } from "@/test/mount";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
@@ -147,6 +148,8 @@ const asked: string[] = [];
 let stopped = false;
 /** Secretariat staff revoked during a case, as the server would forget them. */
 const revoked = new Set<string>();
+/** Reads of the programme list that fail before one succeeds, as a server error would. */
+let failures = 0;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -189,7 +192,13 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     conversations = [{ id: 9, locale: "it", created_at: "2026-10-05T09:00:00Z", title: "q" }];
     return endlessAnswer(init.signal);
   }
-  if (path === "/api/catalog/programmes") return json(scope);
+  if (path === "/api/catalog/programmes") {
+    if (failures > 0) {
+      failures -= 1;
+      return json({ detail: { message: "Server error.", code: "error" } }, 500);
+    }
+    return json(scope);
+  }
   // A teacher views no programme, so no course.
   const course = [PPM, SHARED].find((c) => path === `/api/catalog/courses/${c.code}`);
   if (course !== undefined && scope.length > 0) return json(course);
@@ -280,6 +289,7 @@ beforeEach(() => {
   asked.length = 0;
   stopped = false;
   revoked.clear();
+  failures = 0;
   vi.stubGlobal("fetch", fakeApi);
 });
 
@@ -556,6 +566,26 @@ describe("a course, an edition, and a teacher's own courses", () => {
     unmount();
 
     expect(seen).toEqual(["Non trovato", "Torna ai miei insegnamenti", "/staff/mine"]);
+  });
+});
+
+describe("a read that fails", () => {
+  it("offers to read again, and shows the page once the read succeeds", async () => {
+    reader = ADMIN;
+    // The shell's own read of the list, then the page's.
+    failures = 2;
+    const { container, unmount } = page("/staff/programmes");
+    await settle();
+    const said = text(container.querySelector('main [role="alert"]'));
+    const retry = [...container.querySelectorAll<HTMLButtonElement>("main button")].find(
+      (button) => button.textContent === "Riprova",
+    );
+    act(() => retry?.click());
+    await settle();
+    const title = text(container.querySelector("main h1"));
+    unmount();
+
+    expect([said, title]).toEqual([`${i18n.t("staff.loadFailed")}Riprova`, "Corsi di laurea"]);
   });
 });
 

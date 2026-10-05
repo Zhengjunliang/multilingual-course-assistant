@@ -42,7 +42,10 @@ export default function MinePage() {
   const switching = useSetCurrent({ editions: editions.data ?? [], reload: editions.reload });
   useCrumbs(editions.error === null ? { kind: "mine" } : { kind: "notFound" });
 
-  if (editions.error !== null) return <LoadFailure error={editions.error} back={back} />;
+  if (editions.error !== null)
+    return (
+      <LoadFailure error={editions.error} back={back} onRetry={() => void editions.reload()} />
+    );
   if (editions.data === null) return null;
   const groups = byCourse(editions.data, account?.username ?? "");
 

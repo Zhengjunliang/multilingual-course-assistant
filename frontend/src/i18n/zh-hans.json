@@ -91,7 +91,7 @@
   "staff": {
     "cancel": "取消",
     "breadcrumb": "路径",
-    "loadFailed": "页面加载失败，请重试。",
+    "loadFailed": "页面加载失败。",
     "nav": {
       "programmes": "专业",
       "management": "管理",
@@ -221,6 +221,7 @@
       "secretariat": "{{username}} 将不再属于 {{programme}} 的教学秘书处。",
       "done": "已撤销角色",
       "gone": "{{username}} 已不再拥有此角色: 它已在别处被撤销。"
-    }
+    },
+    "retry": "重试"
   }
 }

@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import type { Permission } from "@/api/catalog";
+import { Button } from "@/components/ui/button";
 import { isNotFound } from "./errors";
 
 export interface Back {
@@ -47,11 +48,31 @@ export function NotFound({ back }: { back: Back }) {
   );
 }
 
-/** A page whose data did not load: not found for a 404, a general sentence otherwise. */
-export function LoadFailure({ error, back }: { error: unknown; back: Back }) {
+interface LoadFailureProps {
+  error: unknown;
+  back: Back;
+  /** Reads the page again; offered beside a failure that is not "not found". */
+  onRetry?: () => void;
+}
+
+/**
+ * A page whose data did not load: not found for a 404; otherwise a sentence
+ * and the button that reads it again, since what failed — the network, the
+ * server — may answer the next time.
+ */
+export function LoadFailure({ error, back, onRetry }: LoadFailureProps) {
   const { t } = useTranslation();
   if (isNotFound(error)) return <NotFound back={back} />;
-  return <p className="text-body text-warn-ink">{t("staff.loadFailed")}</p>;
+  return (
+    <div role="alert" className="flex flex-wrap items-center gap-snug py-room">
+      <p className="text-body text-warn-ink">{t("staff.loadFailed")}</p>
+      {onRetry !== undefined && (
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          {t("staff.retry")}
+        </Button>
+      )}
+    </div>
+  );
 }
 
 /** The sentence each write's missing permission comes with. */
