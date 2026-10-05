@@ -3,8 +3,10 @@
  *
  * The shapes mirror apps/catalog/serializers.py, which is the single source;
  * tests/test_catalog_contract.py fails when a field is added or renamed on one
- * side only, or when a permission name or an error code differs from the
- * Python side.
+ * side only, or when a permission name, a code source or an error code differs
+ * from the Python side. The test compares each interface's field names with the
+ * serializer's, so an interface spells its own fields, never `extends` another,
+ * and names a nested shape by its type rather than writing it inline.
  * What the caller may do is read from each row — `permissions` and
  * `can_set_current` — and never worked out from a role name here.
  */
@@ -19,17 +21,48 @@ export type Permission =
   | "edition.set_current"
   | "edition.assign_teacher";
 
+/**
+ * Where a course's `code` was read from (apps/catalog/models.py): its Moodle
+ * course, or, for a course no single Moodle course holds, the Cineca catalogue.
+ */
+export type CodeSource = "moodle" | "cineca-only";
+
+/** A programme as a curriculum entry names it. */
+export interface ProgrammeName {
+  code: string;
+  name: string;
+  locale: string;
+}
+
+/** A programme's study plan lists a course in one curriculum, in one year of study. */
+export interface CurriculumEntry {
+  programme: ProgrammeName;
+  /** As the Cineca catalogue prints it; empty when the programme has no curricula. */
+  curriculum: string;
+  year_of_study: number;
+  ad_code: string;
+}
+
 export interface Course {
   code: string;
   name: string;
   /** The language the name is written in: the name is data and is shown as it is. */
   locale: string;
+  code_source: CodeSource;
+  /** Its entries in every programme that lists it, by programme code: the study plans are public. */
+  entries: CurriculumEntry[];
 }
 
 export interface Programme {
   code: string;
   name: string;
   locale: string;
+  /** Its curricula's names, sorted; empty when it has none. */
+  curricula: string[];
+  /** The courses its study plan lists, each once however many curricula list it. */
+  course_count: number;
+  /** By username. */
+  secretariat: StaffMember[];
   permissions: Permission[];
 }
 
@@ -52,6 +85,20 @@ export interface Edition {
    * switch changes nothing: whether to offer it there is the page's call.
    */
   can_set_current: boolean;
+}
+
+/** An edition as a study plan row shows it. */
+export interface EditionSummary {
+  id: number;
+  academic_year: string;
+  /** By username. */
+  teachers: StaffMember[];
+}
+
+/** A row of a programme's study plan: one course, and its current edition when it has one. */
+export interface StudyPlanCourse {
+  course: Course;
+  current_edition: EditionSummary | null;
 }
 
 /**
@@ -80,6 +127,16 @@ export function listProgrammes(): Promise<Programme[]> {
 
 export function readProgramme(code: string): Promise<Programme> {
   return request<Programme>(`${CATALOG}/programmes/${encodeURIComponent(code)}`);
+}
+
+/** The programme's study plan, each course once, by code. */
+export function listStudyPlan(code: string): Promise<StudyPlanCourse[]> {
+  return request<StudyPlanCourse[]>(`${CATALOG}/programmes/${encodeURIComponent(code)}/courses`);
+}
+
+/** A course a programme the caller may view lists; 404 for any other. */
+export function readCourse(code: string): Promise<Course> {
+  return request<Course>(`${CATALOG}/courses/${encodeURIComponent(code)}`);
 }
 
 /** Every edition in the caller's scope, or only the courses `programme` offers. */

@@ -29,7 +29,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.db.models import Exists, OuterRef, Q, QuerySet
 
 from apps.catalog.editions import current_besides
-from apps.catalog.models import CourseEdition, DegreeProgramme
+from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import (
     EDITION_PERMISSIONS,
@@ -133,6 +133,27 @@ def programmes_for(user: Caller, permission: Permission) -> QuerySet[DegreeProgr
         return programmes
     covering = _covering(_PROGRAMME_FLAGS, permission)
     return programmes.filter(covering) if covering is not None else programmes.none()
+
+
+def courses_for(user: Caller, permission: Permission) -> QuerySet[Course]:
+    """The courses listed by a programme on which `user` holds `permission`.
+
+    A course is no scope of the registry: it is seen through the study plans
+    that list it, a course with no edition yet included. So a teacher, who
+    views no programme, reads no course, and reaches their editions through
+    the edition list instead. Which programmes list a course is the public
+    catalogue, so a course read this way shows all of them; whoever runs them
+    stays behind each programme's own scope.
+    """
+    caller = _active(user)
+    if caller is None or permission not in PROGRAMME_PERMISSIONS:
+        return Course.objects.none()
+    if caller.is_superuser:
+        return Course.objects.all()
+    listed = CurriculumEntry.objects.filter(
+        course=OuterRef("pk"), programme__in=programmes_for(caller, permission)
+    )
+    return Course.objects.filter(Exists(listed))
 
 
 def permissions_on(user: Caller, scope: CourseEdition | DegreeProgramme) -> frozenset[Permission]:

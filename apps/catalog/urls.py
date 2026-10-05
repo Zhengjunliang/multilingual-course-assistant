@@ -9,18 +9,20 @@ from apps.catalog.staff_views import (
     ProgrammeSecretariatView,
 )
 from apps.catalog.views import (
+    CourseDetailView,
     EditionDetailView,
     EditionListView,
     EditionSetCurrentView,
+    ProgrammeCoursesView,
     ProgrammeDetailView,
     ProgrammeListView,
 )
 
 
 class _Key:
-    """A programme code or a username: letters, digits and the marks Django's username validator
-    allows. Anything else, a NUL byte included, cannot name one, so it is a 404 before any query
-    rather than a value PostgreSQL refuses."""
+    """A programme or course code, or a username: letters, digits and the marks Django's username
+    validator allows. Anything else, a NUL byte included, cannot name one, so it is a 404 before
+    any query rather than a value PostgreSQL refuses."""
 
     regex = r"[\w.@+-]+"
 
@@ -39,6 +41,7 @@ urlpatterns = [
     # No trailing slash, matching the rest of the API (apps/qa/urls.py).
     path("programmes", ProgrammeListView.as_view(), name="programmes"),
     path("programmes/<key:code>", ProgrammeDetailView.as_view(), name="programme"),
+    path("programmes/<key:code>/courses", ProgrammeCoursesView.as_view(), name="programme-courses"),
     path(
         "programmes/<key:code>/secretariat",
         ProgrammeSecretariatView.as_view(),
@@ -49,6 +52,7 @@ urlpatterns = [
         ProgrammeSecretariatMemberView.as_view(),
         name="programme-secretariat-member",
     ),
+    path("courses/<key:code>", CourseDetailView.as_view(), name="course"),
     path("editions", EditionListView.as_view(), name="editions"),
     path("editions/<int:pk>", EditionDetailView.as_view(), name="edition"),
     path("editions/<int:pk>/set-current", EditionSetCurrentView.as_view(), name="set-current"),
