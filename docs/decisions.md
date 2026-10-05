@@ -100,6 +100,9 @@ This file owns the decisions taken without the supervisor that are in force: the
 5. **The corpus is one edition.** All 31 PDFs in `data/corpus/PPM/` match, title by title, the 2025-2026 Moodle course of `B028451`. The years in their file names (2024, 2025, 2026) date the slides, not the teaching: the teacher reuses decks across academic years. This corrects `#96`, which read the file names as two academic years.
    **Why:** a file name dates the deck; the Moodle course dates the teaching.
    **The price:** the evaluation scope is a single pair, (`B028451`, `2025-2026`).
+6. **A course whose material no single Moodle course holds takes the code its curricula list, and says so.** For an integrated course (C.I.), such as `B047`'s `B003271` GEOMETRIA E ALGEBRA LINEARE/CALCOLO NUMERICO C.I., point 1 has no container to read, so `Course.code` is the AD code the Cineca study plan lists and `Course.code_source` is `cineca-only`; every other course is `moodle`, the default.
+   **Why:** the staff pages print a course's code beside its name, and a reader who looks a `cineca-only` code up in Moodle finds no course; the page says where the code comes from instead. The field names the code's source, not the kind of course, so it is two values rather than an `is_integrated` flag: point 1 is the rule, this the one exception to it.
+   **The price:** like point 1, the source is read by a person when the row is entered; the demo data file marks its integrated courses by hand (`apps/roles/management/commands/demo_catalog.json`).
 
 **Status:** 🔶 the tables and their constraints are `apps/catalog/models.py`; PPM's rows are entered with `#96` (M5).
 

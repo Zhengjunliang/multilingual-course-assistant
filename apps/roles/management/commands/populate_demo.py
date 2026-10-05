@@ -13,7 +13,9 @@ on one holding rows of its own:
   curriculum and course, an edition by course and year: created when missing,
   never changed when present. Each new row passes `full_clean()` first, so the
   models' own rules — an AD code belongs to one course (apps/catalog/models.py)
-  — stop a bad data file at the row that breaks them.
+  — stop a bad data file at the row that breaks them. A course the file marks
+  `code_source: cineca-only` is created so; one with no mark, as from its
+  Moodle course.
 - A new edition is not current. A course with no current edition gets the data
   file's first year through `set_current()`, the one way to change it
   (docs/data-model.md, invariant 2); a course with one keeps it.
@@ -45,7 +47,13 @@ from django.db import transaction
 
 from apps.accounts.models import User
 from apps.catalog.editions import set_current
-from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
+from apps.catalog.models import (
+    CodeSource,
+    Course,
+    CourseEdition,
+    CurriculumEntry,
+    DegreeProgramme,
+)
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Role
 from config.env import env
@@ -127,7 +135,13 @@ class Command(BaseCommand):
         }
         for c in demo["courses"]:
             course = self._merge(
-                Course, {"code": c["code"]}, {"name": c["name"], "locale": c["locale"]}
+                Course,
+                {"code": c["code"]},
+                {
+                    "name": c["name"],
+                    "locale": c["locale"],
+                    "code_source": c.get("code_source", CodeSource.MOODLE),
+                },
             )
             for e in c["entries"]:
                 self._merge(

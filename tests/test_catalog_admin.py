@@ -139,7 +139,7 @@ def test_saved_keys_are_read_only_in_the_admin(
 
         response = admin_client.post(
             reverse("admin:catalog_course_change", args=[course.pk]),
-            {"code": "ZZZZZZZ", "name": "New PPM Name", "locale": "it"},
+            {"code": "ZZZZZZZ", "name": "New PPM Name", "locale": "it", "code_source": "moodle"},
         )
 
         assert response.status_code == 302
@@ -174,7 +174,12 @@ def test_ppm_rows_can_be_entered_through_the_admin(admin_client) -> None:
         ),
         admin_client.post(
             reverse("admin:catalog_course_add"),
-            {"code": "B028451", "name": "Progettazione e Produzione Multimediale", "locale": "it"},
+            {
+                "code": "B028451",
+                "name": "Progettazione e Produzione Multimediale",
+                "locale": "it",
+                "code_source": "moodle",
+            },
         ),
     ]
     programme = DegreeProgramme.objects.get(code="B047")

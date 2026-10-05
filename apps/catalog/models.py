@@ -98,13 +98,23 @@ class DegreeProgramme(models.Model):
         return f"[{self.code}] {self.name}"
 
 
+class CodeSource(models.TextChoices):
+    """Where a course's `code` was read from."""
+
+    MOODLE = "moodle", _("Moodle course")
+    CINECA_ONLY = "cineca-only", _("Cineca catalogue only")
+
+
 class Course(models.Model):
     """A course, independent of the year it is taught in.
 
     A course can have more than one official code, one per curriculum that
     offers it. `code` is the one whose Moodle course holds the material — the
     teacher's choice, read from Moodle — and every other code lives on a
-    `CurriculumEntry`.
+    `CurriculumEntry`. Where no single Moodle course holds the material, as
+    for an integrated course (C.I.), `code_source` says so
+    and `code` is the one its curricula list
+    (docs/decisions.md, 2026-09-25, *PPM read from Moodle and Cineca*, point 6).
     """
 
     code = models.CharField(
@@ -124,6 +134,17 @@ class Course(models.Model):
         default=settings.LANGUAGE_CODE,
         verbose_name=_("language"),
         help_text=_("Language the name is written in."),
+    )
+    code_source = models.CharField(
+        max_length=16,
+        choices=CodeSource.choices,
+        default=CodeSource.MOODLE,
+        verbose_name=_("code source"),
+        help_text=_(
+            "Where the code was read from: the Moodle course that holds the material, or, "
+            "when no single Moodle course holds it, as for an integrated course, the code "
+            "its curricula list in the Cineca catalogue."
+        ),
     )
 
     class Meta:

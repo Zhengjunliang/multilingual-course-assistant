@@ -85,6 +85,19 @@ class Migration(migrations.Migration):
                         verbose_name="language",
                     ),
                 ),
+                (
+                    "code_source",
+                    models.CharField(
+                        choices=[
+                            ("moodle", "Moodle course"),
+                            ("cineca-only", "Cineca catalogue only"),
+                        ],
+                        default="moodle",
+                        help_text="Where the code was read from: the Moodle course that holds the material, or, when no single Moodle course holds it, as for an integrated course, the code its curricula list in the Cineca catalogue.",
+                        max_length=16,
+                        verbose_name="code source",
+                    ),
+                ),
             ],
             options={
                 "verbose_name": "course",
