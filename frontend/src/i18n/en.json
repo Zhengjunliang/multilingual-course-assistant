@@ -91,7 +91,7 @@
   "staff": {
     "cancel": "Cancel",
     "breadcrumb": "Breadcrumb",
-    "loadFailed": "This page could not be loaded. Try again.",
+    "loadFailed": "This page could not be loaded.",
     "nav": {
       "programmes": "Degree programmes",
       "management": "Management",
@@ -221,6 +221,7 @@
       "secretariat": "{{username}} will no longer be part of the teaching secretariat of {{programme}}.",
       "done": "Role revoked",
       "gone": "{{username}} no longer held this role: it had been revoked elsewhere."
-    }
+    },
+    "retry": "Try again"
   }
 }

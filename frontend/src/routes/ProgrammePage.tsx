@@ -49,7 +49,8 @@ export default function ProgrammePage() {
         : { kind: "programme", programme },
   );
 
-  if (page.error !== null) return <LoadFailure error={page.error} back={back} />;
+  if (page.error !== null)
+    return <LoadFailure error={page.error} back={back} onRetry={() => void page.reload()} />;
   if (page.data === null || programme === null) return null;
   const [, plan] = page.data;
 

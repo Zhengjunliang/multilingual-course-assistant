@@ -91,7 +91,7 @@
   "staff": {
     "cancel": "Annulla",
     "breadcrumb": "Percorso",
-    "loadFailed": "Impossibile caricare la pagina. Riprova.",
+    "loadFailed": "Impossibile caricare la pagina.",
     "nav": {
       "programmes": "Corsi di laurea",
       "management": "Gestione",
@@ -221,6 +221,7 @@
       "secretariat": "{{username}} non farà più parte della segreteria didattica di {{programme}}.",
       "done": "Ruolo revocato",
       "gone": "{{username}} non aveva più questo ruolo: era già stato revocato altrove."
-    }
+    },
+    "retry": "Riprova"
   }
 }

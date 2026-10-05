@@ -92,7 +92,8 @@ export default function CoursePage() {
         : { kind: "course", course, programme: through },
   );
 
-  if (page.error !== null) return <LoadFailure error={page.error} back={back} />;
+  if (page.error !== null)
+    return <LoadFailure error={page.error} back={back} onRetry={() => void page.reload()} />;
   if (page.data === null || course === null) return null;
   const [, editions] = page.data;
   const listing = programmesOf(course.entries);
