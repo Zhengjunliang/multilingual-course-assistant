@@ -158,8 +158,8 @@ jobs:
         # and no virtualenv — the input is already a complete pin set, and resolving
         # would trip over the torch custom index.
         #
-        # Two advisories are ignored rather than fixed, and they are ignored for
-        # different reasons. Delete each flag the day its reason stops holding.
+        # Three advisories are ignored rather than fixed, for two different
+        # reasons. Delete each flag the day its reason stops holding.
         #
         # PYSEC-2026-3804 (accelerate) — there is nothing to upgrade to.
         #   1. accelerate cannot be dropped. `uv tree --invert --package accelerate`
@@ -180,11 +180,19 @@ jobs:
         # its price. What makes the wait acceptable meanwhile is reachability: the
         # flaw is in save_pretrained(), and this repository never calls it — the
         # only calls are loads, in rag/chunk.py and rag/search.py.
+        #
+        # PYSEC-2026-4174 (transformers) — fixed after 5.8.1, above the same
+        # ceiling as PYSEC-2026-3929, so it waits on #55 too. The flaw:
+        # load_custom_generate() caches a repository's custom generate code before
+        # the trust_remote_code check. Only two paths reach it, from_pretrained()
+        # with trust_remote_code=True and generate(custom_generate=...); nothing in
+        # this repository passes the one or calls the other.
         run: |
           uv export --locked --no-emit-project --no-hashes -o requirements.txt
           uvx pip-audit --no-deps --disable-pip \
             --ignore-vuln PYSEC-2026-3804 \
             --ignore-vuln PYSEC-2026-3929 \
+            --ignore-vuln PYSEC-2026-4174 \
             -r requirements.txt
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
