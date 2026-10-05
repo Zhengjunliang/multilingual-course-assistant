@@ -23,7 +23,9 @@ on one holding rows of its own:
   account's superuser flag and role rows are made the file's, rows it does not
   declare removed; a `demo-` account the file does not name keeps the account
   and loses its role rows, so the demo holds exactly the roles the file shows.
-  An account outside `demo-` is never touched.
+  An account switched off in the admin stays off: every demo account shares
+  `DEMO_PASSWORD`, so switching `demo-admin` off is how a site others can reach
+  keeps the superuser's door shut. An account outside `demo-` is never touched.
 - Passwords: with `DEMO_PASSWORD` set (config/env.py), every declared account
   gets it, on every run. Without it a new account gets no usable password, and a
   declared account that already has a usable one stops the run: anyone may
@@ -78,7 +80,11 @@ class Command(BaseCommand):
         demo = json.loads(data.read_text(encoding="utf-8"))
         secret = env.demo_password.get_secret_value() if env.demo_password is not None else ""
         password = secret or None
-        self._check_accounts(demo["accounts"], password)
+        strangers = [
+            a["username"] for a in demo["accounts"] if not a["username"].startswith(PREFIX)
+        ]
+        if strangers:
+            raise CommandError(f"the data file names accounts outside {PREFIX}: {strangers}")
         self.created: dict[str, int] = {}
         with transaction.atomic():
             self._catalogue(demo)
@@ -93,23 +99,6 @@ class Command(BaseCommand):
                 self.stdout.write(f"removed role {row}")
         made = ", ".join(f"{count} {name}" for name, count in self.created.items()) or "nothing"
         self.stdout.write(f"created {made}")
-
-    def _check_accounts(self, accounts: list[dict[str, Any]], password: str | None) -> None:
-        """Refuse, before writing anything, an account this command must not take over."""
-        strangers = [a["username"] for a in accounts if not a["username"].startswith(PREFIX)]
-        if strangers:
-            raise CommandError(f"the data file names accounts outside {PREFIX}: {strangers}")
-        if password is not None:
-            return
-        names = [a["username"] for a in accounts]
-        taken = [
-            u.username for u in User.objects.filter(username__in=names) if u.has_usable_password()
-        ]
-        if taken:
-            raise CommandError(
-                f"{taken} already have a password of their own; set DEMO_PASSWORD to take "
-                "them over, or delete them"
-            )
 
     def _merge[M: Model](self, model: type[M], key: dict[str, Any], fields: dict[str, Any]) -> M:
         """The row `key` names, created with `fields` when there is none."""
@@ -161,14 +150,25 @@ class Command(BaseCommand):
                 set_current(editions[0])
 
     def _account(self, account: dict[str, Any], password: str | None) -> None:
+        # Checked here, inside the transaction, and not before the run: a name
+        # registered while the catalogue is written is read here, and one
+        # registered after this read makes the save below break the unique
+        # username, so neither is taken over.
         username = account["username"]
         user = User.objects.filter(username=username).first() or User(username=username)
         if password is not None:
-            user.set_password(password)
+            # A new hash would end the account's sessions (Django ties each
+            # session to it), so a run with the same password leaves it alone.
+            if not user.check_password(password):
+                user.set_password(password)
         elif user.pk is None:
             user.set_unusable_password()
+        elif user.has_usable_password():
+            raise CommandError(
+                f"{username} already has a password of its own; set DEMO_PASSWORD to take "
+                "it over, or delete it"
+            )
         user.is_superuser = user.is_staff = account.get("superuser", False)
-        user.is_active = True
         user.full_clean()
         user.save()
 
@@ -194,10 +194,12 @@ class Command(BaseCommand):
                 code, year = role["edition"].split(":")
                 edition = CourseEdition.objects.get(course__code=code, academic_year=year)
                 return RoleAssignment(user=user, role=Role.TEACHER, edition=edition)
-            programme = DegreeProgramme.objects.get(code=role["programme"])
-            return RoleAssignment(user=user, role=Role.SECRETARIAT, programme=programme)
-        except (CourseEdition.DoesNotExist, DegreeProgramme.DoesNotExist):
+            if role["role"] == Role.SECRETARIAT:
+                programme = DegreeProgramme.objects.get(code=role["programme"])
+                return RoleAssignment(user=user, role=Role.SECRETARIAT, programme=programme)
+        except (CourseEdition.DoesNotExist, DegreeProgramme.DoesNotExist, ValueError):
             raise CommandError(f"{user.username}: no scope {role}") from None
+        raise CommandError(f"{user.username}: no role {role['role']!r}")
 
 
 def _same(row: RoleAssignment, want: RoleAssignment) -> bool:
