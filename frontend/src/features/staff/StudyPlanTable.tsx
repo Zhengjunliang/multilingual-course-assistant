@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { coursePath } from "./crumbs";
+import { Code } from "./page";
 import { PeopleInline } from "./people";
 import { type PlanRow, studyPlan } from "./studyPlan";
 
@@ -41,8 +42,8 @@ function Entries({ row }: { row: PlanRow }) {
       <>
         {row.entries.map((entry) => (
           <span key={entry.curriculum} className="flex flex-wrap gap-x-tight">
-            <span className="font-mono">{entry.ad_code}</span>
-            <span className="text-muted">{entry.curriculum}</span>
+            <Code>{entry.ad_code}</Code>
+            <span className="text-caption text-muted">{entry.curriculum}</span>
           </span>
         ))}
         <span className={NOTE}>
@@ -54,9 +55,9 @@ function Entries({ row }: { row: PlanRow }) {
   const { coverage } = row;
   return (
     <span className="flex flex-wrap gap-x-tight">
-      <span className="font-mono">{row.entries[0]?.ad_code}</span>
+      <Code>{row.entries[0]?.ad_code}</Code>
       {coverage !== null && (
-        <span className="text-muted">
+        <span className="text-caption text-muted">
           {coverage.kind === "only"
             ? t("staff.plan.only", { list: coverage.curricula.join(", ") })
             : t(`staff.plan.${coverage.kind}`)}
@@ -97,7 +98,7 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
             placeholder={t("staff.plan.search")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="pl-room"
+            className="pl-control-icon"
           />
         </div>
         {programme.curricula.length > 1 && (
@@ -128,7 +129,7 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
           {query.trim() === "" ? t("staff.plan.noCurriculum") : t("staff.plan.noMatch")}
         </p>
       ) : (
-        <Table frameClassName="lg:overflow-visible">
+        <Table frameClassName="rounded-lg border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0 lg:overflow-visible">
           <TableHeader>
             <TableRow>
               <TableHead>{t("staff.plan.course")}</TableHead>

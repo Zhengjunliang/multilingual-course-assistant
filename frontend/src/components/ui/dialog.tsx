@@ -26,6 +26,11 @@ interface DialogProps {
   description?: string;
   /** Labels the close button for a reader who cannot see the cross. */
   closeLabel: string;
+  /**
+   * Where focus goes on closing. Radix returns it only to a `Trigger` of its
+   * own, so a dialog opened from state says where it came from.
+   */
+  onCloseAutoFocus?: (event: Event) => void;
   children: ReactNode;
 }
 
@@ -35,6 +40,7 @@ export function Dialog({
   title,
   description,
   closeLabel,
+  onCloseAutoFocus,
   children,
 }: DialogProps) {
   return (
@@ -44,7 +50,10 @@ export function Dialog({
         {/* Full width with a gutter on a phone, a fixed column above that.
             `max-h` with its own scroll so a long body cannot push the close
             button off the bottom of a short screen. */}
-        <RadixDialog.Content className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-room overflow-y-auto rounded-lg border border-line bg-surface p-gutter shadow-lg">
+        <RadixDialog.Content
+          onCloseAutoFocus={onCloseAutoFocus}
+          className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-room overflow-y-auto rounded-lg border border-line bg-surface p-gutter shadow-lg"
+        >
           <div className="flex items-start justify-between gap-snug">
             <div className="flex min-w-0 flex-col gap-hair">
               <RadixDialog.Title className="font-semibold text-ink text-title">

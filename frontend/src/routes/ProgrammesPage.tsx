@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useLoad } from "@/features/staff/context";
-import { Note, PageHead } from "@/features/staff/page";
+import { Code, Note, PageHead } from "@/features/staff/page";
 import { PeopleInline } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { useCrumbs, useShell } from "./shell";
@@ -48,7 +48,7 @@ export default function ProgrammesPage() {
         <p className="text-body text-muted">{t("staff.programmes.empty")}</p>
       ) : (
         <div className="flex flex-col gap-snug">
-          <Table>
+          <Table frameClassName="rounded-lg border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0">
             <TableHeader>
               <TableRow>
                 <TableHead>{t("staff.programmes.code")}</TableHead>
@@ -64,16 +64,16 @@ export default function ProgrammesPage() {
             <TableBody>
               {programmes.data.map((programme) => (
                 <TableRow key={programme.code} className="relative cursor-pointer">
-                  <TableCell className="font-mono">
+                  <TableCell>
                     <Link
                       to={`/staff/programmes/${encodeURIComponent(programme.code)}`}
                       className="after:absolute after:inset-0 focus-visible:outline-2 focus-visible:outline-accent"
                     >
-                      {programme.code}
+                      <Code>{programme.code}</Code>
                     </Link>
                   </TableCell>
                   <TableCell className="font-medium uppercase">{programme.name}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-caption">
                     {programme.curricula.map((curriculum) => (
                       <span key={curriculum} className="block">
                         {curriculum}

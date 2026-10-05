@@ -19,7 +19,7 @@ import { Card } from "@/components/ui/card";
 import { useMembers, useSetCurrent } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine } from "@/features/staff/crumbs";
-import { Note, PageHead } from "@/features/staff/page";
+import { Code, Note, PageHead } from "@/features/staff/page";
 import { StaffList } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { useCrumbs, useShell } from "./shell";
@@ -44,6 +44,7 @@ export default function EditionPage() {
     scope: { kind: "edition", id: Number(id) },
     people: data?.teachers ?? [],
     object,
+    description: object,
     canManage: assigns,
     sentence: (username) =>
       t("staff.revoke.teacher", {
@@ -75,7 +76,7 @@ export default function EditionPage() {
       <PageHead
         eyebrow={
           <>
-            <span className="font-mono">{`${course.code} · ${year}`}</span>
+            <Code>{`${course.code} · ${year}`}</Code>
             {data.is_current && <Badge>{t("staff.current")}</Badge>}
           </>
         }

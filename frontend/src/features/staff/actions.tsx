@@ -6,10 +6,12 @@
  * after a write the page reads again, since every row's flags may change.
  * A button is offered only where the row's `permissions` hold its permission.
  *
- * Focus goes back to the button that opened the dialog, as Radix does. When
- * that button is gone — its row revoked, its edition made current — it goes,
- * in the prototype's order, to the "Revoca" that took the row's place, then
- * the one before it, then the "Assegna…" button, else the page's heading.
+ * Focus goes back to the button that opened the dialog. Radix returns it only
+ * to its own `Trigger`, which a dialog opened from state does not have, so
+ * each close puts it there itself. When that button is gone — its row
+ * revoked, its edition made current — focus goes, in the prototype's order, to
+ * the "Revoca" that took the row's place, then the one before it, then the
+ * "Assegna…" button, else the page's heading.
  */
 
 import { UserPlus } from "lucide-react";
@@ -28,10 +30,9 @@ function returnFocus(
   fallbacks: () => readonly (Element | null | undefined)[],
 ) {
   return (event: Event) => {
-    if (trigger()?.isConnected) return;
     event.preventDefault();
     const heading = document.querySelector("main h1");
-    const target = [...fallbacks(), heading].find((element) => element?.isConnected);
+    const target = [trigger(), ...fallbacks(), heading].find((element) => element?.isConnected);
     if (target instanceof HTMLElement) target.focus();
   };
 }
@@ -39,8 +40,10 @@ function returnFocus(
 interface MembersOptions {
   scope: MemberScope;
   people: readonly StaffMember[];
-  /** What the role is held on, as the dialogs and toasts name it. */
+  /** What the role is held on, as the toasts name it. */
   object: string;
+  /** The same, as the assign dialog names it under its title. */
+  description: string;
   canManage: boolean;
   /** The revoke question's body for `username`. */
   sentence: (username: string) => string;
@@ -59,6 +62,7 @@ export function useMembers({
   scope,
   people,
   object,
+  description,
   canManage,
   sentence,
   reload,
@@ -68,9 +72,18 @@ export function useMembers({
   const [revoking, setRevoking] = useState<Revoking | null>(null);
   // Read when the dialog has closed and its state is gone.
   const last = useRef<{ trigger?: HTMLElement; index: number }>({ index: 0 });
+  const assignedFrom = useRef<HTMLElement>(undefined);
 
   const assign = canManage ? (
-    <Button type="button" size="sm" data-assign onClick={() => setAssigning(true)}>
+    <Button
+      type="button"
+      size="sm"
+      data-assign
+      onClick={(event) => {
+        assignedFrom.current = event.currentTarget;
+        setAssigning(true);
+      }}
+    >
       <UserPlus aria-hidden className="size-icon" />
       {t(scope.kind === "edition" ? "staff.assign.teacher" : "staff.assign.secretariat")}
     </Button>
@@ -104,8 +117,13 @@ export function useMembers({
       <AssignDialog
         scope={assigning ? scope : null}
         object={object}
+        description={description}
         onClose={() => setAssigning(false)}
         onChanged={reload}
+        onCloseAutoFocus={returnFocus(
+          () => assignedFrom.current,
+          () => [document.querySelector("main [data-assign]")],
+        )}
       />
       <RevokeDialog
         revoking={revoking}

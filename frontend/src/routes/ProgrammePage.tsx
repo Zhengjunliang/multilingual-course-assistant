@@ -17,7 +17,7 @@ import { listStudyPlan, readProgramme } from "@/api/catalog";
 import { Card } from "@/components/ui/card";
 import { useMembers } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
-import { Note, PageHead, Section } from "@/features/staff/page";
+import { Code, Note, PageHead, Section } from "@/features/staff/page";
 import { StaffList } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { StudyPlanTable } from "@/features/staff/StudyPlanTable";
@@ -35,6 +35,7 @@ export default function ProgrammePage() {
     scope: { kind: "programme", code },
     people: programme?.secretariat ?? [],
     object: programme?.code ?? code,
+    description: programme === null ? code : `${programme.name} · ${programme.code}`,
     canManage: assigns,
     sentence: (username) =>
       t("staff.revoke.secretariat", { username, programme: programme?.name ?? code }),
@@ -55,7 +56,7 @@ export default function ProgrammePage() {
   return (
     <>
       <PageHead
-        eyebrow={<span className="font-mono">{programme.code}</span>}
+        eyebrow={<Code>{programme.code}</Code>}
         title={programme.name}
         caps
         sub={

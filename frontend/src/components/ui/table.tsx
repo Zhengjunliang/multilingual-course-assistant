@@ -7,9 +7,11 @@
  * the table is called. A wide table scrolls inside its own frame, so a phone's
  * page never scrolls sideways; a table whose headers stick to the top of the
  * page lets that frame go where the screen is wide enough (`frameClassName`),
- * since a sticky cell sticks to the nearest frame that scrolls. A row under the
- * pointer wears `--mark`, the same quiet fill as everywhere else something can
- * be acted on.
+ * since a sticky cell sticks to the nearest frame that scrolls. The frame is
+ * also the containing block of what is positioned inside it — a screen-reader
+ * label, a row's stretched link — so nothing absolute escapes its scroll and
+ * widens the page. A row under the pointer wears `--mark`, the same quiet fill
+ * as everywhere else something can be acted on.
  */
 
 import type { ComponentProps } from "react";
@@ -22,7 +24,7 @@ export function Table({
   ...props
 }: ComponentProps<"table"> & { frameClassName?: string }) {
   return (
-    <div className={cn("w-full overflow-x-auto", frameClassName)}>
+    <div className={cn("relative w-full overflow-x-auto", frameClassName)}>
       <table className={cn("w-full border-collapse text-body", className)} {...props} />
     </div>
   );
