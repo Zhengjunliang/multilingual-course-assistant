@@ -565,6 +565,12 @@ def test_staff_requests_that_change_nothing(
         # Only the superuser assigns secretariat staff.
         "secretariat assigns secretariat": (w.secretariat, "post", b047, student),
         "teacher assigns secretariat": (w.continuing, "post", b047, student),
+        "other programme's secretariat assigns secretariat": (
+            w.other_secretariat,
+            "post",
+            b047,
+            student,
+        ),
         "other programme's secretariat revokes": (
             w.other_secretariat,
             "delete",
@@ -574,6 +580,13 @@ def test_staff_requests_that_change_nothing(
         "teacher revokes": (w.continuing, "delete", f"{new}/newcomer", None),
         "secretariat revokes a non-member": (w.secretariat, "delete", f"{new}/student", None),
         "secretariat revokes their own row": (w.secretariat, "delete", f"{b047}/secretariat", None),
+        "other programme's secretariat revokes secretariat": (
+            w.other_secretariat,
+            "delete",
+            f"{b047}/secretariat",
+            None,
+        ),
+        "teacher revokes secretariat": (w.continuing, "delete", f"{b047}/secretariat", None),
         # Members are read on the scope's own row, so no collection answers a GET,
         # whoever asks: the method is refused before any scope is looked up.
         "teacher reads the teachers": (w.continuing, "get", new, None),
@@ -623,10 +636,13 @@ def test_staff_requests_that_change_nothing(
         ),
         "secretariat assigns secretariat": (403, "permission_denied"),
         "teacher assigns secretariat": (404, "not_found"),
+        "other programme's secretariat assigns secretariat": (404, "not_found"),
         "other programme's secretariat revokes": (404, "not_found"),
         "teacher revokes": (403, "permission_denied"),
         "secretariat revokes a non-member": (404, "not_found"),
         "secretariat revokes their own row": (403, "permission_denied"),
+        "other programme's secretariat revokes secretariat": (404, "not_found"),
+        "teacher revokes secretariat": (404, "not_found"),
         "teacher reads the teachers": (405, "method_not_allowed"),
         "student reads the teachers": (405, "method_not_allowed"),
         "secretariat reads the secretariat": (405, "method_not_allowed"),
