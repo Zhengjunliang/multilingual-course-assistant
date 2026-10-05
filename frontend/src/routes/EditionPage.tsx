@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { useMembers, useSetCurrent } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine } from "@/features/staff/crumbs";
+import { isNotFound } from "@/features/staff/errors";
 import { Code, Note, PageHead } from "@/features/staff/page";
 import { StaffList } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
@@ -60,7 +61,7 @@ export default function EditionPage() {
       ? null
       : contextProgramme(data.course.entries, search.get("programme"), programmes ?? []);
   useCrumbs(
-    edition.error !== null
+    isNotFound(edition.error)
       ? { kind: "notFound" }
       : data === null
         ? null

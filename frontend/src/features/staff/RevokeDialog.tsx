@@ -6,8 +6,10 @@
  * someone who may assign it again (docs/decisions.md, 2026-09-29, *The warning
  * hue also confirms destroying something, and the staff pages add components,
  * not tokens*), a deliberate departure from the prototype's plain button.
- * A member already gone — revoked from another tab — is the outcome asked
- * for: the page reads again and the toast says it was done elsewhere.
+ * A 404 is a member already gone — revoked from another tab, the outcome
+ * asked for — or a scope the reader lost meanwhile; the page reads again to
+ * tell them apart, and only the first gets the toast that says it was done
+ * elsewhere, while the second closes on the page's "not found".
  */
 
 import { useState } from "react";
@@ -33,7 +35,8 @@ interface RevokeDialogProps {
   /** The role to revoke; null while the dialog is closed. */
   revoking: Revoking | null;
   onClose: () => void;
-  onChanged: () => Promise<void>;
+  /** Reads the page again, and resolves to whether it still could be read. */
+  onChanged: () => Promise<boolean>;
   onCloseAutoFocus?: (event: Event) => void;
 }
 
@@ -59,7 +62,7 @@ export function RevokeDialog({
       await removeMember(revoking.scope, revoking.username);
     } catch (error) {
       if (isNotFound(error)) {
-        await onChanged();
+        if (!(await onChanged())) return true;
         return done(t("staff.revoke.gone", { username: revoking.username }));
       }
       if (isForbidden(error)) setForbidden(true);

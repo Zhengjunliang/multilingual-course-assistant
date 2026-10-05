@@ -8,14 +8,15 @@ import { useSession } from "./useSession";
  *
  * `replace` so that the login page does not pile up in the back button, and the
  * attempted path travels in `state` so that a reader who was sent here from a
- * conversation link lands back on it rather than on the front page.
+ * conversation link lands back on it rather than on the front page; with its
+ * query, which names the programme a staff page was reached through.
  */
 export function RequireSession({ children }: { children: ReactNode }) {
   const { account } = useSession();
   const location = useLocation();
 
   if (account === null) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   }
   return <>{children}</>;
 }

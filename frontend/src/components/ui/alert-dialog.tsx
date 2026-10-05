@@ -13,7 +13,10 @@
  * close the dialog on click. Here it closes only when `onConfirm` resolves to
  * true, so a refusal is shown inside the dialog that asked, and while
  * `onConfirm` runs neither Escape nor Cancel closes it: a dialog gone before the
- * server answered would say "done" about something that may not be.
+ * server answered would say "done" about something that may not be. Both
+ * buttons are off while it runs, and a browser drops the focus of a button
+ * that turns off to the page, outside the dialog; after a refusal focus goes
+ * to Cancel, the way out that is always on.
  *
  * Where focus lands on closing is the caller's, through Radix's own
  * `onCloseAutoFocus`: Radix returns it to the element that opened the dialog,
@@ -21,7 +24,7 @@
  */
 
 import * as RadixAlertDialog from "@radix-ui/react-alert-dialog";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -59,15 +62,25 @@ export function AlertDialog({
   children,
 }: AlertDialogProps) {
   const [running, setRunning] = useState(false);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const refused = useRef(false);
 
   const confirm = async () => {
     setRunning(true);
     try {
       if (await onConfirm()) onOpenChange(false);
+      else refused.current = true;
     } finally {
       setRunning(false);
     }
   };
+
+  // Once Cancel is on again, which is the render after `running` clears.
+  useEffect(() => {
+    if (running || !refused.current) return;
+    refused.current = false;
+    cancel.current?.focus();
+  }, [running]);
 
   return (
     <RadixAlertDialog.Root
@@ -93,7 +106,7 @@ export function AlertDialog({
           {children}
           <div className="flex flex-wrap justify-end gap-tight">
             <RadixAlertDialog.Cancel asChild>
-              <Button type="button" variant="outline" disabled={running}>
+              <Button ref={cancel} type="button" variant="outline" disabled={running}>
                 {cancelLabel}
               </Button>
             </RadixAlertDialog.Cancel>

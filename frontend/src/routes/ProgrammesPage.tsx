@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useLoad } from "@/features/staff/context";
+import { isNotFound } from "@/features/staff/errors";
 import { Code, Note, PageHead } from "@/features/staff/page";
 import { PeopleInline } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
@@ -32,7 +33,7 @@ export default function ProgrammesPage() {
   const { account } = useSession();
   const { back } = useShell();
   const programmes = useLoad(listProgrammes);
-  useCrumbs(programmes.error === null ? { kind: "programmes" } : { kind: "notFound" });
+  useCrumbs(isNotFound(programmes.error) ? { kind: "notFound" } : { kind: "programmes" });
 
   if (programmes.error !== null)
     return (

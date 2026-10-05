@@ -17,6 +17,7 @@ import { listStudyPlan, readProgramme } from "@/api/catalog";
 import { Card } from "@/components/ui/card";
 import { useMembers } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
+import { isNotFound } from "@/features/staff/errors";
 import { Code, Note, PageHead, Section } from "@/features/staff/page";
 import { StaffList } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
@@ -42,7 +43,7 @@ export default function ProgrammePage() {
     reload: page.reload,
   });
   useCrumbs(
-    page.error !== null
+    isNotFound(page.error)
       ? { kind: "notFound" }
       : programme === null
         ? null

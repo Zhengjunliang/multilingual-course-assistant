@@ -1,9 +1,10 @@
 /**
  * What the chat sidebar's "Gestione" group offers, and where `/staff` lands.
  *
- * Read from the account's superuser flag and from the programmes the caller
- * may view — a list the server already narrows to the caller's scope — never
- * from a role name. The superuser, and whoever views two programmes or more,
+ * Read from the account's superuser flag, from the programmes the caller may
+ * view — a list the server already narrows to the caller's scope — and from
+ * whether the account teaches an edition (auth/staff.ts); what a page offers
+ * to do is each row's `permissions`, not this. The superuser, and whoever views two programmes or more,
  * get the list of programmes; whoever views exactly one goes straight to it,
  * since a list of one is a page with nothing to choose. That is the
  * prototype's shape (its secretariat opens on its programme), carried over to
@@ -37,6 +38,9 @@ export function managementItems(
   account: Account,
   programmes: readonly Programme[] | null,
 ): ManagementItem[] {
+  // Before the list, a teacher who also runs a programme would land on their
+  // own courses rather than on the programme: no item but the superuser's yet.
+  if (programmes === null && !account.is_superuser) return [];
   const below = ["/staff/courses", "/staff/editions"];
   const items: ManagementItem[] = [];
   const only = programmes?.length === 1 ? programmes[0] : undefined;

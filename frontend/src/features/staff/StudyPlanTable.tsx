@@ -34,8 +34,13 @@ import { type PlanRow, studyPlan } from "./studyPlan";
 
 const NOTE = "block text-caption text-muted";
 
+/** `items` as a phrase of the reader's language, as crumbs.ts's `programmeLine` writes one. */
+function list(items: readonly string[], language: string): string {
+  return new Intl.ListFormat(language, { type: "conjunction" }).format(items);
+}
+
 function Entries({ row }: { row: PlanRow }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   if (row.splitCodes) {
     const codes = row.entries.length;
     return (
@@ -59,7 +64,7 @@ function Entries({ row }: { row: PlanRow }) {
       {coverage !== null && (
         <span className="text-caption text-muted">
           {coverage.kind === "only"
-            ? t("staff.plan.only", { list: coverage.curricula.join(", ") })
+            ? t("staff.plan.only", { list: list(coverage.curricula, i18n.language) })
             : t(`staff.plan.${coverage.kind}`)}
         </span>
       )}
@@ -73,7 +78,7 @@ interface StudyPlanTableProps {
 }
 
 export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const searchId = useId();
   const [curriculum, setCurriculum] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -171,9 +176,10 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
                       <span className={NOTE}>
                         {t("staff.plan.alsoIn", {
                           // Name first, as the prototype writes it in a sentence.
-                          list: row.others
-                            .map((other) => `${other.name} · ${other.code}`)
-                            .join(", "),
+                          list: list(
+                            row.others.map((other) => `${other.name} · ${other.code}`),
+                            i18n.language,
+                          ),
                         })}
                       </span>
                     )}

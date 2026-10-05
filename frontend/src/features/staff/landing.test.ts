@@ -62,6 +62,13 @@ describe("the Gestione group", () => {
       "/staff/programmes",
     ],
     ["secretariat, before the list", account([SECRETARIAT]), null, [], null],
+    [
+      "secretariat staff who teach, before the list",
+      account([SECRETARIAT, { role: "teacher", edition: 3 }]),
+      null,
+      [],
+      null,
+    ],
   ])("for %s", (_, reader, programmes, keys, lands) => {
     expect(managementItems(reader, programmes).map((item) => item.key)).toEqual(keys);
     expect(landing(reader, programmes)).toBe(lands);

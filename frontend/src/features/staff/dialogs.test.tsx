@@ -63,8 +63,11 @@ const REFUSED = {
 
 let changed = 0;
 let closed = 0;
+/** Whether the page reads again after the write, as `useLoad().reload` resolves. */
+let readable = true;
 const onChanged = async () => {
   changed += 1;
+  return readable;
 };
 const onClose = () => {
   closed += 1;
@@ -117,6 +120,7 @@ function type(input: HTMLInputElement, value: string) {
 beforeEach(() => {
   changed = 0;
   closed = 0;
+  readable = true;
   vi.stubGlobal("fetch", async () => answer());
 });
 
@@ -125,8 +129,19 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
+/** The label of the focused button, or what else holds focus. */
+function focused(): string | null {
+  const active = document.activeElement;
+  if (active instanceof HTMLButtonElement) return active.textContent?.trim() ?? null;
+  return active?.tagName.toLowerCase() ?? null;
+}
+
 describe("assigning a member", () => {
-  async function assign(scope: MemberScope, refusal: (() => Response) | null) {
+  async function assign(
+    scope: MemberScope,
+    refusal: (() => Response) | null,
+    press: "button" | "enter" = "button",
+  ) {
     answer = refusal ?? (() => json({ id: 7, username: "mrossi" }, 201));
     const { unmount } = open(
       <AssignDialog
@@ -140,10 +155,15 @@ describe("assigning a member", () => {
     const input = document.body.querySelector<HTMLInputElement>('[role="dialog"] input');
     const focusedOnOpen = document.activeElement === input;
     if (input) type(input, "mrossi");
-    // A pointer press moves focus to the button, which jsdom's click does not.
     act(() => {
-      button("Assegna")?.focus();
-      button("Assegna")?.click();
+      if (press === "enter") {
+        // What Enter in the field does: submit the form it is in.
+        input?.form?.requestSubmit();
+      } else {
+        // A pointer press moves focus to the button, which jsdom's click does not.
+        button("Assegna")?.focus();
+        button("Assegna")?.click();
+      }
     });
     await settle();
     const seen = {
@@ -159,11 +179,14 @@ describe("assigning a member", () => {
     return seen;
   }
 
-  it("assigns, reads the page again, closes and says so", async () => {
-    const seen = await assign(EDITION, null);
+  it.each([
+    [EDITION, "button" as const, "Docente assegnato"],
+    [B047, "enter" as const, "Segreteria assegnata"],
+  ])("assigns, reads the page again, closes and says so", async (scope, press, title) => {
+    const seen = await assign(scope, null, press);
 
     expect([seen.focusedOnOpen, seen.closed, seen.changed]).toEqual([true, 1, 1]);
-    expect(seen.text).toContain("Docente assegnato");
+    expect(seen.text).toContain(title);
     expect(seen.text).toContain("mrossi · PPM · 2025-2026");
   });
 
@@ -189,7 +212,8 @@ describe("assigning a member", () => {
     async (scope, permission, sentence) => {
       const seen = await assign(scope, REFUSED.forbidden);
 
-      expect([seen.closed, seen.submitOff]).toEqual([0, true]);
+      // Focus back in the field, since the button it was on is off.
+      expect([seen.closed, seen.submitOff, seen.focusedAfter]).toEqual([0, true, true]);
       expect(seen.text).toContain(`Permesso mancante: ${permission}`);
       expect(seen.text).toContain(sentence);
     },
@@ -219,13 +243,17 @@ describe("revoking a role", () => {
     );
     const confirm = button("Revoca");
     const destructive = confirm?.className.includes("bg-warn-ink") ?? false;
-    act(() => confirm?.click());
+    act(() => {
+      confirm?.focus();
+      confirm?.click();
+    });
     await settle();
     const seen = {
       destructive,
       closed,
       changed,
       confirmOff: button("Revoca")?.disabled ?? null,
+      focused: focused(),
       text: body(),
     };
     unmount();
@@ -247,10 +275,18 @@ describe("revoking a role", () => {
     expect(seen.text).toContain("era già stato revocato altrove");
   });
 
-  it("names the missing permission and keeps the button off", async () => {
+  it("closes without a toast when the page is gone too", async () => {
+    readable = false;
+    const seen = await revoke(REFUSED.gone);
+
+    expect([seen.closed, seen.changed]).toEqual([1, 1]);
+    expect(seen.text).not.toContain("Ruolo revocato");
+  });
+
+  it("names the missing permission, keeps the button off and hands focus to Cancel", async () => {
     const seen = await revoke(REFUSED.forbidden);
 
-    expect([seen.closed, seen.confirmOff]).toEqual([0, true]);
+    expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, true, "Annulla"]);
     expect(seen.text).toContain("Permesso mancante: programme.assign_secretariat");
   });
 });
@@ -270,13 +306,17 @@ describe("making an edition current", () => {
       />,
     );
     const question = dialog()?.textContent ?? "";
-    act(() => button("Imposta come corrente")?.click());
+    act(() => {
+      button("Imposta come corrente")?.focus();
+      button("Imposta come corrente")?.click();
+    });
     await settle();
     const seen = {
       question,
       closed,
       changed,
       confirmOff: button("Imposta come corrente")?.disabled ?? null,
+      focused: focused(),
       text: body(),
     };
     unmount();
@@ -305,7 +345,7 @@ describe("making an edition current", () => {
   ])("keeps %s in the dialog with the button off", async (_, refusal, sentence) => {
     const seen = await switching(current, refusal);
 
-    expect([seen.closed, seen.confirmOff]).toEqual([0, true]);
+    expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, true, "Annulla"]);
     expect(seen.text).toContain(sentence);
   });
 

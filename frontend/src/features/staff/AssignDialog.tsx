@@ -5,8 +5,10 @@
  *
  * The dialog stays open while the request runs and after a refusal. A refusal
  * of the name — no such user, already holding the role here — is shown at the
- * field, which takes focus back. A missing permission is shown in the dialog,
- * with the button off. A 404 means the scope left the caller's reach since
+ * field. A missing permission is shown in the dialog, with the button off.
+ * After any of them the field takes focus back: the button was off while the
+ * request ran, and a browser drops the focus of a button that turns off to
+ * the page, outside the dialog. A 404 means the scope left the caller's reach since
  * the page was read: the dialog closes and the page reads again, and says
  * "not found" if that is what it is now.
  */
@@ -33,7 +35,7 @@ interface AssignDialogProps {
   description: string;
   onClose: () => void;
   /** Reads the page again after the assignment, or after the scope turned out gone. */
-  onChanged: () => Promise<void>;
+  onChanged: () => Promise<unknown>;
   onCloseAutoFocus?: (event: Event) => void;
 }
 
@@ -80,17 +82,15 @@ export function AssignDialog({
       close();
     } catch (error) {
       const field = fieldErrorKey(error, "username");
-      if (field !== null) {
-        setFieldError(t(field));
-        input.current?.focus();
-      } else if (isForbidden(error)) {
-        setForbidden(true);
-      } else if (isNotFound(error)) {
+      if (isNotFound(error)) {
         await onChanged();
         close();
-      } else {
-        setRefusal(fail(error));
+        return;
       }
+      if (field !== null) setFieldError(t(field));
+      else if (isForbidden(error)) setForbidden(true);
+      else setRefusal(fail(error));
+      input.current?.focus();
     } finally {
       setRunning(false);
     }

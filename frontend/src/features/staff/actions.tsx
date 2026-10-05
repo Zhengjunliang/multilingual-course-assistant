@@ -47,7 +47,7 @@ interface MembersOptions {
   canManage: boolean;
   /** The revoke question's body for `username`. */
   sentence: (username: string) => string;
-  reload: () => Promise<void>;
+  reload: () => Promise<boolean>;
 }
 
 interface Members {
@@ -146,7 +146,7 @@ export function useMembers({
 interface SetCurrentOptions {
   /** The editions the page shows, among which the one a switch replaces is found. */
   editions: readonly Edition[];
-  reload: () => Promise<void>;
+  reload: () => Promise<boolean>;
 }
 
 interface SetCurrent {

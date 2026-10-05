@@ -1,6 +1,7 @@
 /**
- * The frame around a conversation: the sidebar, its narrow-screen drawer, and
- * the row of controls above the thread.
+ * The frame of every signed-in page, the chat and the staff pages alike
+ * (routes/ShellLayout.tsx renders it): the sidebar, its narrow-screen drawer,
+ * and the row of controls above the page.
  *
  * Lifted out of `ChatPage` for two reasons, and the test harness is neither of
  * them. The first is that the button which opens the drawer and the state it
