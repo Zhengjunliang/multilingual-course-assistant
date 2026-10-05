@@ -228,3 +228,6 @@ def test_ppm_rows_can_be_entered_through_the_admin(admin_client) -> None:
     assert CurriculumEntry.objects.filter(course__code="B028451").count() == 2
     current = CourseEdition.objects.get(course=course, is_current=True)
     assert str(current) == "B028451:2025-2026"
+    # The course list says where each code comes from, as the staff pages do.
+    changelist = admin_client.get(reverse("admin:catalog_course_changelist"))
+    assert "Moodle course" in changelist.content.decode()
