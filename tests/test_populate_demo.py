@@ -27,7 +27,7 @@ from apps.catalog.models import (
     CurriculumEntry,
     DegreeProgramme,
 )
-from apps.roles.management.commands.populate_demo import DATA
+from apps.roles.management.commands.populate_demo import DATA, Command
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Role
 from config.env import env
@@ -230,11 +230,26 @@ def test_demo_password_lets_every_demo_account_log_in(
 ) -> None:
     run(tmp_path, monkeypatch, None, DEMO)
     run(tmp_path, monkeypatch, PASSWORD, DEMO)
+    signed_in = Client()
+    signed_in.login(username="demo-teacher", password=PASSWORD)
+    # A run with the same password keeps its hash, so the session stays valid.
+    run(tmp_path, monkeypatch, PASSWORD, DEMO)
 
     assert all(
         Client().login(username=account["username"], password=PASSWORD)
         for account in DEMO["accounts"]
     )
+    assert signed_in.get("/api/auth/me").json()["authenticated"] is True
+
+
+def test_a_demo_account_switched_off_stays_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run(tmp_path, monkeypatch, PASSWORD, DEMO)
+    User.objects.filter(username="demo-admin").update(is_active=False)
+    run(tmp_path, monkeypatch, PASSWORD, DEMO)
+
+    assert User.objects.get(username="demo-admin").is_active is False
 
 
 def _with(**changes: Any) -> dict[str, Any]:
@@ -242,7 +257,7 @@ def _with(**changes: Any) -> dict[str, Any]:
 
 
 @pytest.mark.parametrize(
-    ("demo", "before", "refusal"),
+    ("demo", "taken", "refusal"),
     [
         pytest.param(
             _with(
@@ -269,9 +284,15 @@ def _with(**changes: Any) -> dict[str, Any]:
         ),
         pytest.param(
             DEMO,
-            "demo-admin",
-            "already have a password of their own",
+            "before the run",
+            "already has a password of its own",
             id="a-demo-account-with-a-password",
+        ),
+        pytest.param(
+            DEMO,
+            "during the run",
+            "already has a password of its own",
+            id="a-demo-account-registered-during-the-run",
         ),
         pytest.param(
             _with(accounts=[*DEMO["accounts"], {"username": "mrossi"}]),
@@ -279,19 +300,48 @@ def _with(**changes: Any) -> dict[str, Any]:
             "outside demo-",
             id="an-account-outside-demo",
         ),
+        pytest.param(
+            _with(
+                accounts=[
+                    {"username": "demo-x", "roles": [{"role": "secretary", "programme": "B047"}]}
+                ]
+            ),
+            None,
+            "no role 'secretary'",
+            id="a-role-the-registry-does-not-name",
+        ),
+        pytest.param(
+            _with(
+                accounts=[
+                    {"username": "demo-x", "roles": [{"role": "teacher", "edition": "B028451"}]}
+                ]
+            ),
+            None,
+            "no scope",
+            id="an-edition-with-no-year",
+        ),
     ],
 )
 def test_a_refused_run_changes_nothing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     demo: dict[str, Any],
-    before: str | None,
+    taken: str | None,
     refusal: str,
 ) -> None:
-    if before is not None:
-        # Registration is open: anyone may have taken a demo name first.
-        User.objects.create_user(username=before, password=PASSWORD)
+    # Registration is open: anyone may take a demo name, before the run or while
+    # it writes the catalogue.
+    if taken == "before the run":
+        User.objects.create_user(username="demo-admin", password=PASSWORD)
     empty = snapshot()
+    if taken == "during the run":
+        catalogue = Command._catalogue
+
+        def racing(self: Command, demo: dict[str, Any]) -> None:
+            catalogue(self, demo)
+            User.objects.create_user(username="demo-admin", password=PASSWORD)
+
+        monkeypatch.setattr(Command, "_catalogue", racing)
 
     with pytest.raises(CommandError, match=refusal):
         run(tmp_path, monkeypatch, None, demo)
