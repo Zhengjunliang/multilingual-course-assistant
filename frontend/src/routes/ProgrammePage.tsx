@@ -4,8 +4,9 @@
  *
  * The programme and its study plan are two reads made together; a programme
  * outside the caller's scope is a 404 on both, and the page says "not found".
- * Only the superuser assigns secretariat staff, which the programme's
- * `permissions` say; anyone else reads who they are and why they cannot.
+ * Only the superuser assigns and revokes secretariat staff, which the
+ * programme's `permissions` say; anyone else reads who they are and why they
+ * cannot.
  */
 
 import { useCallback } from "react";
@@ -14,6 +15,7 @@ import { useParams } from "react-router-dom";
 
 import { listStudyPlan, readProgramme } from "@/api/catalog";
 import { Card } from "@/components/ui/card";
+import { useMembers } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { Note, PageHead, Section } from "@/features/staff/page";
 import { StaffList } from "@/features/staff/people";
@@ -28,6 +30,16 @@ export default function ProgrammePage() {
   const load = useCallback(() => Promise.all([readProgramme(code), listStudyPlan(code)]), [code]);
   const page = useLoad(load);
   const programme = page.data?.[0] ?? null;
+  const assigns = programme?.permissions.includes("programme.assign_secretariat") ?? false;
+  const members = useMembers({
+    scope: { kind: "programme", code },
+    people: programme?.secretariat ?? [],
+    object: programme?.code ?? code,
+    canManage: assigns,
+    sentence: (username) =>
+      t("staff.revoke.secretariat", { username, programme: programme?.name ?? code }),
+    reload: page.reload,
+  });
   useCrumbs(
     page.error !== null
       ? { kind: "notFound" }
@@ -39,7 +51,6 @@ export default function ProgrammePage() {
   if (page.error !== null) return <LoadFailure error={page.error} back={back} />;
   if (page.data === null || programme === null) return null;
   const [, plan] = page.data;
-  const assigns = programme.permissions.includes("programme.assign_secretariat");
 
   return (
     <>
@@ -57,12 +68,21 @@ export default function ProgrammePage() {
       <Section title={t("staff.plan.title")} sub={t("staff.plan.sub", { count: plan.length })}>
         <StudyPlanTable rows={plan} programme={programme} />
       </Section>
-      <Section title={t("staff.secretariat.title")} sub={t("staff.secretariat.sub")}>
+      <Section
+        title={t("staff.secretariat.title")}
+        sub={t("staff.secretariat.sub")}
+        right={members.assign}
+      >
         <Card className="overflow-hidden shadow-none">
-          <StaffList people={programme.secretariat} empty={t("staff.secretariat.empty")} />
+          <StaffList
+            people={programme.secretariat}
+            empty={t("staff.secretariat.empty")}
+            action={members.action}
+          />
           {!assigns && <Note foot>{t("staff.secretariat.onlyAdmin")}</Note>}
         </Card>
       </Section>
+      {members.dialogs}
     </>
   );
 }

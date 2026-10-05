@@ -99,11 +99,12 @@
       "mine": "I miei insegnamenti"
     },
     "setCurrent": {
-      "title": "Rendere corrente {{new}}?",
-      "body": "{{new}} diventa l'edizione corrente di {{course}}; {{old}} non lo sarà più.",
-      "bodyAlone": "{{new}} diventa l'edizione corrente di {{course}}.",
-      "confirm": "Rendi corrente",
-      "done": "{{new}} è l'edizione corrente di {{course}}."
+      "title": "Impostare come corrente?",
+      "done": "Edizione corrente aggiornata",
+      "action": "Imposta come corrente",
+      "becomes": "La <b>{{year}}</b> diventa l'edizione corrente.",
+      "switch": "L'edizione corrente passa da <b>{{old}}</b> a <b>{{new}}</b>.",
+      "caption": "Un insegnamento ha al massimo un'edizione corrente."
     },
     "programmes": {
       "title": "Corsi di laurea",
@@ -119,9 +120,9 @@
       "footnote": "Un insegnamento nel piano di studi di più corsi di laurea conta in ciascuno."
     },
     "error": {
-      "no_such_user": "Nessun account ha questo nome utente.",
+      "no_such_user": "Nessun utente con questo nome.",
       "already_held": "Questo utente ha già questo ruolo qui.",
-      "switch_needs_both": "Non puoi sostituire l'edizione corrente: chiedi alla segreteria di cambiarla.",
+      "switch_needs_both": "Serve il permesso anche sull'edizione corrente: chiedi alla segreteria didattica.",
       "required": "Inserisci un nome utente.",
       "blank": "Inserisci un nome utente.",
       "not_authenticated": "La sessione è scaduta. Accedi di nuovo.",
@@ -168,7 +169,13 @@
       "notFound": "Non trovato",
       "notFoundBody": "Questa pagina non esiste o non è visibile al tuo account.",
       "home": "Torna all'inizio",
-      "mine": "Torna ai miei insegnamenti"
+      "mine": "Torna ai miei insegnamenti",
+      "forbidden": "Permesso mancante",
+      "cannot": {
+        "assignTeacher": "Puoi vedere questa edizione, ma non assegnare docenti.",
+        "assignSecretariat": "Solo l'amministratore assegna la segreteria didattica.",
+        "setCurrent": "Puoi vedere questa edizione, ma non impostarla come corrente."
+      }
     },
     "open": "Apri",
     "current": "Corrente",
@@ -194,6 +201,26 @@
       "sub": "Le edizioni a cui sei assegnato come docente.",
       "empty": "Nessun insegnamento assegnato.",
       "note": "Un insegnamento ha al massimo un'edizione corrente; cambiarla richiede il permesso su entrambe le edizioni."
+    },
+    "assign": {
+      "teacher": "Assegna docente",
+      "secretariat": "Assegna segreteria",
+      "username": "Nome utente",
+      "placeholder": "es. luca.verdi",
+      "hint": "Il nome con cui la persona accede; l'account deve già esistere.",
+      "submit": "Assegna",
+      "running": "Assegnazione…",
+      "doneTeacher": "Docente assegnato",
+      "doneSecretariat": "Segreteria assegnata"
+    },
+    "revoke": {
+      "action": "Revoca",
+      "actionLabel": "Revoca {{username}}",
+      "title": "Revocare il ruolo?",
+      "teacher": "{{username}} non sarà più docente di {{course}}, edizione {{year}}.",
+      "secretariat": "{{username}} non farà più parte della segreteria didattica di {{programme}}.",
+      "done": "Ruolo revocato",
+      "gone": "{{username}} non aveva più questo ruolo: era già stato revocato altrove."
     }
   }
 }

@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useSetCurrent } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine, programmesOf } from "@/features/staff/crumbs";
 import { Note, PageHead, Section } from "@/features/staff/page";
@@ -77,6 +78,7 @@ export default function CoursePage() {
   );
   const page = useLoad(load);
   const course = page.data?.[0] ?? null;
+  const switching = useSetCurrent({ editions: page.data?.[1] ?? [], reload: page.reload });
   const through =
     course === null
       ? null
@@ -165,14 +167,18 @@ export default function CoursePage() {
                     </span>
                   )}
                 </TableCell>
-                <TableCell className="text-muted">
-                  <ChevronRight aria-hidden className="size-icon" />
+                <TableCell>
+                  <span className="flex items-center justify-end gap-snug text-muted">
+                    {switching.button(edition)}
+                    <ChevronRight aria-hidden className="size-icon" />
+                  </span>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Section>
+      {switching.dialog}
     </>
   );
 }

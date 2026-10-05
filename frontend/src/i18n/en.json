@@ -99,11 +99,12 @@
       "mine": "My courses"
     },
     "setCurrent": {
-      "title": "Make {{new}} current?",
-      "body": "{{new}} becomes the current edition of {{course}}; {{old}} will no longer be.",
-      "bodyAlone": "{{new}} becomes the current edition of {{course}}.",
-      "confirm": "Make current",
-      "done": "{{new}} is the current edition of {{course}}."
+      "title": "Make it current?",
+      "done": "Current edition updated",
+      "action": "Make current",
+      "becomes": "<b>{{year}}</b> becomes the current edition.",
+      "switch": "The current edition moves from <b>{{old}}</b> to <b>{{new}}</b>.",
+      "caption": "A course has at most one current edition."
     },
     "programmes": {
       "title": "Degree programmes",
@@ -119,9 +120,9 @@
       "footnote": "A course in the study plan of several degree programmes counts in each."
     },
     "error": {
-      "no_such_user": "No account has this username.",
+      "no_such_user": "No user has this name.",
       "already_held": "This user already holds this role here.",
-      "switch_needs_both": "The current edition is not yours to replace: ask the secretariat to switch it.",
+      "switch_needs_both": "It takes the permission on the current edition too: ask the teaching secretariat.",
       "required": "Enter a username.",
       "blank": "Enter a username.",
       "not_authenticated": "Your session has ended. Sign in again.",
@@ -168,7 +169,13 @@
       "notFound": "Not found",
       "notFoundBody": "This page does not exist or is not visible to your account.",
       "home": "Back to the start",
-      "mine": "Back to my courses"
+      "mine": "Back to my courses",
+      "forbidden": "Missing permission",
+      "cannot": {
+        "assignTeacher": "You can see this edition, but not assign teachers.",
+        "assignSecretariat": "Only the administrator assigns the teaching secretariat.",
+        "setCurrent": "You can see this edition, but not make it current."
+      }
     },
     "open": "Open",
     "current": "Current",
@@ -194,6 +201,26 @@
       "sub": "The editions you are assigned to as a teacher.",
       "empty": "No course assigned.",
       "note": "A course has at most one current edition; changing it takes the permission on both editions."
+    },
+    "assign": {
+      "teacher": "Assign teacher",
+      "secretariat": "Assign secretariat",
+      "username": "Username",
+      "placeholder": "e.g. luca.verdi",
+      "hint": "The name the person signs in with; the account must exist.",
+      "submit": "Assign",
+      "running": "Assigning…",
+      "doneTeacher": "Teacher assigned",
+      "doneSecretariat": "Secretariat assigned"
+    },
+    "revoke": {
+      "action": "Revoke",
+      "actionLabel": "Revoke {{username}}",
+      "title": "Revoke the role?",
+      "teacher": "{{username}} will no longer teach {{course}}, edition {{year}}.",
+      "secretariat": "{{username}} will no longer be part of the teaching secretariat of {{programme}}.",
+      "done": "Role revoked",
+      "gone": "{{username}} no longer held this role: it had been revoked elsewhere."
     }
   }
 }

@@ -1,16 +1,21 @@
 /**
- * What a staff page shows when its object cannot be read.
+ * What a staff page shows when its object cannot be read, and what a dialog
+ * shows when a write it offered is refused for a missing permission.
  *
  * Outside the caller's scope the server answers 404, as if the object did not
  * exist, and the page says the same: "not found", never "not allowed", which
  * would tell a reader the object is there. The way back is the reader's own
- * start, which only the page knows (routes/shell.ts).
+ * start, which only the page knows (routes/shell.ts). Inside the scope
+ * without the permission the server answers 403; the page offers an action
+ * only where `permissions` holds it, so that 403 means the permissions
+ * changed after the page read them, and the dialog names the one missing.
  */
 
-import { ArrowLeft, SearchX } from "lucide-react";
+import { ArrowLeft, Ban, SearchX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import type { Permission } from "@/api/catalog";
 import { isNotFound } from "./errors";
 
 export interface Back {
@@ -47,4 +52,29 @@ export function LoadFailure({ error, back }: { error: unknown; back: Back }) {
   const { t } = useTranslation();
   if (isNotFound(error)) return <NotFound back={back} />;
   return <p className="text-body text-warn-ink">{t("staff.loadFailed")}</p>;
+}
+
+/** The sentence each write's missing permission comes with. */
+const CANNOT: Partial<Record<Permission, string>> = {
+  "edition.assign_teacher": "staff.refusal.cannot.assignTeacher",
+  "programme.assign_secretariat": "staff.refusal.cannot.assignSecretariat",
+  "edition.set_current": "staff.refusal.cannot.setCurrent",
+};
+
+export function Forbidden({ permission }: { permission: Permission }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="alert"
+      className="flex gap-tight rounded-md border border-warn-line bg-warn px-snug py-tight text-warn-ink"
+    >
+      <Ban aria-hidden className="mt-hair size-icon shrink-0" />
+      <div className="flex flex-col gap-hair text-body">
+        <p className="font-medium">
+          {t("staff.refusal.forbidden")}: <code className="font-mono">{permission}</code>
+        </p>
+        {CANNOT[permission] !== undefined && <p>{t(CANNOT[permission])}</p>}
+      </div>
+    </div>
+  );
 }

@@ -20,6 +20,7 @@
 
 import { LogOut, UserRound } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Avatar } from "@/components/ui/avatar";
@@ -32,6 +33,7 @@ import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { Sheet } from "@/components/ui/sheet";
+import { Toaster } from "@/components/ui/sonner";
 import { Suggestion, Suggestions } from "@/components/ui/suggestion";
 import {
   Table,
@@ -193,6 +195,22 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
             { label: "B047 · INGEGNERIA INFORMATICA" },
           ]}
         />
+      </Specimen>
+
+      <Specimen
+        name="Toaster"
+        note="Where a finished action says so, in the corner, read out politely and gone after a few seconds; the button raises one."
+      >
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() =>
+            toast("Docente assegnato", { description: "mrossi · B028451 · 2025-2026" })
+          }
+        >
+          Mostra un avviso
+        </Button>
+        <Toaster />
       </Specimen>
 
       <Specimen

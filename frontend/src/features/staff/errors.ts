@@ -8,7 +8,7 @@
  * has words.
  */
 
-import type { StaffErrorCode } from "@/api/catalog";
+import type { MemberScope, Permission, StaffErrorCode } from "@/api/catalog";
 import { ApiError } from "@/api/http";
 
 const SENTENCE: Record<StaffErrorCode, `staff.error.${StaffErrorCode}`> = {
@@ -54,4 +54,18 @@ export function isSessionLost(error: unknown): boolean {
 
 export function isNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.status === 404;
+}
+
+/**
+ * Whether the caller sees the scope but lacks the permission the write needs,
+ * a 403 the page offered the action for: its permissions were read before a
+ * role changed. Not a lost session, and not the switch's own refusal.
+ */
+export function isForbidden(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403 && error.code === "permission_denied";
+}
+
+/** The permission adding or removing a member of `scope` needs (apps/roles/registry.py). */
+export function grantPermission(scope: MemberScope): Permission {
+  return scope.kind === "edition" ? "edition.assign_teacher" : "programme.assign_secretariat";
 }

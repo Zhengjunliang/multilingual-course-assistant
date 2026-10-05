@@ -1,59 +1,75 @@
 /**
- * The question before switching a course's current edition, naming both the
+ * The question before switching a course's current edition, naming the
  * edition that becomes current and the one that stops being, as GitHub names
  * the old and new default branch and Vercel the deployment it promotes (outside
  * the repository: their documentation). Not destructive — switching back undoes
- * it — so the confirming button is the default ink. A refusal the server gives
- * anyway, such as a switch another tab made first, is shown in the dialog.
+ * it — so the confirming button is the default ink.
+ *
+ * The page offers the switch only where `can_set_current` holds, so the
+ * edition it replaces is one the caller sees, or there is none. A refusal the
+ * server gives anyway stays in the dialog with the button off: the switch's
+ * own, `switch_needs_both`, when the edition being replaced is out of the
+ * caller's reach; a missing permission; or a 404, which closes the dialog and
+ * reads the page again.
  */
 
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 import { type Edition, setCurrent } from "@/api/catalog";
 import { AlertDialog } from "@/components/ui/alert-dialog";
-import { useFailure, useStaff } from "./context";
+import { useFailure } from "./context";
+import { isForbidden, isNotFound } from "./errors";
+import { Forbidden } from "./Refusal";
 
 interface SetCurrentDialogProps {
-  /** The edition to make current; null when the dialog is closed. */
+  /** The edition to make current; null while the dialog is closed. */
   edition: Edition | null;
-  /** The course's current edition, when the caller can see it. */
+  /** The course's current edition, among those the caller sees; null when it has none. */
   replaced: Edition | null;
   onClose: () => void;
-  /** After a switch: every row's flags may have changed, so the list is read again. */
-  onSwitched: () => void;
+  /** Reads the page again: every row's flags may have changed. */
+  onChanged: () => Promise<void>;
+  onCloseAutoFocus?: (event: Event) => void;
 }
+
+type Refusal = { kind: "forbidden" } | { kind: "said"; sentence: string };
 
 export function SetCurrentDialog({
   edition,
   replaced,
   onClose,
-  onSwitched,
+  onChanged,
+  onCloseAutoFocus,
 }: SetCurrentDialogProps) {
   const { t } = useTranslation();
-  const { announce } = useStaff();
   const fail = useFailure();
-  const [refusal, setRefusal] = useState<string | null>(null);
-
-  const names = {
-    course: edition === null ? "" : `${edition.course.code} ${edition.course.name}`,
-    new: edition?.academic_year ?? "",
-    old: replaced?.academic_year ?? "",
-  };
+  const [refusal, setRefusal] = useState<Refusal | null>(null);
 
   const confirm = async () => {
     if (edition === null) return false;
     try {
       await setCurrent(edition.id);
     } catch (error) {
-      setRefusal(fail(error));
+      if (isNotFound(error)) {
+        await onChanged();
+        return true;
+      }
+      setRefusal(
+        isForbidden(error) ? { kind: "forbidden" } : { kind: "said", sentence: fail(error) },
+      );
       return false;
     }
-    announce(t("staff.setCurrent.done", names));
-    onSwitched();
+    await onChanged();
+    toast(t("staff.setCurrent.done"), {
+      description: `${edition.course.name} · ${edition.academic_year}`,
+    });
     return true;
   };
 
+  // Asking again would only be refused again: the button stays off until the dialog reopens.
+  const blocked = refusal !== null;
   return (
     <AlertDialog
       open={edition !== null}
@@ -62,16 +78,43 @@ export function SetCurrentDialog({
         setRefusal(null);
         onClose();
       }}
-      title={t("staff.setCurrent.title", names)}
-      description={t(
-        replaced === null ? "staff.setCurrent.bodyAlone" : "staff.setCurrent.body",
-        names,
-      )}
+      title={t("staff.setCurrent.title")}
+      description={edition?.course.name ?? ""}
       cancelLabel={t("staff.cancel")}
-      confirmLabel={t("staff.setCurrent.confirm")}
+      confirmLabel={t("staff.setCurrent.action")}
       onConfirm={confirm}
+      confirmDisabled={blocked}
+      onCloseAutoFocus={onCloseAutoFocus}
     >
-      {refusal !== null && <p className="text-body text-warn-ink">{refusal}</p>}
+      {edition !== null && (
+        <div className="flex flex-col gap-hair text-body text-ink">
+          <p>
+            {replaced === null ? (
+              <Trans
+                i18nKey="staff.setCurrent.becomes"
+                values={{ year: edition.academic_year }}
+                components={{ b: <strong /> }}
+              />
+            ) : (
+              <Trans
+                i18nKey="staff.setCurrent.switch"
+                values={{ old: replaced.academic_year, new: edition.academic_year }}
+                components={{ b: <strong /> }}
+              />
+            )}
+          </p>
+          <p className="text-caption text-muted">{t("staff.setCurrent.caption")}</p>
+        </div>
+      )}
+      {refusal?.kind === "forbidden" && <Forbidden permission="edition.set_current" />}
+      {refusal?.kind === "said" && (
+        <p
+          role="alert"
+          className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink"
+        >
+          {refusal.sentence}
+        </p>
+      )}
     </AlertDialog>
   );
 }

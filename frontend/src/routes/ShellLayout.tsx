@@ -10,6 +10,8 @@
  * answered live here for that reason; the chat reports the last of these
  * (routes/shell.ts). Leaving the chat unmounts it, which stops an answer
  * being written (features/chat/useAsk.ts), as leaving for any other page did.
+ * The toasts the staff pages raise live here too, so one outlasts the page
+ * that raised it.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -25,6 +27,7 @@ import { isStaff } from "@/auth/staff";
 import { useSession } from "@/auth/useSession";
 import { AccountMenu } from "@/components/AccountMenu";
 import { Breadcrumb, type Crumb } from "@/components/ui/breadcrumb";
+import { Toaster } from "@/components/ui/sonner";
 import { ChatShell, type SidebarControls } from "@/features/chat/ChatShell";
 import { ConversationSidebar } from "@/features/chat/ConversationSidebar";
 import { isSessionLost } from "@/features/staff/errors";
@@ -152,6 +155,7 @@ export default function ShellLayout() {
       >
         <Outlet />
       </ChatShell>
+      <Toaster />
     </ShellContext>
   );
 }
