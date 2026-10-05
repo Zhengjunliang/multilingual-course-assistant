@@ -12,7 +12,9 @@ data of the response it built.
 
 Only views that mix in `CodedErrors` answer this way (the staff endpoints:
 apps/roles/api.py, apps/catalog/views.py); the rest of the API keeps plain
-sentences until the handler is made global, which is #91's.
+sentences until one error contract covers every endpoint, which is #143's
+(docs/decisions.md, 2026-10-05, *The staff pages live in the chat shell*,
+point 3).
 """
 
 from __future__ import annotations
