@@ -1,5 +1,5 @@
 import { MessageSquarePlus, PanelLeft, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
@@ -24,6 +24,11 @@ interface ConversationSidebarProps {
   onNavigate?: () => void;
   /** Closes the wide-screen column. Absent on narrow screens, where the drawer wins. */
   onCollapse?: () => void;
+  /**
+   * The staff pages the account may open (features/staff/ManagementNav.tsx),
+   * above the conversations, which then take a heading of their own.
+   */
+  management?: ReactNode;
 }
 
 export function ConversationSidebar({
@@ -32,6 +37,7 @@ export function ConversationSidebar({
   onDelete,
   onNavigate,
   onCollapse,
+  management,
 }: ConversationSidebarProps) {
   const { t } = useTranslation();
   const [pending, setPending] = useState<ConversationSummary | null>(null);
@@ -108,51 +114,62 @@ export function ConversationSidebar({
         {t("sidebar.new")}
       </NavLink>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto">
-        {conversations.length === 0 ? (
-          <p className="px-tight py-gutter text-body text-muted">{t("sidebar.empty")}</p>
-        ) : (
-          <ul className="flex flex-col gap-hair">
-            {conversations.map((conversation) => (
-              <li key={conversation.id} className="group flex items-center gap-hair">
-                <NavLink
-                  to={`/c/${conversation.id}`}
-                  onClick={onNavigate}
-                  className={({ isActive }) =>
-                    cn(
-                      "block min-w-0 flex-1 truncate rounded-md px-tight py-tight text-body transition-colors",
-                      // The open conversation is where the reader *is*, not
-                      // something they are about to do: ink and a quiet fill,
-                      // the same rule the language switch follows.
-                      isActive
-                        ? "bg-mark font-medium text-ink"
-                        : "text-muted hover:bg-mark hover:text-ink",
-                    )
-                  }
-                >
-                  {titleOf(conversation)}
-                </NavLink>
-                {/* Shown on hover or focus where there is a fine pointer to
+      {/* One scroller for both groups, as the prototype has it: a long list of
+          conversations scrolls the Gestione items away rather than squeezing
+          them. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-snug overflow-y-auto">
+        {management}
+        <nav aria-label={t("sidebar.title")} className="flex flex-col gap-hair">
+          {management !== undefined && (
+            <p className="px-tight pt-tight font-medium text-caption text-muted">
+              {t("sidebar.title")}
+            </p>
+          )}
+          {conversations.length === 0 ? (
+            <p className="px-tight py-gutter text-body text-muted">{t("sidebar.empty")}</p>
+          ) : (
+            <ul className="flex flex-col gap-hair">
+              {conversations.map((conversation) => (
+                <li key={conversation.id} className="group flex items-center gap-hair">
+                  <NavLink
+                    to={`/c/${conversation.id}`}
+                    onClick={onNavigate}
+                    className={({ isActive }) =>
+                      cn(
+                        "block min-w-0 flex-1 truncate rounded-md px-tight py-tight text-body transition-colors",
+                        // The open conversation is where the reader *is*, not
+                        // something they are about to do: ink and a quiet fill,
+                        // the same rule the language switch follows.
+                        isActive
+                          ? "bg-mark font-medium text-ink"
+                          : "text-muted hover:bg-mark hover:text-ink",
+                      )
+                    }
+                  >
+                    {titleOf(conversation)}
+                  </NavLink>
+                  {/* Shown on hover or focus where there is a fine pointer to
                     hover with; always on a touch screen, whatever its width.
                     Disabled while this conversation's answer is being written:
                     the question would be refused and the half answer lost. */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0 pointer-fine:opacity-0 pointer-fine:focus-visible:opacity-100 pointer-fine:group-hover:opacity-100"
-                  aria-label={t("sidebar.delete", { title: titleOf(conversation) })}
-                  title={busy === conversation.id ? t("sidebar.deleteBusy") : undefined}
-                  disabled={busy === conversation.id}
-                  onClick={() => ask(conversation)}
-                >
-                  <Trash2 aria-hidden className="size-icon" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </nav>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 pointer-fine:opacity-0 pointer-fine:focus-visible:opacity-100 pointer-fine:group-hover:opacity-100"
+                    aria-label={t("sidebar.delete", { title: titleOf(conversation) })}
+                    title={busy === conversation.id ? t("sidebar.deleteBusy") : undefined}
+                    disabled={busy === conversation.id}
+                    onClick={() => ask(conversation)}
+                  >
+                    <Trash2 aria-hidden className="size-icon" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </nav>
+      </div>
 
       <AlertDialog
         open={pending !== null}

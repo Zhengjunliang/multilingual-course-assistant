@@ -16,10 +16,12 @@ import { cn } from "@/lib/utils";
 interface AvatarProps {
   /** Shown as its first letter, uppercased. An empty name renders no letter. */
   name: string;
+  /** `sm` sits inside a line of text, beside the name it stands for. */
+  size?: "default" | "sm";
   className?: string;
 }
 
-export function Avatar({ name, className }: AvatarProps) {
+export function Avatar({ name, size = "default", className }: AvatarProps) {
   // `[...name]` and not `name[0]`: the first *character* of "Émile" is one code
   // point but the first UTF-16 unit of an emoji or a rarer CJK glyph is half of
   // a surrogate pair, which renders as a replacement square.
@@ -29,7 +31,8 @@ export function Avatar({ name, className }: AvatarProps) {
     <span
       aria-hidden
       className={cn(
-        "flex size-control-icon shrink-0 select-none items-center justify-center rounded-full bg-mark font-medium text-caption text-ink",
+        "flex shrink-0 select-none items-center justify-center rounded-full bg-mark font-medium text-caption text-ink",
+        size === "sm" ? "size-icon-lg" : "size-control-icon",
         className,
       )}
     >

@@ -39,7 +39,8 @@
     "themeCaption": "Vale su questo dispositivo, non sull'account.",
     "language": "Lingua",
     "logOut": "Esci",
-    "close": "Chiudi"
+    "close": "Chiudi",
+    "admin": "Amministrazione"
   },
   "theme": {
     "system": "Di sistema",
@@ -88,34 +89,19 @@
     "retryAfter": "Il servizio ha chiesto di riprovare tra {{seconds}} secondi."
   },
   "staff": {
-    "area": "Area staff",
     "cancel": "Annulla",
     "breadcrumb": "Percorso",
     "loadFailed": "Impossibile caricare la pagina. Riprova.",
     "nav": {
-      "label": "Area staff",
-      "editions": "Edizioni",
       "programmes": "Corsi di laurea",
-      "admin": "Amministrazione",
-      "chat": "Torna alla chat"
+      "management": "Gestione",
+      "programme": "Corso di laurea"
     },
     "editions": {
       "title": "Edizioni dei corsi",
-      "ofProgramme": "Insegnamenti offerti da {{programme}}.",
-      "caption": "Edizioni di tua competenza",
-      "empty": "Nessuna edizione corrisponde.",
-      "filter": "Filtra per insegnamento o docente",
-      "allYears": "Tutti gli anni",
-      "course": "Insegnamento",
-      "year": "Anno accademico",
-      "status": "Stato",
-      "teachers": "Docenti",
-      "actions": "Azioni",
-      "current": "Corrente",
-      "setCurrent": "Rendi corrente"
+      "current": "Corrente"
     },
     "setCurrent": {
-      "action": "Rendi corrente {{course}} {{year}}",
       "title": "Rendere corrente {{new}}?",
       "body": "{{new}} diventa l'edizione corrente di {{course}}; {{old}} non lo sarà più.",
       "bodyAlone": "{{new}} diventa l'edizione corrente di {{course}}.",
@@ -124,7 +110,6 @@
     },
     "members": {
       "teachers": "Docenti",
-      "secretariat": "Segreteria",
       "username": "Aggiungi per nome utente esatto",
       "add": "Aggiungi",
       "remove": "Rimuovi {{username}}",
@@ -138,16 +123,17 @@
     },
     "programmes": {
       "title": "Corsi di laurea",
-      "caption": "Corsi di laurea di tua competenza",
       "empty": "Nessun corso di laurea di tua competenza.",
       "code": "Codice",
       "name": "Nome",
-      "editions": "Edizioni degli insegnamenti di questo corso di laurea"
-    },
-    "notFound": {
-      "title": "Non trovato",
-      "body": "Qui non c'è nulla, oppure è fuori dalla tua competenza.",
-      "back": "Torna alle edizioni"
+      "sub": "Tutti i corsi di laurea del sito, con la loro segreteria didattica.",
+      "subScoped": "I corsi di laurea di cui fai parte della segreteria didattica.",
+      "curriculum": "Curriculum",
+      "courses": "Insegnamenti",
+      "secretariat": "Segreteria didattica",
+      "none": "Nessuno",
+      "footnote": "Un insegnamento nel piano di studi di più corsi di laurea conta in ciascuno.",
+      "open": "Apri"
     },
     "error": {
       "no_such_user": "Nessun account ha questo nome utente.",
@@ -159,6 +145,46 @@
       "permission_denied": "Non hai il permesso di farlo.",
       "not_found": "Non esiste più.",
       "unknown": "Qualcosa è andato storto. Riprova."
+    },
+    "source": "Piano di studi dal catalogo dei corsi Cineca.",
+    "you": "tu",
+    "plan": {
+      "title": "Insegnamenti",
+      "sub_one": "Il piano di studi, per anno di corso: {{count}} insegnamento.",
+      "sub_other": "Il piano di studi, per anno di corso: {{count}} insegnamenti.",
+      "curricula": "Curriculum: {{list}}",
+      "search": "Cerca per nome o codice",
+      "searchLabel": "Cerca un insegnamento",
+      "filter": "Curriculum",
+      "all": "Tutti",
+      "course": "Insegnamento",
+      "entries": "Voci del piano di studi",
+      "current": "Edizione corrente",
+      "teachers": "Docenti",
+      "noTeacher": "Nessun docente assegnato",
+      "year": "{{year}}° anno",
+      "count_one": "{{count}} insegnamento",
+      "count_other": "{{count}} insegnamenti",
+      "both": "entrambi i curriculum",
+      "every": "tutti i curriculum",
+      "only": "solo {{list}}",
+      "twoCodes": "due codici, un solo insegnamento",
+      "codes": "{{count}} codici, un solo insegnamento",
+      "integrated": "corso integrato: codice dal catalogo Cineca",
+      "alsoIn": "anche nel piano di studi di {{list}}",
+      "noMatch": "Nessun insegnamento corrisponde alla ricerca.",
+      "noCurriculum": "Nessun insegnamento in questo curriculum."
+    },
+    "secretariat": {
+      "title": "Segreteria didattica",
+      "sub": "Gestisce le edizioni degli insegnamenti di questo piano di studi.",
+      "empty": "Nessun membro della segreteria didattica.",
+      "onlyAdmin": "Solo l'amministratore assegna la segreteria didattica."
+    },
+    "refusal": {
+      "notFound": "Non trovato",
+      "notFoundBody": "Questa pagina non esiste o non è visibile al tuo account.",
+      "home": "Torna all'inizio"
     }
   }
 }

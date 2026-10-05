@@ -39,7 +39,8 @@
     "themeCaption": "只对这台设备生效，不跟随账号。",
     "language": "语言",
     "logOut": "退出登录",
-    "close": "关闭"
+    "close": "关闭",
+    "admin": "管理后台"
   },
   "theme": {
     "system": "跟随系统",
@@ -88,34 +89,19 @@
     "retryAfter": "服务要求 {{seconds}} 秒后重试。"
   },
   "staff": {
-    "area": "教职工区",
     "cancel": "取消",
     "breadcrumb": "路径",
     "loadFailed": "页面加载失败，请重试。",
     "nav": {
-      "label": "教职工区",
-      "editions": "课程版本",
       "programmes": "专业",
-      "admin": "管理后台",
-      "chat": "返回聊天"
+      "management": "管理",
+      "programme": "学位专业"
     },
     "editions": {
       "title": "课程版本",
-      "ofProgramme": "{{programme}} 开设的课程。",
-      "caption": "你负责范围内的课程版本",
-      "empty": "没有匹配的版本。",
-      "filter": "按课程或老师筛选",
-      "allYears": "全部学年",
-      "course": "课程",
-      "year": "学年",
-      "status": "状态",
-      "teachers": "老师",
-      "actions": "操作",
-      "current": "当前",
-      "setCurrent": "设为当前"
+      "current": "当前"
     },
     "setCurrent": {
-      "action": "将 {{course}} {{year}} 设为当前",
       "title": "将 {{new}} 设为当前？",
       "body": "{{new}} 成为 {{course}} 的当前版本；{{old}} 将不再是。",
       "bodyAlone": "{{new}} 成为 {{course}} 的当前版本。",
@@ -124,7 +110,6 @@
     },
     "members": {
       "teachers": "老师",
-      "secretariat": "教务秘书",
       "username": "按准确的用户名添加",
       "add": "添加",
       "remove": "移除 {{username}}",
@@ -138,16 +123,17 @@
     },
     "programmes": {
       "title": "专业",
-      "caption": "你负责范围内的专业",
       "empty": "你负责的范围内没有专业。",
       "code": "代码",
       "name": "名称",
-      "editions": "本专业所开课程的版本"
-    },
-    "notFound": {
-      "title": "未找到",
-      "body": "这里什么也没有，或者不在你的负责范围内。",
-      "back": "返回课程版本"
+      "sub": "本站的全部学位专业, 及其教学秘书处。",
+      "subScoped": "你所在教学秘书处的学位专业。",
+      "curriculum": "方向",
+      "courses": "课程",
+      "secretariat": "教学秘书处",
+      "none": "无",
+      "footnote": "同时列在多个专业学习计划里的课程, 在每个专业各计一次。",
+      "open": "打开"
     },
     "error": {
       "no_such_user": "没有使用此用户名的账号。",
@@ -159,6 +145,46 @@
       "permission_denied": "你没有权限执行此操作。",
       "not_found": "它已经不存在了。",
       "unknown": "出错了，请重试。"
+    },
+    "source": "学习计划取自 Cineca 课程目录。",
+    "you": "你",
+    "plan": {
+      "title": "课程",
+      "sub_one": "学习计划, 按年级排列: {{count}} 门课程。",
+      "sub_other": "学习计划, 按年级排列: {{count}} 门课程。",
+      "curricula": "方向: {{list}}",
+      "search": "按名称或代码搜索",
+      "searchLabel": "搜索课程",
+      "filter": "方向",
+      "all": "全部",
+      "course": "课程",
+      "entries": "学习计划条目",
+      "current": "当前版本",
+      "teachers": "教师",
+      "noTeacher": "未指派教师",
+      "year": "{{year}} 年级",
+      "count_one": "{{count}} 门课程",
+      "count_other": "{{count}} 门课程",
+      "both": "两个方向都有",
+      "every": "所有方向都有",
+      "only": "仅 {{list}}",
+      "twoCodes": "两个代码, 同一门课",
+      "codes": "{{count}} 个代码, 同一门课",
+      "integrated": "综合课程: 代码取自 Cineca 目录",
+      "alsoIn": "也在以下专业的学习计划中: {{list}}",
+      "noMatch": "没有符合搜索的课程。",
+      "noCurriculum": "该方向没有课程。"
+    },
+    "secretariat": {
+      "title": "教学秘书处",
+      "sub": "管理本学习计划中各课程的版本。",
+      "empty": "教学秘书处没有成员。",
+      "onlyAdmin": "只有管理员能指派教学秘书。"
+    },
+    "refusal": {
+      "notFound": "未找到",
+      "notFoundBody": "此页面不存在, 或你的账号看不到它。",
+      "home": "返回首页"
     }
   }
 }

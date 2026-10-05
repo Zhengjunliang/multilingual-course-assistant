@@ -27,7 +27,6 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCaption, TableCell, TableRow } from "@/components/ui/table";
 import { useFailure, useLoad, useStaff } from "./context";
 import { fieldErrorKey, isNotFound } from "./errors";
-import { LoadFailure } from "./NotFound";
 
 interface MembersPanelProps {
   /** Stable across renders: the list is read again whenever it changes. */
@@ -85,7 +84,8 @@ export function MembersPanel({ scope, title, scopeName, canManage }: MembersPane
     return true;
   };
 
-  if (members.error !== null) return <LoadFailure error={members.error} />;
+  if (members.error !== null)
+    return <p className="text-body text-warn-ink">{t("staff.loadFailed")}</p>;
 
   return (
     <section className="flex flex-col gap-snug">

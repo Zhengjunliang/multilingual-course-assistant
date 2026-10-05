@@ -139,12 +139,6 @@ export function readCourse(code: string): Promise<Course> {
   return request<Course>(`${CATALOG}/courses/${encodeURIComponent(code)}`);
 }
 
-/** Every edition in the caller's scope, or only the courses `programme` offers. */
-export function listEditions(programme?: string): Promise<Edition[]> {
-  const query = programme === undefined ? "" : `?${new URLSearchParams({ programme })}`;
-  return request<Edition[]>(`${CATALOG}/editions${query}`);
-}
-
 export function readEdition(id: number): Promise<Edition> {
   return request<Edition>(`${CATALOG}/editions/${id}`);
 }
