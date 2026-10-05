@@ -99,11 +99,12 @@
       "mine": "我的课程"
     },
     "setCurrent": {
-      "title": "将 {{new}} 设为当前？",
-      "body": "{{new}} 成为 {{course}} 的当前版本；{{old}} 将不再是。",
-      "bodyAlone": "{{new}} 成为 {{course}} 的当前版本。",
-      "confirm": "设为当前",
-      "done": "{{new}} 现为 {{course}} 的当前版本。"
+      "title": "设为当前版本?",
+      "done": "当前版本已更新",
+      "action": "设为当前",
+      "becomes": "<b>{{year}}</b> 成为当前版本。",
+      "switch": "当前版本从 <b>{{old}}</b> 换成 <b>{{new}}</b>。",
+      "caption": "一门课程最多有一个当前版本。"
     },
     "programmes": {
       "title": "专业",
@@ -119,9 +120,9 @@
       "footnote": "同时列在多个专业学习计划里的课程, 在每个专业各计一次。"
     },
     "error": {
-      "no_such_user": "没有使用此用户名的账号。",
+      "no_such_user": "没有这个名字的用户。",
       "already_held": "该用户在这里已有此角色。",
-      "switch_needs_both": "当前版本不归你替换：请联系教务秘书切换。",
+      "switch_needs_both": "还需要对当前版本的权限: 请联系教学秘书。",
       "required": "请输入用户名。",
       "blank": "请输入用户名。",
       "not_authenticated": "会话已结束，请重新登录。",
@@ -168,7 +169,13 @@
       "notFound": "未找到",
       "notFoundBody": "此页面不存在, 或你的账号看不到它。",
       "home": "返回首页",
-      "mine": "返回我的课程"
+      "mine": "返回我的课程",
+      "forbidden": "缺少权限",
+      "cannot": {
+        "assignTeacher": "你能看到这个版本, 但不能指派教师。",
+        "assignSecretariat": "只有管理员能指派教学秘书。",
+        "setCurrent": "你能看到这个版本, 但不能把它设为当前版本。"
+      }
     },
     "open": "打开",
     "current": "当前",
@@ -194,6 +201,26 @@
       "sub": "你作为教师被指派的版本。",
       "empty": "没有指派的课程。",
       "note": "一门课程最多有一个当前版本; 更换它需要对两个版本都有权限。"
+    },
+    "assign": {
+      "teacher": "指派教师",
+      "secretariat": "指派秘书",
+      "username": "用户名",
+      "placeholder": "例如 luca.verdi",
+      "hint": "此人登录用的名字; 账号必须存在。",
+      "submit": "指派",
+      "running": "正在指派…",
+      "doneTeacher": "已指派教师",
+      "doneSecretariat": "已指派秘书"
+    },
+    "revoke": {
+      "action": "撤销",
+      "actionLabel": "撤销 {{username}}",
+      "title": "撤销该角色?",
+      "teacher": "{{username}} 将不再是 {{course}} {{year}} 版本的教师。",
+      "secretariat": "{{username}} 将不再属于 {{programme}} 的教学秘书处。",
+      "done": "已撤销角色",
+      "gone": "{{username}} 已不再拥有此角色: 它已在别处被撤销。"
     }
   }
 }

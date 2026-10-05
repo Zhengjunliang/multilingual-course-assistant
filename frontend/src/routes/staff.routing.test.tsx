@@ -145,6 +145,8 @@ let conversations: ConversationSummary[] = [];
 const asked: string[] = [];
 /** Whether the answer stream was told to stop. */
 let stopped = false;
+/** Secretariat staff revoked during a case, as the server would forget them. */
+const revoked = new Set<string>();
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -202,7 +204,14 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return json({ ...one, permissions: [...assigns, ...one.permissions] });
   }
   if (programme !== undefined && path.endsWith("/courses")) return json(PLAN);
-  if (programme !== undefined) return json(programme);
+  if (method === "DELETE" && programme !== undefined) {
+    revoked.add(path.slice(path.lastIndexOf("/") + 1));
+    return new Response(null, { status: 204 });
+  }
+  if (programme !== undefined) {
+    const secretariat = programme.secretariat.filter((m) => !revoked.has(m.username));
+    return json({ ...programme, secretariat });
+  }
   return json({ detail: { message: "Not found.", code: "not_found" } }, 404);
 }
 
@@ -270,6 +279,7 @@ beforeEach(() => {
   conversations = [{ id: 7, locale: "it", created_at: "2026-10-04T10:00:00Z", title: "ORM" }];
   asked.length = 0;
   stopped = false;
+  revoked.clear();
   vi.stubGlobal("fetch", fakeApi);
 });
 
@@ -487,7 +497,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
       path: "/staff/mine",
       cards: ["PROGETTAZIONE E PRODUZIONE MULTIMEDIALE"],
       rows: [
-        ["/staff/editions/5", "2025-2026demo-colleague, demo-teacher"],
+        ["/staff/editions/5", "2025-2026demo-colleague, demo-teacherImposta come corrente"],
         ["/staff/editions/4", "2024-2025Correntedemo-teacher"],
       ],
     });
@@ -527,9 +537,11 @@ describe("a course, an edition, and a teacher's own courses", () => {
     unmount();
 
     expect(seen).toEqual({
-      // The reader is marked as themselves.
+      // The reader is marked as themselves; whoever may assign gets a "Revoca" per row.
       people:
-        who === TEACHER ? ["demo-colleague", "demo-teachertu"] : ["demo-colleague", "demo-teacher"],
+        who === TEACHER
+          ? ["demo-colleague", "demo-teachertu"]
+          : ["demo-colleagueRevoca", "demo-teacherRevoca"],
       crumbs: trail,
       footnote,
     });
@@ -544,6 +556,32 @@ describe("a course, an edition, and a teacher's own courses", () => {
     unmount();
 
     expect(seen).toEqual(["Non trovato", "Torna ai miei insegnamenti", "/staff/mine"]);
+  });
+});
+
+describe("a write from a page", () => {
+  it("revokes the last secretariat member, says so, and hands focus to the assign button", async () => {
+    reader = ADMIN;
+    const { container, unmount } = page("/staff/programmes/B047");
+    await settle();
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Revoca demo-secretariat"]')
+        ?.click(),
+    );
+    const confirm = [
+      ...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+    ].find((candidate) => candidate.textContent === "Revoca");
+    act(() => confirm?.click());
+    await settle();
+    const seen = {
+      left: (container.textContent ?? "").includes("Nessun membro della segreteria didattica."),
+      toast: (document.body.textContent ?? "").includes("Ruolo revocato"),
+      focused: document.activeElement?.textContent?.trim(),
+    };
+    unmount();
+
+    expect(seen).toEqual({ left: true, toast: true, focused: "Assegna segreteria" });
   });
 });
 

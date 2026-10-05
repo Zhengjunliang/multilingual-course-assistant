@@ -14,6 +14,7 @@ import { type Edition, listEditions } from "@/api/catalog";
 import { useSession } from "@/auth/useSession";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { useSetCurrent } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { programmeLine } from "@/features/staff/crumbs";
 import { Note, PageHead } from "@/features/staff/page";
@@ -38,6 +39,7 @@ export default function MinePage() {
   const { account } = useSession();
   const { back } = useShell();
   const editions = useLoad(listEditions);
+  const switching = useSetCurrent({ editions: editions.data ?? [], reload: editions.reload });
   useCrumbs(editions.error === null ? { kind: "mine" } : { kind: "notFound" });
 
   if (editions.error !== null) return <LoadFailure error={editions.error} back={back} />;
@@ -82,6 +84,7 @@ export default function MinePage() {
                     <span className="min-w-0 flex-1">
                       <PeopleInline people={edition.teachers} />
                     </span>
+                    {switching.button(edition)}
                     <ChevronRight aria-hidden className="size-icon text-muted" />
                   </li>
                 ))}
@@ -91,6 +94,7 @@ export default function MinePage() {
         })
       )}
       <Note>{t("staff.mine.note")}</Note>
+      {switching.dialog}
     </>
   );
 }

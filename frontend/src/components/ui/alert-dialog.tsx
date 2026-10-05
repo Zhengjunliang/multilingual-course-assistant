@@ -38,6 +38,8 @@ interface AlertDialogProps {
   onConfirm: () => Promise<boolean>;
   /** The warning colour on the confirming button, for an action that destroys something. */
   destructive?: boolean;
+  /** Keeps the confirming button off, after a refusal that asking again would only repeat. */
+  confirmDisabled?: boolean;
   onCloseAutoFocus?: (event: Event) => void;
   /** Shown above the buttons: a refusal, when there is one. */
   children?: ReactNode;
@@ -52,6 +54,7 @@ export function AlertDialog({
   confirmLabel,
   onConfirm,
   destructive = false,
+  confirmDisabled = false,
   onCloseAutoFocus,
   children,
 }: AlertDialogProps) {
@@ -97,7 +100,7 @@ export function AlertDialog({
             <Button
               type="button"
               variant={destructive ? "destructive" : "default"}
-              disabled={running}
+              disabled={running || confirmDisabled}
               onClick={() => void confirm()}
             >
               {confirmLabel}
