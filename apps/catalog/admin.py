@@ -38,6 +38,8 @@ class DegreeProgrammeAdmin(admin.ModelAdmin):  # pyright: ignore[reportMissingTy
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):  # pyright: ignore[reportMissingTypeArgument]
+    list_display = ("code", "name", "code_source")
+
     def get_readonly_fields(
         self, request: HttpRequest, obj: Model | None = None
     ) -> tuple[str, ...]:

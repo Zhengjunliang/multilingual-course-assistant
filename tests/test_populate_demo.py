@@ -20,7 +20,13 @@ from django.test import Client
 from pydantic import SecretStr
 
 from apps.accounts.models import User
-from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
+from apps.catalog.models import (
+    CodeSource,
+    Course,
+    CourseEdition,
+    CurriculumEntry,
+    DegreeProgramme,
+)
 from apps.roles.management.commands.populate_demo import DATA
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Role
@@ -35,7 +41,8 @@ pytestmark = pytest.mark.django_db
 
 PASSWORD = "demo-password"
 
-# PPM in both of B047's curricula, a course B047 shares with B046, and one of B046's own.
+# PPM in both of B047's curricula, a course B047 shares with B046, and an integrated
+# course of B046's own, whose code no single Moodle course holds.
 DEMO: dict[str, Any] = {
     "academic_years": ["2024-2025", "2025-2026"],
     "programmes": [
@@ -73,8 +80,9 @@ DEMO: dict[str, Any] = {
         },
         {
             "code": "B000002",
-            "name": "Elettronica I",
+            "name": "Elettronica e Misure C.I.",
             "locale": "it",
+            "code_source": "cineca-only",
             "entries": [
                 {"programme": "B046", "curriculum": "", "year_of_study": 2, "ad_code": "B000002"},
             ],
@@ -112,7 +120,7 @@ def run(
 def snapshot() -> dict[str, list[Any]]:
     return {
         "programmes": sorted(DegreeProgramme.objects.values_list("code", "name")),
-        "courses": sorted(Course.objects.values_list("code", "name")),
+        "courses": sorted(Course.objects.values_list("code", "name", "code_source")),
         "entries": sorted(str(e) for e in CurriculumEntry.objects.select_related("programme")),
         "editions": sorted(
             (str(e), e.is_current) for e in CourseEdition.objects.select_related("course")
@@ -149,9 +157,9 @@ def test_an_empty_database_gets_the_demo_and_a_second_run_changes_nothing(
     assert once == {
         "programmes": [("B046", "Ingegneria Elettronica"), ("B047", "Ingegneria Informatica")],
         "courses": [
-            ("B000001", "Analisi Matematica I"),
-            ("B000002", "Elettronica I"),
-            ("B028451", "Progettazione e Produzione Multimediale"),
+            ("B000001", "Analisi Matematica I", "moodle"),
+            ("B000002", "Elettronica e Misure C.I.", "cineca-only"),
+            ("B028451", "Progettazione e Produzione Multimediale", "moodle"),
         ],
         "entries": [
             "B000001 (B046)",
@@ -198,7 +206,7 @@ def test_rows_of_its_own_are_kept_and_demo_accounts_made_the_files(
     out = run(tmp_path, monkeypatch, None, DEMO)
     seen = snapshot()
 
-    assert ("B028451", "PPM") in seen["courses"]
+    assert ("B028451", "PPM", "moodle") in seen["courses"]
     assert [e for e in seen["editions"] if e[0].startswith("B028451")] == [
         ("B028451:2024-2025", False),
         ("B028451:2025-2026", True),
@@ -292,15 +300,18 @@ def test_a_refused_run_changes_nothing(
 
 
 def test_the_demo_data_file_keeps_the_catalogue_rules() -> None:
-    """The shipped file, read without a database: codes, entries, and one course per AD code."""
+    """The shipped file, read without a database: codes, code sources, entries, and one
+    course per AD code."""
     demo = json.loads(DATA.read_text(encoding="utf-8"))
     ad_codes: dict[str, set[str]] = {}
     for course in demo["courses"]:
         for entry in course["entries"]:
             ad_codes.setdefault(entry["ad_code"], set()).add(course["code"])
     codes = [c["code"] for c in demo["courses"]] + list(ad_codes)
+    sources = {c.get("code_source", CodeSource.MOODLE) for c in demo["courses"]}
 
     assert [c["code"] for c in demo["courses"] if not c["entries"]] == []
     assert [code for code in codes if not re.fullmatch("[A-Z0-9]+", code)] == []
+    assert sources - set(CodeSource.values) == set()
     assert {ad: courses for ad, courses in ad_codes.items() if len(courses) > 1} == {}
     assert all(account["username"].startswith("demo-") for account in demo["accounts"])

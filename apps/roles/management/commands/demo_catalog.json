@@ -8,7 +8,7 @@
     "Two programmes: B047 (both curricula) and the UniFi bachelor's programme whose study plan shares the most AD codes with B047's.",
     "Every teaching of the study plan that is taught, mandatory or a named option; no prova finale, tirocinio, free-choice placeholder or idoneità without a teaching.",
     "One course per teaching; a teaching listed in two curricula, or shared by the two programmes under one AD code, is one course with an entry in each.",
-    "Course code: the AD code of the Moodle course that holds the material (docs/decisions.md, 2026-09-25, PPM read from Moodle and Cineca, point 1), read from the course summaries Moodle shows without a login; where no single Moodle course holds the material, as for an integrated course (C.I.), the course says code_source cineca-only and takes the code its curricula list.",
+    "Course code: the AD code of the Moodle course that holds the material (docs/decisions.md, 2026-09-25, PPM read from Moodle and Cineca, point 1), read from the course summaries Moodle shows without a login; where no single Moodle course holds the material, as for an integrated course (C.I.), the course says code_source cineca-only and takes the code its curricula list (the same entry, point 6).",
     "Entry AD code: the one the curriculum lists; of two, the one listed only in that curriculum (the same entry, point 2). A course already in the database keeps its row.",
     "Two editions per course, one per academic year below; a course with no current edition gets the first one, through set_current()."
   ],
