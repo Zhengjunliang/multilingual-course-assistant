@@ -32,7 +32,6 @@ import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { Sheet } from "@/components/ui/sheet";
-import { Status } from "@/components/ui/status";
 import { Suggestion, Suggestions } from "@/components/ui/suggestion";
 import {
   Table,
@@ -189,15 +188,11 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
       >
         <Breadcrumb
           label="Percorso"
-          crumbs={[{ label: "Edizioni", to: "/staff/editions" }, { label: "B028451 2025-2026" }]}
+          crumbs={[
+            { label: "Corsi di laurea", to: "/staff/programmes" },
+            { label: "B047 · INGEGNERIA INFORMATICA" },
+          ]}
         />
-      </Specimen>
-
-      <Specimen
-        name="Status"
-        note="A polite live region, on the page before anything is said in it; the result of the last action stays until the next replaces it."
-      >
-        <Status message="mrossi aggiunto." />
       </Specimen>
 
       <Specimen

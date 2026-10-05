@@ -1,5 +1,6 @@
 /**
- * The chat itself: sidebar, thread, composer.
+ * The chat itself: thread and composer, inside the shell's frame
+ * (routes/ShellLayout.tsx), which holds the sidebar and its conversations.
  *
  * The URL owns which conversation is open. `/` is a new one and `/c/:id` is a
  * stored one, which makes a thread a place — bookmarkable, shareable with
@@ -12,6 +13,10 @@
  * "open a different thread" and refetching over a stream in progress. The
  * reverse must not be read as a new id either: leaving `/c/7` for `/` renders
  * once with the URL at `/` and the hook still holding 7, before the reset lands.
+ *
+ * The page tells the frame two things: that the list of conversations
+ * changed, and which conversation is being answered, which the sidebar must
+ * not delete. Unmounting clears the second, since leaving stops the answer.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,26 +24,22 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { isRefusal } from "@/api/client";
-import type { ConversationSummary } from "@/api/conversations";
-import { deleteConversation, listConversations, readConversation } from "@/api/conversations";
-import { ApiError } from "@/api/http";
+import { readConversation } from "@/api/conversations";
 import { useSession } from "@/auth/useSession";
-import { AccountMenu } from "@/components/AccountMenu";
-import { ChatShell, type SidebarControls } from "@/features/chat/ChatShell";
 import { Composer } from "@/features/chat/Composer";
-import { ConversationSidebar } from "@/features/chat/ConversationSidebar";
 import { EmptyState } from "@/features/chat/EmptyState";
 import { TurnView } from "@/features/chat/TurnView";
 import { useAsk } from "@/features/chat/useAsk";
 import { scrollBehavior } from "@/lib/utils";
+import { useShell } from "./shell";
 
 export default function ChatPage() {
   const { t } = useTranslation();
   const { conversationId } = useParams();
   const navigate = useNavigate();
   const { forget } = useSession();
+  const { refreshConversations, setBusy } = useShell();
 
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [unreadable, setUnreadable] = useState(false);
 
@@ -57,14 +58,6 @@ export default function ChatPage() {
     },
     [forget],
   );
-
-  const refreshSidebar = useCallback(() => {
-    listConversations()
-      .then(setConversations)
-      .catch((error: unknown) => refused(error));
-  }, [refused]);
-
-  useEffect(refreshSidebar, [refreshSidebar]);
 
   // Open whatever the URL names, and only when it changes to something this
   // component is not already holding.
@@ -105,8 +98,8 @@ export default function ChatPage() {
     if (before !== null || ask.conversationId === null || conversationId !== undefined) return;
     loaded.current = String(ask.conversationId);
     void navigate(`/c/${ask.conversationId}`, { replace: true });
-    refreshSidebar();
-  }, [ask.conversationId, conversationId, navigate, refreshSidebar]);
+    refreshConversations();
+  }, [ask.conversationId, conversationId, navigate, refreshConversations]);
 
   // Follow the answer as it is written, but only while it is being written.
   // `turns` is the trigger rather than an input — the effect reads nothing out
@@ -119,33 +112,8 @@ export default function ChatPage() {
   }, [waiting.phase, turns]);
 
   const onSubmit = (question: string) => {
-    void submit(question).then(refreshSidebar);
+    void submit(question).then(refreshConversations);
   };
-
-  // The URL is this component's, so leaving a deleted conversation is decided
-  // here, and only once the server has said it is gone: navigating first would
-  // show an empty page for a conversation that may still exist. `replace` so
-  // the back button does not lead to it.
-  const onDelete = useCallback(
-    async (id: number) => {
-      try {
-        await deleteConversation(id);
-      } catch (error) {
-        // A 404 is a conversation already gone — deleted from another tab —
-        // which is the outcome that was asked for.
-        const gone = error instanceof ApiError && error.status === 404;
-        if (!gone) {
-          refused(error);
-          refreshSidebar();
-          return false;
-        }
-      }
-      if (conversationId === String(id)) void navigate("/", { replace: true });
-      refreshSidebar();
-      return true;
-    },
-    [conversationId, navigate, refreshSidebar, refused],
-  );
 
   // The conversation an answer is being written into. `retrying` counts: the
   // question is still on its way to the server.
@@ -154,15 +122,8 @@ export default function ChatPage() {
       ? ask.conversationId
       : null;
 
-  const sidebar = ({ onNavigate, onCollapse }: SidebarControls) => (
-    <ConversationSidebar
-      conversations={conversations}
-      busy={busy}
-      onDelete={onDelete}
-      onNavigate={onNavigate}
-      onCollapse={onCollapse}
-    />
-  );
+  useEffect(() => setBusy(busy), [busy, setBusy]);
+  useEffect(() => () => setBusy(null), [setBusy]);
 
   // Before the first question the page is a front door: heading, suggestions
   // and the composer together in the middle of the screen. After it, the
@@ -180,7 +141,7 @@ export default function ChatPage() {
   );
 
   return (
-    <ChatShell sidebar={sidebar} controls={<AccountMenu />}>
+    <>
       {empty ? (
         <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room">
           <EmptyState onPick={onSubmit} />
@@ -217,6 +178,6 @@ export default function ChatPage() {
           {!unreadable && composer}
         </>
       )}
-    </ChatShell>
+    </>
   );
 }

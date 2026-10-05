@@ -1,55 +1,68 @@
 /**
- * `/staff/programmes/:code`: one programme, its secretariat staff, and a link
- * to the editions of the courses it offers. Only the superuser assigns
- * secretariat staff, which the programme's `permissions` say.
+ * `/staff/programmes/:code`: one programme — its study plan, and its
+ * secretariat.
+ *
+ * The programme and its study plan are two reads made together; a programme
+ * outside the caller's scope is a 404 on both, and the page says "not found".
+ * Only the superuser assigns secretariat staff, which the programme's
+ * `permissions` say; anyone else reads who they are and why they cannot.
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
-import { type MemberScope, readProgramme } from "@/api/catalog";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { listStudyPlan, readProgramme } from "@/api/catalog";
+import { Card } from "@/components/ui/card";
 import { useLoad } from "@/features/staff/context";
-import { MembersPanel } from "@/features/staff/MembersPanel";
-import { LoadFailure } from "@/features/staff/NotFound";
+import { Note, PageHead, Section } from "@/features/staff/page";
+import { StaffList } from "@/features/staff/people";
+import { LoadFailure } from "@/features/staff/Refusal";
+import { StudyPlanTable } from "@/features/staff/StudyPlanTable";
+import { useCrumbs, useShell } from "./shell";
 
 export default function ProgrammePage() {
   const { t } = useTranslation();
   const { code = "" } = useParams();
-  const load = useCallback(() => readProgramme(code), [code]);
-  const programme = useLoad(load);
-  const scope = useMemo<MemberScope>(() => ({ kind: "programme", code }), [code]);
+  const { back } = useShell();
+  const load = useCallback(() => Promise.all([readProgramme(code), listStudyPlan(code)]), [code]);
+  const page = useLoad(load);
+  const programme = page.data?.[0] ?? null;
+  useCrumbs(
+    page.error !== null
+      ? { kind: "notFound" }
+      : programme === null
+        ? null
+        : { kind: "programme", programme },
+  );
 
-  if (programme.error !== null) return <LoadFailure error={programme.error} />;
-  if (programme.data === null) return null;
+  if (page.error !== null) return <LoadFailure error={page.error} back={back} />;
+  if (page.data === null || programme === null) return null;
+  const [, plan] = page.data;
+  const assigns = programme.permissions.includes("programme.assign_secretariat");
 
   return (
-    <section className="flex flex-col gap-gutter">
-      <Breadcrumb
-        label={t("staff.breadcrumb")}
-        crumbs={[
-          { label: t("staff.programmes.title"), to: "/staff/programmes" },
-          { label: programme.data.code },
-        ]}
+    <>
+      <PageHead
+        eyebrow={<span className="font-mono">{programme.code}</span>}
+        title={programme.name}
+        caps
+        sub={
+          programme.curricula.length > 0
+            ? t("staff.plan.curricula", { list: programme.curricula.join(" · ") })
+            : undefined
+        }
+        source
       />
-      <header className="flex flex-col gap-hair">
-        <h1 className="font-semibold text-ink text-title">
-          <span className="font-mono text-muted">{programme.data.code}</span> {programme.data.name}
-        </h1>
-        <Link
-          to={`/staff/editions?${new URLSearchParams({ programme: code })}`}
-          className="self-start text-body text-ink underline"
-        >
-          {t("staff.programmes.editions")}
-        </Link>
-      </header>
-      <MembersPanel
-        scope={scope}
-        title={t("staff.members.secretariat")}
-        scopeName={programme.data.code}
-        canManage={programme.data.permissions.includes("programme.assign_secretariat")}
-      />
-    </section>
+      <Section title={t("staff.plan.title")} sub={t("staff.plan.sub", { count: plan.length })}>
+        <StudyPlanTable rows={plan} programme={programme} />
+      </Section>
+      <Section title={t("staff.secretariat.title")} sub={t("staff.secretariat.sub")}>
+        <Card className="overflow-hidden shadow-none">
+          <StaffList people={programme.secretariat} empty={t("staff.secretariat.empty")} />
+          {!assigns && <Note foot>{t("staff.secretariat.onlyAdmin")}</Note>}
+        </Card>
+      </Section>
+    </>
   );
 }

@@ -5,17 +5,24 @@
  * the browser then gives a screen reader the rows, columns and headers itself
  * (outside the repository: WAI-ARIA APG, "Table Pattern"); the caption is what
  * the table is called. A wide table scrolls inside its own frame, so a phone's
- * page never scrolls sideways. A row under the pointer wears `--mark`, the same
- * quiet fill as everywhere else something can be acted on.
+ * page never scrolls sideways; a table whose headers stick to the top of the
+ * page lets that frame go where the screen is wide enough (`frameClassName`),
+ * since a sticky cell sticks to the nearest frame that scrolls. A row under the
+ * pointer wears `--mark`, the same quiet fill as everywhere else something can
+ * be acted on.
  */
 
 import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
-export function Table({ className, ...props }: ComponentProps<"table">) {
+export function Table({
+  className,
+  frameClassName,
+  ...props
+}: ComponentProps<"table"> & { frameClassName?: string }) {
   return (
-    <div className="w-full overflow-x-auto">
+    <div className={cn("w-full overflow-x-auto", frameClassName)}>
       <table className={cn("w-full border-collapse text-body", className)} {...props} />
     </div>
   );

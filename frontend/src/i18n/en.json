@@ -39,7 +39,8 @@
     "themeCaption": "Applies to this device, not to your account.",
     "language": "Language",
     "logOut": "Sign out",
-    "close": "Close"
+    "close": "Close",
+    "admin": "Administration"
   },
   "theme": {
     "system": "System",
@@ -88,34 +89,19 @@
     "retryAfter": "The service asked us to retry in {{seconds}} seconds."
   },
   "staff": {
-    "area": "Staff area",
     "cancel": "Cancel",
     "breadcrumb": "Breadcrumb",
     "loadFailed": "This page could not be loaded. Try again.",
     "nav": {
-      "label": "Staff area",
-      "editions": "Editions",
       "programmes": "Degree programmes",
-      "admin": "Admin",
-      "chat": "Back to the chat"
+      "management": "Management",
+      "programme": "Degree programme"
     },
     "editions": {
       "title": "Course editions",
-      "ofProgramme": "Courses offered by {{programme}}.",
-      "caption": "Editions in your scope",
-      "empty": "No edition matches.",
-      "filter": "Filter by course or teacher",
-      "allYears": "All years",
-      "course": "Course",
-      "year": "Academic year",
-      "status": "Status",
-      "teachers": "Teachers",
-      "actions": "Actions",
-      "current": "Current",
-      "setCurrent": "Make current"
+      "current": "Current"
     },
     "setCurrent": {
-      "action": "Make {{course}} {{year}} current",
       "title": "Make {{new}} current?",
       "body": "{{new}} becomes the current edition of {{course}}; {{old}} will no longer be.",
       "bodyAlone": "{{new}} becomes the current edition of {{course}}.",
@@ -124,7 +110,6 @@
     },
     "members": {
       "teachers": "Teachers",
-      "secretariat": "Secretariat staff",
       "username": "Add by exact username",
       "add": "Add",
       "remove": "Remove {{username}}",
@@ -138,16 +123,17 @@
     },
     "programmes": {
       "title": "Degree programmes",
-      "caption": "Degree programmes in your scope",
       "empty": "No degree programme in your scope.",
       "code": "Code",
       "name": "Name",
-      "editions": "Editions of the courses this programme offers"
-    },
-    "notFound": {
-      "title": "Not found",
-      "body": "There is nothing here, or it is outside your scope.",
-      "back": "Back to the editions"
+      "sub": "Every degree programme on the site, with its teaching secretariat.",
+      "subScoped": "The degree programmes whose teaching secretariat you belong to.",
+      "curriculum": "Curricula",
+      "courses": "Courses",
+      "secretariat": "Teaching secretariat",
+      "none": "Nobody",
+      "footnote": "A course in the study plan of several degree programmes counts in each.",
+      "open": "Open"
     },
     "error": {
       "no_such_user": "No account has this username.",
@@ -159,6 +145,46 @@
       "permission_denied": "You are not allowed to do this.",
       "not_found": "This is no longer there.",
       "unknown": "Something went wrong. Try again."
+    },
+    "source": "Study plan from the Cineca course catalogue.",
+    "you": "you",
+    "plan": {
+      "title": "Courses",
+      "sub_one": "The study plan, by year of study: {{count}} course.",
+      "sub_other": "The study plan, by year of study: {{count}} courses.",
+      "curricula": "Curricula: {{list}}",
+      "search": "Search by name or code",
+      "searchLabel": "Search for a course",
+      "filter": "Curriculum",
+      "all": "All",
+      "course": "Course",
+      "entries": "Study plan entries",
+      "current": "Current edition",
+      "teachers": "Teachers",
+      "noTeacher": "No teacher assigned",
+      "year": "Year {{year}}",
+      "count_one": "{{count}} course",
+      "count_other": "{{count}} courses",
+      "both": "both curricula",
+      "every": "every curriculum",
+      "only": "only {{list}}",
+      "twoCodes": "two codes, one course",
+      "codes": "{{count}} codes, one course",
+      "integrated": "integrated course: code from the Cineca catalogue",
+      "alsoIn": "also in the study plan of {{list}}",
+      "noMatch": "No course matches the search.",
+      "noCurriculum": "No course in this curriculum."
+    },
+    "secretariat": {
+      "title": "Teaching secretariat",
+      "sub": "Manages the editions of the courses in this study plan.",
+      "empty": "No member of the teaching secretariat.",
+      "onlyAdmin": "Only the administrator assigns the teaching secretariat."
+    },
+    "refusal": {
+      "notFound": "Not found",
+      "notFoundBody": "This page does not exist or is not visible to your account.",
+      "home": "Back to the start"
     }
   }
 }

@@ -1,55 +1,105 @@
-/** `/staff/programmes`: the degree programmes the caller may view. */
+/**
+ * `/staff/programmes`: the degree programmes the caller may view, each with
+ * its curricula, its course count and its secretariat.
+ *
+ * The whole row opens the programme. The code is the row's one real link,
+ * stretched over the row, so the row is reachable by keyboard and a screen
+ * reader hears one link per programme rather than five cells to click.
+ */
 
+import { ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { listProgrammes } from "@/api/catalog";
+import { useSession } from "@/auth/useSession";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { useLoad } from "@/features/staff/context";
-import { LoadFailure } from "@/features/staff/NotFound";
+import { Note, PageHead } from "@/features/staff/page";
+import { PeopleInline } from "@/features/staff/people";
+import { LoadFailure } from "@/features/staff/Refusal";
+import { useCrumbs, useShell } from "./shell";
 
 export default function ProgrammesPage() {
   const { t } = useTranslation();
+  const { account } = useSession();
+  const { back } = useShell();
   const programmes = useLoad(listProgrammes);
+  useCrumbs(programmes.error === null ? { kind: "programmes" } : { kind: "notFound" });
+
+  if (programmes.error !== null) return <LoadFailure error={programmes.error} back={back} />;
+  if (programmes.data === null) return null;
 
   return (
-    <section className="flex flex-col gap-snug">
-      <h1 className="font-semibold text-ink text-title">{t("staff.programmes.title")}</h1>
-      {programmes.error !== null && <LoadFailure error={programmes.error} />}
-      {programmes.data?.length === 0 && (
+    <>
+      <PageHead
+        title={t("staff.programmes.title")}
+        sub={account?.is_superuser ? t("staff.programmes.sub") : t("staff.programmes.subScoped")}
+        source
+      />
+      {programmes.data.length === 0 ? (
         <p className="text-body text-muted">{t("staff.programmes.empty")}</p>
-      )}
-      {programmes.data !== null && programmes.data.length > 0 && (
-        <Table>
-          <TableCaption>{t("staff.programmes.caption")}</TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("staff.programmes.code")}</TableHead>
-              <TableHead>{t("staff.programmes.name")}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {programmes.data.map((programme) => (
-              <TableRow key={programme.code}>
-                <TableCell className="font-mono">
-                  <Link to={`/staff/programmes/${programme.code}`} className="hover:underline">
-                    {programme.code}
-                  </Link>
-                </TableCell>
-                <TableCell>{programme.name}</TableCell>
+      ) : (
+        <div className="flex flex-col gap-snug">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("staff.programmes.code")}</TableHead>
+                <TableHead>{t("staff.programmes.name")}</TableHead>
+                <TableHead>{t("staff.programmes.curriculum")}</TableHead>
+                <TableHead className="text-right">{t("staff.programmes.courses")}</TableHead>
+                <TableHead>{t("staff.programmes.secretariat")}</TableHead>
+                <TableHead>
+                  <span className="sr-only">{t("staff.programmes.open")}</span>
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {programmes.data.map((programme) => (
+                <TableRow key={programme.code} className="relative cursor-pointer">
+                  <TableCell className="font-mono">
+                    <Link
+                      to={`/staff/programmes/${encodeURIComponent(programme.code)}`}
+                      className="after:absolute after:inset-0 focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      {programme.code}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="font-medium uppercase">{programme.name}</TableCell>
+                  <TableCell>
+                    {programme.curricula.map((curriculum) => (
+                      <span key={curriculum} className="block">
+                        {curriculum}
+                      </span>
+                    ))}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {programme.course_count}
+                  </TableCell>
+                  <TableCell>
+                    {programme.secretariat.length > 0 ? (
+                      <PeopleInline people={programme.secretariat} />
+                    ) : (
+                      <span className="text-muted">{t("staff.programmes.none")}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted">
+                    <ChevronRight aria-hidden className="size-icon" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <Note>{t("staff.programmes.footnote")}</Note>
+        </div>
       )}
-    </section>
+    </>
   );
 }

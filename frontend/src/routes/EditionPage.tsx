@@ -12,16 +12,18 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { useLoad } from "@/features/staff/context";
 import { MembersPanel } from "@/features/staff/MembersPanel";
-import { LoadFailure } from "@/features/staff/NotFound";
+import { LoadFailure } from "@/features/staff/Refusal";
+import { useShell } from "./shell";
 
 export default function EditionPage() {
   const { t } = useTranslation();
   const { id } = useParams();
   const load = useCallback(() => readEdition(Number(id)), [id]);
   const edition = useLoad(load);
+  const { back } = useShell();
   const scope = useMemo<MemberScope>(() => ({ kind: "edition", id: Number(id) }), [id]);
 
-  if (edition.error !== null) return <LoadFailure error={edition.error} />;
+  if (edition.error !== null) return <LoadFailure error={edition.error} back={back} />;
   if (edition.data === null) return null;
   const { course, academic_year: year } = edition.data;
 

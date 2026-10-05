@@ -61,12 +61,14 @@ interface ChatShellProps {
    * point of having lifted it here.
    */
   sidebar: (controls: SidebarControls) => ReactNode;
+  /** Beside the sidebar button: where the page sits, such as a staff page's breadcrumb. */
+  leading?: ReactNode;
   /** Whatever belongs opposite the sidebar button: the account, the title. */
   controls: ReactNode;
   children: ReactNode;
 }
 
-export function ChatShell({ sidebar, controls, children }: ChatShellProps) {
+export function ChatShell({ sidebar, leading, controls, children }: ChatShellProps) {
   const { t } = useTranslation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(storedCollapsed);
@@ -139,7 +141,8 @@ export function ChatShell({ sidebar, controls, children }: ChatShellProps) {
               <PanelLeft aria-hidden className="size-icon-lg" />
             </Button>
           )}
-          <div className="ml-auto">{controls}</div>
+          <div className="min-w-0 flex-1">{leading}</div>
+          <div className="shrink-0">{controls}</div>
         </header>
         {children}
       </div>

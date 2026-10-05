@@ -165,40 +165,6 @@ def test_each_caller_lists_their_own_scope() -> None:
     }
 
 
-def test_the_edition_list_narrows_to_a_programme() -> None:
-    w = world()
-    # PPM in B047's second curriculum too: two entries, still one row per edition.
-    CurriculumEntry.objects.create(
-        programme=w.b047,
-        course=w.ppm_old.course,
-        curriculum="TECNICO SCIENTIFICO",
-        year_of_study=3,
-        ad_code="B003712",
-    )
-    asked = {
-        "secretariat, their programme": (w.secretariat, "B047"),
-        # The shared course is L031's too, which this caller may not be told.
-        "secretariat, another programme": (w.secretariat, "L031"),
-        "superuser, a programme": (w.root, "L031"),
-        "superuser, an unknown code": (w.root, "X999"),
-        # A teacher views no programme, so no code narrows their list to anything.
-        "teacher, their course's programme": (w.continuing, "B047"),
-    }
-
-    seen = {
-        case: [row_label(e) for e in as_user(user).get(EDITIONS_URL, {"programme": code}).json()]
-        for case, (user, code) in asked.items()
-    }
-
-    assert seen == {
-        "secretariat, their programme": ["B000001:2025-2026", NEW, OLD],
-        "secretariat, another programme": [],
-        "superuser, a programme": ["B000001:2025-2026", "B003725:2025-2026"],
-        "superuser, an unknown code": [],
-        "teacher, their course's programme": [],
-    }
-
-
 def test_each_caller_reads_courses_and_study_plans() -> None:
     w = world()
     # A course B047 lists with no edition yet: a row of its study plan all the same.

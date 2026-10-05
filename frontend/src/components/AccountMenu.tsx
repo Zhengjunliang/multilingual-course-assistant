@@ -11,14 +11,16 @@
  * closes, and a dialog opened during `onSelect` is claiming focus at the same
  * moment: the two fight, and which one wins depends on timing. Waiting for the
  * menu to finish makes the order explicit.
+ *
+ * The superuser also finds the Django admin here, above "Esci": a plain page
+ * load, since Django serves it and not this application. The staff pages are
+ * not here: they are the sidebar's "Gestione" group.
  */
 
-import { Briefcase, LogOut, UserRound } from "lucide-react";
+import { LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 
-import { isStaff } from "@/auth/staff";
 import { useSession } from "@/auth/useSession";
 import { AccountDialog } from "@/components/AccountDialog";
 import { Avatar } from "@/components/ui/avatar";
@@ -29,19 +31,16 @@ export function AccountMenu() {
   const { account, logOut } = useSession();
   const [dialogOpen, setDialogOpen] = useState(false);
   const wantsDialog = useRef(false);
-  const navigate = useNavigate();
 
   if (account === null) return null;
 
-  // The staff area's one entry, as Open WebUI puts its admin panel in the user
-  // menu (outside the repository: Open WebUI source), and only for whoever may open it.
-  const staff = isStaff(account)
+  const admin = account.is_superuser
     ? [
         {
-          key: "staff",
-          icon: Briefcase,
-          label: t("staff.area"),
-          onSelect: () => navigate("/staff"),
+          key: "admin",
+          icon: ShieldCheck,
+          label: t("account.admin"),
+          onSelect: () => window.location.assign("/admin/"),
         },
       ]
     : [];
@@ -58,7 +57,6 @@ export function AccountMenu() {
           setDialogOpen(true);
         }}
         entries={[
-          ...staff,
           {
             key: "account",
             icon: UserRound,
@@ -67,6 +65,7 @@ export function AccountMenu() {
               wantsDialog.current = true;
             },
           },
+          ...admin,
           {
             key: "logout",
             icon: LogOut,

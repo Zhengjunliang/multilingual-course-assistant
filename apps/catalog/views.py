@@ -2,12 +2,11 @@
 
 A list holds the scopes the caller may view, each with the permissions the
 caller holds on it (apps/catalog/serializers.py); a student with no role gets
-an empty list. The edition list narrows to one programme with `?programme=`,
-or to one course with `?course=`. A view on one scope — reading it, or acting
-on it — answers 404 for a scope outside the caller's reach and 403 for one
-inside it without the permission, in that order, by construction
-(apps/roles/api.py). What each role may do is the registry's
-(apps/roles/registry.py); no view here names a role.
+an empty list. The edition list narrows to one course with `?course=`. A
+view on one scope — reading it, or acting on it — answers 404 for a scope
+outside the caller's reach and 403 for one inside it without the permission,
+in that order, by construction (apps/roles/api.py). What each role may do is
+the registry's (apps/roles/registry.py); no view here names a role.
 
 A programme's study plan lists each course once, with or without an edition,
 and a course is read by whoever views a programme that lists it
@@ -145,19 +144,7 @@ class EditionListView(CodedErrors, ListAPIView[CourseEdition]):
         if course is not None:
             known = course.isascii() and course.isalnum()
             editions = editions.filter(course__code=course) if known else editions.none()
-        code = self.request.query_params.get("programme")
-        if code is None:
-            return editions
-        # `Exists`, not a join: a course a programme offers in two curricula
-        # stays one row. A code the caller may not view narrows to nothing, as
-        # an unknown one does, so the list never tells the two apart.
-        offered = CurriculumEntry.objects.filter(
-            course=OuterRef("course"),
-            programme__in=programmes_for(self.request.user, Permission.PROGRAMME_VIEW).filter(
-                code=code
-            ),
-        )
-        return editions.filter(Exists(offered))
+        return editions
 
 
 class EditionView(ScopedObjectView[CourseEdition]):
