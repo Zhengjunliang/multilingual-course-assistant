@@ -143,7 +143,7 @@ REST_FRAMEWORK = {
         # authentication runs before throttling (`APIView.initial`), so a wrong
         # password is refused without ever reaching a rate limit. Deployed, that
         # is an unmetered password-guessing budget on every endpoint. It stays
-        # in development because README's curl recipe for the stream needs a
+        # in development because docs/api.md's curl recipe for the stream needs a
         # credential that is not a cookie.
         *(["rest_framework.authentication.BasicAuthentication"] if DEBUG else []),
     ],

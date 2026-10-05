@@ -55,7 +55,7 @@ erDiagram
 
 ## Migration order
 
-✅ ① is in `apps/catalog/migrations/0001_initial.py`, ② in `apps/roles/migrations/0001_initial.py`, and ④ is done ([experiment-log.md](experiment-log.md), entry of 2026-09-28, *The slides points move to their edition key without re-embedding*); 🔜 M5: ③. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisions.md](decisions.md), 2026-09-26. Roles' `0001` depends on the catalogue's, so rewriting the catalogue's rewrites both; the steps are in [README.md](../README.md), under *Changing a model*.
+✅ ① is in `apps/catalog/migrations/0001_initial.py`, ② in `apps/roles/migrations/0001_initial.py`, and ④ is done ([experiment-log.md](experiment-log.md), entry of 2026-09-28, *The slides points move to their edition key without re-embedding*); 🔜 M5: ③. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisions.md](decisions.md), 2026-09-26. Roles' `0001` depends on the catalogue's, so rewriting the catalogue's rewrites both; the steps are in [development.md](development.md), under *Changing a model*.
 
 - ① Catalogue tables: `DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`.
 - ② `RoleAssignment`, with the roles of `#93`.

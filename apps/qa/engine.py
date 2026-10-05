@@ -179,7 +179,7 @@ class Engine:
         try:
             # `both` is also what the router falls back to, so a question can be
             # aimed at a collection this index never built: a fresh checkout
-            # follows the README, runs `rag.index` under its default
+            # follows docs/development.md, runs `rag.index` under its default
             # `--collection slides`, and has no `unifi_web` at all. Dropping what
             # is absent keeps such a question answerable from the half that
             # exists, instead of turning a perfectly good slides corpus into a 503.

@@ -24,7 +24,7 @@ from rag.parse import DEFAULT_OUT_DIR, ParsedMeta
 logger = logging.getLogger(__name__)
 
 # Where rag.parse writes its sidecars by default, and the corpus beside them
-# (README, "Pipeline CLI"). Read when `source_pdf` runs, so a test can point
+# (docs/development.md, "The pipeline CLI"). Read when `source_pdf` runs, so a test can point
 # both at tmp_path.
 PARSED_DIR = DEFAULT_OUT_DIR
 CORPUS_DIR = DEFAULT_OUT_DIR.parent / "corpus"
