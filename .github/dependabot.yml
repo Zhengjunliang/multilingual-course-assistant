@@ -3,7 +3,12 @@
 # and nothing in this repository said so until pip-audit turned the build red.
 #
 # Alerts are a separate switch, in the repository settings rather than in this
-# file. This file only schedules version updates.
+# file. This file only schedules version updates and names their label.
+#
+# Every ecosystem below carries `labels: ["dependencies"]`, the one label of the
+# account's label manifest (Zhengjunliang/.github, labels/labels.json) meant for
+# Dependabot. Without the key Dependabot adds, and creates when missing, a
+# label per ecosystem as well, and the next label sync would delete them again.
 version: 2
 updates:
   # `uv`, not `pip`. This project is locked with uv.lock, and the pip ecosystem
@@ -15,6 +20,7 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    labels: ["dependencies"]
     # Five packages are held back, and the reason is the same for all five: a
     # green CI does not mean they are safe here. This pipeline's CI runs no
     # ingest, touches no GPU, and mocks the LLM client away — so for anything
@@ -69,6 +75,7 @@ updates:
     directory: "/frontend"
     schedule:
       interval: "monthly"
+    labels: ["dependencies"]
 
   # The hook revs in .pre-commit-config.yaml, ruff's among them: ruff is not a
   # dev dependency, so the uv ecosystem above does not see it, and this one
@@ -77,6 +84,7 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    labels: ["dependencies"]
 
   # The action pins in ci.yml are SHAs, and a SHA says nothing about how old it
   # is — the trailing `# vN` comment is the only readable part, and it is written
@@ -85,3 +93,4 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    labels: ["dependencies"]
