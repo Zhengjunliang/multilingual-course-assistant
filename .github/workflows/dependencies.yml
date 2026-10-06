@@ -10,10 +10,12 @@
 # 357 npm packages on 2026-10-05.
 #
 # On main, weekly and by hand, `audit` asks whether anything locked is
-# vulnerable today: pip-audit and npm audit over the whole lockfiles. It blocks
-# no pull request, because what turns it red is a new advisory, not a change.
-# A failed scheduled run notifies whoever last edited the cron, and Dependabot
-# alerts name the same packages one by one.
+# vulnerable today: pip-audit over the lockfile's Linux resolution, since it
+# skips every line whose marker does not hold on the runner, and npm audit over
+# what ships to a browser. It blocks no pull request, because what turns it red
+# is a new advisory, not a change. A failed scheduled run notifies whoever last
+# edited the cron. Dependabot alerts read both lockfiles whole, so they also
+# watch what only Windows, macOS or the npm toolchain installs.
 #
 # A file of its own rather than jobs in ci.yml, as secrets.yml is: ci.yml keeps
 # only the jobs of the check chain, and this file answers one security question.
@@ -52,8 +54,10 @@ jobs:
           # Both written out although both are the defaults. low: a pull request
           # may bring in no known vulnerability at all, stricter than npm
           # audit's `high` below, because only what the change adds is judged
-          # here. runtime: the development toolchain's advisories are left to
-          # the audit and to Dependabot.
+          # here. runtime: the dependency graph files every package of uv.lock
+          # under it, the dev group included, and npm's devDependencies under
+          # `development`, which this check, like `npm audit --omit=dev` below,
+          # leaves to Dependabot's alerts.
           fail-on-severity: low
           fail-on-scopes: runtime
           # On by default; licences are not the question this check answers.

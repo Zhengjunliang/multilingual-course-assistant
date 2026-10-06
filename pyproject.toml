@@ -16,8 +16,8 @@ dependencies = [
     "pypdf>=6.14.2",
     "qdrant-client>=1.18.0",
     "sentence-transformers>=5.6.1",
-    # docling is what actually needs torch and torchvision; they are named here only
-    # so [tool.uv.sources] below can reach them — uv applies sources to direct
+    # rag/ imports torch itself; torchvision is docling's alone, named here so that
+    # [tool.uv.sources] below can reach it — uv applies sources to direct
     # dependencies only.
     "torch>=2.13",
     "torchvision>=0.28",
@@ -42,7 +42,8 @@ dev = [
 # Application, not a distributable library: nothing to build or install.
 package = false
 # The two machines the lockfile is installed on, the Linux CI runner and the Windows
-# laptop: `uv lock` fails rather than pick a version with no wheel for one of them.
+# laptop: for a package that publishes no source distribution, as torch does not,
+# `uv lock` fails rather than pick a version with no wheel for one of them.
 required-environments = [
     "sys_platform == 'linux' and platform_machine == 'x86_64'",
     "sys_platform == 'win32' and platform_machine == 'AMD64'",
