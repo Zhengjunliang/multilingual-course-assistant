@@ -57,6 +57,29 @@ repos:
     hooks:
       - id: uv-lock
 
+  # The workflows' own linters, both run from pre-commit as CPython runs them:
+  # zizmor for security (credentials left in .git/config, template injection,
+  # unpinned actions), actionlint for what GitHub would reject or misread. Each
+  # looks only at the files it understands, so a commit that leaves .github/ and
+  # this file alone skips both.
+  #
+  # --offline: zizmor's online audits ask the GitHub API, so with a token in
+  # reach it would judge the same file differently in CI than on the laptop.
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: fa412071e4f5d44d44f9e365f4676f9df92456a2 # frozen: v1.30.1
+    hooks:
+      - id: zizmor
+        args: [--no-progress, --offline]
+
+  # Empty -shellcheck= and -pyflakes= turn off what actionlint runs on `run:`
+  # scripts when it finds those tools on PATH: the runner image ships shellcheck
+  # and the laptop does not, and one verdict in both places matters more.
+  - repo: https://github.com/rhysd/actionlint
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # frozen: v1.7.12
+    hooks:
+      - id: actionlint
+        args: [-shellcheck=, -pyflakes=]
+
   # Rules of this repository that no off-the-shelf linter knows. The python
   # ones are guards of scripts/guards, each rule proven by the good and bad
   # examples tests/test_guards.py runs; `language: python` gives them a
