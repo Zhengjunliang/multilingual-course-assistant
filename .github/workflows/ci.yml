@@ -51,6 +51,13 @@ jobs:
           # suffix this job and the others save to one key, and whichever
           # finishes first decides what the next run restores.
           cache-suffix: hooks
+          # Saved from main only. A pull request restores what its base branch
+          # saved, but what it saves only that pull request can restore, and
+          # each such entry held 2.65 GB: mostly prebuilt wheels, which
+          # setup-uv keeps because `prune-cache` is off by default since v9. A
+          # pull request that changes uv.lock restores nothing, since the key
+          # carries the lockfile's hash, and it saves nothing either.
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
 
       # The hook environments (ruff, pre-commit-hooks) are built on first use;
       # the key moves with the config that pins them and the Python they run on.
@@ -69,9 +76,8 @@ jobs:
 
   check:
     runs-on: ubuntu-latest
-    # About twice the slowest run measured, 389 s, nearly all of it a torch
-    # download (#87), so that a slow network is not mistaken for a hang. The
-    # budget is the cap on the tests step, which network time does not touch.
+    # Catches a hung run rather than budgeting one: the budget is the cap on
+    # the tests step, which network time does not touch.
     timeout-minutes: 12
     env:
       # Not a secret: this key only ever signs throwaway CI sessions. Its length
@@ -104,6 +110,9 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
+          # A key of its own and saved from main only, as in `hooks`.
+          cache-suffix: check
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install dependencies
         run: uv sync --locked
@@ -149,9 +158,10 @@ jobs:
         with:
           # Without this, every audit run re-downloads pip-audit and its whole
           # tree through `uvx`. Nothing is installed into a venv here, so what
-          # gets saved stays small. The key carries no job name, so `check`
-          # restores and saves the same entry as this job.
+          # gets saved stays small. `hooks` and `check` carry suffixes, so the
+          # unsuffixed key is this job's alone; saved from main only, as there.
           enable-cache: true
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Audit locked dependencies
         # --no-deps --disable-pip: audit exactly what the lockfile pins, no resolving
