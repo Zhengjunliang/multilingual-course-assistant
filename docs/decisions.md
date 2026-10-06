@@ -2,6 +2,13 @@
 
 This file owns the decisions taken without the supervisor that are in force: the date, what was decided, why, and what it costs. A reversed decision is removed, and the entry that replaces it says what it replaced; `git log -p --follow docs/decisions.md` keeps the old text. ⛔ Not here: the stack table and the state of each choice's verification, owned by [architecture.md](architecture.md); progress, blockers and deferred work, owned by GitHub issues (milestones M3 · M4 · M5 · M6 · M7).
 
+## 2026-10-06 — `accelerate` moves to 1.15.0, and the advisory that no longer names it stays an accepted risk
+
+1. **`accelerate` is at 1.15.0, the audit ignores no advisory, and PYSEC-2026-3804 stays an accepted risk.** This replaces 2026-09-14, *One CVE is an accepted risk, not a fix*, whose one remaining point accepted it with a flag in the `audit` step of [ci.yml](../.github/workflows/ci.yml). The advisory's range ends where its data ends: OSV records `last_affected: 1.14.0`, and GHSA-4j2p-28q2-5m79 reads `<= 1.14.0` with no patched version, so pip-audit and Dependabot stop reporting it on 1.15.0. The code did not change: the unsanitised `os.path.join(checkpoint_folder, f)` of `src/accelerate/utils/modeling.py` is line 1932 in 1.14.0 and line 1944 in 1.15.0 (outside the repository: the two releases' sources). A scanner going quiet is not a fix.
+   **Why it is accepted:** `accelerate` cannot be dropped, since `uv tree --invert --package accelerate` puts it under `docling-ibm-models` and `docling-slim[standard]`, and docling parses every PDF (`rag/parse.py`). The trigger is loading an untrusted sharded checkpoint, and this project loads only the weights its code names; no user supplies one. The control that covers it is `#10`, pinning each Hugging Face model to a revision.
+   **When the flag returns:** the day an advisory database extends the range to 1.15.0 or later, `--ignore-vuln PYSEC-2026-3804` goes back into the audit with this entry as its reason. GitHub's Dependabot alert is dismissed as a tolerable risk rather than left to close as fixed, so the repository settings say what this entry says.
+   **The price:** no scanner reports the advisory any more, and this entry is the only place that knows it is open. Two short corpus PDFs parsed on the laptop GPU gave byte-identical docling JSON on 1.14.0 and 1.15.0, which shows that the classic pipeline did not move, not that the measured numbers hold; the next M3 remeasurement is the first on 1.15.0.
+
 ## 2026-10-05 — `transformers` reaches its fixes through a lockfile that resolves darwin apart
 
 1. **`transformers` is at 5.10.1 on every platform, by neither of the two ways `#55` priced.** The lockfile forks on darwin (`resolution-markers` in `uv.lock`): there `docling-ibm-models` 3.13.2 and `docling-core` 2.99.0 resolve, and neither caps `transformers`; Windows and Linux keep `docling-ibm-models` 3.13.3 and `docling-core` 2.89.0, whose cap below 5.9.0 applies on darwin only. PYSEC-2026-3929 and PYSEC-2026-4174 are fixed, and their flags are gone from the `audit` step of [ci.yml](../.github/workflows/ci.yml). This replaces points 2 and 3 of 2026-09-14, *One CVE is an accepted risk, not a fix*, which accepted both until `#55` closed.
@@ -202,12 +209,6 @@ This file owns the decisions taken without the supervisor that are in force: the
    **The price:** the automatic gate's errors are measurable (`--measure-gate`); a person's fatigue is not, and someone approving fifty candidates a day fails in a way no metric in this repository observes. Replacing a failure mode does not remove one.
    **Status:** 🔶 the code keeps what the gate passes (`rag/live.py`); the confirmation step is `#48`, which has no milestone.
 2. **The interface is graded.** The reading of 2026-07-30 that PPM set no requirement on the interface was wrong: its appearance counts toward the course grade. The interface work has its own milestone, M4 — Interface (`#49`, `#85`), reusing the number left free when cross-language work joined the core on 2026-08-21.
-
-## 2026-09-14 — One CVE is an accepted risk, not a fix
-
-`pip-audit` in CI's `audit` job reports one advisory with no fix, and the thesis records it as identified, graded and explained — never as fixed.
-
-1. **`accelerate` PYSEC-2026-3804 is accepted without an end date.** Upstream has no fixed version, and it is a required transitive dependency of `docling`. Why it cannot be removed, why it is unreachable and why the real control is `#10` is written next to `--ignore-vuln` in the `audit` step of [ci.yml](../.github/workflows/ci.yml); `#7` records it.
 
 ## 2026-09-14 — Progress moves into GitHub issues
 
