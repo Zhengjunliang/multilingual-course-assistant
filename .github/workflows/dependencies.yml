@@ -1,0 +1,123 @@
+# Dependency checks in two layers, each asking a question of its own.
+#
+# On a pull request, `dependency-review` asks what the change adds: it diffs
+# the dependency graph between base and head and fails only on a vulnerable
+# version the pull request brings in. An advisory published overnight against
+# a package nobody touched cannot turn it red, which is what lets it be a
+# required check (GitHub documentation, "About dependency review"; sigstore-python
+# runs it the same way, in a workflow of its own). The dependency graph reads
+# uv.lock and frontend/package-lock.json: its SBOM export listed 175 PyPI and
+# 357 npm packages on 2026-10-05.
+#
+# On main, weekly and by hand, `audit` asks whether anything locked is
+# vulnerable today: pip-audit and npm audit over the whole lockfiles. It blocks
+# no pull request, because what turns it red is a new advisory, not a change.
+# A failed scheduled run notifies whoever last edited the cron, and Dependabot
+# alerts name the same packages one by one.
+#
+# A file of its own rather than jobs in ci.yml, as secrets.yml is: ci.yml keeps
+# only the jobs of the check chain, and this file answers one security question.
+name: Dependencies
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly, three days after secrets.yml's run, only to spread the load.
+    - cron: "0 4 * * 4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependencies-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The token is not left in .git/config: the action asks the API, with
+      # its own token input, and never git.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # Both written out although both are the defaults. low: a pull request
+          # may bring in no known vulnerability at all, stricter than npm
+          # audit's `high` below, because only what the change adds is judged
+          # here. runtime: the development toolchain's advisories are left to
+          # the audit and to Dependabot.
+          fail-on-severity: low
+          fail-on-scopes: runtime
+          # On by default; licences are not the question this check answers.
+          license-check: false
+
+  audit:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # As in `dependency-review`, nothing here needs the token in .git/config.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          # Without this, every audit run re-downloads pip-audit and its whole
+          # tree through `uvx`. Nothing is installed into a venv here, so what
+          # gets saved stays small. The jobs of ci.yml carry suffixes, so the
+          # unsuffixed key is this job's alone; saved from main only, as there.
+          enable-cache: true
+          save-cache: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Audit locked dependencies
+        # --no-deps --disable-pip: audit exactly what the lockfile pins, no resolving
+        # and no virtualenv — the input is already a complete pin set, and resolving
+        # would trip over the torch custom index.
+        #
+        # sed drops the local version labels, so torch 2.13.0+cpu is audited as
+        # 2.13.0: a label names a build of the released source, and pip-audit
+        # looks each pin up on PyPI, where a labelled version is a 404 that it
+        # reports as a skip and exits 0 on.
+        #
+        # The two ignored advisories are docling's, accepted risks until the M3
+        # remeasurement upgrades it: docs/decisions.md, 2026-10-06, *`docling`'s two
+        # file-disclosure advisories*, which says why each is out of reach. The
+        # other accepted risk, accelerate's, is one the advisory databases no
+        # longer name: docs/decisions.md, 2026-10-06, *`accelerate` moves to
+        # 1.15.0*, which also says when its flag returns.
+        run: |
+          uv export --locked --no-emit-project --no-hashes -o requirements.txt
+          sed -E -i 's/(==[^ ;+]+)\+[^ ;]+/\1/' requirements.txt
+          uvx pip-audit --no-deps --disable-pip \
+            --ignore-vuln CVE-2026-105750 \
+            --ignore-vuln CVE-2026-105751 \
+            -r requirements.txt
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # No `cache: npm` here, unlike ci.yml's check job: with the install
+          # gone, nothing in this job reads npm's download cache. `npm audit`
+          # asks the registry's advisory endpoint directly, so restoring and
+          # then saving a cache would be pure overhead. setup-node itself stays
+          # — the job still needs a pinned npm binary to run `npm audit` with.
+          node-version-file: frontend/.nvmrc
+
+      - name: Audit frontend dependencies
+        # No `npm ci`: `npm audit` builds its tree from package-lock.json alone,
+        # so installing first only bought an unused node_modules and the minute
+        # it took to write one. ci.yml's check job is where an install is real.
+        #
+        # --omit=dev: only what ships to a browser. The build toolchain's own
+        # advisories are a steady drip that would turn this audit into noise
+        # without ever describing something a visitor could reach.
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: frontend
