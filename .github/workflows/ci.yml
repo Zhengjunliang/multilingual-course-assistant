@@ -33,7 +33,8 @@ jobs:
   hooks:
     runs-on: ubuntu-latest
     # Caps as `check` below: the job's catches a hung run, the step's is the budget.
-    timeout-minutes: 12
+    # This job's first cold run took 47 s; a minute above the step's cap.
+    timeout-minutes: 3
     steps:
       # This job runs code fetched from the hook repositories; nothing it does
       # needs the token afterwards, so the token is not left in .git/config.
@@ -68,18 +69,19 @@ jobs:
 
       # A step of scripts/check.py called by name, like every step of `check`
       # below; tests/test_check_script.py reads both jobs as one chain.
-      # Its warm median measured 3.5 s. Three minutes is for a cold cache, which
-      # builds every hook environment, actionlint's with Go among them: 20 s
-      # before the workflow linters, and 25 s for actionlint's alone on the laptop.
+      # About twice a cold cache, which builds every hook environment,
+      # actionlint's with Go among them: 34 s with the workflow linters, 20 s
+      # before them, rounded up to minutes. Warm, its median measured 3.5 s.
       - name: Pre-commit hooks over every tracked file
-        timeout-minutes: 3
+        timeout-minutes: 2
         run: uv run --only-dev --locked python scripts/check.py hooks
 
   check:
     runs-on: ubuntu-latest
-    # Catches a hung run rather than budgeting one: the budget is the cap on
-    # the tests step, which network time does not touch.
-    timeout-minutes: 12
+    # About twice this job's run with a cold uv cache, 138 s, rounded up to
+    # minutes; the CPU torch makes the Install step 4 s. It catches a hung run:
+    # the budget is the cap on the tests step, which network time does not touch.
+    timeout-minutes: 5
     env:
       # Not a secret: this key only ever signs throwaway CI sessions. Its length
       # is not arbitrary — `check --deploy` rejects anything under 50 characters.
