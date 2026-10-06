@@ -2,7 +2,7 @@
 
 ✅ One self-review of the whole repository, dated 2026-09-14 and checked against the code again on 2026-09-27 (`.github/workflows/dependencies.yml` runs the audits it relies on). The criteria are two current lists, versions pinned so that a later reader can tell whether they are out of date: the **OWASP Top 10:2025** (final; OWASP marks the 2021 edition superseded, and SSRF is no longer a category of its own but part of A01) and the **OWASP Top 10 for Large Language Model Applications, 2026 edition** (published 2026-08-04 by the OWASP GenAI Security Project; it replaces the 2025 edition) (both outside the repository). Why OWASP and not ISO 27001 or NIST: [decisions.md](decisions.md), 2026-09-14, *Progress moves into GitHub issues*, point 3.
 
-This file owns the **coverage**: what each item of the two lists was judged to be in this project. The findings themselves are GitHub issues labelled `security-review`. Every row below falls into one of three kinds — sound (with the grounds), an open finding (with the issue), or a gap (with the issue). There is no fourth kind.
+This file owns the **coverage**: what each item of the two lists was judged to be in this project. The findings themselves are GitHub issues labelled `security`. Every row below falls into one of three kinds — sound (with the grounds), an open finding (with the issue), or a gap (with the issue). There is no fourth kind.
 
 ## OWASP Top 10:2025
 
