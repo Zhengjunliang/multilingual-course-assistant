@@ -11,6 +11,12 @@
 # account's label manifest (Zhengjunliang/.github, labels/labels.json) meant for
 # Dependabot. Without the key Dependabot adds, and creates when missing, a
 # label per ecosystem as well, and the next label sync would delete them again.
+#
+# Every ecosystem also waits seven days after a release before proposing it:
+# a compromised release is usually found and pulled within days, and seven is
+# the floor zizmor's dependabot-cooldown audit holds this file to. The wait
+# applies to version updates only; a security update opens as soon as its
+# advisory does (Dependabot options reference, `cooldown`).
 version: 2
 updates:
   # `uv`, not `pip`. This project is locked with uv.lock, and the pip ecosystem
@@ -23,6 +29,8 @@ updates:
     schedule:
       interval: "monthly"
     labels: ["dependencies"]
+    cooldown:
+      default-days: 7
     # Six packages are held back, and the reason is the same for all six: a
     # green CI does not mean they are safe here. This pipeline's CI runs no
     # ingest, touches no GPU, and mocks the LLM client away — so for anything
@@ -81,6 +89,8 @@ updates:
     schedule:
       interval: "monthly"
     labels: ["dependencies"]
+    cooldown:
+      default-days: 7
 
   # The hook revs in .pre-commit-config.yaml, ruff's among them: ruff is not a
   # dev dependency, so the uv ecosystem above does not see it, and this one
@@ -90,6 +100,8 @@ updates:
     schedule:
       interval: "monthly"
     labels: ["dependencies"]
+    cooldown:
+      default-days: 7
 
   # The action pins in ci.yml are SHAs, and a SHA says nothing about how old it
   # is — the trailing `# vN` comment is the only readable part, and it is written
@@ -99,3 +111,5 @@ updates:
     schedule:
       interval: "monthly"
     labels: ["dependencies"]
+    cooldown:
+      default-days: 7

@@ -68,10 +68,11 @@ jobs:
 
       # A step of scripts/check.py called by name, like every step of `check`
       # below; tests/test_check_script.py reads both jobs as one chain.
-      # About twice its measured median of 3.5 s, rounded up to a minute; a cold
-      # cache, which builds the hook environments, measured 20 s.
+      # Its warm median measured 3.5 s. Three minutes is for a cold cache, which
+      # builds every hook environment, actionlint's with Go among them: 20 s
+      # before the workflow linters, and 25 s for actionlint's alone on the laptop.
       - name: Pre-commit hooks over every tracked file
-        timeout-minutes: 1
+        timeout-minutes: 3
         run: uv run --only-dev --locked python scripts/check.py hooks
 
   check:
@@ -105,7 +106,10 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
+      # As in `hooks`, the token is not left in .git/config: nothing here needs it.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
@@ -152,7 +156,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # As in `hooks`, the token is not left in .git/config: nothing here needs it.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
