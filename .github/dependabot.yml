@@ -23,7 +23,7 @@ updates:
     schedule:
       interval: "monthly"
     labels: ["dependencies"]
-    # Five packages are held back, and the reason is the same for all five: a
+    # Six packages are held back, and the reason is the same for all six: a
     # green CI does not mean they are safe here. This pipeline's CI runs no
     # ingest, touches no GPU, and mocks the LLM client away — so for anything
     # that changes how documents are parsed, how text is embedded, or how the
@@ -50,10 +50,13 @@ updates:
       # PYSEC-2026-4174 came in on 5.10.1 before any re-measurement, which
       # docs/decisions.md prices; routine bumps wait for the session.
       - dependency-name: "transformers"
-      # The floor the three above stand on, and the one dependency with a custom
-      # CUDA index: CI installs the Linux PyPI wheel, the laptop installs a
-      # cu126 one, so a green CI says nothing about the machine that develops.
+      # The floor the three above stand on, and the one dependency with custom
+      # indexes: CI installs the Linux CPU build, the laptop installs a cu126
+      # one, so a green CI says nothing about the machine that develops.
       - dependency-name: "torch"
+      # Each release requires exactly one torch release, so an update of it
+      # alone would move torch as well. The two move together, in that session.
+      - dependency-name: "torchvision"
       # The OpenAI-compatible client every generation path uses. CI mocks it,
       # so CI covers exactly none of what a major bump would change.
       - dependency-name: "openai"

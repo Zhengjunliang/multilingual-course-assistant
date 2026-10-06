@@ -14,11 +14,13 @@ dependencies = [
     "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2",
     "pypdf>=6.14.2",
-    # docling is what actually needs torch; it is named here only so [tool.uv.sources]
-    # below can reach it — uv applies sources to direct dependencies only.
     "qdrant-client>=1.18.0",
     "sentence-transformers>=5.6.1",
+    # docling is what actually needs torch and torchvision; they are named here only
+    # so [tool.uv.sources] below can reach them — uv applies sources to direct
+    # dependencies only.
     "torch>=2.13",
+    "torchvision>=0.28",
 ]
 
 [dependency-groups]
@@ -39,6 +41,12 @@ dev = [
 [tool.uv]
 # Application, not a distributable library: nothing to build or install.
 package = false
+# The two machines the lockfile is installed on, the Linux CI runner and the Windows
+# laptop: `uv lock` fails rather than pick a version with no wheel for one of them.
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
 
 [[tool.uv.index]]
 name = "pytorch-cu126"
@@ -46,11 +54,24 @@ url = "https://download.pytorch.org/whl/cu126"
 # Explicit: only packages routed here in [tool.uv.sources] use this index.
 explicit = true
 
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.uv.sources]
 # PyPI ships a CPU-only torch for Windows, which left docling's VLM pipeline running
-# at >56 s/page on a machine with an idle RTX 4070. The Linux CI runner has no GPU and
-# keeps the PyPI wheel, so the marker is what stops CI from pulling a CUDA build.
-torch = [{ index = "pytorch-cu126", marker = "sys_platform == 'win32'" }]
+# at >56 s/page on a machine with an idle RTX 4070, so the laptop takes the cu126
+# build. On Linux PyPI's wheel is the CUDA 13 build instead, and the CPU index keeps
+# the CI runner, which has no GPU, from installing the CUDA runtime with it.
+# torchvision's compiled operators match one torch build, so on Linux it comes from
+# the same index; on Windows it stays the PyPI wheel the M3 index was parsed with.
+# macOS takes both from PyPI.
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu126", marker = "sys_platform == 'win32'" },
+]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [tool.ruff]
 target-version = "py312"
