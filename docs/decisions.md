@@ -2,6 +2,12 @@
 
 This file owns the decisions taken without the supervisor that are in force: the date, what was decided, why, and what it costs. A reversed decision is removed, and the entry that replaces it says what it replaced; `git log -p --follow docs/decisions.md` keeps the old text. ⛔ Not here: the stack table and the state of each choice's verification, owned by [architecture.md](architecture.md); progress, blockers and deferred work, owned by GitHub issues (milestones M3 · M4 · M5 · M6 · M7).
 
+## 2026-10-06 — The labels are the account's six
+
+1. **Issues and pull requests carry the labels of the account's manifest** (outside the repository: `Zhengjunliang/.github`, `labels/labels.json`): `bug`, `feature`, `task`, `security`, `blocked` and `dependencies`. This replaces the labels of 2026-09-14, *Progress moves into GitHub issues*, point 2, whose `chore`, `security-review` and four `severity:` levels the manifest does not have; a security finding states its severity in its own table instead.
+   **Why:** one manifest for every repository of the account, applied from there, so a label means the same thing everywhere; a label made here by hand is deleted by the next sync, which is why `.github/dependabot.yml` names the one Dependabot uses.
+   **The price:** findings can no longer be filtered by severity; it is read in each finding's table.
+
 ## 2026-10-06 — Dependency checks run in two layers, and the workflows are linted at commit time
 
 1. **A pull request is judged on what it adds, the lockfiles on what is known.** `dependency-review` runs on pull requests and fails on a vulnerable version the change brings in; `audit`, pip-audit over the lockfile's Linux resolution and `npm audit --omit=dev`, runs on pushes to `main`, weekly and by hand, and blocks nothing ([dependencies.yml](../.github/workflows/dependencies.yml)). `gitleaks` and `dependency-review` join `check` and `hooks` as the checks the `main` ruleset requires. Dependabot waits seven days after a release and groups each ecosystem's minor and patch updates ([dependabot.yml](../.github/dependabot.yml)).
@@ -214,7 +220,7 @@ This file owns the decisions taken without the supervisor that are in force: the
 ## 2026-09-14 — The repository goes public, and paths-ignore is withdrawn
 
 1. **The repository is public.** The motive is Actions minutes: the CI jobs on every push plus Dependabot's pull requests exceed what the Free plan allows a private repository each month, while a public one runs Actions free. The history was checked before the switch: no PDF, corpus or other binary in any commit (the largest object is the 261 KB `uv.lock`), `.env` never tracked, and gitleaks found nothing in 47 commits.
-   **The price:** the `security-review` issues are public, with unfixed weaknesses, code locations and reproduction commands (`#4`, `#5`, `#6`, `#9`). While the system runs only on the author's machine and inside the MICC network this is no real exposure; a demonstration reachable from outside — the clean-machine demonstration of `#41`, or any work after the thesis that puts the site on the public internet (M7) — waits until those issues are closed or regraded. CodeQL, free for public repositories, is reconsidered in `#82`.
+   **The price:** the `security` issues are public, with unfixed weaknesses, code locations and reproduction commands (`#4`, `#5`, `#6`, `#9`). While the system runs only on the author's machine and inside the MICC network this is no real exposure; a demonstration reachable from outside — the clean-machine demonstration of `#41`, or any work after the thesis that puts the site on the public internet (M7) — waits until those issues are closed or regraded. CodeQL, free for public repositories, is reconsidered in `#82`.
 2. **The `paths-ignore` filter added to `ci.yml` earlier that day is withdrawn.** A path filter is an event-level switch: a filtered commit starts no workflow and reports no status, and a required check waits forever for it, so a documentation-only pull request could never merge. A filter and required checks exclude each other, and required checks win; the filter's real support, saving minutes, went with the private repository. `secrets.yml` stays a separate workflow for its other reason: gitleaks-action scans the full history only under `workflow_dispatch` and `schedule` (`.github/workflows/secrets.yml`).
 
 ## 2026-09-14 — A person confirms what automatic growth proposes; the interface is graded
@@ -227,8 +233,8 @@ This file owns the decisions taken without the supervisor that are in force: the
 ## 2026-09-14 — Progress moves into GitHub issues
 
 1. **`ROADMAP.md` is deleted.** Milestones, blockers and deferred work are GitHub issues, and this file keeps the decisions. Checkboxes and documents own different things: a document says what and why, an issue says what is left and what blocks it, and in one file every step forward edits a document.
-2. **Labels and milestones follow `airjump-booking`** (outside the repository: `Zhengjunliang/airjump-booking`): `chore`, `blocked`, `security-review` and four `severity:` levels, `critical`, `high`, `medium` and `low`. The milestones are five, M3 · M4 · M5 · M6 · M7, and each description states its acceptance goal.
-3. **The security self-review follows OWASP, not ISO 27001.** An ISO or NIST mapping holds where a real audit report stands behind it; this repository has none, so the mapping would be invented. The OWASP Top 10 and the OWASP Top 10 for LLM Applications (outside the repository) assume no audit, and a self-review is their intended use. The coverage — what was checked and judged sound — is owned by [security.md](security.md); open findings are issues labelled `security-review`.
+2. **Milestones follow `airjump-booking`** (outside the repository: `Zhengjunliang/airjump-booking`). They are five, M3 · M4 · M5 · M6 · M7, and each description states its acceptance goal.
+3. **The security self-review follows OWASP, not ISO 27001.** An ISO or NIST mapping holds where a real audit report stands behind it; this repository has none, so the mapping would be invented. The OWASP Top 10 and the OWASP Top 10 for LLM Applications (outside the repository) assume no audit, and a self-review is their intended use. The coverage — what was checked and judged sound — is owned by [security.md](security.md); open findings are issues labelled `security`.
 
 ## 2026-08-27 — Website delivery (M5)
 
