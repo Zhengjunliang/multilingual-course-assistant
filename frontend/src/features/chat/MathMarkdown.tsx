@@ -18,11 +18,14 @@ import rehypeKatex from "rehype-katex";
 import { AnswerMarkdown, type AnswerMarkdownProps } from "./AnswerMarkdown";
 
 // A formula KaTeX cannot parse is shown as its source in the text colour: the
-// default #cc0000 would be the only colour on an achromatic page. `trust` keeps
-// its default, false, so `\href` and `\includegraphics` in a model's formula do
-// nothing. `maxSize` bounds a rule or a space, which KaTeX leaves unbounded.
+// default #cc0000 would be the only colour on an achromatic page. `trust` is
+// false, so `\href`, `\htmlStyle` and `\includegraphics` in a model's formula do
+// nothing; it is written out although false is the default, because KaTeX
+// before 0.18.2 reads an inherited `trust` off a polluted Object.prototype
+// (GHSA-238p-pmpm-9mq7), and an option of its own shadows that. `maxSize`
+// bounds a rule or a space, which KaTeX leaves unbounded.
 const REHYPE: Options["rehypePlugins"] = [
-  [rehypeKatex, { errorColor: "currentColor", maxSize: 10 }],
+  [rehypeKatex, { errorColor: "currentColor", maxSize: 10, trust: false }],
 ];
 
 export default function MathMarkdown(props: AnswerMarkdownProps) {
