@@ -56,7 +56,7 @@ uv run python scripts/check.py hooks types   # only these two
 
 | Step | Runs |
 | ---- | ---- |
-| `hooks` | every hook of `.pre-commit-config.yaml` except `uv-lock`, over every tracked file: file hygiene, `detect-private-key`, ruff lint and format, typos, and the repository's own guards, each named with its rule in `CLAUDE.md`, section 5 |
+| `hooks` | every hook of `.pre-commit-config.yaml` except `uv-lock`, over every tracked file: file hygiene, `detect-private-key`, ruff lint and format, typos, zizmor and actionlint over the workflows, and the repository's own guards, each named with its rule in `CLAUDE.md`, section 5 |
 | `frontend` | biome, `tsc`, catalogue keys, colour contrast, vitest, production build |
 | `types` | `pyright` |
 | `deploy` | `manage.py check --deploy --fail-level WARNING`, which runs the ordinary system checks too |
@@ -126,7 +126,7 @@ The endpoint and model are `LLM_BASE_URL` and `LLM_MODEL` in `.env`; the M3 expe
 | `tests/` | pytest. `test_smoke.py` guards the `rag/` boundary and the Django configuration; `test_qa_contract.py` and `test_catalog_contract.py` the API's shapes and their mirrors; `test_check_script.py` the chain and the workflow that calls it; `test_qa_engine.py` and `test_spa.py` carry no `django_db`, so pytest-django fails them if they touch the database; `test_catalog_editions.py` holds the only test that runs with `transaction=True`, two threads switching one course's edition at once |
 | `gold/` | Gold question sets; schema in [gold/README.md](../gold/README.md) |
 | `docs/` | One topic per file: decisions, architecture, development (this file), the HTTP API, the security review, the data model, the Docling pipeline, the web source, RAG analysis, the experiment log, when a test may be deleted |
-| `.github/` | `workflows/ci.yml` (the check chain + dependency audit), `workflows/secrets.yml` (gitleaks), `dependabot.yml` · `SECURITY.md` (how to report a vulnerability; the review is `docs/security.md`). The code of conduct, the contributing guide, the issue forms and the pull request template are the account's defaults, from the Zhengjunliang/.github repository (outside the repository) |
+| `.github/` | `workflows/ci.yml` (the check chain), `workflows/dependencies.yml` (dependency review and audit), `workflows/secrets.yml` (gitleaks), `dependabot.yml` · `SECURITY.md` (how to report a vulnerability; the review is `docs/security.md`). The code of conduct, the contributing guide, the issue forms and the pull request template are the account's defaults, from the Zhengjunliang/.github repository (outside the repository) |
 | `data/` | Course material and everything derived from it (parsed output and chunks; the index lives in the `qdrant-data` compose volume): gitignored, **never** in git |
 
 ## Working on the MICC servers
@@ -141,7 +141,7 @@ Access and hardware are in [docs/architecture.md](architecture.md). SSH aliases 
 
 ## CI
 
-[.github/workflows/ci.yml](../.github/workflows/ci.yml) runs on pushes to `main` and on pull requests. Two jobs call the steps of `scripts/check.py` by name, side by side: `hooks` runs the `hooks` step with only the dev dependencies installed, and `check` installs with `uv sync --locked` and `npm ci` — so `uv.lock` and `frontend/package-lock.json` are committed with every dependency change — and runs the rest; [tests/test_check_script.py](../tests/test_check_script.py) fails if either job runs anything else, or a step goes missing, repeats or changes places. The `audit` job runs pip-audit over the lockfile and `npm audit --omit=dev`, and [.github/workflows/secrets.yml](../.github/workflows/secrets.yml) scans the whole history with gitleaks weekly. Dependency updates arrive as monthly Dependabot pull requests ([.github/dependabot.yml](../.github/dependabot.yml)).
+[.github/workflows/ci.yml](../.github/workflows/ci.yml) runs on pushes to `main` and on pull requests. Two jobs call the steps of `scripts/check.py` by name, side by side: `hooks` runs the `hooks` step with only the dev dependencies installed, and `check` installs with `uv sync --locked` and `npm ci` — so `uv.lock` and `frontend/package-lock.json` are committed with every dependency change — and runs the rest; [tests/test_check_script.py](../tests/test_check_script.py) fails if either job runs anything else, or a step goes missing, repeats or changes places. Both save their uv cache from `main` only. [.github/workflows/dependencies.yml](../.github/workflows/dependencies.yml) checks the dependencies in two layers: on a pull request, `dependency-review` fails on a vulnerable version the change brings in; on `main`, weekly and by hand, `audit` runs pip-audit over the lockfile and `npm audit --omit=dev`, and blocks nothing. [.github/workflows/secrets.yml](../.github/workflows/secrets.yml) runs gitleaks over a pull request's commits, and over the whole history weekly. The `main` ruleset requires `check`, `hooks`, `gitleaks` and `dependency-review` ([decisions.md](decisions.md), 2026-10-06, *Dependency checks run in two layers*). Dependency updates arrive as monthly Dependabot pull requests, seven days after a release, minor and patch updates grouped per ecosystem ([.github/dependabot.yml](../.github/dependabot.yml)).
 
 ## Language
 
