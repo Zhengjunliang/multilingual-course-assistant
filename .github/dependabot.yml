@@ -68,8 +68,8 @@ updates:
       # PYSEC-2026-4174 came in on 5.10.1 before any re-measurement, which
       # docs/decisions.md prices; routine bumps wait for the session.
       - dependency-name: "transformers"
-      # The floor the three above stand on, and the one dependency with custom
-      # indexes: CI installs the Linux CPU build, the laptop installs a cu126
+      # The floor the three above stand on. With torchvision below, it comes
+      # from custom indexes: CI installs the Linux CPU build, the laptop a cu126
       # one, so a green CI says nothing about the machine that develops.
       - dependency-name: "torch"
       # Each release requires exactly one torch release, so an update of it
