@@ -40,7 +40,7 @@ updates:
       uv:
         patterns: ["*"]
         update-types: ["minor", "patch"]
-    # Six packages are held back, and the reason is the same for all six: a
+    # Six entries hold packages back, and the reason is the same for all six: a
     # green CI does not mean they are safe here. This pipeline's CI runs no
     # ingest, touches no GPU, and mocks the LLM client away — so for anything
     # that changes how documents are parsed, how text is embedded, or how the
@@ -57,9 +57,13 @@ updates:
     # Delete the entries below when the M3 re-measurement happens; that session
     # is where these belong.
     ignore:
-      # Pulls docling-ibm-models across a major boundary even on a minor bump,
-      # and that package is layout, TableFormer and CodeFormula — the parsing.
-      - dependency-name: "docling"
+      # Every package of the docling family, docling-slim, -core, -parse and
+      # -ibm-models among them: each changes the parsing, and docling itself is
+      # a shell around docling-slim. Naming `docling` alone let a security
+      # update of docling-slim move docling as well (#164). A minor bump also
+      # pulls docling-ibm-models across a major boundary, and that package is
+      # layout, TableFormer and CodeFormula.
+      - dependency-name: "docling*"
       # Embedding and reranker both come through it. New vectors mean a rebuilt
       # index and every hit@k number measured again.
       - dependency-name: "sentence-transformers"
@@ -105,6 +109,15 @@ updates:
       npm:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      # A direct dependency only for its stylesheet, which MathMarkdown.tsx
+      # imports; the markup comes from rehype-katex, whose own range is
+      # katex ^0.16. The stylesheet has to match the version that wrote the
+      # markup, and a bump of katex alone installs a second katex under
+      # rehype-katex and pairs the new stylesheet with the old markup. The two
+      # move together, the day rehype-katex's range allows it; until then its
+      # advisory is an accepted risk (docs/decisions.md, 2026-10-06).
+      - dependency-name: "katex"
 
   # The hook revs in .pre-commit-config.yaml, ruff's among them: ruff is not a
   # dev dependency, so the uv ecosystem above does not see it, and this one
