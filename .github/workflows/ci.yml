@@ -158,24 +158,18 @@ jobs:
         # and no virtualenv — the input is already a complete pin set, and resolving
         # would trip over the torch custom index.
         #
-        # One advisory is ignored rather than fixed. Delete its flag the day its
-        # reason stops holding.
+        # sed drops the local version labels, so torch 2.13.0+cpu is audited as
+        # 2.13.0: a label names a build of the released source, and pip-audit
+        # looks each pin up on PyPI, where a labelled version is a 404 that it
+        # reports as a skip and exits 0 on.
         #
-        # PYSEC-2026-3804 (accelerate) — there is nothing to upgrade to.
-        #   1. accelerate cannot be dropped. `uv tree --invert --package accelerate`
-        #      puts it under docling-ibm-models and under docling-slim[standard],
-        #      and docling is what rag/parse.py parses every PDF with.
-        #   2. No fixed version exists upstream, so Dependabot cannot open a pull
-        #      request for this one either.
-        #   3. The trigger is loading an untrusted sharded checkpoint. This project
-        #      loads weights it names itself; a user never supplies one.
-        #   4. The control that actually covers it is issue #10, pinning the
-        #      HuggingFace revision. Anything done here would be second best.
+        # No advisory is ignored. The one accepted risk, accelerate's, is one the
+        # advisory databases no longer name: docs/decisions.md, 2026-10-06,
+        # *`accelerate` moves to 1.15.0*, which also says when its flag returns.
         run: |
           uv export --locked --no-emit-project --no-hashes -o requirements.txt
-          uvx pip-audit --no-deps --disable-pip \
-            --ignore-vuln PYSEC-2026-3804 \
-            -r requirements.txt
+          sed -E -i 's/(==[^ ;+]+)\+[^ ;]+/\1/' requirements.txt
+          uvx pip-audit --no-deps --disable-pip -r requirements.txt
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
