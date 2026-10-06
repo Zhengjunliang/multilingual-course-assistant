@@ -5,7 +5,8 @@
 # Alerts and security updates are switches in the repository settings rather
 # than in this file. This file schedules version updates, but its `labels` and
 # `ignore` apply to security updates as well: the packages held back below get
-# an alert and a red audit, never a pull request.
+# an alert and a red weekly audit (workflows/dependencies.yml), never a pull
+# request.
 #
 # Every ecosystem below carries `labels: ["dependencies"]`, the one label of the
 # account's label manifest (Zhengjunliang/.github, labels/labels.json) meant for
@@ -17,6 +18,10 @@
 # the floor zizmor's dependabot-cooldown audit holds this file to. The wait
 # applies to version updates only; a security update opens as soon as its
 # advisory does (Dependabot options reference, `cooldown`).
+#
+# And each groups its minor and patch updates into one pull request, named
+# after the ecosystem; a major update still arrives on its own, as the one
+# that may need code to change with it.
 version: 2
 updates:
   # `uv`, not `pip`. This project is locked with uv.lock, and the pip ecosystem
@@ -31,6 +36,10 @@ updates:
     labels: ["dependencies"]
     cooldown:
       default-days: 7
+    groups:
+      uv:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
     # Six packages are held back, and the reason is the same for all six: a
     # green CI does not mean they are safe here. This pipeline's CI runs no
     # ingest, touches no GPU, and mocks the LLM client away — so for anything
@@ -40,9 +49,10 @@ updates:
     # reproducing gold 38/40 and campus 28/32, and that is an M3 session on
     # MICC, not a routine pull request.
     #
-    # This is not a security hole. `pip-audit` runs on every push and will turn
-    # the build red if an advisory lands on any of them, at which point the
-    # upgrade stops being routine and gets handled on its own terms.
+    # This is not a security hole. An advisory on any of them turns the weekly
+    # `audit` red and raises a Dependabot alert, at which point the upgrade
+    # stops being routine and gets handled on its own terms, as docling's two
+    # were (#158).
     #
     # Delete the entries below when the M3 re-measurement happens; that session
     # is where these belong.
@@ -91,6 +101,10 @@ updates:
     labels: ["dependencies"]
     cooldown:
       default-days: 7
+    groups:
+      npm:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   # The hook revs in .pre-commit-config.yaml, ruff's among them: ruff is not a
   # dev dependency, so the uv ecosystem above does not see it, and this one
@@ -102,6 +116,10 @@ updates:
     labels: ["dependencies"]
     cooldown:
       default-days: 7
+    groups:
+      pre-commit:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   # The action pins in ci.yml are SHAs, and a SHA says nothing about how old it
   # is — the trailing `# vN` comment is the only readable part, and it is written
@@ -113,3 +131,7 @@ updates:
     labels: ["dependencies"]
     cooldown:
       default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
