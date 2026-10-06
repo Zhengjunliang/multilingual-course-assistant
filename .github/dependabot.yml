@@ -5,8 +5,8 @@
 # Alerts and security updates are switches in the repository settings rather
 # than in this file. This file schedules version updates, but its `labels` and
 # `ignore` apply to security updates as well: the packages held back below get
-# an alert and a red weekly audit (workflows/dependencies.yml), never a pull
-# request.
+# an alert, and a red weekly audit (workflows/dependencies.yml) when the
+# advisory reaches the audit's threshold, never a pull request.
 #
 # Every ecosystem below carries `labels: ["dependencies"]`, the one label of the
 # account's label manifest (Zhengjunliang/.github, labels/labels.json) meant for
@@ -110,14 +110,17 @@ updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
     ignore:
-      # A direct dependency only for its stylesheet, which MathMarkdown.tsx
-      # imports; the markup comes from rehype-katex, whose own range is
-      # katex ^0.16. The stylesheet has to match the version that wrote the
-      # markup, and a bump of katex alone installs a second katex under
-      # rehype-katex and pairs the new stylesheet with the old markup. The two
-      # move together, the day rehype-katex's range allows it; until then its
-      # advisory is an accepted risk (docs/decisions.md, 2026-10-06).
+      # katex is a direct dependency only for its stylesheet, which
+      # MathMarkdown.tsx imports; the markup comes from rehype-katex, whose own
+      # range is katex ^0.16. The stylesheet has to match the version that
+      # wrote the markup, and a bump of either package alone installs a second
+      # katex beside the first and pairs one version's stylesheet with the
+      # other's markup. The two move together, by hand, the day rehype-katex's
+      # range allows it; until then katex's advisory is an accepted risk
+      # (docs/decisions.md, 2026-10-06, *Dependabot holds the whole docling
+      # family and katex*).
       - dependency-name: "katex"
+      - dependency-name: "rehype-katex"
 
   # The hook revs in .pre-commit-config.yaml, ruff's among them: ruff is not a
   # dev dependency, so the uv ecosystem above does not see it, and this one

@@ -183,6 +183,32 @@ describe("an answer", () => {
     expect(html).not.toContain("width:60em");
   });
 
+  it("keeps KaTeX untrusted when Object.prototype carries a trust", async () => {
+    // GHSA-238p-pmpm-9mq7: KaTeX before 0.18.2 reads an inherited `trust` as
+    // if the page had set it, and then `\href` is a link and `\htmlStyle` a
+    // style that may fetch from any host. An option of KaTeX's own shadows it.
+    // A first render starts the lazy load, which a bare import does not.
+    answer("$$x$$");
+    await import("./MathMarkdown");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    Object.defineProperty(Object.prototype, "trust", {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+    try {
+      const html = answer(
+        String.raw`Vedi $$\href{https://attacker.example}{x}\htmlStyle{color:red}{y}$$.`,
+      );
+      expect(html).toContain('class="katex"');
+      expect(html).not.toContain('href="https://attacker.example');
+      expect(html).not.toContain('style="color:red');
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "trust");
+    }
+  });
+
   it("bolds Chinese text that ends in full-width punctuation", () => {
     expect(answer("**注意：**请按时缴费。")).toContain("<strong>注意：</strong>请按时缴费。");
   });
