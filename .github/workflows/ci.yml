@@ -163,13 +163,19 @@ jobs:
         # looks each pin up on PyPI, where a labelled version is a 404 that it
         # reports as a skip and exits 0 on.
         #
-        # No advisory is ignored. The one accepted risk, accelerate's, is one the
-        # advisory databases no longer name: docs/decisions.md, 2026-10-06,
-        # *`accelerate` moves to 1.15.0*, which also says when its flag returns.
+        # The two ignored advisories are docling's, accepted risks until the M3
+        # remeasurement upgrades it: docs/decisions.md, 2026-10-06, *`docling`'s two
+        # file-disclosure advisories*, which says why each is out of reach. The
+        # other accepted risk, accelerate's, is one the advisory databases no
+        # longer name: docs/decisions.md, 2026-10-06, *`accelerate` moves to
+        # 1.15.0*, which also says when its flag returns.
         run: |
           uv export --locked --no-emit-project --no-hashes -o requirements.txt
           sed -E -i 's/(==[^ ;+]+)\+[^ ;]+/\1/' requirements.txt
-          uvx pip-audit --no-deps --disable-pip -r requirements.txt
+          uvx pip-audit --no-deps --disable-pip \
+            --ignore-vuln CVE-2026-105750 \
+            --ignore-vuln CVE-2026-105751 \
+            -r requirements.txt
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

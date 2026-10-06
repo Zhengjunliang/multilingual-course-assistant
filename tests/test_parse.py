@@ -1,9 +1,11 @@
 """Normalisation has to hold, or lexical retrieval silently misses matches; the CLI
 flag rules and variant names are pure logic guarding user-facing behaviour."""
 
+import io
 import subprocess
 import sys
 import unicodedata
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -16,7 +18,7 @@ from rag.parse import (
     persist,
     variant_of,
 )
-from rag.probe import ParsePlan
+from rag.probe import ParsePlan, Pipeline
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -201,6 +203,27 @@ def test_build_converter_pins_the_device_and_timeout_for_live_ingest() -> None:
 
     assert options.accelerator_options.device == "cpu"  # pyright: ignore[reportAttributeAccessIssue]
     assert options.document_timeout == 60  # pyright: ignore[reportAttributeAccessIssue]
+
+
+@pytest.mark.parametrize("pipeline", ["classic", "vlm"])
+def test_build_converter_skips_a_document_that_is_not_a_pdf(pipeline: Pipeline) -> None:
+    """Docling picks the backend from the bytes, not the name, and the live path
+    names whatever a server sends as a PDF `*.pdf`. An OpenDocument archive under
+    that name would reach the OpenDocument backend, which reads a local path the
+    document names (CVE-2026-105751), so the converter admits PDFs only and skips
+    the rest before any backend loads."""
+    from docling.datamodel.base_models import ConversionStatus, DocumentStream, InputFormat
+
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as odt:
+        odt.writestr("mimetype", "application/vnd.oasis.opendocument.text")
+        odt.writestr("content.xml", "<office:document-content/>")
+    stream = DocumentStream(name="attachment.pdf", stream=io.BytesIO(archive.getvalue()))
+
+    result = build_converter(pipeline).convert(stream, raises_on_error=False)
+
+    assert result.input.format == InputFormat.ODT
+    assert result.status == ConversionStatus.SKIPPED
 
 
 def test_importing_parse_does_not_load_docling() -> None:

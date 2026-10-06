@@ -141,6 +141,12 @@ def build_converter(
     open-weight constraint), with `picture_area_threshold` keeping decorative images
     out of the bill.
 
+    Both converters admit PDFs and nothing else. Docling picks the backend from the
+    bytes rather than the name, and by default admits every format it knows, so an
+    OpenDocument archive named `.pdf` would reach the OpenDocument backend, which
+    reads a local path the document names (CVE-2026-105751). Any other format is
+    skipped.
+
     All docling imports live inside this function: importing them at module level
     costs seconds and drags torch along, which anything that only wants
     `normalize_text` or the CLI flag validation should never pay.
@@ -160,7 +166,8 @@ def build_converter(
             options.accelerator_options = AcceleratorOptions(device=device)
         options.document_timeout = document_timeout
         return DocumentConverter(
-            format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)}
+            allowed_formats=[InputFormat.PDF],
+            format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)},
         )
 
     from docling.datamodel import vlm_model_specs
@@ -169,9 +176,10 @@ def build_converter(
 
     vlm_options = VlmPipelineOptions(vlm_options=vlm_model_specs.GRANITEDOCLING_TRANSFORMERS)
     return DocumentConverter(
+        allowed_formats=[InputFormat.PDF],
         format_options={
             InputFormat.PDF: PdfFormatOption(pipeline_cls=VlmPipeline, pipeline_options=vlm_options)
-        }
+        },
     )
 
 
