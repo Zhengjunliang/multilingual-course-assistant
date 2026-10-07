@@ -74,9 +74,18 @@ describe("the account dialog", () => {
   it("offers all three interface languages", () => {
     const { unmount } = dialog();
 
-    for (const locale of ["it", "en", "zh-hans"]) {
-      expect(buttonLabelled(locale)).toBeDefined();
-    }
+    const trigger = buttonLabelled("Italiano");
+    expect(trigger).toBeDefined();
+    // Radix opens a menu on pointerdown, not on click (dropdown-menu.test.tsx).
+    act(() => {
+      trigger?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, ctrlKey: false }),
+      );
+    });
+    const offered = [...document.body.querySelectorAll('[role="menuitemradio"]')].map((entry) =>
+      entry.getAttribute("lang"),
+    );
+    expect(offered).toEqual(["it", "en", "zh-hans"]);
 
     unmount();
   });

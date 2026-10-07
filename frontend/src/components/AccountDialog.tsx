@@ -92,6 +92,7 @@ export function AccountDialog({ open, onOpenChange }: AccountDialogProps) {
           className="self-start"
           locales={UI_LOCALES}
           value={i18n.language}
+          label={t("account.language")}
           onChange={(locale: UiLocale) => void chooseLocale(locale)}
         />
       </Section>

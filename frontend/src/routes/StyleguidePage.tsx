@@ -160,9 +160,14 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
       <Specimen
         name="LocaleSwitch"
-        note="Rendered twice on screen — header and login frame — and written once. The language in use wears ink and a quiet fill, never the accent: the accent is for what a reader is about to do, not for a setting already true."
+        note="A globe and the language in use, opening on each language named in itself. Rendered twice on screen — account dialog and login frame — and written once. The chosen language gets a check mark, never the accent."
       >
-        <LocaleSwitch locales={["it", "en", "zh-hans"]} value="it" onChange={() => {}} />
+        <LocaleSwitch
+          locales={["it", "en", "zh-hans"]}
+          value="it"
+          label="Lingua"
+          onChange={() => {}}
+        />
       </Specimen>
 
       <Specimen
