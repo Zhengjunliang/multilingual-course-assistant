@@ -31,6 +31,8 @@ const NO_BADGES: readonly Badge[] = [];
 
 interface AnswerStreamProps {
   text: string;
+  /** The answer's language, for `lang` on the prose and nothing around it. */
+  lang?: string;
   badges: readonly Badge[];
   /**
    * Whether the whole answer is in hand. Marker linking waits for it: a marker
@@ -52,13 +54,20 @@ interface AnswerStreamProps {
  * a formula is not re-laid out on every token; until KaTeX arrives it shows as
  * its LaTeX source.
  */
-export function AnswerStream({ text, badges, complete, live, onBadgeClick }: AnswerStreamProps) {
+export function AnswerStream({
+  text,
+  lang,
+  badges,
+  complete,
+  live,
+  onBadgeClick,
+}: AnswerStreamProps) {
   const { t } = useTranslation();
 
   if (!complete) {
     return (
       <div className="flex min-w-0 flex-col">
-        <AnswerMarkdown text={text} badges={NO_BADGES} onBadgeClick={onBadgeClick} />
+        <AnswerMarkdown text={text} lang={lang} badges={NO_BADGES} onBadgeClick={onBadgeClick} />
         {live && (
           <span className="mt-hair inline-block h-4 w-2 animate-pulse bg-muted motion-reduce:animate-none">
             <span className="sr-only">{t("status.streaming")}</span>
@@ -69,12 +78,22 @@ export function AnswerStream({ text, badges, complete, live, onBadgeClick }: Ans
   }
 
   const plain = (
-    <AnswerMarkdown text={withPills(text, badges)} badges={badges} onBadgeClick={onBadgeClick} />
+    <AnswerMarkdown
+      text={withPills(text, badges)}
+      lang={lang}
+      badges={badges}
+      onBadgeClick={onBadgeClick}
+    />
   );
   if (!MATH.test(text)) return plain;
   return (
     <Suspense fallback={plain}>
-      <MathMarkdown text={withPills(text, badges)} badges={badges} onBadgeClick={onBadgeClick} />
+      <MathMarkdown
+        text={withPills(text, badges)}
+        lang={lang}
+        badges={badges}
+        onBadgeClick={onBadgeClick}
+      />
     </Suspense>
   );
 }

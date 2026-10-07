@@ -81,7 +81,7 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
       data-theme={theme}
       className="flex min-w-0 flex-1 flex-col gap-room rounded-card border border-line bg-canvas p-gutter"
     >
-      <h2 className="font-semibold text-ink text-title">{theme}</h2>
+      <h2 className="font-semibold font-serif text-ink text-title">{theme}</h2>
 
       <Specimen
         name="Button"

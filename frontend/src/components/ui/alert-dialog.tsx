@@ -96,7 +96,7 @@ export function AlertDialog({
           className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-room overflow-y-auto rounded-card border border-line bg-surface p-gutter shadow-overlay"
         >
           <div className="flex flex-col gap-hair">
-            <RadixAlertDialog.Title className="font-semibold text-ink text-title">
+            <RadixAlertDialog.Title className="font-semibold font-serif text-ink text-title">
               {title}
             </RadixAlertDialog.Title>
             <RadixAlertDialog.Description className="text-body text-muted">

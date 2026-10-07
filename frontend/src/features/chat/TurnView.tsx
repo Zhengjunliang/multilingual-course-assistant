@@ -118,6 +118,7 @@ export const TurnView = memo(function TurnView({
         ) : (
           <AnswerStream
             text={answer}
+            lang={turn.locale ?? undefined}
             badges={badges}
             complete={turn.complete}
             live={live}

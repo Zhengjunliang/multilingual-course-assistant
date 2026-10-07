@@ -58,6 +58,7 @@ function turn(overrides: Partial<Turn> = {}): Turn {
     answer: "La scadenza è il 30 settembre. [Excerpt 1]",
     citations: [citation("[Excerpt 1]", 3), citation("[Excerpt 2]", 4), citation("[Excerpt 3]", 5)],
     route: ROUTE,
+    locale: "it",
     complete: true,
     failure: null,
     ...overrides,
@@ -133,6 +134,35 @@ describe("the order of a turn", () => {
 
     expect(html).toContain("Fonti");
     expect(html).toContain("Sto cercando");
+  });
+});
+
+describe("the answer's language", () => {
+  it("is marked on the prose, which is set as reading text", () => {
+    // A Chinese answer in the Italian interface: `lang` is what gives it the
+    // Chinese leading in index.css, and what a screen reader switches voice on.
+    const { container, unmount } = mount(
+      <TurnView
+        turn={turn({ answer: "学费九月三十日截止。[Excerpt 1]", locale: "zh" })}
+        live={false}
+        thinking={false}
+        highlighted={null}
+        onHighlight={() => {}}
+      />,
+    );
+    const prose = container.querySelector('[lang="zh"]');
+    const marked = [...container.querySelectorAll("[lang]")].map((element) =>
+      element.getAttribute("lang"),
+    );
+    const classes = [...(prose?.classList ?? [])];
+    const text = prose?.textContent;
+    unmount();
+
+    expect(text).toContain("学费九月三十日截止");
+    expect(classes).toEqual(expect.arrayContaining(["font-serif", "text-reading"]));
+    // The route line and the sources are the interface's and the excerpts' own
+    // languages; only the answer says "zh". Citation cards carry their own.
+    expect(marked.filter((lang) => lang === "zh")).toHaveLength(1);
   });
 });
 

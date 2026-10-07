@@ -183,7 +183,7 @@ function ListItem({ children }: ComponentProps<"li">) {
 // The class passes through: GFM labels a footnote section with a heading it
 // marks `sr-only`, in English whatever the interface language.
 function heading({ children, className }: { children?: ReactNode; className?: string }) {
-  return <p className={cn("font-semibold text-body text-ink", className)}>{children}</p>;
+  return <p className={cn("font-semibold text-ink text-reading", className)}>{children}</p>;
 }
 
 const COMPONENTS = {
@@ -232,12 +232,20 @@ const COMPONENTS = {
 
 export interface AnswerMarkdownProps {
   text: string;
+  /** The answer's language: a Chinese answer sets at Chinese leading (index.css). */
+  lang?: string;
   badges: readonly Badge[];
   onBadgeClick: (marker: string) => void;
   rehypePlugins?: Options["rehypePlugins"];
 }
 
-export function AnswerMarkdown({ text, badges, onBadgeClick, rehypePlugins }: AnswerMarkdownProps) {
+export function AnswerMarkdown({
+  text,
+  lang,
+  badges,
+  onBadgeClick,
+  rehypePlugins,
+}: AnswerMarkdownProps) {
   // remark-cjk-friendly after remark-gfm, as its README asks: it lets bold
   // open and close next to the full-width punctuation of Chinese text.
   // remark-math only marks `$$…$$` as math here, so that Markdown escapes
@@ -274,7 +282,9 @@ export function AnswerMarkdown({ text, badges, onBadgeClick, rehypePlugins }: An
 
   return (
     <PillContext value={pills}>
-      <div className="flex min-w-0 flex-col gap-snug text-ink leading-relaxed">{body}</div>
+      <div lang={lang} className="flex min-w-0 flex-col gap-snug font-serif text-ink text-reading">
+        {body}
+      </div>
     </PillContext>
   );
 }

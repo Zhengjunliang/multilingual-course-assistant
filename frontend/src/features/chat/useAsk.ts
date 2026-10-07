@@ -36,6 +36,12 @@ export interface Turn {
   answer: string;
   citations: Citation[];
   route: RouteDecision | null;
+  /**
+   * The language the answer was written in, from `start` or the stored row;
+   * `null` until then. Not the interface's language: a Chinese answer in the
+   * Italian interface is set as Chinese.
+   */
+  locale: string | null;
   /** `end` arrived. Only then may markers be matched against the prose. */
   complete: boolean;
   failure: Failure | null;
@@ -62,6 +68,7 @@ function blankTurn(key: string, question: string): Turn {
     answer: "",
     citations: [],
     route: null,
+    locale: null,
     complete: false,
     failure: null,
   };
@@ -86,6 +93,7 @@ function replayed(messages: readonly StoredMessage[]): Turn[] {
     open.answer = message.text;
     open.citations = message.citations;
     open.route = message.route;
+    open.locale = message.locale;
     open.complete = message.complete;
     if (!message.complete) open.failure = { kind: "incomplete" };
   }
@@ -230,7 +238,11 @@ async function run(
   for await (const event of readAnswerEvents(body)) {
     switch (event.name) {
       case "start":
-        patch({ citations: event.data.citations, route: event.data.route });
+        patch({
+          citations: event.data.citations,
+          route: event.data.route,
+          locale: event.data.locale,
+        });
         opened.current = event.data.conversation_id;
         setState((current) => ({ ...current, conversationId: event.data.conversation_id }));
         break;

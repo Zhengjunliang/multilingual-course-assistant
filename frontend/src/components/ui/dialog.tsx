@@ -56,7 +56,7 @@ export function Dialog({
         >
           <div className="flex items-start justify-between gap-snug">
             <div className="flex min-w-0 flex-col gap-hair">
-              <RadixDialog.Title className="font-semibold text-ink text-title">
+              <RadixDialog.Title className="font-semibold font-serif text-ink text-title">
                 {title}
               </RadixDialog.Title>
               {description === undefined ? (
