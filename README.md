@@ -2,6 +2,8 @@
 
 Ask about a university course or about the campus in any language, and the answer comes back in that language, citing the slide or web page it was drawn from, even when the material is in another language: an English question over the university's Italian web pages, an Italian one over English slides. Retrieval-augmented generation over open-weights models (the Qwen family), with a Django + React website in front; generating or grading exercises is ⛔ out of scope.
 
+![A question asked in Chinese about the exam sessions, answered in Chinese from the university's Italian and English web pages, with the excerpts it drew on shown above the answer](.github/assets/chat.png)
+
 Bachelor's thesis in Information Engineering at the University of Florence, supervised by Prof. Marco Bertini. MIT licence.
 
 **Run it** with Docker, uv and Node.js installed, in PowerShell or any POSIX shell:
