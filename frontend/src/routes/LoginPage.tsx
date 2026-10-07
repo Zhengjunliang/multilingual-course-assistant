@@ -67,7 +67,7 @@ export default function LoginPage() {
         </div>
 
         {failure !== null && (
-          <p className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
+          <p className="rounded-control border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
             {failure}
           </p>
         )}

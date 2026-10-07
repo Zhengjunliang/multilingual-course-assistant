@@ -48,8 +48,11 @@ export function ManagementNav({ items, onNavigate }: ManagementNavProps) {
             onClick={onNavigate}
             aria-current={pathname === item.to ? "page" : inside ? "true" : undefined}
             className={cn(
-              "flex items-center gap-tight rounded-md px-tight py-tight text-body transition-colors",
-              inside ? "bg-mark font-medium text-ink" : "text-muted hover:bg-mark hover:text-ink",
+              "flex items-center gap-tight rounded-control px-tight py-tight text-body transition-colors",
+              // Where the reader is, drawn as the open conversation is.
+              inside
+                ? "bg-accent-soft font-medium text-accent"
+                : "text-muted hover:bg-mark hover:text-ink",
             )}
           >
             <Icon aria-hidden className="size-icon shrink-0" />

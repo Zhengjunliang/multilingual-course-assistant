@@ -92,13 +92,13 @@ export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: Comp
       )}
       onSubmit={onFormSubmit}
     >
-      {/* One rounded shell holding the field and its controls, rather than a
+      {/* One shell holding the field and its controls, rather than a
           bare textarea with buttons loose underneath it. The border is the
           accent once there is something to send: the only moving colour on an
           otherwise still screen, and it lands exactly where the next action is. */}
       <div
         className={cn(
-          "mx-auto flex max-w-4xl flex-col gap-tight rounded-2xl border bg-surface p-snug transition-colors",
+          "mx-auto flex max-w-4xl flex-col gap-tight rounded-bubble border bg-surface p-snug transition-colors",
           ready ? "border-accent" : "border-line",
         )}
       >

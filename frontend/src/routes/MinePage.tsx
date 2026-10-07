@@ -54,7 +54,7 @@ export default function MinePage() {
     <>
       <PageHead title={t("staff.mine.title")} sub={t("staff.mine.sub")} />
       {groups.length === 0 ? (
-        <p className="rounded-lg border border-line bg-surface px-snug py-room text-center text-body text-muted">
+        <p className="rounded-card border border-line bg-surface px-snug py-room text-center text-body text-muted">
           {t("staff.mine.empty")}
         </p>
       ) : (

@@ -178,7 +178,7 @@ export function CitationList({
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="shrink-0 self-stretch rounded-lg border border-line border-dashed px-snug text-caption text-muted hover:bg-mark hover:text-ink"
+            className="shrink-0 self-stretch rounded-card border border-line border-dashed px-snug text-caption text-muted hover:bg-mark hover:text-ink"
           >
             {t("citations.more", { count: folded })}
           </button>

@@ -83,7 +83,7 @@ export function Forbidden({ permission }: { permission: Permission }) {
   return (
     <div
       role="alert"
-      className="flex gap-tight rounded-md border border-warn-line bg-warn px-snug py-tight text-warn-ink"
+      className="flex gap-tight rounded-control border border-warn-line bg-warn px-snug py-tight text-warn-ink"
     >
       <Ban aria-hidden className="mt-hair size-icon shrink-0" />
       <div className="flex flex-col gap-hair text-body">

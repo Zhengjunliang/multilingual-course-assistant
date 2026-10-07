@@ -79,7 +79,7 @@ export function Section({ title, sub, right, children }: SectionProps) {
 
 /** A code of the catalogue, set apart as the catalogue's identifier it is. */
 export function Code({ children }: { children: ReactNode }) {
-  return <span className="rounded-sm bg-mark px-hair font-mono text-ink">{children}</span>;
+  return <span className="rounded-chip bg-mark px-hair font-mono text-ink">{children}</span>;
 }
 
 /** A note under what it is about: under a table, or across the foot of a card (`foot`). */
