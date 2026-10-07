@@ -99,6 +99,28 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
       </Specimen>
 
       <Specimen
+        name="Type"
+        note="Fraunces for headings and the answer, at the reading size; Figtree for every control. Chinese falls through to the system's faces."
+      >
+        <div className="flex max-w-prose flex-col gap-tight">
+          <p className="font-semibold font-serif text-ink text-title">
+            Il passo lungo il gradiente
+          </p>
+          <p lang="en" className="font-serif text-ink text-reading">
+            The learning rate sets the size of each step along the negative gradient; a value too
+            large makes the loss <em>oscillate</em>.
+          </p>
+          <p lang="it" className="font-serif text-ink text-reading">
+            Il tasso di apprendimento fissa l'ampiezza di ogni passo; un valore troppo alto fa{" "}
+            <em>oscillare</em> la perdita.
+          </p>
+          <p lang="zh-hans" className="font-serif text-ink text-reading">
+            学习率决定了沿负梯度方向每一步的大小；学习率过大会导致损失震荡。
+          </p>
+        </div>
+      </Specimen>
+
+      <Specimen
         name="Shape"
         note="Four corners by what wears them — chip, control, card, bubble — and two heights: raised on the page, overlay above it."
       >
@@ -285,7 +307,7 @@ export default function StyleguidePage() {
     <div className="min-h-full bg-canvas p-gutter">
       <div className="mx-auto flex max-w-6xl flex-col gap-room">
         <header className="flex flex-col gap-hair">
-          <h1 className="font-semibold text-display text-ink">Component catalogue</h1>
+          <h1 className="font-semibold font-serif text-display text-ink">Component catalogue</h1>
           <p className="text-body text-muted">
             Every component of the layer, side by side in both themes. A primitive added and left
             out of this page fails its own test.
