@@ -26,6 +26,7 @@ export function AuthLayout({ title, children }: { title: string; children: React
           className="self-center"
           locales={UI_LOCALES}
           value={i18n.language}
+          label={t("account.language")}
           onChange={(locale: UiLocale) => void i18n.changeLanguage(locale)}
         />
       </div>
