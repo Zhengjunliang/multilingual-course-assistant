@@ -59,6 +59,7 @@ OPEN: dict[str, str] = {
     "accounts:login": "logging in is what a caller without a session does",
     "accounts:register": "anyone may open an account",
     "spa": "the shell is static HTML; every call it makes is an API route checked here",
+    "favicon": "a redirect to a public static file, reading nothing",
 }
 
 # URL namespace -> what decides who may call the routes under it.

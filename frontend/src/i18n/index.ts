@@ -23,6 +23,13 @@ export type UiLocale = (typeof UI_LOCALES)[number];
 
 export const DEFAULT_UI_LOCALE: UiLocale = "it";
 
+// The page says which language it is in, because two things read it: a screen
+// reader picks its voice from it (WCAG 3.1.1), and index.css sets Chinese by
+// `:lang(zh)`. Registered before `init`, which announces the first language.
+i18n.on("languageChanged", (language) => {
+  if (typeof document !== "undefined") document.documentElement.lang = language;
+});
+
 void i18n.use(initReactI18next).init({
   resources: {
     it: { translation: it },

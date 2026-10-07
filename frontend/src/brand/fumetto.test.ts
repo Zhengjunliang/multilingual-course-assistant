@@ -1,5 +1,5 @@
 /**
- * The cat's files on disk are what its drawing writes.
+ * The cat's text files on disk are what its drawing writes.
  *
  * scripts/brand.mjs writes them, and a drawing changed without a run of it
  * would leave the favicon and the brand folder showing the old cat while the
@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { CANVAS, CANVAS_DARK, svgFiles } from "./fumetto";
+import { CANVAS, CANVAS_DARK, writtenFiles } from "./fumetto";
 
 // `fileURLToPath`, not `URL.pathname`: on Windows the latter yields "/D:/…".
 const FRONTEND = fileURLToPath(new URL("../../", import.meta.url));
@@ -26,7 +26,7 @@ function onDisk(path: string): string | null {
 
 describe("the cat's files", () => {
   it("are what the drawing writes (else run node scripts/brand.mjs)", () => {
-    const stale = Object.entries(svgFiles())
+    const stale = Object.entries(writtenFiles())
       .filter(([path, svg]) => onDisk(path) !== svg)
       .map(([path]) => path);
 

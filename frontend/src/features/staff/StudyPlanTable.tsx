@@ -134,7 +134,7 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
           {query.trim() === "" ? t("staff.plan.noCurriculum") : t("staff.plan.noMatch")}
         </p>
       ) : (
-        <Table frameClassName="rounded-card border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0 lg:overflow-visible">
+        <Table frameClassName="rounded-card border border-line bg-surface sm:[&_tbody:last-child_tr:last-child]:border-b-0 lg:overflow-visible">
           <TableHeader>
             <TableRow>
               <TableHead>{t("staff.plan.course")}</TableHead>
@@ -148,8 +148,12 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
           </TableHeader>
           {groups.map((group) => (
             <TableBody key={group.year}>
-              <tr>
+              {/* Its roles stated, as in table.tsx: the row stacks with the cards. */}
+              {/* biome-ignore lint/a11y/noRedundantRoles: restores the role a stacked table loses in WebKit */}
+              <tr role="row">
+                {/* biome-ignore lint/a11y/useSemanticElements: restores the role a stacked table loses in WebKit */}
                 <th
+                  role="columnheader"
                   colSpan={5}
                   scope="colgroup"
                   className="sticky top-0 z-lifted border-line border-b bg-canvas px-tight py-tight text-left font-semibold text-body text-ink max-sm:block"

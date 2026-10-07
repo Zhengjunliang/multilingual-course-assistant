@@ -35,12 +35,32 @@ export const TEXT = 4.5;
 
 export const PAIRS = [
   { front: "ink", back: "canvas", min: TEXT, where: "index.css body rule" },
-  { front: "ink", back: "surface", min: TEXT, where: "card.tsx:19 card body" },
-  { front: "muted", back: "canvas", min: TEXT, where: "EmptyState.tsx:39 subtitle" },
+  {
+    front: "ink",
+    back: "surface",
+    min: TEXT,
+    where: "card.tsx:19 card body, sonner.tsx toast (through --normal-bg and --normal-text)",
+  },
+  {
+    front: "muted",
+    back: "canvas",
+    min: TEXT,
+    where: "EmptyState.tsx subtitle, ChatShell.tsx icon-only buttons (button.tsx ghost)",
+  },
   { front: "muted", back: "surface", min: TEXT, where: "CitationList.tsx:113 excerpt" },
   { front: "ink", back: "sidebar", min: TEXT, where: "ConversationSidebar.tsx title and rows" },
-  { front: "muted", back: "sidebar", min: TEXT, where: "ConversationSidebar.tsx idle row" },
-  { front: "ink", back: "mark", min: TEXT, where: "AnswerStream.tsx:91 citation pill" },
+  {
+    front: "muted",
+    back: "sidebar",
+    min: TEXT,
+    where: "ConversationSidebar.tsx idle row, collapse and delete icon buttons",
+  },
+  {
+    front: "ink",
+    back: "mark",
+    min: TEXT,
+    where: "AnswerMarkdown.tsx citation pill, a ghost icon button under the pointer",
+  },
   { front: "muted", back: "mark", min: TEXT, where: "CitationList.tsx:113 on a lit card" },
   { front: "accent-ink", back: "accent", min: TEXT, where: "button.tsx default variant" },
   {

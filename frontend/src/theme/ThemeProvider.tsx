@@ -12,6 +12,8 @@
 
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
+import { CANVAS, CANVAS_DARK } from "@/brand/fumetto";
+
 export const THEMES = ["system", "light", "dark"] as const;
 export type Theme = (typeof THEMES)[number];
 
@@ -57,8 +59,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // On the root element rather than in React's tree: `body` is painted by the
   // browser before any component mounts, and the variables live on :root.
+  // The browser's bar too. index.html gives it the system's choice before any
+  // script runs; a reader who picked a theme here gets the bar of that theme,
+  // so both entries, whatever their media query, take what is painted.
   useEffect(() => {
     document.documentElement.dataset.theme = resolved;
+    for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+      meta.setAttribute("content", resolved === "dark" ? CANVAS_DARK : CANVAS);
+    }
   }, [resolved]);
 
   const setTheme = useCallback((next: Theme) => {

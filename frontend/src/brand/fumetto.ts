@@ -225,18 +225,40 @@ const DARK_RULE =
 /** `notFound` is fumetto-not-found.svg. */
 const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 
+/** The web app manifest, listing the icons scripts/brand.mjs rasterises. */
+function manifest(): string {
+  const app = {
+    name: "Multilingual Course Assistant",
+    short_name: "Course Assistant",
+    start_url: "/",
+    display: "standalone",
+    background_color: CANVAS,
+    theme_color: BLUE,
+    icons: [
+      { src: "icon-192.png", type: "image/png", sizes: "192x192" },
+      { src: "icon-512.png", type: "image/png", sizes: "512x512" },
+      { src: "icon-maskable-512.png", type: "image/png", sizes: "512x512", purpose: "maskable" },
+    ],
+  };
+  return `${JSON.stringify(app, null, 2)}\n`;
+}
+
 /**
- * Every SVG file the drawing is published as, by path under frontend/: the
- * mark with its one-colour and reversed forms and each pose for light and dark
- * grounds in brand/, and the browser's icon in public/. scripts/brand.mjs
- * writes them; fumetto.test.ts holds the files on disk to them.
+ * Every text file the drawing is published as, by path under frontend/: the
+ * mark with its square, one-colour and reversed forms and each pose for light
+ * and dark grounds in brand/; the browser's icon and the manifest in public/.
+ * scripts/brand.mjs writes them, and rasterises the PNG icons from the same
+ * tiles; fumetto.test.ts holds the files on disk to them, so a change to a
+ * tile, a pose or a colour fails until the script has run.
  */
-export function svgFiles(): Record<string, string> {
+export function writtenFiles(): Record<string, string> {
   const files: Record<string, string> = {
     "brand/fumetto-mark.svg": tileSvg(ICON),
+    "brand/fumetto-mark-square.svg": tileSvg(SQUARE),
     "brand/fumetto-mark-mono.svg": tileSvg({ tile: null, ink: "#000000", radius: 0, scale: 1 }),
     "brand/fumetto-mark-reversed.svg": tileSvg({ tile: null, ink: WHITE, radius: 0, scale: 1 }),
     "public/icon.svg": tileSvg({ ...ICON, style: DARK_RULE }),
+    "public/manifest.webmanifest": manifest(),
   };
   for (const pose of Object.keys(POSES) as Pose[]) {
     files[`brand/fumetto-${kebab(pose)}.svg`] = lineSvg(pose, BLUE);

@@ -20,9 +20,9 @@
  * row needs none. Changing
  * `display` on table elements makes WebKit drop their table semantics (outside
  * the repository: Adrian Roselli, "Tables, CSS Display Properties, and ARIA"),
- * so each element whose `display` changes states its role, which is redundant
- * everywhere else and restores the table there; the header row only leaves
- * sight, and keeps its own.
+ * so every element of it states its role, which is redundant everywhere else
+ * and restores the table there. The header row is no exception: `sr-only`
+ * positions it absolutely, which turns it into a block as well.
  */
 
 import type { ComponentProps } from "react";
@@ -62,7 +62,10 @@ export function TableCaption({ className, ...props }: ComponentProps<"caption">)
 }
 
 export function TableHeader({ className, ...props }: ComponentProps<"thead">) {
-  return <thead className={cn("max-sm:sr-only", className)} {...props} />;
+  return (
+    // biome-ignore lint/a11y/noRedundantRoles: restores the role a stacked table loses in WebKit
+    <thead role="rowgroup" className={cn("max-sm:sr-only", className)} {...props} />
+  );
 }
 
 export function TableBody({ className, ...props }: ComponentProps<"tbody">) {
@@ -93,7 +96,9 @@ export function TableRow({ className, ...props }: ComponentProps<"tr">) {
 
 export function TableHead({ className, ...props }: ComponentProps<"th">) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: restores the role a stacked table loses in WebKit
     <th
+      role="columnheader"
       className={cn(
         "whitespace-nowrap px-tight py-tight text-left font-medium text-caption text-muted",
         className,

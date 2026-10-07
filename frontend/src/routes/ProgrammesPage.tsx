@@ -52,7 +52,7 @@ export default function ProgrammesPage() {
         <p className="text-body text-muted">{t("staff.programmes.empty")}</p>
       ) : (
         <div className="flex flex-col gap-snug">
-          <Table frameClassName="rounded-card border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0">
+          <Table frameClassName="rounded-card border border-line bg-surface sm:[&_tbody:last-child_tr:last-child]:border-b-0">
             <TableHeader>
               <TableRow>
                 <TableHead>{t("staff.programmes.code")}</TableHead>
