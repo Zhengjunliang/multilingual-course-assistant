@@ -60,7 +60,7 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 | Any piece of information | one owner | `review` |
 | `docs/decisions.md` | an entry only for what the thesis argues, in force only | `review` |
 
-**Map** — the root files, `docs/`, `.github/` and `gold/README.md`. No other plan or checklist files anywhere in the repository:
+**Map** — the root files, `docs/`, `.github/`, `gold/README.md` and `frontend/brand/README.md`. No other plan or checklist files anywhere in the repository:
 
 | File | Contents |
 | ---- | -------- |
@@ -68,7 +68,9 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 | `CLAUDE.md` | Agent rules, project overview, documentation conventions |
 | `docs/decisions.md` | The decisions the thesis argues, in force only: the date, what was decided, why, the price |
 | `docs/*.md` | One topic per file, created only when the topic exists |
+| `DESIGN.md` | Design rules: the tokens (generated from `frontend/src/index.css`), how colour, type, layout, depth and shape are spent, the components and where the mascot stands |
 | `gold/README.md` | Gold set schema, id prefixes, writing rules and acceptance thresholds |
+| `frontend/brand/README.md` | The mark and the mascot: its files, how to use them, its provenance and its CC0 licence |
 | `.github/` | What GitHub reads besides the code, and what it inherits from the account: `docs/development.md`, section "Code layout" |
 
 **Progress is owned by GitHub issues, never by a markdown file**: milestone checklists, blockers and deferred work live only in issues; documents say *what* and *why*, never *not yet*.
