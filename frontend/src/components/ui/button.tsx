@@ -3,7 +3,8 @@ import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
+/** Also for a link that looks like a button: it goes somewhere rather than doing something. */
+export const buttonVariants = cva(
   "inline-flex items-center justify-center gap-tight whitespace-nowrap rounded-control text-body font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {

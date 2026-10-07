@@ -163,6 +163,19 @@ export interface TileOptions {
 /** The head's bounding box on the grid, measured with getBBox(): x 10.4 to 54.4, y 10.6 to 58.8. */
 const HEAD_CENTRE = { x: 32.4, y: 34.7 };
 
+/** Where the head sits on a tile at `scale`: centred on its own box, not on the grid. */
+export function placement(scale: number): string {
+  const x = (32 - HEAD_CENTRE.x * scale).toFixed(2);
+  const y = (32 - HEAD_CENTRE.y * scale).toFixed(2);
+  return `translate(${x} ${y}) scale(${scale})`;
+}
+
+/** The pupils of the mark, larger than a pose's, so a 16 px icon keeps them. */
+export const MARK_PUPILS: readonly Circle[] = POSES.avatar.pupils.map((p) => ({
+  ...p,
+  r: p.r + 0.5,
+}));
+
 /**
  * The mark: the head filled in on a tile, for the favicon and the app icons,
  * where a line one pixel wide would vanish. The mouth and whiskers are dropped
@@ -172,25 +185,22 @@ const HEAD_CENTRE = { x: 32.4, y: 34.7 };
  */
 export function tileSvg({ tile, ink, radius, scale, style }: TileOptions): string {
   const { eyes } = POSES.avatar;
-  const enlarged = POSES.avatar.pupils.map((p) => ({ ...p, r: p.r + 0.5 }));
-  const x = (32 - HEAD_CENTRE.x * scale).toFixed(2);
-  const y = (32 - HEAD_CENTRE.y * scale).toFixed(2);
   const eye = (d: string, paint: string, extra = "") =>
     `<path${extra} d="${d}" fill="${paint}" stroke="${paint}" stroke-width="1.6" stroke-linejoin="round"/>`;
   const face =
     tile === null
-      ? `<mask id="eyes"><rect width="64" height="64" fill="#fff"/>${eyes.map((d) => eye(d, "#000")).join("")}${enlarged.map((p) => circle(p, "#fff")).join("")}</mask>` +
+      ? `<mask id="eyes"><rect width="64" height="64" fill="#fff"/>${eyes.map((d) => eye(d, "#000")).join("")}${MARK_PUPILS.map((p) => circle(p, "#fff")).join("")}</mask>` +
         `<path d="${HEAD}" fill="${ink}" mask="url(#eyes)"/>`
       : `<path class="ink" d="${HEAD}" fill="${ink}"/>` +
         eyes.map((d) => eye(d, tile, ' class="cut"')).join("") +
-        enlarged.map((p) => circle(p, ink).replace("<circle", '<circle class="ink"')).join("");
+        MARK_PUPILS.map((p) => circle(p, ink).replace("<circle", '<circle class="ink"')).join("");
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">`,
     style === undefined ? "" : `<style>${style}</style>`,
     tile === null
       ? ""
       : `<rect class="tile" width="64" height="64" rx="${radius}" fill="${tile}"/>`,
-    `<g transform="translate(${x} ${y}) scale(${scale})">${face}</g>`,
+    `<g transform="${placement(scale)}">${face}</g>`,
     "</svg>\n",
   ].join("");
 }

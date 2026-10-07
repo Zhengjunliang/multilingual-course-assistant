@@ -20,13 +20,14 @@
 
 import { LogOut, UserRound } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
-
+import { Mascot, MascotMark } from "@/components/Mascot";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
@@ -96,6 +97,25 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
           ●
         </Button>
         <Button disabled>disabled</Button>
+      </Specimen>
+
+      <Specimen
+        name="buttonVariants"
+        note="The button's classes on a link, for an action that goes somewhere: the way back from a page that is not there."
+      >
+        <Link to="/styleguide" className={buttonVariants({ variant: "outline" })}>
+          outline link
+        </Link>
+      </Specimen>
+
+      <Specimen
+        name="Mascot"
+        note="Fumetto's five poses in the accent, and MascotMark, the tile beside the app's name. Decorative: words beside it always say the same."
+      >
+        <MascotMark className="size-avatar" />
+        {(["avatar", "welcome", "thinking", "error", "notFound"] as const).map((pose) => (
+          <Mascot key={pose} pose={pose} className="size-mascot" />
+        ))}
       </Specimen>
 
       <Specimen

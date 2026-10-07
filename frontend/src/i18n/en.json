@@ -88,6 +88,11 @@
     "incomplete": "The answer stopped before it was finished.",
     "retryAfter": "The service asked us to retry in {{seconds}} seconds."
   },
+  "notFound": {
+    "title": "Page not found",
+    "body": "There is no page at this address: the link may be mistyped or out of date.",
+    "home": "Back to the start"
+  },
   "staff": {
     "cancel": "Cancel",
     "breadcrumb": "Breadcrumb",

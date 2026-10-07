@@ -88,6 +88,11 @@
     "incomplete": "La risposta si è interrotta prima della fine.",
     "retryAfter": "Il servizio ha chiesto di riprovare tra {{seconds}} secondi."
   },
+  "notFound": {
+    "title": "Pagina non trovata",
+    "body": "A questo indirizzo non c'è nessuna pagina: il link potrebbe essere sbagliato o non più valido.",
+    "home": "Torna all'inizio"
+  },
   "staff": {
     "cancel": "Annulla",
     "breadcrumb": "Percorso",
