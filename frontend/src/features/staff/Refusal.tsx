@@ -32,7 +32,7 @@ export function NotFound({ back }: { back: Back }) {
         <SearchX aria-hidden className="m-auto size-icon-lg" />
       </span>
       <div className="flex flex-col gap-hair">
-        <h1 tabIndex={-1} className="font-semibold text-display text-ink outline-none">
+        <h1 tabIndex={-1} className="font-semibold font-serif text-display text-ink outline-none">
           {t("staff.refusal.notFound")}
         </h1>
         <p className="text-body text-muted">{t("staff.refusal.notFoundBody")}</p>

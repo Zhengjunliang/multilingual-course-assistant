@@ -87,7 +87,7 @@ export function ConversationSidebar({
           is where the product's own furniture is, and the reading column starts
           at the top of the screen. */}
       <div className="flex items-center gap-tight">
-        <p className="min-w-0 flex-1 truncate px-tight py-tight font-semibold text-ink text-title">
+        <p className="min-w-0 flex-1 truncate px-tight py-tight font-semibold font-serif text-ink text-title">
           {t("app.title")}
         </p>
         {/* Only from `lg` up: below that the sidebar is a drawer, and a drawer

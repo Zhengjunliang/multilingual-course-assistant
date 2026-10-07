@@ -37,7 +37,7 @@ export function EmptyState({ onPick }: EmptyStateProps) {
     // and the three things a reader looks at first sit on three different axes.
     <div className="flex w-full max-w-4xl flex-col items-center gap-room text-center">
       <div className="flex flex-col gap-tight">
-        <h2 className="font-semibold text-display text-ink">{t("empty.title")}</h2>
+        <h2 className="font-semibold font-serif text-display text-ink">{t("empty.title")}</h2>
         <p className="text-body text-muted">{t("app.subtitle")}</p>
       </div>
 

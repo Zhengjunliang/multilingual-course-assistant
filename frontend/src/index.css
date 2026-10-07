@@ -182,6 +182,12 @@
      a reader came for. */
   --text-reading: 1rem;
   --text-reading--line-height: 1.625rem;
+  /* The same answer in Chinese, looser: a line of square characters with no
+     ascenders or descenders closes up at Latin leading. Above the 1.57 to 1.71
+     that Ant Design, DeepSeek, Kimi and Qwen Chat give their interface text
+     (measured 7 October 2026), because an answer is read at length. The rule
+     that applies it is at the end of this file. */
+  --leading-reading-zh: 1.8;
 
   /* Corners, by what wears them: a short word, a control, a card or window, a
      message. Softer than the university website's square frames, which a lab
@@ -251,4 +257,18 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Chinese reading text takes its own leading wherever it is Chinese: an answer
+ * whose `lang` says so, or any reading text in the Chinese interface. A rule
+ * rather than a class at each use, so a new place that sets reading text cannot
+ * forget it. `:lang()` and not a custom property set on `:lang(zh)`, because a
+ * property is inherited: an English answer inside the Chinese interface would
+ * inherit the Chinese leading from the page around it.
+ */
+@layer utilities {
+  .text-reading:lang(zh) {
+    line-height: var(--leading-reading-zh);
+  }
 }

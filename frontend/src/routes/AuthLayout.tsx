@@ -18,7 +18,7 @@ export function AuthLayout({ title, children }: { title: string; children: React
     <div className="flex min-h-full flex-col items-center justify-center gap-room px-gutter py-room">
       <div className="flex w-full max-w-sm flex-col gap-room">
         <div className="flex flex-col gap-hair text-center">
-          <h1 className="font-semibold text-display text-ink">{t("app.title")}</h1>
+          <h1 className="font-semibold font-serif text-display text-ink">{t("app.title")}</h1>
           <p className="text-body text-muted">{title}</p>
         </div>
         {children}

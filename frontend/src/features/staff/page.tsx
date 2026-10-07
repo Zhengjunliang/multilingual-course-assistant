@@ -34,7 +34,10 @@ export function PageHead({ eyebrow, title, caps, sub, source, actions }: PageHea
         )}
         <h1
           tabIndex={-1}
-          className={cn("font-semibold text-display text-ink outline-none", caps && "uppercase")}
+          className={cn(
+            "font-semibold font-serif text-display text-ink outline-none",
+            caps && "uppercase",
+          )}
         >
           {title}
         </h1>
@@ -64,7 +67,7 @@ export function Section({ title, sub, right, children }: SectionProps) {
     <section className="flex flex-col gap-snug">
       <div className="flex flex-wrap items-end gap-snug">
         <div className="flex min-w-0 flex-1 flex-col gap-hair">
-          <h2 className="font-semibold text-ink text-title">{title}</h2>
+          <h2 className="font-semibold font-serif text-ink text-title">{title}</h2>
           {sub !== undefined && <p className="text-body text-muted">{sub}</p>}
         </div>
         {right}
