@@ -3,13 +3,11 @@
 /**
  * What the composer offers before anything has been typed.
  *
- * This exists because of a defect nothing caught: the send button used to be
- * rendered disabled, which on the old palette was a washed-out accent that
- * still read as a button. On an achromatic one the accent is pure black and
- * `disabled:opacity-50` turns it into a grey slab with unreadable lettering —
- * the loudest thing on an otherwise empty screen, and the first thing a reader
- * sees. Every gate was green: it is a claim about what is on the page in a
- * given state, and only a document can answer that.
+ * A send button rendered disabled is a defect no gate catches: on the accent
+ * fill `disabled:opacity-50` makes a faded slab with unreadable lettering — the
+ * loudest thing on an otherwise empty screen, and the first thing a reader
+ * sees. Every gate stays green, because it is a claim about what is on the page
+ * in a given state, and only a document can answer that.
  */
 
 import { act } from "react";

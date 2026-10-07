@@ -92,11 +92,10 @@ describe("the source strip", () => {
     unmount();
   });
 
-  // These two stand in for a gate that cannot exist. The palette is achromatic,
-  // so the link between a citation and its source is carried by fill rather
-  // than by colour, and check-contrast.mjs has nothing left to measure about it:
-  // it can prove --mark is a step away from the page, not that anything wears
-  // it. That is what these assert.
+  // These two stand in for a gate that cannot exist. The link between a
+  // citation and its source is carried by fill rather than by colour
+  // (index.css), and check-contrast.mjs can prove --mark is a step away from the
+  // page, not that anything wears it. That is what these assert.
   it("fills and rings the highlighted card, and no other", () => {
     const { container, unmount } = mounted(CITATIONS, "[Excerpt 2]");
     const highlighted = cardClasses(container, "Excerpt behind [Excerpt 2].");

@@ -51,29 +51,27 @@
  * about, which is why biome.json turns `tailwindDirectives` on: without it this
  * file is a parse error rather than a file the linter has an opinion about.
  *
- * The palette is achromatic on purpose. Every token below has zero chroma
- * except the three `--warn*`, which are the one colour left in the interface —
- * spent on a failure and on the button that confirms destroying something,
- * never on a preference (docs/decisions.md). `scripts/check-contrast.mjs` reads
- * these very declarations and holds the neutral tokens to a chroma *ceiling*,
- * so a tint cannot creep back in unnoticed.
+ * One hue, the university's blue. `--accent` is the website's own
+ * `--main-blue`, #004C7F, the screen value of Pantone 301; the dark theme takes
+ * a lighter step of the same hue, so the blue still clears 4.5:1 on a dark
+ * ground. Every grey leans toward that hue at a chroma that still reads as
+ * grey, the way the website's own #F4F5F6 and #212529 do. The blue is spent on
+ * what a reader can do or where they are — the primary button, the focus ring,
+ * a link, the open conversation, `--accent-soft` behind a current item — and
+ * never on the reading: an answer stays in ink. The three `--warn*` are the one
+ * other hue, for a failure and for confirming a destruction (docs/decisions.md).
+ * `scripts/check-contrast.mjs` reads these very declarations and holds them to
+ * one hue: a second hue creeping in fails it, and so does the accent fading to
+ * a grey.
  *
- * Be clear about what that ceiling is worth: with every neutral token at
- * exactly zero, no legitimate edit can trip it. It is a guard against
- * inattention, not a measurement under tension. The assertion it replaced —
- * that the accent is not simply the ink — is no longer defensible with a
- * number, because here the accent *is* the ink by choice: `--accent` is the
- * black a button fills with, `--ink` the black a sentence is written in, and
- * they agree. What used to be carried by colour, the link between a citation
- * in the answer and its source card, is carried by fill instead: a pill wears
- * `--mark` and the highlighted card wears `--mark` with an ink ring. Those are
+ * The link between a citation in the answer and its source card is carried by
+ * fill, not colour: a pill wears `--mark`, the highlighted card wears `--mark`
+ * with an ink ring. Blue there would read as a link to somewhere else. Those are
  * asserted in CitationList.test.tsx, because no colour gate can see them.
  *
- * `--accent` and `--accent-ink` are still two variables rather than one,
- * because a surface and the ink that sits on it are inverses: black fill with
- * white lettering in the light theme, white fill with black lettering in the
- * dark one. There is no third accent variable. One that only ever equalled
- * `--ink` would be a second name for a colour that already has one.
+ * `--accent` and `--accent-ink` are two variables because a surface and the ink
+ * that sits on it are inverses: white lettering on the deep blue of the light
+ * theme, dark lettering on the light blue of the dark one.
  *
  * Spacing and type are named here for the same reason the colours are: `px-4`
  * says how far, not what for, and two components meaning "a control's side
@@ -90,6 +88,7 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
   --color-mark: var(--mark);
   --color-warn: var(--warn);
   --color-warn-line: var(--warn-line);
@@ -127,37 +126,41 @@
 }
 
 /*
- * Lightness is written in whole percentage points, and the gate compares it
- * that way. Two fills that touch without a border between them have to stand a
- * step apart, and `0.25 - 0.23` in binary floating point is 0.0199999999999999
- * — a correct palette failing its own rule on the last bit. Integers have no
- * such edge.
+ * The fills' lightness is written in whole percentage points, and the gate
+ * compares it that way. Two fills that touch without a border between them
+ * have to stand a step apart, and `0.25 - 0.23` in binary floating point is
+ * 0.0199999999999999 — a correct palette failing its own rule on the last bit.
+ * Integers have no such edge. The light theme's accent is the exception, at a
+ * tenth of a point, because it is a value converted from #004C7F rather than a
+ * value chosen here.
  */
 :root {
-  --canvas: oklch(99% 0 0);
+  --canvas: oklch(99% 0.003 247);
   --surface: oklch(100% 0 0);
-  --sidebar: oklch(97% 0 0);
-  --ink: oklch(0% 0 0);
-  --muted: oklch(44% 0 0);
-  --line: oklch(92% 0 0);
-  --accent: oklch(0% 0 0);
+  --sidebar: oklch(97% 0.005 247);
+  --ink: oklch(25% 0.012 247);
+  --muted: oklch(47% 0.012 247);
+  --line: oklch(90% 0.006 247);
+  --accent: oklch(40.5% 0.107 247);
   --accent-ink: oklch(100% 0 0);
-  --mark: oklch(94% 0 0);
+  --accent-soft: oklch(94% 0.025 247);
+  --mark: oklch(94% 0.006 247);
   --warn: oklch(96% 0.02 23);
   --warn-line: oklch(63% 0.19 23);
   --warn-ink: oklch(45% 0.18 23);
 }
 
 [data-theme="dark"] {
-  --canvas: oklch(0% 0 0);
-  --surface: oklch(14% 0 0);
-  --sidebar: oklch(23% 0 0);
-  --ink: oklch(100% 0 0);
-  --muted: oklch(72% 0 0);
-  --line: oklch(26% 0 0);
-  --accent: oklch(100% 0 0);
-  --accent-ink: oklch(0% 0 0);
-  --mark: oklch(25% 0 0);
+  --canvas: oklch(14% 0.008 247);
+  --surface: oklch(18% 0.01 247);
+  --sidebar: oklch(21% 0.012 247);
+  --ink: oklch(95% 0.004 247);
+  --muted: oklch(73% 0.01 247);
+  --line: oklch(28% 0.012 247);
+  --accent: oklch(70% 0.11 247);
+  --accent-ink: oklch(14% 0.02 247);
+  --accent-soft: oklch(29% 0.05 247);
+  --mark: oklch(25% 0.012 247);
   --warn: oklch(22% 0.03 23);
   --warn-line: oklch(69% 0.2 24);
   --warn-ink: oklch(85% 0.09 23);
