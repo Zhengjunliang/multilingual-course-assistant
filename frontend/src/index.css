@@ -1,14 +1,24 @@
 @import "tailwindcss";
 
 /*
- * Geist Sans, served from this repository.
+ * Fraunces and Figtree, served from this repository.
+ *
+ * Fraunces, a serif with soft, slightly wonky curves, sets headings and the
+ * answer a reader came for; Figtree, a friendly geometric sans, sets every
+ * control. A serif for the reading and a sans for the interface is how
+ * Claude.ai sets its answers, and this pair was chosen from a specimen in
+ * English, Italian and Chinese (#128). Both are under the SIL Open Font
+ * License, in the `-OFL.txt` files beside them.
  *
  * Not a CDN. The demo has to work on a machine with no network, and a webfont
  * fetched from a third party also tells that third party who opened the page —
- * a poor trade for a university tool. The file is 69,652 bytes: one variable
- * face covering every weight from 100 to 900, against 138,212 bytes and three
- * requests for the three static weights this interface actually uses. A weight
- * added later costs nothing.
+ * a poor trade for a university tool. Each file is one variable face, every
+ * weight in one request: Fraunces 67,304 bytes, its italic 81,520, Figtree
+ * 20,156. They are Google Fonts' latin subset, which holds English and
+ * Italian; `unicode-range` repeats it, so a character outside the subset never
+ * makes the browser download a face that cannot draw it. The italic is a file
+ * of its own because Fraunces draws a true italic rather than a slanted roman,
+ * and the browser fetches it only when a page shows one.
  *
  * The leading slash is load-bearing. Vite only recognises a `url()` as a public
  * file when it starts with `/`; without it the build emits a warning rather
@@ -20,17 +30,43 @@
  * spelling and Safari rejects it. The range on `font-weight` is what makes the
  * single file answer for all of them.
  *
- * No Chinese is packaged. Every grotesque here covers Latin only, and a CJK
- * face is megabytes; `zh-hans` falls through to whatever the machine has. The
- * two CJK names below sit *before* `sans-serif` because a stack stops at the
- * first family that resolves, and `sans-serif` always resolves.
+ * No Chinese is packaged: a CJK face is megabytes, and DeepSeek, Kimi, Qwen
+ * Chat and Ant Design's font specification all leave Chinese to the system.
+ * The system faces sit in both stacks *before* the generic family, because a
+ * stack stops at the first family that resolves, and `serif` or `sans-serif`
+ * always does.
  */
 @font-face {
-  font-family: "Geist Sans";
-  src: url("/fonts/Geist-Variable.woff2") format("woff2");
+  font-family: "Fraunces";
+  src: url("/fonts/Fraunces-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Fraunces";
+  src: url("/fonts/Fraunces-Italic-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Figtree";
+  src: url("/fonts/Figtree-Variable.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /*
@@ -101,6 +137,17 @@
 }
 
 @theme {
+  /* Two families by job, each followed by the system's Chinese faces in the
+     order Kimi and Ant Design use: PingFang on Apple, Source Han and Noto CJK
+     where installed, YaHei on Windows. One list for both, because Windows has
+     no system serif for Chinese worth choosing. */
+  --font-sans:
+    "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  --font-serif:
+    "Fraunces", ui-serif, Georgia, "PingFang SC", "Source Han Sans SC", "Noto Sans CJK SC",
+    "Microsoft YaHei UI", "Microsoft YaHei", serif;
+
   /* Interior rhythm. Named by how close things are, not by a step number. */
   --spacing-hair: 0.25rem;
   --spacing-tight: 0.5rem;
@@ -130,6 +177,11 @@
   --text-title--line-height: 1.75rem;
   --text-display: 1.875rem;
   --text-display--line-height: 2.25rem;
+  /* The answer, set in the serif: a size up from the interface's body, because
+     a serif reads smaller than a sans at the same size and the answer is what
+     a reader came for. */
+  --text-reading: 1rem;
+  --text-reading--line-height: 1.625rem;
 
   /* Corners, by what wears them: a short word, a control, a card or window, a
      message. Softer than the university website's square frames, which a lab
@@ -197,8 +249,6 @@ body {
   margin: 0;
   background-color: var(--canvas);
   color: var(--ink);
-  font-family:
-    "Geist Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
