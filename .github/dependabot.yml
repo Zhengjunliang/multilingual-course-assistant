@@ -69,8 +69,9 @@ updates:
       - dependency-name: "sentence-transformers"
       # What the embedder loads through sentence-transformers and the reranker
       # loads directly (rag/search.py). Its fixes for PYSEC-2026-3929 and
-      # PYSEC-2026-4174 came in on 5.10.1 before any re-measurement, which
-      # docs/decisions.md prices; routine bumps wait for the session.
+      # PYSEC-2026-4174 came in on 5.10.1 before any re-measurement: gold 38/40
+      # and campus 28/32 were measured on 5.8.1, so the next M3 remeasurement is
+      # the first on 5.10.1. Routine bumps wait for that session.
       - dependency-name: "transformers"
       # The floor the three above stand on. With torchvision below, it comes
       # from custom indexes: CI installs the Linux CPU build, the laptop a cu126
@@ -117,8 +118,7 @@ updates:
       # katex beside the first and pairs one version's stylesheet with the
       # other's markup. The two move together, by hand, the day rehype-katex's
       # range allows it; until then katex's advisory is an accepted risk
-      # (docs/decisions.md, 2026-10-06, *Dependabot holds the whole docling
-      # family and katex*).
+      # (docs/security.md, the table of accepted risks).
       - dependency-name: "katex"
       - dependency-name: "rehype-katex"
 
