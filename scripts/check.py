@@ -90,7 +90,15 @@ STEPS: tuple[Step, ...] = (
         "frontend",
         tuple(
             _npm(script)
-            for script in ("lint", "typecheck", "check:i18n", "check:contrast", "test", "build")
+            for script in (
+                "lint",
+                "typecheck",
+                "check:i18n",
+                "check:contrast",
+                "check:design",
+                "test",
+                "build",
+            )
         ),
         cwd=FRONTEND,
         requires=(FRONTEND / "node_modules", "npm ci --prefix frontend"),
