@@ -190,8 +190,8 @@
   /* The same answer in Chinese, looser: a line of square characters with no
      ascenders or descenders closes up at Latin leading. Above the 1.57 to 1.71
      that Ant Design, DeepSeek, Kimi and Qwen Chat give their interface text
-     (measured 7 October 2026), because an answer is read at length. The rule
-     that applies it is at the end of this file. */
+     (measured 7 October 2026), because an answer is read at length. The rules
+     that apply it, and Chinese's own stack, are at the end of this file. */
   --leading-reading-zh: 1.8;
 
   /* Corners, by what wears them: a short word, a control, a card or window, a
@@ -291,14 +291,23 @@ body {
 }
 
 /*
- * Chinese reading text takes its own leading wherever it is Chinese: an answer
- * whose `lang` says so, or any reading text in the Chinese interface. A rule
- * rather than a class at each use, so a new place that sets reading text cannot
- * forget it. `:lang()` and not a custom property set on `:lang(zh)`, because a
- * property is inherited: an English answer inside the Chinese interface would
- * inherit the Chinese leading from the page around it.
+ * Chinese takes its own stack and its own leading wherever it is Chinese: an
+ * answer whose `lang` says so, or anything in the Chinese interface. Rules
+ * rather than classes at each use, so a new place that sets reading text or a
+ * heading cannot forget them. `:lang()` and not a custom property set on
+ * `:lang(zh)`, because a property is inherited: an English answer inside the
+ * Chinese interface would inherit the Chinese settings from the page around it.
+ *
+ * The stack is the sans one. Windows has no system serif for Chinese worth
+ * choosing, so Chinese is drawn by a sans face, and the Latin letters and
+ * digits inside Chinese text follow it instead of mixing Fraunces into the
+ * line; DeepSeek, Kimi and Qwen Chat set Chinese in a sans throughout.
  */
 @layer utilities {
+  .font-serif:lang(zh) {
+    font-family: var(--font-sans);
+  }
+
   .text-reading:lang(zh) {
     line-height: var(--leading-reading-zh);
   }

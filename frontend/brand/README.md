@@ -1,6 +1,6 @@
 # Fumetto, the project's cat
 
-The mark of Multilingual Course Assistant and the mascot of its interface: a cat whose head is a speech bubble. Released under CC0 ([LICENSE](LICENSE)); how it was made is in [PROVENANCE.md](PROVENANCE.md).
+The mark of Multilingual Course Assistant and the mascot of its interface: a cat whose head is a speech bubble. Released under CC0 ([LICENSE](LICENSE)), apart from the code's MIT licence; how it was made, the candidates and why this one was chosen are in [PROVENANCE.md](PROVENANCE.md).
 
 ## The files
 
@@ -20,7 +20,7 @@ The poses are `avatar`, `welcome`, `thinking`, `error` and `not-found`. The brow
 - **Smallest size**: 16 px for the mark, the size at which its eyes read; 24 px for a pose, below which its line closes up.
 - **Clear space**: a quarter of the mark's width on every side, kept free of text and other signs.
 - **As drawn**: no stretching, rotating, redrawing or lettering inside the head. A new pose is drawn in `src/brand/fumetto.ts` with the others, never beside them.
-- **No endorsement**: Fumetto is this project's sign, not the University of Florence's. It is never set beside or combined with the university's mark, or with the university's name in the university's own lettering, in a way that suggests the university made or approves the project.
+- **No endorsement**: Fumetto is this project's sign, not the University of Florence's nor MICC's. Please do not use it in a way that suggests either of them made or approves what it is used for, and never set it beside or combine it with the university's mark, or with the university's name in the university's own lettering.
 
 ## Changing it
 

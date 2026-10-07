@@ -85,7 +85,7 @@ function tokens() {
   }
   lines.push(
     "  reading-zh:",
-    `    fontFamily: ${quote(firstFamily(theme.get("font-serif")))}`,
+    `    fontFamily: ${quote(firstFamily(theme.get("font-sans")))}`,
     `    fontSize: ${quote(theme.get("text-reading"))}`,
     `    lineHeight: ${theme.get("leading-reading-zh")}`,
   );

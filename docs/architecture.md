@@ -12,7 +12,7 @@ This file owns the stack choices and the state of each decision's verification. 
 - **Compute**: Google Colab (free T4) first, then the GPU machines the supervisor provides, with Runpod or Lightning as alternatives. The GPU experiments skip Colab ([decisions.md](decisions.md), 2026-07-31, *The retrieval pipeline replaces a throwaway experiment, and MICC replaces Colab*).
 - **A new direction** (oral, 2026-08-21): agentic RAG, from the Lightning template the supervisor forwarded, and the UniFi website as a second knowledge source, so that Erasmus and foreign students can ask about the campus (enrolment, fees, calendars) in their own language. The design is [unifi-web-source.md](unifi-web-source.md); the decision is [decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*.
 
-- **The interface** (oral, the thesis meeting behind `#128`): it is too bare, and it may take the university's colour. How it does is [decisions.md](decisions.md), 2026-10-07, *The interface takes the university's blue on greys tinted toward it, and a cat for a mark*.
+- **The interface** (oral, the thesis meeting behind `#128`): it is too bare, and it may take the university's colour. How it does is [decisions.md](decisions.md), 2026-10-07, *The interface takes the university's blue on greys tinted toward it*.
 
 The four starting links the supervisor sent are analysed in [rag-analysis.md](rag-analysis.md).
 

@@ -52,7 +52,7 @@ typography:
     fontSize: '1rem'
     lineHeight: '1.625rem'
   reading-zh:
-    fontFamily: 'Fraunces'
+    fontFamily: 'Figtree'
     fontSize: '1rem'
     lineHeight: 1.8
 rounded:
@@ -200,7 +200,7 @@ Two families, self-hosted under the SIL Open Font License, each followed by the 
 - **Fraunces** (`font-serif`) for the answer at `text-reading` and for every heading at `text-title` or `text-display`. A screen's heading is never left in the controls' face; `src/theme/tokens.test.ts` fails on one.
 - **Figtree** (`font-sans`, the body's default) for controls, labels and the rest of the interface, at `text-body` and `text-caption`.
 
-Five sizes carry the interface, and a sixth needs a reason: `caption`, `body`, `reading`, `title`, `display`. Chinese is not packaged — the system draws it, PingFang, Source Han or Microsoft YaHei — and Chinese reading text takes a looser leading, `reading-zh`, applied by a `:lang(zh)` rule wherever the text says it is Chinese. An answer therefore carries `lang` with the language it was written in, which is not always the interface's.
+Five sizes carry the interface, and a sixth needs a reason: `caption`, `body`, `reading`, `title`, `display`. Chinese is not packaged: the system draws it, PingFang, Source Han or Microsoft YaHei. Wherever text says it is Chinese, `:lang(zh)` rules in `index.css` give it the sans stack, headings and answers included, so its Latin letters and digits match the Chinese face instead of mixing Fraunces into the line, and give reading text the looser leading `reading-zh`. An answer therefore carries `lang` with the language it was written in, which is not always the interface's.
 
 ## Layout
 
@@ -215,6 +215,8 @@ Two shadows, by height: `shadow-raised` for what rests on the page (a card, an o
 Three layers, by what sits over what: `z-lifted` for a control above its row's stretched link or a sticky table head, `z-backdrop` for the scrim behind a dialog, `z-floating` for what floats on it. A numbered `z-` index does not appear outside `index.css`.
 
 Motion is one duration and one curve, the defaults every `transition-colors` takes, named in `index.css`. The one other movement is the cat thinking, a slow pulse while an answer is being prepared. Nothing moves for a reader whose system asks for reduced motion. Further effects are chosen in issue #135, each naming its duration and curve beside the defaults.
+
+🔜 (M4, #135) Three.js loads only on the entry screens, the empty chat and sign-in, after the first paint, and steps down when frames drop. 🔜 (M4, #136) A first visit is guided once per audience, can be skipped and replayed from the account menu, and stays seen in the browser; an empty screen explains itself.
 
 ## Shapes
 
