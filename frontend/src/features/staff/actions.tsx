@@ -169,7 +169,7 @@ export function useSetCurrent({ editions, reload }: SetCurrentOptions): SetCurre
         variant="outline"
         size="sm"
         // Above the row's stretched link, so the button is what it presses.
-        className="relative z-10"
+        className="relative z-lifted"
         onClick={(event) => {
           last.current = { trigger: event.currentTarget, id: edition.id };
           setTarget(edition);

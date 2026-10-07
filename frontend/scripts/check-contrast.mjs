@@ -83,7 +83,13 @@ const PAIRS = [
     min: TEXT,
     where: "input.tsx focus outline and border, suggestion.tsx chip under the pointer",
   },
-  { front: "accent", back: "accent-soft", min: TEXT, where: "badge.tsx state word" },
+  {
+    front: "accent",
+    back: "accent-soft",
+    min: TEXT,
+    where:
+      "badge.tsx state word, ConversationSidebar.tsx open conversation, ManagementNav.tsx current page",
+  },
   { front: "warn-ink", back: "warn", min: TEXT, where: "TurnView.tsx:110 failure box" },
   { front: "accent-ink", back: "warn-ink", min: TEXT, where: "button.tsx destructive variant" },
 ];
@@ -101,7 +107,8 @@ const PAIRS = [
 const STEP = 2;
 
 const LADDER = [
-  { a: "mark", b: "sidebar", where: "ConversationSidebar.tsx open conversation and hover" },
+  { a: "mark", b: "sidebar", where: "ConversationSidebar.tsx and ManagementNav.tsx hover" },
+  { a: "accent-soft", b: "sidebar", where: "ConversationSidebar.tsx open conversation" },
   { a: "mark", b: "surface", where: "locale-switch.tsx:36 track, button.tsx:13 ghost hover" },
   { a: "mark", b: "canvas", where: "AnswerStream.tsx:91 citation pill in the answer" },
 ];

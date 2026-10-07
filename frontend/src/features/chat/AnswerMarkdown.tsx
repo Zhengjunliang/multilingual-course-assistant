@@ -206,12 +206,12 @@ const COMPONENTS = {
     <blockquote className="border-line border-l-2 pl-snug text-muted">{children}</blockquote>
   ),
   code: ({ children, className }) => (
-    <code className={cn("rounded-sm bg-mark px-hair font-mono text-caption", className)}>
+    <code className={cn("rounded-chip bg-mark px-hair font-mono text-caption", className)}>
       {children}
     </code>
   ),
   pre: ({ children }) => (
-    <pre className="overflow-x-auto rounded-md bg-mark p-snug font-mono text-caption [&>code]:bg-transparent [&>code]:p-0">
+    <pre className="overflow-x-auto rounded-control bg-mark p-snug font-mono text-caption [&>code]:bg-transparent [&>code]:p-0">
       {children}
     </pre>
   ),

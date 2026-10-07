@@ -66,7 +66,7 @@ export function LocaleSwitch<T extends string>({
         <RadixMenu.Content
           align="start"
           sideOffset={8}
-          className="z-50 flex min-w-40 flex-col rounded-card border border-line bg-surface p-hair shadow-overlay"
+          className="z-floating flex min-w-40 flex-col rounded-card border border-line bg-surface p-hair shadow-overlay"
         >
           <RadixMenu.Label className="px-tight py-hair text-caption text-muted">
             {label}

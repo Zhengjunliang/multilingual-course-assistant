@@ -107,7 +107,7 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
           />
         </div>
         {programme.curricula.length > 1 && (
-          <fieldset className="flex flex-wrap gap-hair rounded-md border border-line p-hair">
+          <fieldset className="flex flex-wrap gap-hair rounded-control border border-line p-hair">
             <legend className="sr-only">{t("staff.plan.filter")}</legend>
             {choices.map((choice) => (
               <button
@@ -116,7 +116,7 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
                 aria-pressed={choice === curriculum}
                 onClick={() => setCurriculum(choice)}
                 className={cn(
-                  "rounded-sm px-tight py-hair text-caption transition-colors",
+                  "rounded-chip px-tight py-hair text-caption transition-colors",
                   choice === curriculum
                     ? "bg-mark font-medium text-ink"
                     : "text-muted hover:bg-mark hover:text-ink",
@@ -130,11 +130,11 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
       </div>
 
       {groups.length === 0 ? (
-        <p className="rounded-lg border border-line bg-surface px-snug py-room text-center text-body text-muted">
+        <p className="rounded-card border border-line bg-surface px-snug py-room text-center text-body text-muted">
           {query.trim() === "" ? t("staff.plan.noCurriculum") : t("staff.plan.noMatch")}
         </p>
       ) : (
-        <Table frameClassName="rounded-lg border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0 lg:overflow-visible">
+        <Table frameClassName="rounded-card border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0 lg:overflow-visible">
           <TableHeader>
             <TableRow>
               <TableHead>{t("staff.plan.course")}</TableHead>
@@ -152,7 +152,7 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
                 <th
                   colSpan={5}
                   scope="colgroup"
-                  className="sticky top-0 z-10 border-line border-b bg-canvas px-tight py-tight text-left font-semibold text-body text-ink"
+                  className="sticky top-0 z-lifted border-line border-b bg-canvas px-tight py-tight text-left font-semibold text-body text-ink max-sm:block"
                 >
                   {t("staff.plan.year", { year: group.year })}{" "}
                   <span className="font-normal text-muted">
@@ -184,13 +184,13 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell label={t("staff.plan.entries")}>
                     <Entries row={row} />
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">
+                  <TableCell label={t("staff.plan.current")} className="whitespace-nowrap">
                     {row.current?.academic_year ?? <span className="text-muted">—</span>}
                   </TableCell>
-                  <TableCell>
+                  <TableCell label={t("staff.plan.teachers")}>
                     {row.current !== null && row.current.teachers.length > 0 ? (
                       <PeopleInline people={row.current.teachers} />
                     ) : (
@@ -199,7 +199,7 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted">
+                  <TableCell className="text-muted max-sm:hidden">
                     <ChevronRight aria-hidden className="size-icon" />
                   </TableCell>
                 </TableRow>

@@ -132,7 +132,7 @@ export default function CoursePage() {
         )}
       </Section>
       <Section title={t("staff.course.editions")} sub={t("staff.course.editionsSub")}>
-        <Table frameClassName="rounded-lg border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0">
+        <Table frameClassName="rounded-card border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0">
           <TableHeader>
             <TableRow>
               <TableHead>{t("staff.course.year")}</TableHead>
@@ -154,14 +154,14 @@ export default function CoursePage() {
                     {edition.academic_year}
                   </Link>
                 </TableCell>
-                <TableCell>
+                <TableCell label={t("staff.course.status")}>
                   {edition.is_current ? (
                     <Badge>{t("staff.current")}</Badge>
                   ) : (
                     <span className="text-muted">—</span>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell label={t("staff.plan.teachers")}>
                   {edition.teachers.length > 0 ? (
                     <PeopleInline people={edition.teachers} />
                   ) : (
@@ -173,7 +173,7 @@ export default function CoursePage() {
                 <TableCell>
                   <span className="flex items-center justify-end gap-snug text-muted">
                     {switching.button(edition)}
-                    <ChevronRight aria-hidden className="size-icon" />
+                    <ChevronRight aria-hidden className="size-icon max-sm:hidden" />
                   </span>
                 </TableCell>
               </TableRow>

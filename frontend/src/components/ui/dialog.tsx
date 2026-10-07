@@ -46,13 +46,13 @@ export function Dialog({
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
+        <RadixDialog.Overlay className="fixed inset-0 z-backdrop bg-black/40" />
         {/* Full width with a gutter on a phone, a fixed column above that.
             `max-h` with its own scroll so a long body cannot push the close
             button off the bottom of a short screen. */}
         <RadixDialog.Content
           onCloseAutoFocus={onCloseAutoFocus}
-          className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-room overflow-y-auto rounded-card border border-line bg-surface p-gutter shadow-overlay"
+          className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-floating flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-room overflow-y-auto rounded-card border border-line bg-surface p-gutter shadow-overlay"
         >
           <div className="flex items-start justify-between gap-snug">
             <div className="flex min-w-0 flex-col gap-hair">

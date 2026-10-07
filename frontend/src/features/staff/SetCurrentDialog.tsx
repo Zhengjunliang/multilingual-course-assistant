@@ -110,7 +110,7 @@ export function SetCurrentDialog({
       {refusal?.kind === "said" && (
         <p
           role="alert"
-          className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink"
+          className="rounded-control border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink"
         >
           {refusal.sentence}
         </p>

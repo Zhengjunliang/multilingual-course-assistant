@@ -122,7 +122,7 @@ export function ConversationSidebar({
         to="/"
         end
         onClick={onNavigate}
-        className="flex h-control w-full items-center justify-center gap-tight rounded-md border border-line font-medium text-body text-ink transition-colors hover:bg-mark"
+        className="flex h-control w-full items-center justify-center gap-tight rounded-control border border-line font-medium text-body text-ink transition-colors hover:bg-mark"
       >
         <MessageSquarePlus aria-hidden className="size-icon" />
         {t("sidebar.new")}
@@ -150,12 +150,13 @@ export function ConversationSidebar({
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       cn(
-                        "block min-w-0 flex-1 truncate rounded-md px-tight py-tight text-body transition-colors",
-                        // The open conversation is where the reader *is*, not
-                        // something they are about to do: ink and a quiet fill,
-                        // the same rule the language switch follows.
+                        "block min-w-0 flex-1 truncate rounded-control px-tight py-tight text-body transition-colors",
+                        // The open conversation is where the reader *is*: the
+                        // accent's tint behind it and the accent on it, which
+                        // index.css keeps for where a reader is and what they
+                        // can do; hovering another stays grey.
                         isActive
-                          ? "bg-mark font-medium text-ink"
+                          ? "bg-accent-soft font-medium text-accent"
                           : "text-muted hover:bg-mark hover:text-ink",
                       )
                     }
@@ -205,7 +206,7 @@ export function ConversationSidebar({
         {failed && (
           <p
             role="alert"
-            className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink"
+            className="rounded-control border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink"
           >
             {t("sidebar.deleteFailed")}
           </p>

@@ -70,7 +70,7 @@ export function DropdownMenu({
           align="end"
           sideOffset={8}
           onCloseAutoFocus={() => onCloseAutoFocus?.()}
-          className="z-50 flex min-w-48 flex-col rounded-card border border-line bg-surface p-hair shadow-overlay"
+          className="z-floating flex min-w-48 flex-col rounded-card border border-line bg-surface p-hair shadow-overlay"
         >
           <RadixMenu.Label className="flex flex-col px-tight py-tight">
             <span className="truncate font-medium text-body text-ink">{label}</span>

@@ -79,7 +79,7 @@ export const TurnView = memo(function TurnView({
 
   return (
     <article className="flex flex-col gap-gutter">
-      <p className="ml-auto max-w-prose whitespace-pre-wrap rounded-2xl rounded-br-sm bg-mark px-gutter py-tight text-ink">
+      <p className="ml-auto max-w-prose whitespace-pre-wrap rounded-bubble rounded-br-chip bg-mark px-gutter py-tight text-ink">
         {turn.question}
       </p>
 
@@ -129,7 +129,7 @@ export const TurnView = memo(function TurnView({
           )}
 
           {turn.failure !== null && (
-            <p className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
+            <p className="rounded-control border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
               {turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete")}
             </p>
           )}

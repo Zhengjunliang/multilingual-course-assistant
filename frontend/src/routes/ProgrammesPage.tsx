@@ -52,7 +52,7 @@ export default function ProgrammesPage() {
         <p className="text-body text-muted">{t("staff.programmes.empty")}</p>
       ) : (
         <div className="flex flex-col gap-snug">
-          <Table frameClassName="rounded-lg border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0">
+          <Table frameClassName="rounded-card border border-line bg-surface [&_tbody:last-child_tr:last-child]:border-b-0">
             <TableHeader>
               <TableRow>
                 <TableHead>{t("staff.programmes.code")}</TableHead>
@@ -77,24 +77,27 @@ export default function ProgrammesPage() {
                     </Link>
                   </TableCell>
                   <TableCell className="font-medium uppercase">{programme.name}</TableCell>
-                  <TableCell className="text-caption">
+                  <TableCell label={t("staff.programmes.curriculum")} className="text-caption">
                     {programme.curricula.map((curriculum) => (
                       <span key={curriculum} className="block">
                         {curriculum}
                       </span>
                     ))}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell
+                    label={t("staff.programmes.courses")}
+                    className="text-right tabular-nums"
+                  >
                     {programme.course_count}
                   </TableCell>
-                  <TableCell>
+                  <TableCell label={t("staff.programmes.secretariat")}>
                     {programme.secretariat.length > 0 ? (
                       <PeopleInline people={programme.secretariat} />
                     ) : (
                       <span className="text-muted">{t("staff.programmes.none")}</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted">
+                  <TableCell className="text-muted max-sm:hidden">
                     <ChevronRight aria-hidden className="size-icon" />
                   </TableCell>
                 </TableRow>
