@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 
 import { RequireSession } from "@/auth/RequireSession";
 import { RequireStaff } from "@/auth/RequireStaff";
@@ -7,6 +7,7 @@ import CoursePage from "@/routes/CoursePage";
 import EditionPage from "@/routes/EditionPage";
 import LoginPage from "@/routes/LoginPage";
 import MinePage from "@/routes/MinePage";
+import NotFoundPage from "@/routes/NotFoundPage";
 import ProgrammePage from "@/routes/ProgrammePage";
 import ProgrammesPage from "@/routes/ProgrammesPage";
 import RegisterPage from "@/routes/RegisterPage";
@@ -16,7 +17,8 @@ import StaffLayout from "@/routes/StaffLayout";
 import StyleguidePage from "@/routes/StyleguidePage";
 
 /**
- * Five routes and the staff pages; two of the five are the same page.
+ * Five routes, the staff pages, and a page for every other address; two of the
+ * five are the same page.
  *
  * `/` and `/c/:conversationId` both render the chat because a new conversation
  * and a stored one differ only in whether the thread starts empty — the page
@@ -65,7 +67,7 @@ export default function App() {
           <Route path="*" element={<StaffNotFound />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

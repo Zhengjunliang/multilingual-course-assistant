@@ -19,6 +19,7 @@
 
 import { useTranslation } from "react-i18next";
 
+import { Mascot } from "@/components/Mascot";
 import { Suggestion, Suggestions } from "@/components/ui/suggestion";
 
 const CHIPS = ["enrolment", "calendar", "material"] as const;
@@ -36,7 +37,8 @@ export function EmptyState({ onPick }: EmptyStateProps) {
     // heading centres on the screen while the chips stretch the whole column,
     // and the three things a reader looks at first sit on three different axes.
     <div className="flex w-full max-w-4xl flex-col items-center gap-room text-center">
-      <div className="flex flex-col gap-tight">
+      <div className="flex flex-col items-center gap-tight">
+        <Mascot pose="welcome" className="size-mascot" />
         <h2 className="font-semibold font-serif text-display text-ink">{t("empty.title")}</h2>
         <p className="text-body text-muted">{t("app.subtitle")}</p>
       </div>

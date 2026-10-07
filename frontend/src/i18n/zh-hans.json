@@ -88,6 +88,11 @@
     "incomplete": "回答在结束之前中断了。",
     "retryAfter": "服务要求 {{seconds}} 秒后重试。"
   },
+  "notFound": {
+    "title": "页面不存在",
+    "body": "这个地址上没有页面, 链接可能写错了或已经失效。",
+    "home": "返回首页"
+  },
   "staff": {
     "cancel": "取消",
     "breadcrumb": "路径",

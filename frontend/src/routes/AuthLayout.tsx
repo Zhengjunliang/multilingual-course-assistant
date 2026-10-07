@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Mascot } from "@/components/Mascot";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { UI_LOCALES, type UiLocale } from "@/i18n";
 
@@ -17,7 +18,8 @@ export function AuthLayout({ title, children }: { title: string; children: React
   return (
     <div className="flex min-h-full flex-col items-center justify-center gap-room px-gutter py-room">
       <div className="flex w-full max-w-sm flex-col gap-room">
-        <div className="flex flex-col gap-hair text-center">
+        <div className="flex flex-col items-center gap-hair text-center">
+          <Mascot pose="welcome" className="size-mascot" />
           <h1 className="font-semibold font-serif text-display text-ink">{t("app.title")}</h1>
           <p className="text-body text-muted">{title}</p>
         </div>

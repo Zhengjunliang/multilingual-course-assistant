@@ -11,12 +11,13 @@
  * changed after the page read them, and the dialog names the one missing.
  */
 
-import { ArrowLeft, Ban, SearchX } from "lucide-react";
+import { ArrowLeft, Ban } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import type { Permission } from "@/api/catalog";
-import { Button } from "@/components/ui/button";
+import { Mascot } from "@/components/Mascot";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { isNotFound } from "./errors";
 
 export interface Back {
@@ -28,19 +29,14 @@ export function NotFound({ back }: { back: Back }) {
   const { t } = useTranslation();
   return (
     <section className="flex flex-col items-start gap-snug py-room">
-      <span className="flex size-control rounded-full bg-mark text-muted">
-        <SearchX aria-hidden className="m-auto size-icon-lg" />
-      </span>
+      <Mascot pose="notFound" className="size-mascot" />
       <div className="flex flex-col gap-hair">
         <h1 tabIndex={-1} className="font-semibold font-serif text-display text-ink outline-none">
           {t("staff.refusal.notFound")}
         </h1>
         <p className="text-body text-muted">{t("staff.refusal.notFoundBody")}</p>
       </div>
-      <Link
-        to={back.to}
-        className="inline-flex h-control items-center gap-tight rounded-md border border-line px-gutter font-medium text-body text-ink transition-colors hover:bg-mark"
-      >
+      <Link to={back.to} className={buttonVariants({ variant: "outline" })}>
         <ArrowLeft aria-hidden className="size-icon" />
         {back.label}
       </Link>

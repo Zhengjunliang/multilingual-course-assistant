@@ -22,6 +22,7 @@ import { Search } from "lucide-react";
 import { memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Mascot } from "@/components/Mascot";
 import { badgesOf, citedMarkers, resolveExcerptRefs } from "@/lib/markers";
 import { AnswerStream } from "./AnswerStream";
 import { CitationList } from "./CitationList";
@@ -43,21 +44,19 @@ interface TurnViewProps {
 
 function Thinking() {
   const { t } = useTranslation();
-  return (
-    <p className="flex items-center gap-tight text-body text-muted">
-      {/* Muted, not the accent. The accent marks what a reader can do, and
-          three bouncing blue dots would be the loudest thing on the screen at
-          the one moment there is nothing yet to read. And
-          `motion-reduce` because a reader who has asked the system to stop
-          moving things has asked this too. */}
-      <span aria-hidden className="flex gap-hair">
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s] motion-reduce:animate-none" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s] motion-reduce:animate-none" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted motion-reduce:animate-none" />
-      </span>
-      {t("status.thinking")}
-    </p>
-  );
+  // The cat beside it is what moves: its thinking pose, whose rising dots
+  // pulse. The words stay muted, the quietest voice for the one moment there
+  // is nothing yet to read.
+  return <p className="text-body text-muted">{t("status.thinking")}</p>;
+}
+
+/**
+ * The cat beside the answer says what the turn is doing: thinking until the
+ * first word, apologising when it failed, and otherwise just there.
+ */
+function poseOf(turn: Turn, waiting: boolean) {
+  if (turn.failure !== null) return "error";
+  return waiting ? "thinking" : "avatar";
 }
 
 export const TurnView = memo(function TurnView({
@@ -76,6 +75,7 @@ export const TurnView = memo(function TurnView({
   const answer = turn.complete ? resolveExcerptRefs(turn.answer, turn.citations) : turn.answer;
   const cited = turn.complete ? citedMarkers(answer, badges) : null;
   const working = thinking || live;
+  const waiting = working && turn.answer === "";
 
   return (
     <article className="flex flex-col gap-gutter">
@@ -83,54 +83,57 @@ export const TurnView = memo(function TurnView({
         {turn.question}
       </p>
 
-      <div className="flex min-w-0 flex-col gap-snug">
-        {turn.route !== null && (
-          <div className="flex min-w-0 flex-col gap-hair">
-            {/* Body size, not the smallest type on the page. This line is the
+      <div className="flex min-w-0 gap-snug">
+        <Mascot pose={poseOf(turn, waiting)} className="size-avatar" />
+        <div className="flex min-w-0 flex-1 flex-col gap-snug">
+          {turn.route !== null && (
+            <div className="flex min-w-0 flex-col gap-hair">
+              {/* Body size, not the smallest type on the page. This line is the
                 only place a reader is told where the answer came from, and it
                 used to say so in the quietest voice available. */}
-            <p className="flex flex-wrap items-center gap-tight text-body">
-              <Search aria-hidden className="size-icon shrink-0 text-ink" />
-              <span className="font-medium text-ink">{t(`route.${turn.route.target}`)}</span>
-              <span aria-hidden className="text-line">
-                •
-              </span>
-              <span className="text-muted">
-                {t("route.sources", { count: turn.citations.length })}
-              </span>
+              <p className="flex flex-wrap items-center gap-tight text-body">
+                <Search aria-hidden className="size-icon shrink-0 text-ink" />
+                <span className="font-medium text-ink">{t(`route.${turn.route.target}`)}</span>
+                <span aria-hidden className="text-line">
+                  •
+                </span>
+                <span className="text-muted">
+                  {t("route.sources", { count: turn.citations.length })}
+                </span>
+              </p>
+              <p className="text-caption text-muted">{turn.route.reason}</p>
+            </div>
+          )}
+
+          {turn.citations.length > 0 && (
+            <CitationList
+              citations={turn.citations}
+              badges={badges}
+              cited={cited}
+              highlighted={highlighted}
+              onSelect={onHighlight}
+            />
+          )}
+
+          {waiting ? (
+            <Thinking />
+          ) : (
+            <AnswerStream
+              text={answer}
+              lang={turn.locale ?? undefined}
+              badges={badges}
+              complete={turn.complete}
+              live={live}
+              onBadgeClick={onHighlight}
+            />
+          )}
+
+          {turn.failure !== null && (
+            <p className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
+              {turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete")}
             </p>
-            <p className="text-caption text-muted">{turn.route.reason}</p>
-          </div>
-        )}
-
-        {turn.citations.length > 0 && (
-          <CitationList
-            citations={turn.citations}
-            badges={badges}
-            cited={cited}
-            highlighted={highlighted}
-            onSelect={onHighlight}
-          />
-        )}
-
-        {working && turn.answer === "" ? (
-          <Thinking />
-        ) : (
-          <AnswerStream
-            text={answer}
-            lang={turn.locale ?? undefined}
-            badges={badges}
-            complete={turn.complete}
-            live={live}
-            onBadgeClick={onHighlight}
-          />
-        )}
-
-        {turn.failure !== null && (
-          <p className="rounded-md border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
-            {turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete")}
-          </p>
-        )}
+          )}
+        </div>
       </div>
     </article>
   );

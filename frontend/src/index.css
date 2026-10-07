@@ -167,6 +167,11 @@
   --spacing-icon: 1rem;
   --spacing-icon-lg: 1.25rem;
 
+  /* The cat (components/Mascot.tsx): beside an answer and as the mark in the
+     sidebar, and standing alone where a screen greets or apologises. */
+  --spacing-avatar: 1.75rem;
+  --spacing-mascot: 6rem;
+
   /* Type. Two sizes carry the whole interface today; a third would need a
      reason, and naming them is how that reason has to be argued. */
   --text-caption: 0.75rem;

@@ -166,6 +166,24 @@ describe("the answer's language", () => {
   });
 });
 
+describe("the cat beside the answer", () => {
+  const poseIn = (html: string) => /data-pose="(\w+)"/.exec(html)?.[1];
+
+  it("thinks until the first word arrives", () => {
+    expect(poseIn(view(turn({ answer: "", complete: false }), false, true))).toBe("thinking");
+  });
+
+  it("is just there once the answer is", () => {
+    expect(poseIn(view(turn()))).toBe("avatar");
+  });
+
+  it("apologises for an answer that failed", () => {
+    const failed = turn({ complete: false, failure: { kind: "incomplete" } });
+
+    expect(poseIn(view(failed))).toBe("error");
+  });
+});
+
 /** The page's wiring of the highlight (ChatPage.tsx), around one turn. */
 function Highlighting({ of }: { of: Turn }) {
   const [highlighted, setHighlighted] = useState<string | null>(null);
