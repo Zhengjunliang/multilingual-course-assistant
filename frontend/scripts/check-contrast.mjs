@@ -33,28 +33,28 @@ const TEXT = 4.5;
 const SHAPE = 3;
 
 /**
- * Above this a "neutral" token has a tint, whatever it is called.
+ * The palette has one hue, the accent's, and these hold it there.
  *
- * This is a ceiling, and it used to be a floor. The palette it guarded had an
- * accent that was simply the ink, so the floor asked a question that could fail.
- * The palette is deliberately achromatic now, every neutral token sits at
- * exactly zero, and no legitimate edit can trip this. It catches inattention,
- * not error, and the honest way to run it is knowing that.
+ * Three rules, each catching one way a single-hue palette drifts. A token that
+ * has a hue at all has the accent's, within a few degrees, so a second hue
+ * cannot creep in; `--warn*` is the one other hue and is exempt. The greys stay
+ * under a chroma that reads as grey however they lean. And the accent keeps a
+ * chroma that reads as a colour: a lightened accent turns grey long before it
+ * fails a contrast pair, and that is the rule a legitimate edit can trip.
+ *
+ * Below `HUELESS` a colour has no hue worth comparing: oklch(100% 0 0) carries
+ * hue 0 only because the syntax wants a number there.
  */
-const MAX_CHROMA = 0.02;
+const HUELESS = 0.002;
+const HUE_TOLERANCE = 4;
+const GREY_MAX_CHROMA = 0.02;
+const ACCENT_MIN_CHROMA = 0.08;
 
-/** The neutral tokens. `--warn*` is the one colour left and is exempt. */
-const NEUTRAL = [
-  "canvas",
-  "surface",
-  "sidebar",
-  "ink",
-  "muted",
-  "line",
-  "accent",
-  "accent-ink",
-  "mark",
-];
+/** The greys, and the ink that sits on the accent. `--accent-soft` is a tint, not a grey. */
+const GREYS = ["canvas", "surface", "sidebar", "ink", "muted", "line", "accent-ink", "mark"];
+
+/** Tokens with a hue of their own, exempt from the one-hue rule. */
+const OTHER_HUE = ["warn", "warn-line", "warn-ink"];
 
 const PAIRS = [
   { front: "ink", back: "canvas", min: TEXT, where: "index.css body rule" },
@@ -65,9 +65,10 @@ const PAIRS = [
   { front: "muted", back: "sidebar", min: TEXT, where: "ConversationSidebar.tsx idle row" },
   { front: "ink", back: "mark", min: TEXT, where: "AnswerStream.tsx:91 citation pill" },
   { front: "muted", back: "mark", min: TEXT, where: "CitationList.tsx:113 on a lit card" },
-  { front: "accent-ink", back: "accent", min: TEXT, where: "button.tsx:11 default variant" },
-  { front: "accent", back: "canvas", min: SHAPE, where: "button.tsx:7 focus outline" },
-  { front: "accent", back: "surface", min: SHAPE, where: "input.tsx:9 focus outline" },
+  { front: "accent-ink", back: "accent", min: TEXT, where: "button.tsx default variant" },
+  { front: "accent", back: "canvas", min: SHAPE, where: "button.tsx focus outline" },
+  { front: "accent", back: "surface", min: SHAPE, where: "input.tsx focus outline" },
+  { front: "accent", back: "accent-soft", min: TEXT, where: "StyleguidePage.tsx Accent specimen" },
   { front: "warn-ink", back: "warn", min: TEXT, where: "TurnView.tsx:110 failure box" },
   { front: "accent-ink", back: "warn-ink", min: TEXT, where: "button.tsx destructive variant" },
 ];
@@ -219,11 +220,45 @@ for (const theme of THEMES) {
     }
   }
 
-  for (const name of NEUTRAL) {
+  const accent = colour("accent");
+  record(
+    "--accent chroma",
+    `${accent.c} (at least ${ACCENT_MIN_CHROMA})`,
+    accent.c / ACCENT_MIN_CHROMA,
+  );
+  if (accent.c < ACCENT_MIN_CHROMA) {
+    failures.push(
+      `${theme.name}: --accent has chroma ${accent.c}, a colour needs ${ACCENT_MIN_CHROMA}`,
+    );
+  }
+
+  for (const name of GREYS) {
     const { c } = colour(name);
-    record(`--${name} chroma`, `${c} (at most ${MAX_CHROMA})`, c === 0 ? Infinity : MAX_CHROMA / c);
-    if (c > MAX_CHROMA) {
-      failures.push(`${theme.name}: --${name} has chroma ${c}, at most ${MAX_CHROMA} is neutral`);
+    record(
+      `--${name} chroma`,
+      `${c} (at most ${GREY_MAX_CHROMA})`,
+      c === 0 ? Infinity : GREY_MAX_CHROMA / c,
+    );
+    if (c > GREY_MAX_CHROMA) {
+      failures.push(`${theme.name}: --${name} has chroma ${c}, at most ${GREY_MAX_CHROMA} is grey`);
+    }
+  }
+
+  for (const name of raw.keys()) {
+    if (OTHER_HUE.includes(name)) continue;
+    const { c, h } = colour(name);
+    if (c < HUELESS) continue;
+    // Hue is an angle: 359 and 1 are two degrees apart, not 358.
+    const off = Math.min(Math.abs(h - accent.h), 360 - Math.abs(h - accent.h));
+    record(
+      `--${name} hue`,
+      `${h}, ${off} from the accent's (at most ${HUE_TOLERANCE})`,
+      off === 0 ? Infinity : HUE_TOLERANCE / off,
+    );
+    if (off > HUE_TOLERANCE) {
+      failures.push(
+        `${theme.name}: --${name} has hue ${h}, ${off} degrees from the accent's ${accent.h}`,
+      );
     }
   }
 

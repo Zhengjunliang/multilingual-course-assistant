@@ -45,9 +45,9 @@ function Thinking() {
   const { t } = useTranslation();
   return (
     <p className="flex items-center gap-tight text-body text-muted">
-      {/* Muted, not the accent. On this palette the accent is pure black on
-          near-white, so three bouncing accent dots would be the loudest thing
-          on the screen at the one moment there is nothing yet to read. And
+      {/* Muted, not the accent. The accent marks what a reader can do, and
+          three bouncing blue dots would be the loudest thing on the screen at
+          the one moment there is nothing yet to read. And
           `motion-reduce` because a reader who has asked the system to stop
           moving things has asked this too. */}
       <span aria-hidden className="flex gap-hair">

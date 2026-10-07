@@ -115,13 +115,11 @@ export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: Comp
           className="min-h-control resize-none border-0 bg-transparent px-hair focus-visible:outline-none"
         />
         <div className="flex flex-wrap items-center gap-snug empty:hidden">
-          {/* Absent rather than disabled while there is nothing to send. On the
-              old palette a disabled accent button was a washed-out teal that
-              still read as a button; on this one the accent is pure black, and
-              `disabled:opacity-50` turns it into a grey slab with white text at
-              half strength inside — unreadable, and the loudest thing on an
-              otherwise empty screen. Enter still sends, and the button appears
-              with the first character. */}
+          {/* Absent rather than disabled while there is nothing to send:
+              `disabled:opacity-50` turns the accent fill into a faded slab with
+              its lettering at half strength — unreadable, and the loudest thing
+              on an otherwise empty screen. Enter still sends, and the button
+              appears with the first character. */}
           {ready && (
             <Button type="submit" size="sm">
               {t("ask.submit")}

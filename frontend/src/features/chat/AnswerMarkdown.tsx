@@ -15,8 +15,9 @@
  *   and when its text hides where it goes, the host is shown after it;
  * - an image is shown as its alt text and never loaded — an image URL can carry
  *   anything the page it came from wanted to send somewhere;
- * - code is not highlighted: the palette is achromatic (index.css), so syntax
- *   colours would be the only colour on the screen.
+ * - code is not highlighted: the palette spends its one hue on what a reader
+ *   can do (index.css), and syntax colours would bring a dozen more into every
+ *   code block.
  *
  * The components are one module-level object. Built inside the component, they
  * would be new functions on every render, React would rebuild every element
@@ -65,9 +66,10 @@ function CitationPill({ number }: { number?: string }) {
     // from the start, a dozen of them would read as a rash across the prose
     // rather than as places to look.
     //
-    // The fill is what says "clickable" — not a colour and not a border. On an
-    // achromatic palette a tinted word is impossible, and a hairline is too weak
-    // to carry the job (check-contrast.mjs says so in its own header). `--mark`
+    // The fill is what says "clickable" — not a colour and not a border. A blue
+    // word inside an answer would read as a link to somewhere else (index.css),
+    // and a hairline is too weak to carry the job (check-contrast.mjs says so in
+    // its own header). `--mark`
     // against `--canvas` is a gated pair for this reason, so the pill cannot
     // quietly dissolve into the paragraph.
     <button

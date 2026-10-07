@@ -6,9 +6,8 @@
  * exists to sequence an image load against a fallback, and there is no image to
  * load. A dependency whose entire job is the case that cannot happen here.
  *
- * `--mark` rather than the accent. On an achromatic palette the accent is the
- * strongest black or white available, and it is spent on what a reader is about
- * to do; an avatar is a label for who they already are.
+ * `--mark` rather than the accent. The accent is spent on what a reader is
+ * about to do; an avatar is a label for who they already are.
  */
 
 import { cn } from "@/lib/utils";

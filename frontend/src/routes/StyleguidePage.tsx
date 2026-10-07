@@ -76,7 +76,7 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
       <Specimen
         name="Button"
-        note="Four variants, three sizes. The default fill is the accent; destructive is the one with a hue, and only confirms destroying something."
+        note="Four variants, three sizes. The default fill is the accent, the university's blue; destructive takes the warning's hue, and only confirms destroying something."
       >
         <Button>default</Button>
         <Button variant="outline">outline</Button>
@@ -230,10 +230,13 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
       <Specimen
         name="Accent"
-        note="Not a colour: black on light, white on dark. --mark is the quiet fill that says a thing can be clicked or is where you are, now that no hue can say it."
+        note="The university's blue, #004C7F, a lighter step of it on dark: spent on what a reader can do. --accent-soft marks where they are; --mark is the quiet fill that says a thing can be clicked; --warn is the one other hue."
       >
         <span className="rounded-md bg-accent px-snug py-hair text-accent-ink text-caption">
           --accent
+        </span>
+        <span className="rounded-md bg-accent-soft px-snug py-hair text-accent text-caption">
+          --accent-soft
         </span>
         <span className="rounded-md bg-mark px-snug py-hair text-caption text-ink">--mark</span>
         <span className="rounded-md border border-warn-line bg-warn px-snug py-hair text-caption text-warn-ink">

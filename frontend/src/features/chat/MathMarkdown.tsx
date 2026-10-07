@@ -18,7 +18,8 @@ import rehypeKatex from "rehype-katex";
 import { AnswerMarkdown, type AnswerMarkdownProps } from "./AnswerMarkdown";
 
 // A formula KaTeX cannot parse is shown as its source in the text colour: the
-// default #cc0000 would be the only colour on an achromatic page. `trust` is
+// default #cc0000 would put the warning's hue on something that is not a
+// failure. `trust` is
 // false, so `\href`, `\htmlStyle` and `\includegraphics` in a model's formula do
 // nothing; it is written out although false is the default, because KaTeX
 // before 0.18.2 reads an inherited `trust` off a polluted Object.prototype
