@@ -25,6 +25,8 @@ import { readFileSync } from "node:fs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { BLUE, BLUE_DARK, CANVAS, CANVAS_DARK } from "../src/brand/fumetto.ts";
+
 // `fileURLToPath`, not `URL.pathname`: on Windows the latter yields "/D:/…".
 const STYLESHEET = fileURLToPath(new URL("../src/index.css", import.meta.url));
 
@@ -104,9 +106,18 @@ const LADDER = [
   { a: "mark", b: "canvas", where: "AnswerStream.tsx:91 citation pill in the answer" },
 ];
 
+/**
+ * The cat's files are written in hex (src/brand/fumetto.ts), because an SVG or
+ * a PNG cannot read a stylesheet. Each hex has to be its token converted, or a
+ * change to the palette leaves the favicon in the old blue.
+ */
 const THEMES = [
-  { name: "light", selector: ":root" },
-  { name: "dark", selector: '[data-theme="dark"]' },
+  { name: "light", selector: ":root", brand: { accent: BLUE, canvas: CANVAS } },
+  {
+    name: "dark",
+    selector: '[data-theme="dark"]',
+    brand: { accent: BLUE_DARK, canvas: CANVAS_DARK },
+  },
 ];
 
 /**
@@ -185,6 +196,17 @@ function luminance(colour) {
     .map(decode);
 
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** The colour as the screen shows it, in the six-digit hex the brand files use. */
+function hex(colour) {
+  const encode = (channel) =>
+    channel <= 0.0031308 ? 12.92 * channel : 1.055 * channel ** (1 / 2.4) - 0.055;
+  const byte = (channel) => Math.round(Math.min(1, Math.max(0, encode(channel))) * 255);
+  return `#${linearRgb(colour)
+    .map((channel) => byte(channel).toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase()}`;
 }
 
 function contrast(front, back) {
@@ -271,6 +293,21 @@ for (const theme of THEMES) {
     if (off > HUE_TOLERANCE) {
       failures.push(
         `${theme.name}: --${name} has hue ${h}, ${off} degrees from the accent's ${accent.h}`,
+      );
+    }
+  }
+
+  for (const [name, written] of Object.entries(theme.brand)) {
+    const converted = hex(colour(name));
+    record(
+      `--${name} in the brand files`,
+      `${written} (is ${converted})`,
+      written === converted ? 1 : 0,
+    );
+    if (written !== converted) {
+      failures.push(
+        `${theme.name}: --${name} converts to ${converted}, src/brand/fumetto.ts says ${written}; ` +
+          "update it and run node scripts/brand.mjs",
       );
     }
   }
