@@ -2,7 +2,7 @@
 
 ## Purpose and owner
 
-This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisions.md](decisions.md), entries of 2026-09-25 and 2026-09-26, the role scopes by [decisions.md](decisions.md), 2026-09-29, *Staff permissions are a registry in code, answered by one backend; the admin is the superuser's*, and the code and year formats and the rule that an AD code names one course by [decisions.md](decisions.md), 2026-09-28, *An AD code belongs to one course, and codes and years are written in ASCII*; the chunk field table by [docling-pipeline.md](docling-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
+This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisions.md](decisions.md), the two entries of 2026-09-25, the role scopes by [decisions.md](decisions.md), 2026-09-29, *Staff permissions are a registry in code, answered by one backend; the admin is the superuser's*, and the code and year formats and the rule that an AD code names one course by [decisions.md](decisions.md), 2026-09-28, *An AD code belongs to one course, and codes and years are written in ASCII*; the chunk field table by [docling-pipeline.md](docling-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
 
 ## Entities and relationships
 
@@ -55,7 +55,7 @@ erDiagram
 
 ## Migration order
 
-✅ ① is in `apps/catalog/migrations/0001_initial.py`, ② in `apps/roles/migrations/0001_initial.py`, and ④ is done ([experiment-log.md](experiment-log.md), entry of 2026-09-28, *The slides points move to their edition key without re-embedding*); 🔜 M5: ③. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisions.md](decisions.md), 2026-09-26. Roles' `0001` depends on the catalogue's, so rewriting the catalogue's rewrites both; the steps are in [development.md](development.md), under *Changing a model*.
+✅ ① is in `apps/catalog/migrations/0001_initial.py`, ② in `apps/roles/migrations/0001_initial.py`, and ④ is done ([experiment-log.md](experiment-log.md), entry of 2026-09-28, *The slides points move to their edition key without re-embedding*); 🔜 M5: ③. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisions.md](decisions.md), 2026-09-25, *The data model is decided on paper*, point 5. Roles' `0001` depends on the catalogue's, so rewriting the catalogue's rewrites both; the steps are in [development.md](development.md), under *Changing a model*.
 
 - ① Catalogue tables: `DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`.
 - ② `RoleAssignment`, with the roles of `#93`.

@@ -15,8 +15,10 @@ checkout reads them from .env.
 
 Standard library only: the first thing it does is refuse to run outside the
 project venv, and that refusal has to work under an interpreter that has none
-of the project's packages. Why a script and not a task runner:
-docs/decisions.md, 2026-09-24.
+of the project's packages. A script and not a task runner: the projects where
+local and CI agree by construction (encode/httpx's scripts/, pip with nox,
+flask with tox) have CI call the aggregate by name, whatever holds it, and a
+Python script needs nothing that `uv sync` does not install.
 """
 
 from __future__ import annotations

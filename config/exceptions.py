@@ -3,18 +3,17 @@
 DRF's default handler answers with its usual envelope — `{"detail": ...}` for a
 refusal of the whole request, `{"<field>": [...]}` for rejected fields — whose
 leaves are sentences: English where this project wrote them, in the request's
-language where DRF did (docs/decisions.md, 2026-08-27, *Website delivery
-(M5)*, point 1). A page cannot translate a sentence, so `full_details_handler`
-keeps the envelope and turns every leaf into `{"message": ..., "code": ...}`,
-the shape DRF's own `get_full_details()` gives, as its documentation shows for
-custom exception handlers: call the default handler first, then change the
-data of the response it built.
+language where DRF did (docs/decisions.md, 2026-08-27, *Backend messages
+have no gettext catalogue and stay English*). A page cannot translate a
+sentence, so `full_details_handler` keeps the envelope and turns every leaf
+into `{"message": ..., "code": ...}`, the shape DRF's own `get_full_details()`
+gives, as its documentation shows for custom exception handlers: call the
+default handler first, then change the data of the response it built.
 
 Only views that mix in `CodedErrors` answer this way (the staff endpoints:
 apps/roles/api.py, apps/catalog/views.py); the rest of the API keeps plain
-sentences until one error contract covers every endpoint, which is #143's
-(docs/decisions.md, 2026-10-05, *The staff pages live in the chat shell*,
-point 3).
+sentences until one error contract covers every endpoint, which is #143's.
+`ApiError` (frontend/src/api/http.ts) reads both shapes until then.
 """
 
 from __future__ import annotations

@@ -5,8 +5,7 @@
  * In the browser and not on the server: the plan is one request of a few
  * dozen rows, and filtering it here answers each keystroke at once with
  * nothing to wait for. Past a few hundred rows that trade stops holding, and
- * the server would filter and page instead (docs/decisions.md,
- * 2026-10-05, *The staff pages live in the chat shell*, point 4).
+ * the server would filter and page instead.
  *
  * The rows are the server's, one per course, each carrying its entries in
  * every programme. A course appears under each year of study its entries in

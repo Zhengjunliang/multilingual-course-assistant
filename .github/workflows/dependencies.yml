@@ -93,11 +93,10 @@ jobs:
         # reports as a skip and exits 0 on.
         #
         # The two ignored advisories are docling's, accepted risks until the M3
-        # remeasurement upgrades it: docs/decisions.md, 2026-10-06, *`docling`'s two
-        # file-disclosure advisories*, which says why each is out of reach. The
-        # other accepted risk, accelerate's, is one the advisory databases no
-        # longer name: docs/decisions.md, 2026-10-06, *`accelerate` moves to
-        # 1.15.0*, which also says when its flag returns.
+        # remeasurement upgrades it. The other accepted risk, accelerate's, is
+        # one the advisory databases no longer name. Why each is out of reach,
+        # and when accelerate's flag returns: docs/security.md, the table of
+        # accepted risks.
         run: |
           uv export --locked --no-emit-project --no-hashes -o requirements.txt
           sed -E -i 's/(==[^ ;+]+)\+[^ ;]+/\1/' requirements.txt

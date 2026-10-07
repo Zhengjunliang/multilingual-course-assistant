@@ -3,9 +3,9 @@
  *
  * In the alert dialog with its confirming button in the `destructive`
  * variant, as deleting a conversation is: losing a role is undone only by
- * someone who may assign it again (docs/decisions.md, 2026-09-29, *The warning
- * hue also confirms destroying something, and the staff pages add components,
- * not tokens*), a deliberate departure from the prototype's plain button.
+ * someone who may assign it again, so the confirmation wears the hue kept for
+ * what cannot be taken back, a deliberate departure from the prototype's
+ * plain button: an accent-filled "Revoca" would look like the safe choice.
  * A 404 is a member already gone — revoked from another tab, the outcome
  * asked for — or a scope the reader lost meanwhile; the page reads again to
  * tell them apart, and only the first gets the toast that says it was done
