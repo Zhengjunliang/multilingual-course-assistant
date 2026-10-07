@@ -7,12 +7,13 @@ The mark of Multilingual Course Assistant and the mascot of its interface: a cat
 | File | Use |
 | ---- | --- |
 | `fumetto-mark.svg` | The mark: the head filled in white on a blue tile. Favicons, app icons, a project's avatar |
+| `fumetto-mark-square.svg` | The mark full-bleed and smaller on its square, where a platform cuts its own shape (an app icon, an avatar) |
 | `fumetto-mark-mono.svg` | The head in black alone, eyes cut out. Print in one colour, stamps, embossing |
 | `fumetto-mark-reversed.svg` | The head in white alone, eyes cut out. On a photograph or a dark or blue ground |
 | `fumetto-<pose>.svg` | A pose as a blue line, for light grounds |
 | `fumetto-<pose>-dark.svg` | The same pose in the lighter blue, for dark grounds |
 
-The poses are `avatar`, `welcome`, `thinking`, `error` and `not-found`. The browser and platform icons built from the mark sit in `frontend/public/`: `favicon.ico`, `icon.svg`, `apple-touch-icon.png`, the three `icon-*.png` and `og.png`, the image a link preview shows.
+The poses are `avatar`, `welcome`, `thinking`, `error` and `not-found`. The browser and platform icons built from the mark sit in `frontend/public/`: `favicon.ico`, `icon.svg`, `apple-touch-icon.png`, the three `icon-*.png`, `manifest.webmanifest`, and `og.png`, a 1200 × 630 image for link previews, which a page links by an absolute address.
 
 ## Using it
 
@@ -30,4 +31,4 @@ The drawing lives once, in `frontend/src/brand/fumetto.ts`; the interface draws 
 node scripts/brand.mjs
 ```
 
-`src/brand/fumetto.test.ts` fails while an SVG here disagrees with the drawing, and `npm run check:contrast` fails while its blue disagrees with `src/index.css`.
+`src/brand/fumetto.test.ts` fails while an SVG here or the manifest disagrees with the drawing, and `npm run check:contrast` fails while its blue disagrees with `src/index.css`.

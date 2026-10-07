@@ -9,8 +9,9 @@
  * 180 px apple-touch-icon, 192 and 512 px icons with a maskable 512, the
  * manifest that lists them, and a 1200 x 630 image for link previews. Nothing
  * is exported by hand, so a change to the drawing is one run away from every
- * file. src/brand/fumetto.test.ts fails when an SVG on disk and the drawing
- * disagree; the PNG files follow the SVGs through this script.
+ * file. src/brand/fumetto.test.ts fails when a written SVG or the manifest
+ * disagrees with the drawing; the PNG files come from the same tiles in the
+ * same run, the square ones from fumetto-mark-square.svg's.
  *
  * Node runs fumetto.ts as it is, stripping its types (Node 22.18 and later).
  * @resvg/resvg-js rasterises: one native binary per platform and no browser.
@@ -23,7 +24,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
 
-import { BLUE, CANVAS, ICON, lineSvg, SQUARE, svgFiles, tileSvg } from "../src/brand/fumetto.ts";
+import { BLUE, ICON, lineSvg, SQUARE, tileSvg, writtenFiles } from "../src/brand/fumetto.ts";
 
 const FRONTEND = fileURLToPath(new URL("../", import.meta.url));
 
@@ -67,25 +68,10 @@ function preview(width, height) {
   );
 }
 
-const manifest = {
-  name: "Multilingual Course Assistant",
-  short_name: "Course Assistant",
-  start_url: "/",
-  display: "standalone",
-  background_color: CANVAS,
-  theme_color: BLUE,
-  icons: [
-    { src: "icon-192.png", type: "image/png", sizes: "192x192" },
-    { src: "icon-512.png", type: "image/png", sizes: "512x512" },
-    { src: "icon-maskable-512.png", type: "image/png", sizes: "512x512", purpose: "maskable" },
-  ],
-};
-
-for (const [path, svg] of Object.entries(svgFiles())) write(path, svg);
+for (const [path, text] of Object.entries(writtenFiles())) write(path, text);
 write("public/favicon.ico", ico(png(tileSvg(ICON), 32), 32));
 write("public/apple-touch-icon.png", png(tileSvg(SQUARE), 180));
 write("public/icon-192.png", png(tileSvg(ICON), 192));
 write("public/icon-512.png", png(tileSvg(ICON), 512));
 write("public/icon-maskable-512.png", png(tileSvg(SQUARE), 512));
 write("public/og.png", png(preview(1200, 630), 1200));
-write("public/manifest.webmanifest", `${JSON.stringify(manifest, null, 2)}\n`);

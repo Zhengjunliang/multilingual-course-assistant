@@ -21,6 +21,7 @@ import { act } from "react";
 import { describe, expect, it } from "vitest";
 
 import { SessionContext } from "@/auth/SessionProvider";
+import { CANVAS, CANVAS_DARK } from "@/brand/fumetto";
 import { AccountDialog } from "@/components/AccountDialog";
 import { mount } from "@/test/mount";
 import { ThemeProvider } from "@/theme/ThemeProvider";
@@ -100,6 +101,32 @@ describe("the account dialog", () => {
     expect(document.documentElement.dataset.theme).toBe("light");
 
     unmount();
+  });
+
+  it("gives the browser's bar the chosen theme, whatever the system says", () => {
+    // index.html carries one theme-color per system scheme; a reader's own
+    // choice has to win over both, or a dark page sits under a light bar.
+    for (const scheme of ["light", "dark"]) {
+      const meta = document.createElement("meta");
+      meta.name = "theme-color";
+      meta.media = `(prefers-color-scheme: ${scheme})`;
+      document.head.append(meta);
+    }
+    const bar = () =>
+      [...document.querySelectorAll('meta[name="theme-color"]')].map((meta) =>
+        meta.getAttribute("content"),
+      );
+    const { unmount } = dialog();
+
+    act(() => buttonLabelled("Scuro")?.click());
+    const dark = bar();
+    act(() => buttonLabelled("Chiaro")?.click());
+    const light = bar();
+    unmount();
+    for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.remove();
+
+    expect(dark).toEqual([CANVAS_DARK, CANVAS_DARK]);
+    expect(light).toEqual([CANVAS, CANVAS]);
   });
 
   it("keeps a way out of the session", () => {

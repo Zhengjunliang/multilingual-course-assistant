@@ -28,6 +28,10 @@ urlpatterns = [
     path("api/auth/", include("apps.accounts.urls")),
     path("api/catalog/", include("apps.catalog.urls")),
     path("api/", include("apps.qa.urls")),
-    path("favicon.ico", RedirectView.as_view(url=static("favicon.ico"), permanent=True)),
+    path(
+        "favicon.ico",
+        RedirectView.as_view(url=static("favicon.ico"), permanent=True),
+        name="favicon",
+    ),
     re_path(r"^(?!api/|admin/|static/).*$", spa, name="spa"),
 ]
