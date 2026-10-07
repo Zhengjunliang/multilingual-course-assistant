@@ -86,3 +86,12 @@ def test_a_wrong_api_path_is_a_404_and_not_the_shell(client: Client, path: str) 
 
     assert response.status_code == 404
     assert SHELL not in response.content
+
+
+@pytest.mark.usefixtures("built")
+def test_the_favicon_at_the_root_redirects_to_the_built_icon(client: Client) -> None:
+    """A tool that guesses `/favicon.ico` gets the icon, not the shell."""
+    response = client.get("/favicon.ico")
+
+    assert response.status_code == 301
+    assert response.headers["Location"] == "/static/favicon.ico"
