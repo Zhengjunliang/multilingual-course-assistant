@@ -33,6 +33,7 @@ export function Toaster() {
           "--normal-bg": "var(--surface)",
           "--normal-text": "var(--ink)",
           "--normal-border": "var(--line)",
+          "--border-radius": "var(--radius-card)",
         } as CSSProperties
       }
     />

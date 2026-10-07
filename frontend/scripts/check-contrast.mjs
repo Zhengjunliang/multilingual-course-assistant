@@ -28,9 +28,12 @@ import { fileURLToPath } from "node:url";
 // `fileURLToPath`, not `URL.pathname`: on Windows the latter yields "/D:/…".
 const STYLESHEET = fileURLToPath(new URL("../src/index.css", import.meta.url));
 
-/** Text needs 4.5:1 (WCAG 1.4.3); a control's own shape needs 3:1 (1.4.11). */
+/**
+ * Text needs 4.5:1 (WCAG 1.4.3). A control's own shape needs only 3:1 (1.4.11),
+ * but the accent that draws the focus ring also writes links and chips on the
+ * same grounds, so every pair here is held to the text threshold.
+ */
 const TEXT = 4.5;
-const SHAPE = 3;
 
 /**
  * The palette has one hue, the accent's, and these hold it there.
@@ -66,9 +69,19 @@ const PAIRS = [
   { front: "ink", back: "mark", min: TEXT, where: "AnswerStream.tsx:91 citation pill" },
   { front: "muted", back: "mark", min: TEXT, where: "CitationList.tsx:113 on a lit card" },
   { front: "accent-ink", back: "accent", min: TEXT, where: "button.tsx default variant" },
-  { front: "accent", back: "canvas", min: SHAPE, where: "button.tsx focus outline" },
-  { front: "accent", back: "surface", min: SHAPE, where: "input.tsx focus outline" },
-  { front: "accent", back: "accent-soft", min: TEXT, where: "StyleguidePage.tsx Accent specimen" },
+  {
+    front: "accent",
+    back: "canvas",
+    min: TEXT,
+    where: "button.tsx focus outline, breadcrumb.tsx link under the pointer",
+  },
+  {
+    front: "accent",
+    back: "surface",
+    min: TEXT,
+    where: "input.tsx focus outline and border, suggestion.tsx chip under the pointer",
+  },
+  { front: "accent", back: "accent-soft", min: TEXT, where: "badge.tsx state word" },
   { front: "warn-ink", back: "warn", min: TEXT, where: "TurnView.tsx:110 failure box" },
   { front: "accent-ink", back: "warn-ink", min: TEXT, where: "button.tsx destructive variant" },
 ];

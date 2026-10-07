@@ -50,6 +50,11 @@
  * `@theme` is Tailwind v4's own directive and not CSS any specification knows
  * about, which is why biome.json turns `tailwindDirectives` on: without it this
  * file is a parse error rather than a file the linter has an opinion about.
+ * The colours sit in `@theme inline` because each one names another variable:
+ * a plain `@theme` declares `--color-canvas: var(--canvas)` on `:root`, where
+ * the `var()` resolves once, and an element that sets `data-theme` inside the
+ * page — the two panels of /styleguide — inherits the light value. Inline, a
+ * utility reads `var(--canvas)` where it is used.
  *
  * One hue, the university's blue. `--accent` is the website's own
  * `--main-blue`, #004C7F, the screen value of Pantone 301; the dark theme takes
@@ -79,7 +84,7 @@
  * are the Tailwind steps they replace, unchanged — this layer buys vocabulary,
  * not a new look.
  */
-@theme {
+@theme inline {
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-sidebar: var(--sidebar);
@@ -93,7 +98,9 @@
   --color-warn: var(--warn);
   --color-warn-line: var(--warn-line);
   --color-warn-ink: var(--warn-ink);
+}
 
+@theme {
   /* Interior rhythm. Named by how close things are, not by a step number. */
   --spacing-hair: 0.25rem;
   --spacing-tight: 0.5rem;
@@ -123,6 +130,20 @@
   --text-title--line-height: 1.75rem;
   --text-display: 1.875rem;
   --text-display--line-height: 2.25rem;
+
+  /* Corners, by what wears them: a short word, a control, a card or window, a
+     message. Softer than the university website's square frames, which a lab
+     tool must not imitate; `rounded-full` stays for what is round by shape. */
+  --radius-chip: 0.375rem;
+  --radius-control: 0.625rem;
+  --radius-card: 0.875rem;
+  --radius-bubble: 1.25rem;
+
+  /* Two heights: resting on the page, and floating above it. The shadow takes
+     the palette's hue, so it reads as depth rather than as dirt. */
+  --shadow-raised: 0 1px 2px 0 oklch(25% 0.03 247 / 0.07), 0 1px 1px 0 oklch(25% 0.03 247 / 0.04);
+  --shadow-overlay:
+    0 16px 40px -12px oklch(20% 0.04 247 / 0.28), 0 4px 10px -4px oklch(20% 0.04 247 / 0.12);
 }
 
 /*

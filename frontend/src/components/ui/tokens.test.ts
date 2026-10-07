@@ -63,6 +63,25 @@ describe("the component layer", () => {
     expect(raw).toEqual([]);
   });
 
+  it("spends corners and shadows through named tokens only", () => {
+    // `rounded-md` says how round, `rounded-control` says what wears it, and
+    // only the second keeps a button and a field agreeing once one is edited.
+    // `rounded-full` is a shape, not a step, and stays. The lookarounds keep a
+    // named token (`rounded-card`, `shadow-raised`) and an English word in a
+    // comment (`shadowing`) from matching.
+    const RAW_SHAPE =
+      /(?<![\w-])(?:rounded(?:-(?:[trblse]|tl|tr|br|bl|ss|se|es|ee))?(?:-(?:xs|sm|md|lg|xl|[2-4]xl))?|shadow(?:-(?:2xs|xs|sm|md|lg|xl|2xl))?)(?![\w-])/g;
+    const raw: string[] = [];
+
+    for (const file of componentFiles()) {
+      for (const [step] of sourceOf(file).matchAll(RAW_SHAPE)) {
+        raw.push(`${file}: ${step}`);
+      }
+    }
+
+    expect(raw).toEqual([]);
+  });
+
   it("keeps no parallel version of a component", () => {
     // CLAUDE.md rule 6: one correct implementation, and history lives in git.
     // A `-old` or `-v2` beside a component is the shape that rule forbids, and
