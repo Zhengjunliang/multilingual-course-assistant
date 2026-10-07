@@ -58,6 +58,7 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 | `.env.example` | names exactly what `config/env.py` reads | `env-example-parity` |
 | GitHub issues | English | `review` |
 | Any piece of information | one owner | `review` |
+| `docs/decisions.md` | an entry only for what the thesis argues, in force only | `review` |
 
 **Map** — the root files, `docs/`, `.github/` and `gold/README.md`. No other plan or checklist files anywhere in the repository:
 
