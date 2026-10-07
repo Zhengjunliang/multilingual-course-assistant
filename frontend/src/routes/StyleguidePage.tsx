@@ -46,6 +46,15 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
+// Written out whole: Tailwind finds a class by reading the source, so a class
+// assembled from `rounded-${corner}` would never be generated.
+const CORNERS = {
+  chip: "rounded-chip",
+  control: "rounded-control",
+  card: "rounded-card",
+  bubble: "rounded-bubble",
+} as const;
+
 function Specimen({
   name,
   note,
@@ -70,7 +79,7 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
   return (
     <div
       data-theme={theme}
-      className="flex min-w-0 flex-1 flex-col gap-room rounded-lg border border-line bg-canvas p-gutter"
+      className="flex min-w-0 flex-1 flex-col gap-room rounded-card border border-line bg-canvas p-gutter"
     >
       <h2 className="font-semibold text-ink text-title">{theme}</h2>
 
@@ -89,7 +98,27 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
         <Button disabled>disabled</Button>
       </Specimen>
 
-      <Specimen name="Card" note="Surface, hairline border, no shadow of its own beyond the lift.">
+      <Specimen
+        name="Shape"
+        note="Four corners by what wears them — chip, control, card, bubble — and two heights: raised on the page, overlay above it."
+      >
+        {(["chip", "control", "card", "bubble"] as const).map((corner) => (
+          <span
+            key={corner}
+            className={`${CORNERS[corner]} flex size-field items-end border border-line bg-surface p-hair font-mono text-caption text-muted`}
+          >
+            {corner}
+          </span>
+        ))}
+        <span className="flex size-field items-end rounded-card bg-surface p-hair font-mono text-caption text-muted shadow-raised">
+          raised
+        </span>
+        <span className="flex size-field items-end rounded-card bg-surface p-hair font-mono text-caption text-muted shadow-overlay">
+          overlay
+        </span>
+      </Specimen>
+
+      <Specimen name="Card" note="Surface, hairline border, raised a step off the page.">
         <Card className="w-full max-w-sm">
           <CardHeader>
             <CardTitle>CardTitle</CardTitle>
@@ -149,7 +178,7 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
       <Specimen
         name="Badge"
-        note="A word for a state, on the citation pill's fill: text, so it reads the same without colour."
+        note="A word for a state, in the accent on --accent-soft, the pair that marks the current one: text, so it reads the same without colour."
       >
         <Badge>Corrente</Badge>
       </Specimen>
@@ -232,14 +261,14 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
         name="Accent"
         note="The university's blue, #004C7F, a lighter step of it on dark: spent on what a reader can do. --accent-soft marks where they are; --mark is the quiet fill that says a thing can be clicked; --warn is the one other hue."
       >
-        <span className="rounded-md bg-accent px-snug py-hair text-accent-ink text-caption">
+        <span className="rounded-chip bg-accent px-snug py-hair text-accent-ink text-caption">
           --accent
         </span>
-        <span className="rounded-md bg-accent-soft px-snug py-hair text-accent text-caption">
+        <span className="rounded-chip bg-accent-soft px-snug py-hair text-accent text-caption">
           --accent-soft
         </span>
-        <span className="rounded-md bg-mark px-snug py-hair text-caption text-ink">--mark</span>
-        <span className="rounded-md border border-warn-line bg-warn px-snug py-hair text-caption text-warn-ink">
+        <span className="rounded-chip bg-mark px-snug py-hair text-caption text-ink">--mark</span>
+        <span className="rounded-chip border border-warn-line bg-warn px-snug py-hair text-caption text-warn-ink">
           --warn
         </span>
       </Specimen>

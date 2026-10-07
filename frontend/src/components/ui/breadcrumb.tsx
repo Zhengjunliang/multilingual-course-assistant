@@ -42,7 +42,7 @@ export function Breadcrumb({ label, crumbs }: BreadcrumbProps) {
             ) : (
               <Link
                 to={crumb.to}
-                className="rounded-md hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                className="rounded-chip hover:text-accent focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
               >
                 {crumb.label}
               </Link>

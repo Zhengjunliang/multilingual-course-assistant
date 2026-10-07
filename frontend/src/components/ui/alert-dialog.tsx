@@ -93,7 +93,7 @@ export function AlertDialog({
         <RadixAlertDialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <RadixAlertDialog.Content
           onCloseAutoFocus={onCloseAutoFocus}
-          className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-room overflow-y-auto rounded-lg border border-line bg-surface p-gutter shadow-lg"
+          className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-room overflow-y-auto rounded-card border border-line bg-surface p-gutter shadow-overlay"
         >
           <div className="flex flex-col gap-hair">
             <RadixAlertDialog.Title className="font-semibold text-ink text-title">

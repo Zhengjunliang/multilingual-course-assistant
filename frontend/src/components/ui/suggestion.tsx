@@ -54,7 +54,10 @@ export function Suggestion({
 }: SuggestionProps) {
   return (
     <Button
-      className={cn("rounded-full px-gutter", className)}
+      className={cn(
+        "rounded-full px-gutter hover:border-accent hover:bg-surface hover:text-accent",
+        className,
+      )}
       onClick={() => onClick?.(suggestion)}
       size={size}
       type="button"

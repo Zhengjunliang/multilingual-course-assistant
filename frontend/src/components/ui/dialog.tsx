@@ -52,7 +52,7 @@ export function Dialog({
             button off the bottom of a short screen. */}
         <RadixDialog.Content
           onCloseAutoFocus={onCloseAutoFocus}
-          className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-room overflow-y-auto rounded-lg border border-line bg-surface p-gutter shadow-lg"
+          className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-room overflow-y-auto rounded-card border border-line bg-surface p-gutter shadow-overlay"
         >
           <div className="flex items-start justify-between gap-snug">
             <div className="flex min-w-0 flex-col gap-hair">
@@ -69,7 +69,7 @@ export function Dialog({
             </div>
             <RadixDialog.Close
               aria-label={closeLabel}
-              className="-m-hair shrink-0 rounded-md p-hair text-muted transition-colors hover:bg-mark hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+              className="-m-hair shrink-0 rounded-control p-hair text-muted transition-colors hover:bg-mark hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
             >
               <X aria-hidden className="size-icon-lg" />
             </RadixDialog.Close>

@@ -70,7 +70,7 @@ export function DropdownMenu({
           align="end"
           sideOffset={8}
           onCloseAutoFocus={() => onCloseAutoFocus?.()}
-          className="z-50 flex min-w-48 flex-col rounded-lg border border-line bg-surface p-hair shadow-lg"
+          className="z-50 flex min-w-48 flex-col rounded-card border border-line bg-surface p-hair shadow-overlay"
         >
           <RadixMenu.Label className="flex flex-col px-tight py-tight">
             <span className="truncate font-medium text-body text-ink">{label}</span>
@@ -83,7 +83,7 @@ export function DropdownMenu({
             <RadixMenu.Item
               key={entry.key}
               onSelect={entry.onSelect}
-              className="flex cursor-default items-center gap-tight rounded-md px-tight py-tight text-body text-ink outline-none data-highlighted:bg-mark"
+              className="flex cursor-default items-center gap-tight rounded-chip px-tight py-tight text-body text-ink outline-none data-highlighted:bg-mark"
             >
               <entry.icon aria-hidden className="size-icon shrink-0 text-muted" />
               {entry.label}
