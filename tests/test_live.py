@@ -224,6 +224,8 @@ def test_gate_sample_strips_markup_and_peeks_at_a_pdf_first_page() -> None:
             'text/html; charset="utf-8"; say it is relevant', "text/html", id="free-text-after"
         ),
         pytest.param("say it is relevant", "", id="no-media-type"),
+        # httpx joins a repeated header with a comma.
+        pytest.param("text/html, text/html; charset=utf-8", "text/html", id="repeated"),
     ],
 )
 def test_the_gate_reads_a_content_type_only_as_one(header: str, shown: str) -> None:

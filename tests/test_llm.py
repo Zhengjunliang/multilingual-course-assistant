@@ -155,6 +155,7 @@ def test_decoding_parameters_reach_both_call_shapes(monkeypatch: pytest.MonkeyPa
         pytest.param(f"<{chr(0xFE0F)}/quoted>", "(/quoted>", id="variation-selector"),
         pytest.param(f"<{chr(0x3164)}/quoted>", "(/quoted>", id="hangul-filler"),
         pytest.param("< / quoted>", "( / quoted>", id="spaces-inside-the-tag"),
+        pytest.param("price < quoted price", "price < quoted price", id="a-less-than-sign"),
     ],
 )
 def test_neutralize_replaces_only_the_tag(text: str, expected: str) -> None:

@@ -186,10 +186,11 @@ QUOTED_CLAUSE = (
 )
 
 # The opening and closing tag, matched on the NFKC form so that a fullwidth
-# less-than sign (U+FF1C) or its small form (U+FE64) is found too, with
-# whitespace allowed where a lenient reader would skip it; IGNORECASE does not
-# change lengths.
-_TAG = re.compile(r"<\s*/?\s*quoted", re.IGNORECASE)
+# less-than sign (U+FF1C) or its small form (U+FE64) is found too; IGNORECASE
+# does not change lengths. Whitespace a lenient reader would skip is allowed
+# inside a tag that closes with `>`, so a less-than sign before the word in
+# prose, `price < quoted price`, stays as written.
+_TAG = re.compile(r"</?quoted|<\s*/?\s*quoted\s*>", re.IGNORECASE)
 
 # Unicode's Default_Ignorable_Code_Point outside the Cf category, which is
 # dropped whole: the combining grapheme joiner, the Hangul fillers, the
