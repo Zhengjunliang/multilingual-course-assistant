@@ -52,9 +52,10 @@ export interface StartEvent {
   /**
    * Where the answer was filed. A request that named no conversation started
    * one, and this is how the client learns which — the value to send back to
-   * make the next question a follow-up.
+   * make the next question a follow-up. `null` for an anonymous question, which
+   * is filed nowhere: the client keeps the thread and sends it back as `history`.
    */
-  conversation_id: number;
+  conversation_id: number | null;
   locale: string;
   route: RouteDecision;
   citations: Citation[];

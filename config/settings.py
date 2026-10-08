@@ -125,10 +125,12 @@ AUTHENTICATION_BACKENDS = [
 # REST framework
 # https://www.django-rest-framework.org/api-guide/settings/
 
-# Every endpoint answers only to a logged-in caller. Not for secrecy — the
-# corpus is course material — but because the thing being served is per-student
-# state: a conversation belongs to somebody, and an anonymous caller has nobody
-# to be. Anything that would have to invent a temporary identity for them is a
+# An endpoint answers only to a logged-in caller unless its view says otherwise,
+# and every view that does is listed with its reason in
+# tests/test_route_permissions.py. Not for secrecy, mostly: what most endpoints
+# serve is per-student state, and a conversation belongs to somebody. The one
+# that answers an anonymous caller, `POST /api/ask`, stores nothing for them
+# rather than inventing a temporary identity to file it under, which would be a
 # second, weaker account system standing next to this one.
 #
 # Throttling is not deferrable either: one POST occupies the GPU for tens of
@@ -148,10 +150,11 @@ REST_FRAMEWORK = {
         *(["rest_framework.authentication.BasicAuthentication"] if DEBUG else []),
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-    # One scoped class instead of the anon/user pair. `AnonRateThrottle` can no
-    # longer be reached at all now that permission is checked first — it would
-    # be dead configuration — and a single `user` rate cannot say both "four
-    # questions a minute" and "five login attempts a minute" at once.
+    # One scoped class instead of the anon/user pair: a single `user` rate
+    # cannot say both "four questions a minute" and "five login attempts a
+    # minute" at once. The scoped class bills an anonymous caller by address,
+    # at the rate of its scope; docs/security.md says why anonymous questions
+    # get no lower one.
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
     # ask: the queue waits 90 seconds and an answer takes tens of them, so about
     # three in flight is all the engine can absorb. Four puts the 429 just past

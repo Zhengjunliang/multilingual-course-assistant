@@ -268,16 +268,20 @@ def test_the_django_locale_maps_onto_the_one_rag_speaks() -> None:
     assert normalize_locale("it") == "it"
 
 
-def test_a_logged_in_question_without_the_csrf_token_is_refused(student: User) -> None:
-    """The debt apps/qa/views.py used to record, from the other side.
+@pytest.mark.parametrize("logged_in", [True, False], ids=["logged-in", "anonymous"])
+def test_a_question_without_the_csrf_token_is_refused(student: User, logged_in: bool) -> None:
+    """A cookie rides along with every request the browser makes, including one
+    a different site caused. The token is what separates those, and it is
+    enforced before the handler, so a refused request costs no GPU at all.
 
-    A session cookie rides along with every request the browser makes, including
-    one a different site caused. The token is what separates those, and it is
-    enforced during authentication — before the handler, so a refused request
-    costs no GPU at all.
+    Logged in, `SessionAuthentication` checks it while authenticating. Anonymous,
+    there is no session for that class to check, and the view's permission
+    class does it instead (apps/accounts/permissions.py): without it any site
+    could ask from a visitor's browser, on the visitor's rate limit.
     """
     client = APIClient(enforce_csrf_checks=True)
-    assert client.login(username=USERNAME, password=PASSWORD)
+    if logged_in:
+        assert client.login(username=USERNAME, password=PASSWORD)
 
     response = client.post(ASK_URL, {"question": "What is an ORM?"}, format="json")
 
@@ -285,7 +289,10 @@ def test_a_logged_in_question_without_the_csrf_token_is_refused(student: User) -
     assert engine_module._HOLDER.engine is None
 
 
-def test_the_csrf_token_from_the_cookie_gets_a_request_through(student: User) -> None:
+@pytest.mark.parametrize("logged_in", [True, False], ids=["logged-in", "anonymous"])
+def test_the_csrf_token_from_the_cookie_gets_a_request_through(
+    student: User, logged_in: bool
+) -> None:
     """The other half: the SPA's actual recipe has to work.
 
     It stops at the serializer on purpose — a blank question is refused at
@@ -293,7 +300,8 @@ def test_the_csrf_token_from_the_cookie_gets_a_request_through(student: User) ->
     far as this test can go without loading a model into a GPU.
     """
     client = APIClient(enforce_csrf_checks=True)
-    assert client.login(username=USERNAME, password=PASSWORD)
+    if logged_in:
+        assert client.login(username=USERNAME, password=PASSWORD)
     client.get(ME_URL)  # what issues the cookie
     token = client.cookies["csrftoken"].value
 

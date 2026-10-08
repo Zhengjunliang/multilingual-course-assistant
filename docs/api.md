@@ -4,7 +4,7 @@ This file owns the HTTP API the site serves: accounts, question answering, conve
 
 ## Accounts
 
-Every endpoint needs a session except `GET /api/auth/me`, `login` and `register`, and that includes `POST /api/ask`: a stored conversation belongs to someone. 🔜 M5 `#93`: anonymous students ask campus questions only, with their history kept in the browser and nothing stored ([docs/decisions.md](decisions.md), 2026-09-25, *The data model is decided on paper*, point 3).
+Every endpoint needs a session except `GET /api/auth/me`, `login`, `register` and `POST /api/ask`: a stored conversation belongs to someone, and an anonymous student asks campus questions only, with nothing stored and the history sent back by the client (section *Multi-turn conversations*; [docs/decisions.md](decisions.md), 2026-09-25, *The data model is decided on paper*, point 3). An anonymous `POST` carries the CSRF token, as a logged-in one does ([apps/accounts/permissions.py](../apps/accounts/permissions.py)).
 
 | Method and path | Does |
 | --------------- | ---- |
@@ -14,11 +14,11 @@ Every endpoint needs a session except `GET /api/auth/me`, `login` and `register`
 | `POST /api/auth/logout` | end the session (204) |
 | `POST /api/auth/register` | open self-registration, logged in on success (201) |
 
-`me` answers 200 rather than 403 when nobody is logged in because with `SessionAuthentication` alone DRF answers unauthenticated calls with 403 — and a failed CSRF check is also 403. Making "nobody is logged in" a normal result leaves 403 one meaning: this request was refused. Throttling is per endpoint (`ask` 4/min per account, `auth` 5/min per address) with no global cap; the reasons are next to the rates in [config/settings.py](../config/settings.py).
+`me` answers 200 rather than 403 when nobody is logged in because with `SessionAuthentication` alone DRF answers unauthenticated calls with 403 — and a failed CSRF check is also 403. Making "nobody is logged in" a normal result leaves 403 one meaning: this request was refused. Throttling is per endpoint (`ask` 4/min per account or, anonymous, per address; `auth` 5/min per address) with no global cap; the reasons are next to the rates in [config/settings.py](../config/settings.py).
 
 ## Question-answering API
 
-`POST /api/ask` is the same chain as `rag.agent` over HTTP — route, retrieve, generate — and it answers with a **server-sent event stream**, not a JSON body: one answer takes tens of seconds, and streaming is how the reader sees the system working. It needs what the CLI needs (Ollama running, the Qdrant service up and indexed) plus the server and an account.
+`POST /api/ask` is the same chain as `rag.agent` over HTTP — route, retrieve, generate — and it answers with a **server-sent event stream**, not a JSON body: one answer takes tens of seconds, and streaming is how the reader sees the system working. It needs what the CLI needs (Ollama running, the Qdrant service up and indexed) plus the server, and an account for course material: an anonymous question is searched against the campus pages only (`scope=[]`, [data-model.md](data-model.md)), so one routed to the slides gets no citation and the refusal, and `route.target` in the `start` event says why.
 
 ```powershell
 $json = @{ question = "What is an ORM?" } | ConvertTo-Json
@@ -46,6 +46,8 @@ The first request takes about a minute while the models load into GPU memory. An
 
 `POST /api/ask` takes an optional `conversation_id` to continue a conversation; without it a new one starts, and its id arrives in the `start` event.
 
+An anonymous caller has no stored conversation: it omits `conversation_id`, gets `"conversation_id": null` in the `start` event, and sends its own history as `history`, a list of at most 3 `{"question", "answer"}` objects, oldest first, with each question at most 1000 characters and each answer at most 4000 (`MAX_HISTORY_ANSWER_CHARS`, [apps/qa/serializers.py](../apps/qa/serializers.py)), empty where the answer never arrived. The server stores none of it and trusts none of it: it is bounded, quoted in the prompt like any text the project did not write, and anything out of bounds is a 400. Each caller has one source of history, so an anonymous `conversation_id`, or a logged-in `history` (even `[]`), is a 400 too.
+
 | Method and path | Does |
 | --------------- | ---- |
 | `GET /api/conversations` | the sidebar list; titles derive from the first question, and conversations with no messages are not listed |
@@ -55,7 +57,7 @@ The first request takes about a minute while the models load into GPU memory. An
 - The last 3 turns (`HISTORY_WINDOW_TURNS`, [apps/qa/models.py](../apps/qa/models.py)) go into the prompt with the next question. The window is capped because the 4B model's context is the same space the retrieved excerpts need.
 - **The router sees only the student's past questions**; the generator sees whole turns, with answers cut to 400 characters and stripped of citation markers (they point at excerpts this turn does not have). History is always one `user` message, never alternating roles: the router is asked to output one JSON object, and a real `assistant` prose turn demonstrates the opposite. The sha256 of both prompts is pinned in `tests/test_agent.py` and `tests/test_answer.py`.
 - Answers are **stored as they stream**: question and empty answer are written just before `start`, the text when the stream stops. `complete` is true only when `end` arrived; a half answer is kept, unless the student deletes the conversation, because it is what the student saw and a sample for the M3 error taxonomy. `citations` and `route` are stored with it, so a stored turn renders exactly like a live one.
-- Errors: 400 validation · 403 not logged in or wrong CSRF token (told apart by `GET /api/auth/me`) · 429 throttled · 503 a dependency is unavailable. With `Accept: text/event-stream` they arrive as an `error` event, otherwise as JSON.
+- Errors: 400 validation · 403 a wrong CSRF token, or on the conversation endpoints not logged in (told apart by `GET /api/auth/me`) · 429 throttled · 503 a dependency is unavailable. With `Accept: text/event-stream` they arrive as an `error` event, otherwise as JSON.
 - **These messages are in English by decision, not by omission**: the interface belongs to the frontend catalogues, the answer language to the prompt in [rag/answer.py](../rag/answer.py), and the readers of a 503 or an `error` are whoever reads the server log — a catalogue for them would have no reader. The strings stay marked with `gettext_lazy`. **A visible consequence, so it is not chased as a bug**: DRF's own validation messages do have Italian translations and follow `Accept-Language` (`LANGUAGE_CODE` is `it`), so one 400 body can hold both `"Questo campo è obbligatorio."` and `"No such conversation."`.
 
 The deepening loop is not in this endpoint: it fetches pages and writes to the shared index, up to 3 fetches, so it runs only from `rag.agent` on the command line. Its web path is an asynchronous task (🔜 `#34`, M5).

@@ -58,6 +58,10 @@ OPEN: dict[str, str] = {
     ),
     "accounts:login": "logging in is what a caller without a session does",
     "accounts:register": "anyone may open an account",
+    "qa:ask": (
+        "an anonymous student may ask campus questions; AskView stores nothing for them "
+        "and answers them from no course material"
+    ),
     "spa": "the shell is static HTML; every call it makes is an API route checked here",
     "favicon": "a redirect to a public static file, reading nothing",
 }

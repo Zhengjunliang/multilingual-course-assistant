@@ -20,7 +20,8 @@ conversation stage is what ended that: the endpoint now writes the question and
 the answer as it goes. The promise moved rather than disappeared — it is
 `tests/test_qa_engine.py`, which drives the engine directly and carries no
 marker, so the layer that must stay query-free still fails loudly if it stops
-being.
+being. Here it holds for an anonymous question alone, which is stored nowhere
+and is held to zero queries below.
 
 Sessions are not exercised here either. `force_authenticate` replaces
 authentication wholesale, so a test of what `SessionAuthentication` enforces
@@ -38,7 +39,8 @@ import httpx
 import pytest
 from django.core.cache import cache
 from django.core.signals import request_finished
-from django.db import close_old_connections
+from django.db import close_old_connections, connection
+from django.test.utils import CaptureQueriesContext
 from openai import APIConnectionError, NotFoundError
 from pydantic import ValidationError
 from qdrant_client import QdrantClient, models
@@ -52,7 +54,7 @@ from apps.qa import engine as engine_module
 from apps.qa import views as views_module
 from apps.qa.engine import Engine
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
-from apps.qa.serializers import MAX_QUESTION_CHARS
+from apps.qa.serializers import MAX_HISTORY_ANSWER_CHARS, MAX_QUESTION_CHARS
 from config.env import env
 from rag import index as rag_index
 from rag import search as rag_search
@@ -94,12 +96,15 @@ def make_web_chunk() -> Chunk:
 
 class ScriptedStreamer:
     """Generation, as a fixed token sequence. Where it breaks decides what the
-    endpoint has to emit as separate `token` events."""
+    endpoint has to emit as separate `token` events. `prompts` keeps what each
+    call was given, joined, for the tests about what reaches generation."""
 
     def __init__(self, tokens: Sequence[str]) -> None:
         self.tokens = list(tokens)
+        self.prompts: list[str] = []
 
     def stream(self, messages: Sequence[ChatMessage]) -> Iterator[str]:
+        self.prompts.append("\n".join(message["content"] for message in messages))
         yield from self.tokens
 
 
@@ -629,31 +634,19 @@ def test_a_qdrant_url_the_client_cannot_parse_is_a_503(monkeypatch: pytest.Monke
     assert engine_module._HOLDER.engine is None
 
 
-def test_an_anonymous_question_is_refused(index: QdrantClient) -> None:
-    """The endpoint answered anybody until the login stage. It is the first
-    thing a browser reaches, so the check that it no longer does belongs next to
-    the answering it guards, not only in the settings file that turned it on."""
-    install_engine(index, SLIDES_ROUTE)
-    response = ask(anonymous=True)
-
-    assert response.status_code == 403
-    # Nothing was built and nothing was locked: permission is checked before the
-    # handler runs, so an unauthenticated burst never reaches the GPU.
-    assert engine_module._HOLDER.lock.acquire(blocking=False)
-    engine_module._HOLDER.lock.release()
-
-
-def test_the_ask_scope_rate_limit_returns_429(index: QdrantClient) -> None:
+@pytest.mark.parametrize("anonymous", [False, True], ids=["logged-in", "anonymous"])
+def test_the_ask_scope_rate_limit_returns_429(index: QdrantClient, anonymous: bool) -> None:
     """Answers are serialised on one GPU, so a burst has to be refused rather
     than queued into a timeout.
 
     Its own scope, not a rate shared with the login endpoints: what bounds this
-    one is how fast the card can answer (config/settings.py).
+    one is how fast the card can answer (config/settings.py). An anonymous
+    caller is counted by address, at the same rate.
     """
     codes = []
     for _ in range(5):
-        install_engine(index, SLIDES_ROUTE, ["ok"])
-        response = ask()
+        install_engine(index, WEB_ROUTE, ["ok"])
+        response = ask(anonymous=anonymous)
         codes.append(response.status_code)
         finish(response)
     assert codes[:4] == [200] * 4
@@ -1038,3 +1031,133 @@ def test_a_conversation_deleted_while_its_question_waits_is_refused(
     assert len(kept) == 1
     assert engine_module._HOLDER.lock.locked() is False
     assert not Message.objects.exists()
+
+
+# What an anonymous browser sends back after one campus exchange.
+FEES_TURN = {"question": "Quando scadono le tasse?", "answer": f"Il 30 novembre {WEB_MARKER}."}
+
+
+def test_an_anonymous_question_is_answered_without_a_query(index: QdrantClient) -> None:
+    """Nothing of an anonymous student's is kept, and the strongest way to say
+    so is that the whole request, stream included, makes no query at all."""
+    install_engine(index, WEB_ROUTE, ["Entro il 30 novembre ", WEB_MARKER])
+
+    with CaptureQueriesContext(connection) as captured:
+        stream = events(ask("E se pago in ritardo?", anonymous=True, history=[FEES_TURN]))
+
+    assert captured.captured_queries == []
+    assert names(stream) == ["start", "token", "token", "end"]
+    assert start_of(stream)["conversation_id"] is None
+
+
+@pytest.mark.parametrize(
+    ("route_reply", "kinds"),
+    [(BOTH_ROUTE, ["web"]), (SLIDES_ROUTE, [])],
+    ids=["both", "slides"],
+)
+def test_an_anonymous_question_never_reaches_course_material(
+    index: QdrantClient, route_reply: str, kinds: list[str]
+) -> None:
+    """Course material is for students with an account. A question routed to
+    both collections is answered from the campus half; one routed to slides
+    alone finds nothing, and the model is never asked to answer it."""
+    engine = install_engine(index, route_reply)
+
+    stream = events(ask(anonymous=True))
+
+    assert [citation["kind"] for citation in start_of(stream)["citations"]] == kinds
+    if not kinds:
+        assert engine.streamer.prompts == []  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def test_an_anonymous_history_reaches_the_router_and_generation(index: QdrantClient) -> None:
+    """The history the browser sends plays the part a stored one plays: the
+    router gets the earlier questions, generation the whole exchanges."""
+    engine = install_engine(index, WEB_ROUTE)
+
+    events(ask("E se pago in ritardo?", anonymous=True, history=[FEES_TURN]))
+
+    router_prompt = engine.completer.questions[-1]  # pyright: ignore[reportAttributeAccessIssue]
+    generation_prompt = engine.streamer.prompts[-1]  # pyright: ignore[reportAttributeAccessIssue]
+    assert FEES_TURN["question"] in router_prompt
+    assert "Il 30 novembre" not in router_prompt
+    assert FEES_TURN["question"] in generation_prompt
+    assert "Il 30 novembre" in generation_prompt
+
+
+@pytest.mark.parametrize(
+    "history",
+    [
+        [FEES_TURN] * (HISTORY_WINDOW_TURNS + 1),
+        [{**FEES_TURN, "question": "x" * (MAX_QUESTION_CHARS + 1)}],
+        [{**FEES_TURN, "answer": "x" * (MAX_HISTORY_ANSWER_CHARS + 1)}],
+        [{**FEES_TURN, "question": "   "}],
+        [{"question": FEES_TURN["question"]}],
+        [FEES_TURN["question"]],
+        FEES_TURN,
+        None,
+    ],
+    ids=[
+        "too-many-turns",
+        "question-too-long",
+        "answer-too-long",
+        "blank-question",
+        "no-answer",
+        "turn-not-an-object",
+        "not-a-list",
+        "null",
+    ],
+)
+def test_an_anonymous_history_out_of_bounds_is_refused(
+    index: QdrantClient, history: object
+) -> None:
+    """The browser's copy is untrusted input, bounded before anything runs."""
+    engine = install_engine(index, WEB_ROUTE)
+
+    response = ask(anonymous=True, history=history)
+
+    assert response.status_code == 400
+    assert "history" in response.json()
+    assert engine.completer.questions == []  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def test_an_anonymous_history_at_its_bounds_is_accepted(index: QdrantClient) -> None:
+    """A full window, an answer at its cap and an answer that never arrived."""
+    install_engine(index, WEB_ROUTE)
+    history = [
+        FEES_TURN,
+        {**FEES_TURN, "answer": "x" * MAX_HISTORY_ANSWER_CHARS},
+        {**FEES_TURN, "answer": ""},
+    ]
+
+    response = ask(anonymous=True, history=history)
+
+    assert len(history) == HISTORY_WINDOW_TURNS
+    assert response.status_code == 200
+    finish(response)
+
+
+def test_an_anonymous_question_cannot_continue_a_stored_conversation(
+    index: QdrantClient,
+) -> None:
+    """Even one that exists: without an account there is nobody it could belong to."""
+    install_engine(index, WEB_ROUTE)
+    theirs = Conversation.objects.create(owner=student(), locale="it")
+
+    response = ask(anonymous=True, conversation_id=theirs.pk)
+
+    assert response.status_code == 400
+    assert "conversation_id" in response.json()
+    assert not Message.objects.exists()
+
+
+def test_a_logged_in_question_cannot_bring_its_own_history(index: QdrantClient) -> None:
+    """A logged-in conversation's history is the stored one. A copy sent
+    alongside it, empty or not, could only contradict it."""
+    install_engine(index, WEB_ROUTE)
+
+    response = ask(history=[])
+
+    assert response.status_code == 400
+    assert "history" in response.json()
+    assert not Conversation.objects.exists()

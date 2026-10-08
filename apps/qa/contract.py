@@ -144,13 +144,15 @@ class StartEvent(Event):
 
     `conversation_id` is where the answer was filed. A request that named no
     conversation started one, and this is how the client learns which — the
-    value it sends back to make the next question a follow-up.
+    value it sends back to make the next question a follow-up. None for an
+    anonymous question, which is filed nowhere: its client keeps the thread and
+    sends it back as `history` (apps/qa/serializers.py).
     """
 
     NAME = "start"
 
     question: str
-    conversation_id: int
+    conversation_id: int | None
     locale: str
     route: RouteDecision
     citations: list[Citation]
