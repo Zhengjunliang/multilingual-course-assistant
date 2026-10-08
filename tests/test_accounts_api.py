@@ -311,6 +311,46 @@ def test_the_csrf_token_from_the_cookie_gets_a_request_through(
     assert "question" in response.json()
 
 
+SIGN_INS = [
+    pytest.param(LOGIN_URL, USERNAME, id="login"),
+    pytest.param(REGISTER_URL, "ada", id="register"),
+]
+
+
+@pytest.mark.parametrize(("url", "username"), SIGN_INS)
+def test_signing_in_without_the_csrf_token_is_refused(
+    student: User, url: str, username: str
+) -> None:
+    """Login CSRF: a form on another site could otherwise sign a visitor's
+    browser into an account the attacker holds, and file every question asked
+    after it where the attacker reads it. Nobody is logged in yet, so DRF checks
+    no token here, and these views ask for it themselves
+    (apps/accounts/permissions.py)."""
+    client = APIClient(enforce_csrf_checks=True)
+
+    response = client.post(url, {"username": username, "password": PASSWORD}, format="json")
+
+    assert response.status_code == 403
+    assert "sessionid" not in response.cookies
+
+
+@pytest.mark.parametrize(("url", "username"), SIGN_INS)
+def test_signing_in_with_the_csrf_token_from_the_cookie_works(
+    student: User, url: str, username: str
+) -> None:
+    """The SPA's recipe, as for a question: read the cookie `me` issues, send it back."""
+    client = APIClient(enforce_csrf_checks=True)
+    client.get(ME_URL)
+    token = client.cookies["csrftoken"].value
+
+    response = client.post(
+        url, {"username": username, "password": PASSWORD}, format="json", HTTP_X_CSRFTOKEN=token
+    )
+
+    assert response.status_code in (200, 201)
+    assert response.json()["authenticated"] is True
+
+
 def test_the_auth_bucket_refuses_a_sixth_attempt_in_a_minute() -> None:
     """A password guess costs the server nothing, which is the problem: without
     a limit the only bound on guessing is the attacker's bandwidth."""

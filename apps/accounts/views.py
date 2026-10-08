@@ -33,6 +33,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import AllowAnyWithCsrf
 from apps.accounts.serializers import LoginSerializer, RegisterSerializer, UserSerializer
 
 if TYPE_CHECKING:
@@ -89,7 +90,9 @@ class SessionView(APIView):
 
 
 class LoginView(APIView):
-    permission_classes = (AllowAny,)
+    # With the token checked, so another site cannot log a visitor's browser
+    # into an account of its own and read what they ask next.
+    permission_classes = (AllowAnyWithCsrf,)
     throttle_scope = "auth"
 
     def post(self, request: Request) -> Response:
@@ -111,7 +114,8 @@ class LogoutView(APIView):
 
 
 class RegisterView(APIView):
-    permission_classes = (AllowAny,)
+    # Checked for the reason LoginView is: registering signs the caller in.
+    permission_classes = (AllowAnyWithCsrf,)
     throttle_scope = "auth"
 
     def post(self, request: Request) -> Response:
