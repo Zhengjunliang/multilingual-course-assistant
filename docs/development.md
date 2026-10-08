@@ -25,7 +25,7 @@ git config pull.rebase true      # history is linear: a pull rebases onto main i
 | run everything CI runs | `uv run python scripts/check.py` |
 | query or build an embedded index instead (tests, a machine without Docker) | `--qdrant <directory>` on any `rag` command that opens the index; one process holds it at a time |
 
-A test is added, changed or deleted by the criteria of [docs/testing.md](testing.md), which also lists the tests kept whatever the criteria say.
+A test is added, changed or deleted by the rules of [docs/testing.md](testing.md): the deletion criteria, the tests kept whatever they say, where a regression test goes and what a test may fake.
 
 **Changing a model** means regenerating the app's migration and rebuilding the local database, or the suite goes red (`test_no_pending_migrations` in `tests/test_accounts.py`). Until a database has to keep its data, each app has one migration, `0001_initial.py`, rewritten on every change rather than followed by a `0002` ([docs/decisions.md](decisions.md), 2026-09-25, *The data model is decided on paper*, point 5). Save the data **before** editing the model — `dumpdata` reads every column the model declares, so it fails once the model is ahead of the database — then run the rest one line at a time, stopping at the first that fails: the `docker compose rm` line deletes the local database.
 
