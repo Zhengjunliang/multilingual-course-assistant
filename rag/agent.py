@@ -53,7 +53,16 @@ from rag.live import (
     shared_robots,
     shared_throttle,
 )
-from rag.llm import Completer, Message, build_completer, build_streamer, complete_json
+from rag.llm import (
+    QUOTED_CLAUSE,
+    Completer,
+    Message,
+    build_completer,
+    build_streamer,
+    complete_json,
+    neutralize,
+    quote,
+)
 from rag.probe import configure_cli_logging
 from rag.search import DEFAULT_RERANK_MODEL, Hit, build_reranker, search
 
@@ -109,7 +118,7 @@ stored snapshot (an open call, a current deadline).
 Reply with ONLY one JSON object, no prose:
 {"target": "slides|unifi_web|both", "query": "...", "fresh": false, "reason": "..."}"""
 
-ASSESS_SYSTEM_PROMPT = """\
+ASSESS_SYSTEM_PROMPT = f"""\
 You decide whether the excerpts already retrieved answer the student's question.
 
 Answer "answerable": true only when the excerpts state the fact the question \
@@ -119,10 +128,12 @@ the right office without the answer is not an answer.
 Saying false costs one more page fetch; saying true on thin material costs the \
 student a wrong answer.
 
-Reply with ONLY one JSON object, no prose:
-{"answerable": false, "reason": "..."}"""
+{QUOTED_CLAUSE}
 
-PICK_SYSTEM_PROMPT = """\
+Reply with ONLY one JSON object, no prose:
+{{"answerable": false, "reason": "..."}}"""
+
+PICK_SYSTEM_PROMPT = f"""\
 You pick the one link most likely to contain the answer to the student's \
 question. The candidates are numbered and PDF attachments are marked [PDF]; \
 a form or a decree is often where an administrative answer actually lives.
@@ -133,9 +144,11 @@ least bad one: what gets fetched is stored for every later question too, so \
 following a link you have already judged irrelevant costs more than leaving \
 this question unanswered.
 
+{QUOTED_CLAUSE}
+
 Reply with the number of exactly one candidate, or with that refusal, and ONLY \
 one JSON object, no prose:
-{"choice": 1, "unsuitable": false, "reason": "..."}"""
+{{"choice": 1, "unsuitable": false, "reason": "..."}}"""
 
 
 class RouteDecision(BaseModel):
@@ -431,10 +444,15 @@ def graph_outlinks(
 
 def format_candidates(candidates: Sequence[Candidate]) -> str:
     """The numbered list the model chooses from; an anchor-less link says so
-    rather than showing an empty label the model would read as noise."""
+    rather than showing an empty label the model would read as noise.
+
+    The anchor is the linking page's text, so it is quoted, under the line that
+    numbers the link; the URL stays on that line and is neutralized, since it
+    keeps whatever the page wrote."""
     return "\n".join(
         f"{number}. {'[PDF] ' if is_pdf(candidate.link.url, '') else ''}"
-        f"{candidate.link.text or '(no anchor text)'} <{candidate.link.url}>"
+        f"<{neutralize(candidate.link.url)}>\n"
+        f"{quote(candidate.link.text) if candidate.link.text else '(no anchor text)'}"
         for number, candidate in enumerate(candidates, start=1)
     )
 

@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, ConfigDict
 
 from rag.chunk import detect_locale, locale_arg
-from rag.llm import ChatStreamer, Message, build_streamer
+from rag.llm import QUOTED_CLAUSE, ChatStreamer, Message, build_streamer, neutralize, quote
 from rag.probe import configure_cli_logging
 from rag.search import (
     DEFAULT_RERANK_MODEL,
@@ -46,16 +46,17 @@ HISTORY_ANSWER_CHARS = 400
 # a bracketed aside lost from a truncated old answer costs nothing.
 _BRACKETED = re.compile(r"\[[^\]]*\]")
 
-SYSTEM_PROMPT = """\
+SYSTEM_PROMPT = f"""\
 You are a course assistant answering questions about university course material.
 
 Rules:
 - Answer ONLY from the numbered excerpts provided by the user. Do not use outside knowledge.
+- {QUOTED_CLAUSE}
 - Cite every claim by copying the bracketed source marker of its excerpt EXACTLY, \
 character for character. Never shorten a marker, never invent one, and never \
 write "Excerpt N" — the marker is the [...] label shown next to the excerpt.
 - If the excerpts do not contain the answer, say so plainly instead of guessing.
-- Answer in {language}.
+- Answer in {{language}}.
 - Be concise: a student wants the concept, not an essay."""
 
 
@@ -93,10 +94,11 @@ def format_history(turns: Sequence[Turn]) -> str:
     left in an old answer is a label the model can copy while the excerpt behind
     it is nowhere in this turn's context, which is a citation that resolves to
     nothing; removing them leaves history as prose to refer back to and nothing
-    to cite from.
+    to cite from. Each exchange is quoted: an anonymous conversation's history
+    is whatever the browser sends back, answers included.
     """
     blocks = [
-        f"Student: {turn.question}\nAssistant: {_shorten(_BRACKETED.sub('', turn.answer))}"
+        quote(f"Student: {turn.question}\nAssistant: {_shorten(_BRACKETED.sub('', turn.answer))}")
         for turn in turns
     ]
     return "Earlier in this conversation, oldest first:\n\n" + "\n\n".join(blocks)
@@ -112,19 +114,24 @@ def _shorten(text: str) -> str:
 def source_marker(hit: Hit) -> str:
     """Web chunks cite by URL and fetch date (the page a student can open);
     slides keep file + page. The Sources footer downstream renders the same
-    markers, so this is the single citation shape for both collections."""
+    markers, so this is the single citation shape for both collections.
+
+    A marker stands outside the quoted excerpt, and a crawled link keeps
+    whatever its page wrote (`urljoin` in rag/crawl.py), so it is neutralized
+    here: the citation the API returns is this same string."""
     if hit.chunk.kind == "web" and hit.chunk.url:
         date = f" · {hit.chunk.fetch_date}" if hit.chunk.fetch_date else ""
-        return f"[{hit.chunk.url}{date}]"
-    return f"[{hit.chunk.source_file} p.{hit.chunk.page}]"
+        return neutralize(f"[{hit.chunk.url}{date}]")
+    return neutralize(f"[{hit.chunk.source_file} p.{hit.chunk.page}]")
 
 
 def format_context(hits: Sequence[Hit]) -> str:
     """Number the excerpts and tag each with the citation marker the model is
     told to reuse; raw `text` is what the user could be shown, so it is also
-    what claims are grounded on."""
+    what claims are grounded on. The number and the marker are this project's,
+    outside the quoted text."""
     blocks = [
-        f"Excerpt {number} {source_marker(hit)}:\n{hit.chunk.text}"
+        f"Excerpt {number} {source_marker(hit)}:\n{quote(hit.chunk.text)}"
         for number, hit in enumerate(hits, start=1)
     ]
     return "\n\n".join(blocks)
@@ -142,9 +149,9 @@ def build_messages(
     that neither can teach it the other's habits.
 
     It sits ahead of the excerpts so that what the answer must be grounded in is
-    the last thing before the question. With no history the two messages are
-    byte for byte what they were before conversations existed, which is what
-    keeps the M3 measurements comparable.
+    the last thing before the question. With no history the user message is the
+    excerpts and the question and nothing else, the prompt the M3 measurements
+    run with.
     """
     language = LOCALE_NAMES.get(locale, "the language of the question")
     earlier = f"{format_history(history)}\n\n" if history else ""
