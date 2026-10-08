@@ -646,7 +646,7 @@ def test_the_ask_scope_rate_limit_returns_429(index: QdrantClient, anonymous: bo
     codes = []
     for _ in range(5):
         install_engine(index, WEB_ROUTE, ["ok"])
-        response = ask(anonymous=anonymous)
+        response = ask(anonymous=True, history=[]) if anonymous else ask()
         codes.append(response.status_code)
         finish(response)
     assert codes[:4] == [200] * 4
@@ -1063,7 +1063,7 @@ def test_an_anonymous_question_never_reaches_course_material(
     alone finds nothing, and the model is never asked to answer it."""
     engine = install_engine(index, route_reply)
 
-    stream = events(ask(anonymous=True))
+    stream = events(ask(anonymous=True, history=[]))
 
     assert [citation["kind"] for citation in start_of(stream)["citations"]] == kinds
     if not kinds:
@@ -1137,17 +1137,26 @@ def test_an_anonymous_history_at_its_bounds_is_accepted(index: QdrantClient) -> 
     finish(response)
 
 
-def test_an_anonymous_question_cannot_continue_a_stored_conversation(
-    index: QdrantClient,
+@pytest.mark.parametrize("names_a_conversation", [False, True], ids=["no-history", "an-id"])
+def test_a_request_shaped_for_a_session_that_has_none_is_refused_as_one_that_ended(
+    index: QdrantClient, names_a_conversation: bool
 ) -> None:
-    """Even one that exists: without an account there is nobody it could belong to."""
-    install_engine(index, WEB_ROUTE)
+    """No history, or a conversation's id, is what a signed-in client sends;
+    arriving without a session, it is one whose session ended in another tab
+    or ran out. It gets the 403 that client acts on, before anything runs,
+    rather than an answer as a visitor that it would render as its own and
+    then lose."""
+    engine = install_engine(index, WEB_ROUTE)
     theirs = Conversation.objects.create(owner=student(), locale="it")
 
-    response = ask(anonymous=True, conversation_id=theirs.pk)
+    response = (
+        ask(anonymous=True, conversation_id=theirs.pk, history=[])
+        if names_a_conversation
+        else ask(anonymous=True)
+    )
 
-    assert response.status_code == 400
-    assert "conversation_id" in response.json()
+    assert response.status_code == 403
+    assert engine.completer.questions == []  # pyright: ignore[reportAttributeAccessIssue]
     assert not Message.objects.exists()
 
 

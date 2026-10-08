@@ -83,6 +83,7 @@ function open(dialog: ReactElement) {
         logOut: async () => {},
         chooseLocale: async () => {},
         forget: () => {},
+        recheck: async () => {},
       }}
     >
       {dialog}

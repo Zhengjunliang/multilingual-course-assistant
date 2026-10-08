@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from rest_framework.exceptions import NotAuthenticated
 
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from rag.answer import Turn
@@ -63,18 +64,19 @@ class AskRequest(serializers.Serializer):
     that matches its caller. A logged-in caller names a stored conversation by
     `conversation_id`, and the server reads the history from it. An anonymous
     caller has nothing stored and sends `history` itself, its last few
-    exchanges, oldest first: the cap is the window a stored conversation is
-    cut to (`HISTORY_WINDOW_TURNS`), so the prompt is built the same way on
-    both paths.
+    exchanges, oldest first, `[]` for a first question: the cap is the window
+    a stored conversation is cut to (`HISTORY_WINDOW_TURNS`), so the prompt is
+    built the same way on both paths.
     """
 
     question = serializers.CharField(max_length=MAX_QUESTION_CHARS, trim_whitespace=True)
     # Omitted or null starts a new conversation; the id of the one that was
     # started comes back in the `start` event.
     conversation_id = serializers.IntegerField(required=False, allow_null=True, default=None)
-    # No default: `validate` tells an omitted history from an empty one, and a
-    # logged-in caller may send neither. The list spelled out rather than
-    # `many=True`, which builds the same one but whose stub drops `max_length`.
+    # No default: `validate` tells an omitted history from an empty one. An
+    # anonymous caller always sends one, a logged-in caller never does. The
+    # list spelled out rather than `many=True`, which builds the same one but
+    # whose stub drops `max_length`.
     history = serializers.ListSerializer(
         child=TurnSerializer(), required=False, max_length=HISTORY_WINDOW_TURNS
     )
@@ -100,10 +102,16 @@ class AskRequest(serializers.Serializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Take the history from where the caller keeps it, and refuse the other source.
 
-        Each caller has one source, and a request naming the other is a 400
-        rather than a field quietly ignored: an anonymous caller has no stored
-        conversation to continue, and a logged-in caller's history is the
-        stored one, which a client-sent copy could only contradict.
+        Each caller has one source, and a request naming the other is refused
+        rather than a field quietly ignored. A logged-in caller's history is
+        the stored one, which a client-sent copy could only contradict: a 400.
+        A request without a session that sends no history, or names a stored
+        conversation, is shaped the way a signed-in client shapes its own; it
+        is one whose session ended in another tab or ran out. It gets the 403
+        such a client acts on by asking its reader to sign in again
+        (frontend/src/api/client.ts, `isRefusal`), as it did before anonymous
+        questions existed, and before the engine runs: answered as a visitor,
+        it would render the reply as its own and lose it on its next call.
 
         For a logged-in caller, the conversation id becomes the row, or a
         refusal. One message for "no such conversation" and for "that one is
@@ -119,11 +127,9 @@ class AskRequest(serializers.Serializer):
         request: Request = self.context["request"]
         attrs["conversation"] = None
         if not request.user.is_authenticated:
-            if attrs.get("conversation_id") is not None:
-                raise serializers.ValidationError(
-                    {"conversation_id": _("Without an account, send the history instead.")}
-                )
-            attrs["history"] = [Turn(**turn) for turn in attrs.get("history", [])]
+            if "history" not in attrs or attrs.get("conversation_id") is not None:
+                raise NotAuthenticated
+            attrs["history"] = [Turn(**turn) for turn in attrs["history"]]
             return attrs
 
         if "history" in attrs:

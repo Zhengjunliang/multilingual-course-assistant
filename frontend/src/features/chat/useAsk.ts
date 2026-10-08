@@ -120,7 +120,9 @@ function replayed(messages: readonly StoredMessage[]): Turn[] {
  * which is where a stored conversation writes its rows, so a question refused
  * with a 503 leaves no hole. An interrupted answer goes as it stands, since it
  * is what the reader saw. Answers are cut to the server's cap; the prompt keeps
- * less than that anyway.
+ * less than that anyway. The cut counts code points, as the server does, and
+ * not UTF-16 units: a cut inside a character outside the BMP leaves half of it
+ * behind, which the server refuses.
  */
 export function historyOf(turns: readonly Turn[]): HistoryTurn[] {
   return turns
@@ -128,7 +130,7 @@ export function historyOf(turns: readonly Turn[]): HistoryTurn[] {
     .slice(-HISTORY_WINDOW_TURNS)
     .map((turn) => ({
       question: turn.question,
-      answer: turn.answer.slice(0, MAX_HISTORY_ANSWER_CHARS),
+      answer: Array.from(turn.answer).slice(0, MAX_HISTORY_ANSWER_CHARS).join(""),
     }));
 }
 
