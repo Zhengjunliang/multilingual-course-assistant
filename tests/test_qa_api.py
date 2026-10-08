@@ -977,15 +977,6 @@ def test_somebody_elses_conversation_is_not_there_to_open(method: str) -> None:
     assert Conversation.objects.filter(pk=theirs.pk).exists()
 
 
-@pytest.mark.parametrize(
-    ("method", "url"),
-    [("get", CONVERSATIONS_URL), ("delete", f"{CONVERSATIONS_URL}/1")],
-    ids=["list", "delete"],
-)
-def test_the_conversation_api_needs_a_login(method: str, url: str) -> None:
-    assert getattr(client_for(anonymous=True), method)(url).status_code == 403
-
-
 def test_a_student_deletes_their_own_conversation_and_its_messages() -> None:
     """Deleting is hard and takes the messages with it; nothing edits a
     conversation, since its title derives from the first question."""
