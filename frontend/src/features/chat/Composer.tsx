@@ -1,13 +1,11 @@
 import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { MAX_QUESTION_CHARS } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { MAX_BUSY_RETRIES, type Waiting } from "./useAsk";
-
-/** The server's own cap (apps/qa/serializers.py); enforced here so the reader sees it coming. */
-const MAX_QUESTION_CHARS = 1000;
 
 interface ComposerProps {
   waiting: Waiting;

@@ -16,7 +16,7 @@ import re
 from pathlib import Path
 
 import pytest
-from test_qa_contract import declaration
+from test_qa_contract import declaration, fields
 
 from apps.catalog.errors import DRF_CODES_SHOWN, StaffError
 from apps.catalog.models import CodeSource
@@ -59,11 +59,6 @@ def union(mirror: str, name: str) -> set[str]:
     if start == -1:
         return set()
     return set(re.findall(r'"([^"]*)"', mirror[start : mirror.find(";", start)]))
-
-
-def fields(body: str | None) -> set[str]:
-    """The field names an interface body declares, one per line; JSDoc lines start with `*`."""
-    return set(re.findall(r"^\s+(\w+)\??:", body or "", re.MULTILINE))
 
 
 def test_the_mirror_declares_exactly_the_serializers_fields(mirror: str) -> None:

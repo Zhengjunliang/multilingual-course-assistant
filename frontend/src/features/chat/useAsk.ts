@@ -11,14 +11,26 @@
  * retry that never gives up is a page that looks like it is working while
  * nothing is. `unavailable` is not retried at all — a model server or a Qdrant
  * service that is not running does not start because we asked again.
+ *
+ * A visitor without an account asks the same way and keeps the thread: the
+ * server stores nothing for them, so each question carries the recent
+ * exchanges back (`historyOf`) and the thread lives in this tab
+ * (`visitorThread.ts`).
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { AskFailed, ask } from "@/api/client";
+import {
+  AskFailed,
+  ask,
+  HISTORY_WINDOW_TURNS,
+  type HistoryTurn,
+  MAX_HISTORY_ANSWER_CHARS,
+} from "@/api/client";
 import type { Citation, RouteDecision } from "@/api/contract";
 import type { ConversationDetail, StoredMessage } from "@/api/conversations";
 import { readAnswerEvents } from "@/api/sse";
+import { readVisitorThread, writeVisitorThread } from "./visitorThread";
 
 export const MAX_BUSY_RETRIES = 2;
 
@@ -100,6 +112,26 @@ function replayed(messages: readonly StoredMessage[]): Turn[] {
   return turns;
 }
 
+/**
+ * What a visitor's question carries back: the server's `recent_turns`
+ * (apps/qa/conversations.py), done on this side.
+ *
+ * The same turns the server would have stored: only those that reached `start`,
+ * which is where a stored conversation writes its rows, so a question refused
+ * with a 503 leaves no hole. An interrupted answer goes as it stands, since it
+ * is what the reader saw. Answers are cut to the server's cap; the prompt keeps
+ * less than that anyway.
+ */
+export function historyOf(turns: readonly Turn[]): HistoryTurn[] {
+  return turns
+    .filter((turn) => turn.route !== null)
+    .slice(-HISTORY_WINDOW_TURNS)
+    .map((turn) => ({
+      question: turn.question,
+      answer: turn.answer.slice(0, MAX_HISTORY_ANSWER_CHARS),
+    }));
+}
+
 function sleep(seconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, seconds * 1000);
@@ -114,12 +146,13 @@ function sleep(seconds: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-export function useAsk() {
-  const [state, setState] = useState<AskState>({
-    turns: [],
+/** `visitor`: nobody is signed in, so nothing is stored and the history travels. */
+export function useAsk(visitor: boolean) {
+  const [state, setState] = useState<AskState>(() => ({
+    turns: visitor ? readVisitorThread() : [],
     waiting: { phase: "idle" },
     conversationId: null,
-  });
+  }));
   const abort = useRef<AbortController | null>(null);
   /**
    * The id the next request will carry.
@@ -137,6 +170,13 @@ export function useAsk() {
   // server is suspended on a yield holding its one engine slot until the
   // connection actually drops.
   useEffect(() => () => abort.current?.abort(), []);
+
+  // Written whenever the thread settles, never once per token: a stream
+  // rewrites the last turn dozens of times a second. A reload mid-answer then
+  // finds the question and the answer as of the last settled moment.
+  useEffect(() => {
+    if (visitor && state.waiting.phase !== "streaming") writeVisitorThread(state.turns);
+  }, [visitor, state.turns, state.waiting.phase]);
 
   const adopt = useCallback((conversation: ConversationDetail) => {
     abort.current?.abort();
@@ -159,56 +199,62 @@ export function useAsk() {
     setState((current) => ({ ...current, waiting: { phase: "idle" } }));
   }, []);
 
-  const submit = useCallback(async (question: string) => {
-    abort.current?.abort();
-    const controller = new AbortController();
-    abort.current = controller;
+  // A visitor's history is taken before this question joins the thread, and
+  // once: a busy retry sends the same request again.
+  const submit = useCallback(
+    async (question: string) => {
+      abort.current?.abort();
+      const controller = new AbortController();
+      abort.current = controller;
+      const history = visitor ? historyOf(state.turns) : null;
 
-    const key = `live-${Date.now()}`;
-    const patch = (change: Partial<Turn>) =>
+      const key = `live-${Date.now()}`;
+      const patch = (change: Partial<Turn>) =>
+        setState((current) => ({
+          ...current,
+          turns: current.turns.map((turn) => (turn.key === key ? { ...turn, ...change } : turn)),
+        }));
+      const settle = (waiting: Waiting) => setState((current) => ({ ...current, waiting }));
+
       setState((current) => ({
         ...current,
-        turns: current.turns.map((turn) => (turn.key === key ? { ...turn, ...change } : turn)),
+        waiting: { phase: "queued" },
+        turns: [...current.turns, blankTurn(key, question)],
       }));
-    const settle = (waiting: Waiting) => setState((current) => ({ ...current, waiting }));
 
-    setState((current) => ({
-      ...current,
-      waiting: { phase: "queued" },
-      turns: [...current.turns, blankTurn(key, question)],
-    }));
-
-    for (let attempt = 0; ; attempt += 1) {
-      try {
-        await run(question, opened, controller.signal, patch, settle, setState);
-        return;
-      } catch (error) {
-        if (controller.signal.aborted) return;
-
-        const busy = error instanceof AskFailed && error.reason === "busy";
-        if (!busy || attempt >= MAX_BUSY_RETRIES) {
-          const failure: Failure = {
-            kind: "reported",
-            detail: error instanceof Error ? error.message : String(error),
-          };
-          patch({ failure });
-          settle({ phase: "stopped", failure, canRetry: busy });
-          return;
-        }
-
-        // The server's own hint, and there always is one on a 503 from this
-        // endpoint (`Retry-After`); the fallback is for a proxy that stripped it.
-        const seconds = (error as AskFailed).retryAfter ?? 30;
-        settle({ phase: "retrying", seconds, attempt: attempt + 1 });
+      for (let attempt = 0; ; attempt += 1) {
         try {
-          await sleep(seconds, controller.signal);
-        } catch {
-          return; // aborted while waiting out the queue
+          await run(question, history, opened, controller.signal, patch, settle, setState);
+          return;
+        } catch (error) {
+          if (controller.signal.aborted) return;
+
+          const busy = error instanceof AskFailed && error.reason === "busy";
+          if (!busy || attempt >= MAX_BUSY_RETRIES) {
+            const failure: Failure = {
+              kind: "reported",
+              detail: error instanceof Error ? error.message : String(error),
+            };
+            patch({ failure });
+            settle({ phase: "stopped", failure, canRetry: busy });
+            return;
+          }
+
+          // The server's own hint, and there always is one on a 503 from this
+          // endpoint (`Retry-After`); the fallback is for a proxy that stripped it.
+          const seconds = (error as AskFailed).retryAfter ?? 30;
+          settle({ phase: "retrying", seconds, attempt: attempt + 1 });
+          try {
+            await sleep(seconds, controller.signal);
+          } catch {
+            return; // aborted while waiting out the queue
+          }
+          settle({ phase: "queued" });
         }
-        settle({ phase: "queued" });
       }
-    }
-  }, []);
+    },
+    [visitor, state.turns],
+  );
 
   return { ...state, submit, adopt, reset, stop };
 }
@@ -223,6 +269,7 @@ export function useAsk() {
  */
 async function run(
   question: string,
+  history: HistoryTurn[] | null,
   opened: { current: number | null },
   signal: AbortSignal,
   patch: (change: Partial<Turn>) => void,
@@ -232,7 +279,10 @@ async function run(
   let answer = "";
   let ended = false;
 
-  const body = await ask({ question, conversation_id: opened.current }, signal);
+  const body = await ask(
+    history === null ? { question, conversation_id: opened.current } : { question, history },
+    signal,
+  );
   settle({ phase: "streaming" });
 
   for await (const event of readAnswerEvents(body)) {
