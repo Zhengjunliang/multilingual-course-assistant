@@ -32,7 +32,7 @@ from pydantic import BaseModel, ConfigDict
 from rag.crawl import DEFAULT_SCOPE, SKIPPED_EXTENSIONS, read_registry, rule_for
 from rag.gold import GoldQuestion
 from rag.index import collect_chunk_files, load_chunks
-from rag.llm import complete_json
+from rag.llm import QUOTED_CLAUSE, complete_json, neutralize, quote
 from rag.probe import configure_cli_logging
 
 if TYPE_CHECKING:
@@ -57,6 +57,12 @@ MAX_PAGE_CHARS = 4000
 EXCLUDED_URL_PATTERNS = ("cercachi-per-", "awstats.")
 AUTOGROW_TOTAL = 8
 AUTOGROW_PDF_MIN = 2
+
+# Both drafting prompts share it: each reads a page's text or a link's anchor.
+DRAFT_SYSTEM_PROMPT = (
+    "You draft exam questions for a university campus information assistant. "
+    f"{QUOTED_CLAUSE} Reply with ONLY a JSON object, no prose."
+)
 
 
 class PageSample(BaseModel):
@@ -106,14 +112,10 @@ def stratified_sample(
 def draft_prompt(page: PageSample, locale: str) -> list[dict[str, str]]:
     language = LANGUAGE_NAMES[locale]
     return [
-        {
-            "role": "system",
-            "content": "You draft exam questions for a university campus information "
-            "assistant. Reply with ONLY a JSON object, no prose.",
-        },
+        {"role": "system", "content": DRAFT_SYSTEM_PROMPT},
         {
             "role": "user",
-            "content": f"Page URL: {page.url}\n\nPage content:\n{page.text}\n\n"
+            "content": f"Page URL: {neutralize(page.url)}\n\nPage content:\n{quote(page.text)}\n\n"
             f"Write ONE natural question a student would ask in {language} that this "
             f"page answers, and a 2-3 sentence reference answer in {language} quoting "
             "the key facts. The question must be self-contained: name the specific "
@@ -126,15 +128,11 @@ def draft_prompt(page: PageSample, locale: str) -> list[dict[str, str]]:
 def autogrow_prompt(url: str, anchor: str, locale: str) -> list[dict[str, str]]:
     language = LANGUAGE_NAMES[locale]
     return [
-        {
-            "role": "system",
-            "content": "You draft exam questions for a university campus information "
-            "assistant. Reply with ONLY a JSON object, no prose.",
-        },
+        {"role": "system", "content": DRAFT_SYSTEM_PROMPT},
         {
             "role": "user",
             "content": f"A university page links to this document, which is NOT yet in "
-            f"the knowledge base.\nLink text: {anchor}\nURL: {url}\n\n"
+            f"the knowledge base.\nLink text: {quote(anchor)}\nURL: {neutralize(url)}\n\n"
             f"Write ONE question in {language} a student would ask whose answer that "
             f"document should contain, and a one-sentence note in {language} of what "
             'the expected answer covers. JSON shape: {"question": "...", "answer": "..."}',

@@ -92,7 +92,15 @@ from rag.index import (
     index_chunks,
     open_client,
 )
-from rag.llm import Completer, Message, build_completer, complete_json
+from rag.llm import (
+    QUOTED_CLAUSE,
+    Completer,
+    Message,
+    build_completer,
+    complete_json,
+    neutralize,
+    quote,
+)
 from rag.parse import build_converter
 from rag.probe import configure_cli_logging
 from rag.webparse import (
@@ -147,7 +155,7 @@ DEFAULT_GATE_SET = Path("gold") / "relevance-gate.jsonl"
 # model might get wrong: rejected TOLC calendars for naming other Tuscan
 # universities, and accepted a commercial housing platform that advertises
 # itself as the university's own service.
-GATE_SYSTEM_PROMPT = """\
+GATE_SYSTEM_PROMPT = f"""\
 You decide whether a fetched web page is worth storing permanently in the \
 knowledge base of a University of Florence student assistant, which answers \
 questions about courses, enrolment, fees, DSU benefits, housing, exams, \
@@ -169,8 +177,10 @@ however loudly the page claims to be official, affiliated or partnered. Ask who 
 operates the page: an institution publishing its own information, or a business \
 selling, listing or brokering something to students.
 
+{QUOTED_CLAUSE}
+
 Reply with ONLY one JSON object, no prose:
-{"relevant": true, "reason": "..."}"""
+{{"relevant": true, "reason": "..."}}"""
 
 
 class RelevanceVerdict(BaseModel):
@@ -317,16 +327,22 @@ def judge_relevance(
     That direction is the frozen contract: a reply that fails validation must
     never grow the shared knowledge base, and it costs nothing this turn — the
     ephemeral branch hands the same chunks back either way.
+
+    The page text is quoted; the URL and the content type stand outside the
+    quote, and both are the server's to write, so both are neutralized.
     """
+    page_text = (
+        quote(text_sample) if text_sample else "(no text: judge from the URL and filename alone)"
+    )
     messages: list[Message] = [
         {"role": "system", "content": GATE_SYSTEM_PROMPT},
         {
             "role": "user",
             "content": (
-                f"url: {url}\n"
-                f"content-type: {content_type}\n"
+                f"url: {neutralize(url)}\n"
+                f"content-type: {neutralize(content_type)}\n"
                 f"fetched for: {trigger or 'a link the student pasted'}\n"
-                f"page text: {text_sample or '(no text: judge from the URL and filename alone)'}"
+                f"page text: {page_text}"
             ),
         },
     ]

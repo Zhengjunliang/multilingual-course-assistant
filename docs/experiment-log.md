@@ -2,6 +2,47 @@
 
 What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; every number is reproducible with the commands in its entry's *Reproducibility* section. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
+## 2026-10-08 — Quoting the text the project did not write: the gate holds, a tag written inline is copied
+
+The prompts were changed to hold every excerpt, earlier turn, anchor and page sample between `<quoted>` tags, under a system prompt that says what the tags hold ([decisions.md](decisions.md), 2026-10-08, *Text the project did not write enters every prompt as quoted material*). Each prompt was measured before the change, at `06bc7e8`, and after it, on Qwen3-4B q4 through the local Ollama, greedy, the gate with `seed=0`.
+
+### 1. The relevance gate
+
+| Prompt | Agreement | Unparsable replies |
+| --- | --- | --- |
+| before the change | 18/20 | 0 |
+| tags inline, `<quoted>text</quoted>` | 17/20 | 0 |
+| each tag on a line of its own | **18/20**, every verdict as before | 0 |
+
+The three runs took place within an hour, on the same day's pages; why runs on different days do not compare is `#83`. The one row that moved with the inline tags is a closed Google Form (`docs.google.com/forms/…/viewform`, labelled irrelevant), which became relevant. That page was then judged alone, twice in each of four prompts: the prompt before, the prompt after, the clause alone and the tags alone. Each pair agreed with itself, and the verdict flipped with the tags and not with the clause.
+
+### 2. Generation
+
+Eight questions, the first three of `gold/smoke.jsonl` and of `gold/campus.jsonl` plus *Quando scade la prima rata delle tasse universitarie?* and *如何申请DSU奖学金？*, each routed and answered from the top five reranked excerpts; one answer per question and prompt.
+
+| Prompt | Answers citing a real marker | Answers writing `[Excerpt N]` | Answers copying a tag |
+| --- | --- | --- | --- |
+| before the change | 1/8 | 3/8 | 0/8 |
+| tags inline | 1/8 | 5/8 | 1/8 |
+| tags inline, plus a rule never to write them | 0/8 | 2/8 | 4/8 |
+| each tag on a line of its own | 1/8 | 6/8 | 0/8 |
+| Qwen-Agent's code fence instead of tags | 2/8 | 5/8 | 0/8 |
+
+With the tags inline, the English slides answer interleaved its sentences with `<quoted>` blocks of its own, which `react-markdown` would show as text; naming the tags in a rule made it worse. On their own lines the tags are not copied. Citation conformance is as poor before the change as after it, the problem of the entry of 2026-08-25, section 2; eight questions cannot tell one in eight from two in eight, so the fence's second citation is not a finding.
+
+### 3. The deepening decisions
+
+On six campus questions, `assess_answerable` gave the same verdict before and after, and no reply failed to parse. `pick_candidate` parsed every reply too, but its choices moved: on the three shortlists the registry gave, the prompt before picked a candidate each time, and the final prompt declared two of them unsuitable. No labelled set says which candidate holds an answer, so the change is recorded, not judged.
+
+### Reproducibility
+
+```bash
+git switch --detach 06bc7e8 && uv run python -m rag.live --measure-gate   # 18/20, the prompt before
+git switch - && uv run python -m rag.live --measure-gate                  # 18/20, this entry's prompt; needs Ollama
+```
+
+The generation and deepening probes called `route`, `search` (top 5, reranker on), `build_messages`, `assess_answerable` and `pick_candidate` directly, from a script that was not kept; the other prompts were the final one with the tags or the clause edited out. Index unchanged: `slides` and `unifi_web` in the Qdrant service. Nothing was fetched or stored by the probes: candidates were the outlinks the registry held for the retrieved pages.
+
 ## 2026-09-29 — The index moves to the Qdrant service whole, and retrieval does not move
 
 ### 1. What moved

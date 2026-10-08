@@ -1,6 +1,6 @@
 # UniFi web source — crawl, snapshots and automatic growth
 
-This file owns the design of the campus source (the UniFi website, Qdrant collection `unifi_web`): the scope table, multi-collection retrieval, the snapshot and registry layout, the deepening loop's state machine and rules, the decision-log schema and the fallback. The reasons behind each rule of the loop are written in the docstrings of `rag/agent.py` and `rag/live.py`, next to the code they explain; the chunk fields are [docling-pipeline.md](docling-pipeline.md), section 3.6; the eval-isolation rule is [architecture.md](architecture.md); every measurement is [experiment-log.md](experiment-log.md), entries of 2026-08-22 to 2026-08-24.
+This file owns the design of the campus source (the UniFi website, Qdrant collection `unifi_web`): the scope table, multi-collection retrieval, the snapshot and registry layout, the deepening loop's state machine and rules, the decision-log schema and the fallback. The reasons behind each rule of the loop are written in the docstrings of `rag/agent.py` and `rag/live.py`, next to the code they explain; the chunk fields are [docling-pipeline.md](docling-pipeline.md), section 3.6; the eval-isolation rule is [architecture.md](architecture.md); every measurement is [experiment-log.md](experiment-log.md), entries of 2026-08-22 to 2026-08-24; how a page's text enters a prompt, and why that defence against prompt injection is a mitigation and not a guarantee, is [security.md](security.md), row LLM01:2026.
 
 ## Scope table
 
