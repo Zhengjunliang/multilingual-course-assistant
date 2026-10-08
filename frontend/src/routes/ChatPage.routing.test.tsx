@@ -11,7 +11,7 @@
  * path, and which conversations the sidebar lists.
  */
 
-import { act } from "react";
+import { act, type ReactNode, useState } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -333,5 +333,59 @@ describe("a visitor's addresses", () => {
     unmount();
 
     expect(landed).toBe("/login");
+  });
+});
+
+/** Lets a test change who is signed in under a mounted page, as `recheck` does. */
+let switchAccount: (next: Account | null) => void = () => {};
+
+/** Built once, as the provider keeps `forget` stable: a new one each render would refetch by itself. */
+const ACTIONS = {
+  logIn: async () => {},
+  register: async () => {},
+  logOut: async () => {},
+  chooseLocale: async () => {},
+  forget: () => {},
+  recheck: async () => {},
+};
+
+function SwitchingSession({ children }: { children: ReactNode }) {
+  const [account, setAccount] = useState<Account | null>(STUDENT);
+  switchAccount = setAccount;
+  return <SessionContext value={{ account, ...ACTIONS }}>{children}</SessionContext>;
+}
+
+describe("another account signed in under the page", () => {
+  beforeEach(() => {
+    conversations = [OTHER];
+    requested = [];
+    vi.stubGlobal("fetch", fakeApi);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("rebuilds the frame, so nothing of the first account stays on screen", async () => {
+    const { unmount } = mount(
+      <ThemeProvider>
+        <SwitchingSession>
+          <MemoryRouter initialEntries={["/"]}>
+            <App />
+          </MemoryRouter>
+        </SwitchingSession>
+      </ThemeProvider>,
+    );
+    await settle();
+    const lists = () => requested.filter((request) => request === "GET /api/conversations");
+    const first = lists().length;
+
+    act(() => switchAccount({ ...STUDENT, id: 2, username: "other" }));
+    await settle();
+    const second = lists().length;
+    unmount();
+
+    // Once for each account: the second list is the second account's.
+    expect([first, second]).toEqual([1, 2]);
   });
 });

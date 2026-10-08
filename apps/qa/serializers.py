@@ -110,8 +110,9 @@ class AskRequest(serializers.Serializer):
         is one whose session ended in another tab or ran out. It gets the 403
         such a client acts on by asking its reader to sign in again
         (frontend/src/api/client.ts, `isRefusal`), as it did before anonymous
-        questions existed, and before the engine runs: answered as a visitor,
-        it would render the reply as its own and lose it on its next call.
+        questions existed, once its fields are valid and before the engine
+        runs: answered as a visitor, it would render the reply as its own and
+        lose it on its next call.
 
         For a logged-in caller, the conversation id becomes the row, or a
         refusal. One message for "no such conversation" and for "that one is

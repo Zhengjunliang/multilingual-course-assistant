@@ -12,10 +12,11 @@
  * switch in the header writes to the account and the account writes back here.
  *
  * Signing in, signing up and signing out also empty the visitor's thread
- * (features/chat/visitorThread.ts). It is not carried into the account, and a
- * reader who signs out of a shared computer leaves no thread for the next one.
- * Only these three: the first `readSession` answering "nobody" is a reload, and
- * a visitor's thread is meant to survive one.
+ * (features/chat/visitorThread.ts), here or in another tab (`recheck`). It is
+ * not carried into the account, and a reader who signs out of a shared
+ * computer leaves no thread for the next one. Only these: the first
+ * `readSession` answering "nobody" is a reload, and a visitor's thread is
+ * meant to survive one.
  */
 
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
@@ -37,10 +38,12 @@ interface SessionValue {
   forget: () => void;
   /**
    * Asks the server again who is signed in, and follows it if that changed.
-   * The reverse of `forget`: a visitor's tab calls it after each question,
-   * because signing in from another tab shares the cookie and not this tab's
-   * state, and the visitor's next question would be refused as a signed-in
-   * client's (apps/qa/serializers.py).
+   * Signing in or out in another tab shares the cookie and not this tab's
+   * state; a visitor's next question would then be refused as a signed-in
+   * client's (apps/qa/serializers.py). So the tab asks whenever it comes back
+   * into view, as NextAuth's `refetchOnWindowFocus` does (outside the
+   * repository), and a visitor's tab after each question too, for the window
+   * that stayed in view while the other one signed in.
    */
   recheck: () => Promise<void>;
 }
@@ -116,7 +119,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       recheck: async () => {
         try {
           const { user } = await readSession();
-          if ((user?.id ?? null) !== (account?.id ?? null)) adopt(user);
+          if ((user?.id ?? null) === (account?.id ?? null)) return;
+          clearVisitorThread();
+          adopt(user);
         } catch {
           // A server that cannot say who is signed in has nothing to follow;
           // the next request reports whatever is wrong with it.
@@ -125,6 +130,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }),
     [account, adopt, forget, i18n],
   );
+
+  const { recheck } = value;
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void recheck();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [recheck]);
 
   if (!asked) return null;
   return <SessionContext value={value}>{children}</SessionContext>;

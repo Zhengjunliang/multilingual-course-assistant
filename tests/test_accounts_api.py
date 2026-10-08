@@ -282,10 +282,15 @@ def test_a_question_without_the_csrf_token_is_refused(student: User, logged_in: 
     client = APIClient(enforce_csrf_checks=True)
     if logged_in:
         assert client.login(username=USERNAME, password=PASSWORD)
+    # Each in the shape the SPA sends: an anonymous question without its
+    # history is refused for that alone (apps/qa/serializers.py), which would
+    # pass this test with no CSRF check at all.
+    body = {"question": "What is an ORM?"} if logged_in else {"question": "?", "history": []}
 
-    response = client.post(ASK_URL, {"question": "What is an ORM?"}, format="json")
+    response = client.post(ASK_URL, body, format="json")
 
     assert response.status_code == 403
+    assert "CSRF" in response.json()["detail"]
     assert engine_module._HOLDER.engine is None
 
 

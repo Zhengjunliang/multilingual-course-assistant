@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Navigate, useLocation, useMatch } from "react-router-dom";
 
 import { useSession } from "./useSession";
@@ -22,13 +22,17 @@ interface RequireSessionProps {
  * attempted path travels in `state` so that a reader who was sent here from a
  * conversation link lands back on it rather than on the front page; with its
  * query, which names the programme a staff page was reached through.
+ *
+ * Keyed by the account: one signed in under the page (`recheck`, in
+ * SessionProvider.tsx) gets every page built afresh, rather than the frame of
+ * the account before it with its list of conversations.
  */
 export function RequireSession({ children, visitor }: RequireSessionProps) {
   const { account } = useSession();
   const location = useLocation();
   const front = useMatch("/") !== null;
 
-  if (account !== null) return <>{children}</>;
+  if (account !== null) return <Fragment key={account.id}>{children}</Fragment>;
   if (front) return <>{visitor}</>;
   return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
 }

@@ -123,6 +123,7 @@ describe("asking the server again", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("takes a session another tab opened, which this tab cannot see on its own", async () => {
@@ -133,6 +134,7 @@ describe("asking the server again", () => {
     );
     await settle();
     const before = session.account;
+    writeVisitorThread(THREAD);
     signedInElsewhere = true;
 
     await act(() => session.recheck());
@@ -140,6 +142,28 @@ describe("asking the server again", () => {
     page.unmount();
 
     expect(before).toBeNull();
+    expect(after?.username).toBe("ada");
+    // Signing in elsewhere is still signing in: the thread is not carried over.
+    expect(readVisitorThread()).toEqual([]);
+  });
+
+  it("asks when the tab comes back into view, before the next question is typed", async () => {
+    const page = mount(
+      <SessionProvider>
+        <Probe />
+      </SessionProvider>,
+    );
+    await settle();
+    signedInElsewhere = true;
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await settle();
+    const after = session.account;
+    page.unmount();
+
     expect(after?.username).toBe("ada");
   });
 });

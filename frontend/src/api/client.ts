@@ -61,8 +61,9 @@ export interface HistoryTurn {
 
 /**
  * A question, and how it continues a conversation: a signed-in reader names the
- * stored one, a visitor sends the history itself. Each is refused with a 400
- * from the other kind of caller.
+ * stored one, a visitor sends the history itself, `[]` for a first question. A
+ * visitor's shape from a signed-in caller is a 400; a signed-in shape without a
+ * session is a 403, a session that ended (apps/qa/serializers.py).
  */
 export interface AskBody {
   question: string;
