@@ -92,18 +92,13 @@ jobs:
         # looks each pin up on PyPI, where a labelled version is a 404 that it
         # reports as a skip and exits 0 on.
         #
-        # The two ignored advisories are docling's, accepted risks until the M3
-        # remeasurement upgrades it. The other accepted risk, accelerate's, is
-        # one the advisory databases no longer name. Why each is out of reach,
-        # and when accelerate's flag returns: docs/security.md, the table of
-        # accepted risks.
+        # No advisory is ignored. The one accepted risk, accelerate's, is one
+        # the advisory databases no longer name. Why it is out of reach, and
+        # when its flag returns: docs/security.md, the table of accepted risks.
         run: |
           uv export --locked --no-emit-project --no-hashes -o requirements.txt
           sed -E -i 's/(==[^ ;+]+)\+[^ ;]+/\1/' requirements.txt
-          uvx pip-audit --no-deps --disable-pip \
-            --ignore-vuln CVE-2026-105750 \
-            --ignore-vuln CVE-2026-105751 \
-            -r requirements.txt
+          uvx pip-audit --no-deps --disable-pip -r requirements.txt
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

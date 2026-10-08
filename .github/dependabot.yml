@@ -62,7 +62,12 @@ updates:
       # a shell around docling-slim. Naming `docling` alone let a security
       # update of docling-slim move docling as well (#164). A minor bump also
       # pulls docling-ibm-models across a major boundary, and that package is
-      # layout, TableFormer and CodeFormula.
+      # layout, TableFormer and CodeFormula. Eight advisories, two of them
+      # reachable from a page the live path fetches (CVE-2026-105747,
+      # CVE-2026-105749), moved it from 2.117.0 to 2.132.0
+      # and docling-ibm-models to 4.x before any re-measurement: gold 38/40 and
+      # campus 28/32 were parsed on 2.117.0, so the next M3 remeasurement is
+      # the first on 2.132.0.
       - dependency-name: "docling*"
       # Embedding and reranker both come through it. New vectors mean a rebuilt
       # index and every hit@k number measured again.
