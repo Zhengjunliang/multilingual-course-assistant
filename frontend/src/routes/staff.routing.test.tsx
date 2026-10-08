@@ -269,6 +269,7 @@ function Session({ children }: { children: ReactNode }) {
         logOut: async () => {},
         chooseLocale: async () => {},
         forget: () => {},
+        recheck: async () => {},
       }}
     >
       {children}

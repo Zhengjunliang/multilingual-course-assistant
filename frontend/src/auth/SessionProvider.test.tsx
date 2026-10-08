@@ -40,11 +40,14 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+/** Whether `me` finds a session another tab opened. */
+let signedInElsewhere = false;
+
 /** Nobody is signed in until a login or a registration says otherwise. */
 async function fakeAuth(input: RequestInfo | URL): Promise<Response> {
   const path = String(input);
   if (path === "/api/auth/logout") return new Response(null, { status: 204 });
-  if (path === "/api/auth/login" || path === "/api/auth/register") {
+  if (path === "/api/auth/login" || path === "/api/auth/register" || signedInElsewhere) {
     return json({ authenticated: true, user: ACCOUNT });
   }
   return json({ authenticated: false, user: null });
@@ -68,6 +71,7 @@ async function settle() {
 describe("a visitor's thread and the account", () => {
   beforeEach(() => {
     sessionStorage.clear();
+    signedInElsewhere = false;
     vi.stubGlobal("fetch", fakeAuth);
   });
 
@@ -108,5 +112,34 @@ describe("a visitor's thread and the account", () => {
 
     expect(signedIn).toBeNull();
     expect(readVisitorThread()).toEqual(THREAD);
+  });
+});
+
+describe("asking the server again", () => {
+  beforeEach(() => {
+    signedInElsewhere = false;
+    vi.stubGlobal("fetch", fakeAuth);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("takes a session another tab opened, which this tab cannot see on its own", async () => {
+    const page = mount(
+      <SessionProvider>
+        <Probe />
+      </SessionProvider>,
+    );
+    await settle();
+    const before = session.account;
+    signedInElsewhere = true;
+
+    await act(() => session.recheck());
+    const after = session.account;
+    page.unmount();
+
+    expect(before).toBeNull();
+    expect(after?.username).toBe("ada");
   });
 });

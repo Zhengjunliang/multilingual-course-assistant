@@ -43,7 +43,7 @@ export default function ChatPage() {
   const { t } = useTranslation();
   const { conversationId } = useParams();
   const navigate = useNavigate();
-  const { account, forget } = useSession();
+  const { account, forget, recheck } = useSession();
   const { refreshConversations, setBusy } = useShell();
 
   const [highlighted, setHighlighted] = useState<string | null>(null);
@@ -118,8 +118,10 @@ export default function ChatPage() {
     }
   }, [waiting.phase, turns]);
 
+  // A visitor has no list to refresh; what can change under them is the
+  // session, signed in from another tab.
   const onSubmit = (question: string) => {
-    void submit(question).then(refreshConversations);
+    void submit(question).then(visitor ? recheck : refreshConversations);
   };
 
   // The conversation an answer is being written into. `retrying` counts: the

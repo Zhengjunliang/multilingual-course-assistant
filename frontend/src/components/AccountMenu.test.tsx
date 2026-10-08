@@ -38,6 +38,7 @@ describe("the account menu", () => {
           logOut: async () => {},
           chooseLocale: async () => {},
           forget: () => {},
+          recheck: async () => {},
         }}
       >
         <ThemeProvider>

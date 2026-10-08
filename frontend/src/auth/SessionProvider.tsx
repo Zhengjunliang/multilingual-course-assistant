@@ -35,6 +35,14 @@ interface SessionValue {
   chooseLocale: (locale: UiLocale) => Promise<void>;
   /** Called when a request comes back refused, to drop a session that ended elsewhere. */
   forget: () => void;
+  /**
+   * Asks the server again who is signed in, and follows it if that changed.
+   * The reverse of `forget`: a visitor's tab calls it after each question,
+   * because signing in from another tab shares the cookie and not this tab's
+   * state, and the visitor's next question would be refused as a signed-in
+   * client's (apps/qa/serializers.py).
+   */
+  recheck: () => Promise<void>;
 }
 
 export const SessionContext = createContext<SessionValue | null>(null);
@@ -105,6 +113,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         adopt((await setAccountLocale(locale)).user);
       },
       forget,
+      recheck: async () => {
+        try {
+          const { user } = await readSession();
+          if ((user?.id ?? null) !== (account?.id ?? null)) adopt(user);
+        } catch {
+          // A server that cannot say who is signed in has nothing to follow;
+          // the next request reports whatever is wrong with it.
+        }
+      },
     }),
     [account, adopt, forget, i18n],
   );

@@ -37,6 +37,7 @@ function dialog() {
           logOut: async () => {},
           chooseLocale: async () => {},
           forget: () => {},
+          recheck: async () => {},
         }}
       >
         <AccountDialog open onOpenChange={() => {}} />

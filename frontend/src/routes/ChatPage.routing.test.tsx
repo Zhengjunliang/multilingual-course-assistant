@@ -56,6 +56,8 @@ let conversations: ConversationSummary[] = [];
 let deleteFails = false;
 /** Every request made, as `METHOD path`. */
 let requested: string[] = [];
+/** How many times the page asked the session provider who is signed in. */
+let rechecked = 0;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -129,6 +131,9 @@ function page(path: string, account: Account | null = STUDENT): Mounted {
           logOut: async () => {},
           chooseLocale: async () => {},
           forget: () => {},
+          recheck: async () => {
+            rechecked += 1;
+          },
         }}
       >
         <MemoryRouter initialEntries={[path]}>
@@ -293,6 +298,7 @@ describe("a visitor's addresses", () => {
   beforeEach(() => {
     conversations = [];
     requested = [];
+    rechecked = 0;
     sessionStorage.clear();
     vi.stubGlobal("fetch", fakeApi);
   });
@@ -316,6 +322,8 @@ describe("a visitor's addresses", () => {
     expect(sidebar).toBeNull();
     expect(links).toEqual(["/login", "/register"]);
     expect(requested).toEqual(["POST /api/ask"]);
+    // Signed in from another tab meanwhile, the next question would be refused.
+    expect(rechecked).toBe(1);
   });
 
   it.each(["/c/7", "/staff", "/staff/programmes"])("sends %s to the login page", async (path) => {

@@ -4,10 +4,13 @@
  * The server stores nothing for a reader without an account (docs/decisions.md,
  * 2026-09-25, *The data model is decided on paper*, point 3), so the thread
  * lives in the browser, and there it lives in `sessionStorage`: it survives a
- * reload and goes with the tab. Not `localStorage`, which would outlive the tab
- * on a shared lab computer and hand one student's questions to the next one
- * (outside the repository: OWASP's HTML5 Security Cheat Sheet prefers
- * `sessionStorage` wherever persistence is not needed).
+ * reload and ends with the tab, though a browser that reopens a closed tab or
+ * restores its last session brings the storage back with it (outside the
+ * repository: MDN, `Window.sessionStorage`). Not `localStorage`, which outlives
+ * every tab and on a shared lab computer would hand one student's questions to
+ * whoever sits down next (outside the repository: OWASP's HTML5 Security Cheat
+ * Sheet prefers `sessionStorage` wherever persistence is not needed). A
+ * visitor leaving a shared computer empties it with a new conversation.
  *
  * One thread at a time, as ChatGPT keeps a single one for a reader who is not
  * signed in (outside the repository). Signing in, signing up and signing out

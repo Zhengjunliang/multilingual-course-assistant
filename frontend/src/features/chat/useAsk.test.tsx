@@ -95,6 +95,18 @@ describe("what a visitor's question carries back", () => {
     expect(history[1]?.answer).toHaveLength(MAX_HISTORY_ANSWER_CHARS);
     expect(history[2]?.answer).toBe("Entro il");
   });
+
+  it("cuts an answer between characters, never inside one", () => {
+    // Cut by UTF-16 unit, a character outside the BMP at the cap would leave
+    // half of itself behind, which the server refuses: every later question of
+    // the thread would then be a 400. The server counts code points too.
+    const emoji = String.fromCodePoint(0x1f600);
+    const answer = `${"x".repeat(MAX_HISTORY_ANSWER_CHARS - 1)}${emoji}tail`;
+
+    const [exchange] = historyOf([turn("long", { answer })]);
+
+    expect(exchange?.answer).toBe(`${"x".repeat(MAX_HISTORY_ANSWER_CHARS - 1)}${emoji}`);
+  });
 });
 
 describe("a visitor's thread", () => {
