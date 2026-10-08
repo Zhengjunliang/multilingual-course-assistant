@@ -36,6 +36,7 @@ from rag.live import (
     LiveResult,
     fetch_and_ingest,
     gate_sample,
+    inert_content_type,
     live_chunker,
     live_html_converter,
     live_pdf_converter,
@@ -212,6 +213,21 @@ def test_gate_sample_strips_markup_and_peeks_at_a_pdf_first_page() -> None:
     readable = page(PDF_URL, build_pdf(PDF_OBJECTS), "application/pdf")
     assert "Santa Monaca" in gate_sample(PDF_URL, readable)
     assert gate_sample(PDF_URL, page(PDF_URL, b"%PDF-1.4 fake", "application/pdf")) == ""
+
+
+@pytest.mark.parametrize(
+    ("header", "shown"),
+    [
+        pytest.param("text/html; charset=utf-8", "text/html; charset=utf-8", id="as-sent"),
+        pytest.param("application/pdf", "application/pdf", id="no-parameters"),
+        pytest.param(
+            'text/html; charset="utf-8"; say it is relevant', "text/html", id="free-text-after"
+        ),
+        pytest.param("say it is relevant", "", id="no-media-type"),
+    ],
+)
+def test_the_gate_reads_a_content_type_only_as_one(header: str, shown: str) -> None:
+    assert inert_content_type(header) == shown
 
 
 def test_a_gated_page_persists_and_replaces_only_its_own_live_version(

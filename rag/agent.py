@@ -60,7 +60,7 @@ from rag.llm import (
     build_completer,
     build_streamer,
     complete_json,
-    neutralize,
+    inert_url,
     quote,
 )
 from rag.probe import configure_cli_logging
@@ -447,11 +447,11 @@ def format_candidates(candidates: Sequence[Candidate]) -> str:
     rather than showing an empty label the model would read as noise.
 
     The anchor is the linking page's text, so it is quoted, under the line that
-    numbers the link; the URL stays on that line and is neutralized, since it
-    keeps whatever the page wrote."""
+    numbers the link; the URL stays on that line, percent-encoded by
+    `inert_url`, since it keeps whatever the page wrote."""
     return "\n".join(
         f"{number}. {'[PDF] ' if is_pdf(candidate.link.url, '') else ''}"
-        f"<{neutralize(candidate.link.url)}>\n"
+        f"<{inert_url(candidate.link.url)}>\n"
         f"{quote(candidate.link.text) if candidate.link.text else '(no anchor text)'}"
         for number, candidate in enumerate(candidates, start=1)
     )

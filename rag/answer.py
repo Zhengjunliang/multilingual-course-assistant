@@ -19,7 +19,15 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, ConfigDict
 
 from rag.chunk import detect_locale, locale_arg
-from rag.llm import QUOTED_CLAUSE, ChatStreamer, Message, build_streamer, neutralize, quote
+from rag.llm import (
+    QUOTED_CLAUSE,
+    ChatStreamer,
+    Message,
+    build_streamer,
+    inert_url,
+    neutralize,
+    quote,
+)
 from rag.probe import configure_cli_logging
 from rag.search import (
     DEFAULT_RERANK_MODEL,
@@ -117,11 +125,12 @@ def source_marker(hit: Hit) -> str:
     markers, so this is the single citation shape for both collections.
 
     A marker stands outside the quoted excerpt, and a crawled link keeps
-    whatever its page wrote (`urljoin` in rag/crawl.py), so it is neutralized
-    here: the citation the API returns is this same string."""
+    whatever its page wrote (`urljoin` in rag/crawl.py), so the URL goes
+    through `inert_url` and a file name through `neutralize` here: the
+    citation the API returns is this same string."""
     if hit.chunk.kind == "web" and hit.chunk.url:
         date = f" · {hit.chunk.fetch_date}" if hit.chunk.fetch_date else ""
-        return neutralize(f"[{hit.chunk.url}{date}]")
+        return f"[{inert_url(hit.chunk.url)}{date}]"
     return neutralize(f"[{hit.chunk.source_file} p.{hit.chunk.page}]")
 
 

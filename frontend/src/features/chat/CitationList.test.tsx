@@ -194,8 +194,10 @@ describe("the source strip", () => {
       );
       // Matched from a prefix, so a card built from a missing field —
       // `/api/sources/undefined`, `B028451 · ` — counts as offered and fails
-      // the other two shapes.
-      expect(html.match(/href="\/api\/sources\/[^"]*" target="[^"]*"/)?.[0] ?? null).toBe(page);
+      // the other two shapes; a link without its target counts too.
+      expect(html.match(/href="\/api\/sources\/[^"]*"(?: target="[^"]*")?/)?.[0] ?? null).toBe(
+        page,
+      );
       expect(html.match(/B028451 ·[^<]*/)?.[0] ?? null).toBe(edition);
     },
   );

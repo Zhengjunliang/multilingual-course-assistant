@@ -237,12 +237,8 @@ def test_every_exemption_names_a_route() -> None:
 
 
 def served(view: type[APIView]) -> set[str]:
-    """The methods a view answers itself: HEAD follows GET, and OPTIONS is DRF's metadata."""
-    return {
-        m.upper()
-        for m in view.http_method_names
-        if m not in {"head", "options"} and hasattr(view, m)
-    }
+    """The methods a view answers, but HEAD, which follows GET."""
+    return {m.upper() for m in view.http_method_names if m != "head" and hasattr(view, m)}
 
 
 def scoped_views() -> dict[str, type[ScopedObjectView]]:
@@ -267,7 +263,11 @@ def test_every_permission_guards_a_route() -> None:
 
 
 def test_each_scoped_view_maps_every_method_it_serves() -> None:
-    """A method a scoped view serves but does not map would be refused to everyone."""
+    """A method a scoped view serves but does not map would be refused to everyone.
+
+    OPTIONS counts too, so a scoped view cannot serve it: its metadata would
+    describe the writes to a caller who may only read (`apps/roles/api.py`).
+    """
     views = scoped_views()
     methods = {name: served(view) for name, view in views.items()}
 

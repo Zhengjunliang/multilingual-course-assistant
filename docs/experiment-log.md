@@ -4,7 +4,7 @@ What was measured, on which data and with which command, and the problems met al
 
 ## 2026-10-08 — Quoting the text the project did not write: the gate holds, a tag written inline is copied
 
-The prompts were changed to hold every excerpt, earlier turn, anchor and page sample between `<quoted>` tags, under a system prompt that says what the tags hold ([decisions.md](decisions.md), 2026-10-08, *Text the project did not write enters every prompt as quoted material*). Each prompt was measured before the change, at `06bc7e8`, and after it, on Qwen3-4B q4 through the local Ollama, greedy, the gate with `seed=0`.
+The prompts were changed to hold every excerpt, earlier turn, anchor and page sample between `<quoted>` tags, under a system prompt that says what the tags hold ([decisions.md](decisions.md), 2026-10-08, *Text the project did not write enters every prompt as quoted material*). Each prompt was measured before the change, at `7660c29`, and after it, on Qwen3-4B q4 through the local Ollama, greedy, the gate with `seed=0`.
 
 ### 1. The relevance gate
 
@@ -37,7 +37,7 @@ On six campus questions, `assess_answerable` gave the same verdict before and af
 ### Reproducibility
 
 ```bash
-git switch --detach 06bc7e8 && uv run python -m rag.live --measure-gate   # 18/20, the prompt before
+git switch --detach 7660c29 && uv run python -m rag.live --measure-gate   # 18/20, the prompt before
 git switch - && uv run python -m rag.live --measure-gate                  # 18/20, this entry's prompt; needs Ollama
 ```
 
