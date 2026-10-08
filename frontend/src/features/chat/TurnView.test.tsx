@@ -15,6 +15,7 @@
  */
 
 import { act, useState } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import type { Citation, RouteDecision } from "@/api/contract";
@@ -65,9 +66,19 @@ function turn(overrides: Partial<Turn> = {}): Turn {
   };
 }
 
-function view(t: Turn, live = false, thinking = false): string {
+function view(t: Turn, live = false, thinking = false, visitor = false): string {
+  // A router because a visitor's turn may link to the login page.
   return render(
-    <TurnView turn={t} live={live} thinking={thinking} highlighted={null} onHighlight={() => {}} />,
+    <MemoryRouter>
+      <TurnView
+        turn={t}
+        live={live}
+        thinking={thinking}
+        highlighted={null}
+        onHighlight={() => {}}
+        visitor={visitor}
+      />
+    </MemoryRouter>,
   );
 }
 
@@ -101,6 +112,7 @@ describe("the route line", () => {
         thinking={false}
         highlighted={null}
         onHighlight={() => {}}
+        visitor={false}
       />,
     );
     // The deepest element holding the route name comes last in document order;
@@ -148,6 +160,7 @@ describe("the answer's language", () => {
         thinking={false}
         highlighted={null}
         onHighlight={() => {}}
+        visitor={false}
       />,
     );
     const prose = container.querySelector('[lang="zh"]');
@@ -194,6 +207,7 @@ function Highlighting({ of }: { of: Turn }) {
       thinking={false}
       highlighted={highlighted}
       onHighlight={setHighlighted}
+      visitor={false}
     />
   );
 }
@@ -216,5 +230,28 @@ describe("a badge in the answer", () => {
 
     expect(card?.className).toContain("ring-ink");
     expect(focused).toBe(pill);
+  });
+});
+
+describe("a visitor's turn routed to the slides", () => {
+  const slides: RouteDecision = { ...ROUTE, target: "slides" };
+  const refused = turn({
+    route: slides,
+    citations: [],
+    answer: "Non ho trovato materiale del corso pertinente a questa domanda.",
+  });
+
+  it("says why nothing was found, and where to sign in", () => {
+    const html = view(refused, false, false, true);
+
+    expect(html).toContain("riservato a chi ha un account");
+    expect(html).toContain('href="/login"');
+  });
+
+  it.each([
+    ["a signed-in reader's", refused, false],
+    ["a visitor's campus", turn({ route: { ...ROUTE, target: "unifi_web" } }), true],
+  ])("is the only one that says so, not %s turn", (_, shown, visitor) => {
+    expect(view(shown, false, false, visitor)).not.toContain("riservato a chi ha un account");
   });
 });

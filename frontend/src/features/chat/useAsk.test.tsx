@@ -92,8 +92,8 @@ describe("what a visitor's question carries back", () => {
 
     expect(history).toHaveLength(HISTORY_WINDOW_TURNS);
     expect(history.map((exchange) => exchange.question)).toEqual(["three", "four", "five"]);
-    expect(history[1].answer).toHaveLength(MAX_HISTORY_ANSWER_CHARS);
-    expect(history[2].answer).toBe("Entro il");
+    expect(history[1]?.answer).toHaveLength(MAX_HISTORY_ANSWER_CHARS);
+    expect(history[2]?.answer).toBe("Entro il");
   });
 });
 

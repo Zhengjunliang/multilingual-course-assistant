@@ -16,6 +16,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "@/App";
+import type { Account } from "@/api/account";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
@@ -53,6 +54,8 @@ const STORED: ConversationDetail = {
 let conversations: ConversationSummary[] = [];
 /** Whether `DELETE` fails, as a server error would. */
 let deleteFails = false;
+/** Every request made, as `METHOD path`. */
+let requested: string[] = [];
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -62,7 +65,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 /** An answer stream in the framing `api/sse.ts` reads: `start`, then `end`. */
-function answerStream(conversationId: number, question: string): Response {
+function answerStream(conversationId: number | null, question: string): Response {
   const start = {
     question,
     conversation_id: conversationId,
@@ -77,6 +80,7 @@ function answerStream(conversationId: number, question: string): Response {
 async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const path = String(input);
   const method = init.method ?? "GET";
+  requested.push(`${method} ${path}`);
   if (method === "GET" && path === "/api/conversations") return json(conversations);
   if (method === "GET" && path === "/api/conversations/7") return json(STORED);
   if (method === "DELETE" && path.startsWith("/api/conversations/")) {
@@ -87,7 +91,12 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return new Response(null, { status: 204 });
   }
   if (method === "POST" && path === "/api/ask") {
-    const { question } = JSON.parse(String(init.body)) as { question: string };
+    const { question, history } = JSON.parse(String(init.body)) as {
+      question: string;
+      history?: unknown;
+    };
+    // A visitor's question is filed nowhere, as the server has it.
+    if (history !== undefined) return answerStream(null, question);
     conversations = [
       { id: 9, locale: "it", created_at: "2026-09-29T09:00:00Z", title: question },
       ...conversations,
@@ -101,12 +110,20 @@ function Pathname() {
   return <output>{useLocation().pathname}</output>;
 }
 
-function page(path: string): Mounted {
+const STUDENT: Account = {
+  id: 1,
+  username: "junliang",
+  locale: "it",
+  is_superuser: false,
+  roles: [],
+};
+
+function page(path: string, account: Account | null = STUDENT): Mounted {
   return mount(
     <ThemeProvider>
       <SessionContext
         value={{
-          account: { id: 1, username: "junliang", locale: "it", is_superuser: false, roles: [] },
+          account,
           logIn: async () => {},
           register: async () => {},
           logOut: async () => {},
@@ -269,5 +286,44 @@ describe("the chat page's address", () => {
     // A refused delete says so, which a missed click would not; nothing else
     // ever does.
     expect(saidFailed).toBe(failing === true);
+  });
+});
+
+describe("a visitor's addresses", () => {
+  beforeEach(() => {
+    conversations = [];
+    requested = [];
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", fakeApi);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("is the chat on /, with no list of conversations and the ways to an account", async () => {
+    const { container, unmount } = page("/", null);
+    await settle();
+    askFromTheFrontDoor(container);
+    await settle();
+    const landed = pathname(container);
+    const sidebar = container.querySelector("aside");
+    const links = [...container.querySelectorAll("header a")].map((a) => a.getAttribute("href"));
+    unmount();
+
+    // Asked, answered, and still on /: a visitor's question names no conversation.
+    expect(landed).toBe("/");
+    expect(sidebar).toBeNull();
+    expect(links).toEqual(["/login", "/register"]);
+    expect(requested).toEqual(["POST /api/ask"]);
+  });
+
+  it.each(["/c/7", "/staff", "/staff/programmes"])("sends %s to the login page", async (path) => {
+    const { container, unmount } = page(path, null);
+    await settle();
+    const landed = pathname(container);
+    unmount();
+
+    expect(landed).toBe("/login");
   });
 });

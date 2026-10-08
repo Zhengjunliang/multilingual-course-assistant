@@ -4,7 +4,7 @@
     "subtitle": "可以问课程材料，也可以问学校的信息。"
   },
   "auth": {
-    "logInTitle": "登录后即可提问",
+    "logInTitle": "登录后可提问课程内容",
     "registerTitle": "注册账号",
     "username": "用户名",
     "password": "密码",
@@ -58,8 +58,12 @@
     "chip": {
       "enrolment": "注册的截止日期是什么时候？",
       "calendar": "考试周从哪天开始？",
-      "material": "总结一下课程的第一讲。"
+      "material": "总结一下课程的第一讲。",
+      "library": "图书馆几点开门？"
     }
+  },
+  "visitor": {
+    "courseMaterial": "课程资料仅对有账号的学生开放。"
   },
   "status": {
     "thinking": "正在检索和思考…",

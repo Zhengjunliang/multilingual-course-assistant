@@ -12,7 +12,8 @@ import { describe, expect, it } from "vitest";
 import { render } from "@/test/render";
 import { EmptyState } from "./EmptyState";
 
-const html = (): string => render(<EmptyState onPick={() => {}} />);
+const html = (visitor = false): string =>
+  render(<EmptyState onPick={() => {}} visitor={visitor} />);
 
 describe("the empty state", () => {
   it("asks the reader a question instead of describing itself", () => {
@@ -40,5 +41,17 @@ describe("the empty state", () => {
     // Wrapped onto a second line at 390px, the chips push the composer below
     // the fold and the front door stops looking like one.
     expect(html()).toContain("overflow-x-auto");
+  });
+});
+
+describe("the empty state for a visitor", () => {
+  it("offers three campus questions and no course one", () => {
+    // The slides are for an account: a course chip would be a first click
+    // that ends in a refusal.
+    const rendered = html(true);
+
+    expect([...rendered.matchAll(/<button[^>]*type="button"/g)]).toHaveLength(3);
+    expect(rendered).toContain("biblioteche");
+    expect(rendered).not.toContain("lezione del corso");
   });
 });

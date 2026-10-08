@@ -4,7 +4,7 @@
     "subtitle": "Ask about the course material or about the university."
   },
   "auth": {
-    "logInTitle": "Sign in to ask a question",
+    "logInTitle": "Sign in to ask about your courses",
     "registerTitle": "Create an account",
     "username": "Username",
     "password": "Password",
@@ -58,8 +58,12 @@
     "chip": {
       "enrolment": "What are the enrolment deadlines?",
       "calendar": "When does the exam session start?",
-      "material": "Summarise the first lecture of the course."
+      "material": "Summarise the first lecture of the course.",
+      "library": "When are the libraries open?"
     }
+  },
+  "visitor": {
+    "courseMaterial": "Course material is for students with an account."
   },
   "status": {
     "thinking": "Searching and thinking…",

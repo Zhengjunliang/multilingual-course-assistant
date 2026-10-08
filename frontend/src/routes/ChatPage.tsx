@@ -17,8 +17,13 @@
  * The page tells the frame two things: that the list of conversations
  * changed, and which conversation is being answered, which the sidebar must
  * not delete. Unmounting clears the second, since leaving stops the answer.
+ *
+ * A visitor, on `/` only (auth/RequireSession.tsx), gets the same page with no
+ * stored conversation behind it: the thread is the tab's, and with no sidebar
+ * the way to a new one is a button at the top of the thread.
  */
 
+import { MessageSquarePlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -26,6 +31,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { isRefusal } from "@/api/client";
 import { readConversation } from "@/api/conversations";
 import { useSession } from "@/auth/useSession";
+import { Button } from "@/components/ui/button";
 import { Composer } from "@/features/chat/Composer";
 import { EmptyState } from "@/features/chat/EmptyState";
 import { TurnView } from "@/features/chat/TurnView";
@@ -43,7 +49,8 @@ export default function ChatPage() {
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [unreadable, setUnreadable] = useState(false);
 
-  const ask = useAsk(account === null);
+  const visitor = account === null;
+  const ask = useAsk(visitor);
   const { turns, waiting, submit, adopt, reset, stop } = ask;
   const loaded = useRef<string | null>(null);
   const previousId = useRef<number | null>(null);
@@ -144,13 +151,19 @@ export default function ChatPage() {
     <>
       {empty ? (
         <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room">
-          <EmptyState onPick={onSubmit} />
+          <EmptyState onPick={onSubmit} visitor={visitor} />
           {composer}
         </main>
       ) : (
         <>
           <main className="min-h-0 flex-1 overflow-y-auto px-gutter py-room">
             <div className="mx-auto flex max-w-4xl flex-col gap-room">
+              {visitor && (
+                <Button type="button" variant="ghost" className="self-start" onClick={reset}>
+                  <MessageSquarePlus aria-hidden className="size-icon" />
+                  {t("sidebar.new")}
+                </Button>
+              )}
               {unreadable && <p className="text-body text-muted">{t("sidebar.unreadable")}</p>}
               {turns.map((turn, position) => {
                 // Only the last turn can be the one being answered; every
@@ -167,6 +180,7 @@ export default function ChatPage() {
                     }
                     highlighted={highlighted}
                     onHighlight={setHighlighted}
+                    visitor={visitor}
                   />
                 );
               })}

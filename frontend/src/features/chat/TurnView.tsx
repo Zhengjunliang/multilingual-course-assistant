@@ -21,6 +21,7 @@
 import { Search } from "lucide-react";
 import { memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { Mascot } from "@/components/Mascot";
 import { badgesOf, citedMarkers, resolveExcerptRefs } from "@/lib/markers";
@@ -40,6 +41,12 @@ interface TurnViewProps {
   thinking: boolean;
   highlighted: string | null;
   onHighlight: (marker: string) => void;
+  /**
+   * Nobody is signed in. A question routed to the slides then finds nothing,
+   * because the slides are for an account, and the answer says only that no
+   * course material was found; the line under it says why.
+   */
+  visitor: boolean;
 }
 
 function Thinking() {
@@ -65,6 +72,7 @@ export const TurnView = memo(function TurnView({
   thinking,
   highlighted,
   onHighlight,
+  visitor,
 }: TurnViewProps) {
   const { t } = useTranslation();
   // Kept by identity: the answer's badges hang off this array, and a new one on
@@ -126,6 +134,15 @@ export const TurnView = memo(function TurnView({
               live={live}
               onBadgeClick={onHighlight}
             />
+          )}
+
+          {visitor && turn.route?.target === "slides" && (
+            <p className="text-body text-muted">
+              {t("visitor.courseMaterial")}{" "}
+              <Link to="/login" className="font-medium text-ink underline">
+                {t("auth.logIn")}
+              </Link>
+            </p>
           )}
 
           {turn.failure !== null && (

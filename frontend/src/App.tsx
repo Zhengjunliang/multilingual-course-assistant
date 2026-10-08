@@ -15,6 +15,7 @@ import ShellLayout from "@/routes/ShellLayout";
 import StaffLanding, { StaffNotFound } from "@/routes/StaffLanding";
 import StaffLayout from "@/routes/StaffLayout";
 import StyleguidePage from "@/routes/StyleguidePage";
+import VisitorLayout from "@/routes/VisitorLayout";
 
 /**
  * Five routes, the staff pages, and a page for every other address; two of the
@@ -31,7 +32,10 @@ import StyleguidePage from "@/routes/StyleguidePage";
  *
  * Every signed-in page sits in one layout route, `ShellLayout`: the chat and
  * the staff pages share its sidebar, whose "Gestione" group opens the staff
- * pages. `/staff/*` is open to an account holding a role or the superuser
+ * pages. A reader without an account gets `/` alone, in `VisitorLayout`, and
+ * the login page for every other address; one guard decides both, so `/` and
+ * `/c/:conversationId` stay one route tree and a signed-in reader's first
+ * question moves between them without the page being rebuilt mid-answer. `/staff/*` is open to an account holding a role or the superuser
  * (`RequireStaff`); `/staff` lands on the account's first Gestione item, and
  * the pages are objects — programmes, courses, editions — not roles.
  */
@@ -43,7 +47,7 @@ export default function App() {
       <Route path="/styleguide" element={<StyleguidePage />} />
       <Route
         element={
-          <RequireSession>
+          <RequireSession visitor={<VisitorLayout />}>
             <ShellLayout />
           </RequireSession>
         }
