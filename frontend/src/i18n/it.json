@@ -4,7 +4,7 @@
     "subtitle": "Chiedi del materiale del corso o delle informazioni di ateneo."
   },
   "auth": {
-    "logInTitle": "Accedi per fare una domanda",
+    "logInTitle": "Accedi per chiedere dei tuoi corsi",
     "registerTitle": "Crea un account",
     "username": "Nome utente",
     "password": "Password",
@@ -58,8 +58,12 @@
     "chip": {
       "enrolment": "Quali sono le scadenze per l'iscrizione?",
       "calendar": "Quando inizia la sessione d'esame?",
-      "material": "Riassumi la prima lezione del corso."
+      "material": "Riassumi la prima lezione del corso.",
+      "library": "Quali sono gli orari delle biblioteche?"
     }
+  },
+  "visitor": {
+    "courseMaterial": "Il materiale dei corsi è riservato a chi ha un account."
   },
   "status": {
     "thinking": "Sto cercando e ragionando…",

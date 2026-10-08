@@ -9,7 +9,9 @@
  * The chips are that answer. Three of them, covering both bases on purpose —
  * enrolment and calendar come from the university pages, the course one from
  * the slides — so the first click a reader makes already demonstrates the thing
- * the system is for.
+ * the system is for. A visitor gets a campus question in place of the course
+ * one: the slides are for an account, and a first click that ends in a refusal
+ * demonstrates nothing.
  *
  * A separate component rather than a block inside ChatPage, because ChatPage
  * needs a router and a session to render and this needs neither. Testing the
@@ -23,13 +25,16 @@ import { Mascot } from "@/components/Mascot";
 import { Suggestion, Suggestions } from "@/components/ui/suggestion";
 
 const CHIPS = ["enrolment", "calendar", "material"] as const;
+const VISITOR_CHIPS = ["enrolment", "calendar", "library"] as const;
 
 interface EmptyStateProps {
   /** Picking a chip asks it, rather than typing it into the composer first. */
   onPick: (question: string) => void;
+  /** Nobody is signed in, so every chip asks about the campus. */
+  visitor: boolean;
 }
 
-export function EmptyState({ onPick }: EmptyStateProps) {
+export function EmptyState({ onPick, visitor }: EmptyStateProps) {
   const { t } = useTranslation();
 
   return (
@@ -44,7 +49,7 @@ export function EmptyState({ onPick }: EmptyStateProps) {
       </div>
 
       <Suggestions className="max-w-full">
-        {CHIPS.map((chip) => {
+        {(visitor ? VISITOR_CHIPS : CHIPS).map((chip) => {
           const question = t(`empty.chip.${chip}`);
           return <Suggestion key={chip} suggestion={question} onClick={onPick} />;
         })}
