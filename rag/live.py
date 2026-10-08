@@ -328,10 +328,12 @@ def inert_content_type(content_type: str) -> str:
     """The header as the gate may read it outside the quote: whole when it is
     a media type with token parameters, as servers send it; otherwise its
     type and subtype alone, or nothing, since the rest is the server's free
-    text."""
-    if _CONTENT_TYPE.fullmatch(content_type):
-        return content_type
-    head = content_type.partition(";")[0].strip()
+    text. A repeated header reaches here joined with commas (httpx), and its
+    first value is the one read."""
+    first = content_type.partition(",")[0].strip()
+    if _CONTENT_TYPE.fullmatch(first):
+        return first
+    head = first.partition(";")[0].strip()
     return head if _MEDIA_TYPE.fullmatch(head) else ""
 
 
