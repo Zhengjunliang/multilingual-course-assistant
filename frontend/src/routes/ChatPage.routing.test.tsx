@@ -195,6 +195,8 @@ describe("the chat page's address", () => {
     deletedElsewhere?: number;
     /** A sidebar row that must be gone afterwards. */
     gone?: string;
+    /** A sidebar row that must still be there afterwards. */
+    kept?: string;
   }
 
   it.each<Case>([
@@ -227,6 +229,7 @@ describe("the chat page's address", () => {
       step: deleting(STORED.title),
       lands: "/c/7",
       failing: true,
+      kept: "/c/7",
     },
     {
       name: "deleting a conversation another tab deleted",
@@ -237,7 +240,7 @@ describe("the chat page's address", () => {
       gone: "/c/7",
     },
   ])("$name lands on $lands, and stays there", async (scenario) => {
-    const { from, step, lands, early, failing, deletedElsewhere, gone } = scenario;
+    const { from, step, lands, early, failing, deletedElsewhere, gone, kept } = scenario;
     deleteFails = failing === true;
     const { container, unmount } = page(from);
     if (!early) await settle();
@@ -253,7 +256,7 @@ describe("the chat page's address", () => {
     const stayed = pathname(container);
     const row = (href: string) => container.querySelector(`aside a[href="${href}"]`);
     const goneRow = gone === undefined ? null : row(gone);
-    const keptRow = row(from);
+    const keptRow = kept === undefined ? undefined : row(kept);
     const saidFailed = document.body.textContent?.includes(i18n.t("sidebar.deleteFailed"));
     unmount();
 
@@ -262,10 +265,9 @@ describe("the chat page's address", () => {
     // The deleted row is off the refreshed sidebar, which is also what proves
     // the step found its button: a missed click would leave it there.
     expect(goneRow).toBeNull();
-    if (failing) {
-      // The dialog says so, which a missed click would not, and nothing moved.
-      expect(saidFailed).toBe(true);
-      expect(keptRow).not.toBeNull();
-    }
+    expect(keptRow).not.toBeNull();
+    // A refused delete says so, which a missed click would not; nothing else
+    // ever does.
+    expect(saidFailed).toBe(failing === true);
   });
 });
