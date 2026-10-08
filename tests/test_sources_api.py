@@ -102,19 +102,18 @@ def test_a_slides_source_opens_inline_as_the_indexed_pdf(root: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("sha", "anonymous", "status"),
+    "sha",
     [
-        pytest.param(SHA, True, 403, id="anonymous-403"),
-        pytest.param("0" * 64, False, 404, id="unknown-sha-404"),
-        pytest.param(SHA.upper(), False, 404, id="uppercase-hex-404"),
-        pytest.param(WEB_SHA, False, 404, id="web-sidecar-404"),
+        pytest.param("0" * 64, id="unknown-sha"),
+        pytest.param(SHA.upper(), id="uppercase-hex"),
+        pytest.param(WEB_SHA, id="web-sidecar"),
     ],
 )
-def test_a_source_is_refused(root: Path, sha: str, anonymous: bool, status: int) -> None:
-    response = client_for(anonymous=anonymous).get(f"/api/sources/{sha}")
+def test_a_source_is_not_found(root: Path, sha: str) -> None:
+    response = client_for().get(f"/api/sources/{sha}")
     response.close()
 
-    assert response.status_code == status
+    assert response.status_code == 404
 
 
 @pytest.mark.parametrize(

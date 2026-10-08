@@ -25,9 +25,10 @@ Each of these is the only guard of what it protects. One that meets a criterion 
 | `rag/` runs without Django | `tests/test_smoke.py` |
 | The TypeScript mirror of `apps/qa/contract.py` | `tests/test_qa_contract.py` |
 | The TypeScript mirror of the catalogue serializers and the permission names | `tests/test_catalog_contract.py` |
-| Login, logout, sessions, CSRF and the login throttle | `tests/test_accounts_api.py`, and the cases of `tests/test_qa_api.py` that refuse an anonymous caller |
+| Login, logout, sessions, CSRF and the login throttle | `tests/test_accounts_api.py` |
 | Migration drift, which no other step checks | `tests/test_accounts.py::test_no_pending_migrations` |
 | Every route says who may call it | `tests/test_route_permissions.py` |
+| What each kind of caller gets from every API route | `tests/access_matrix.txt`, checked by `tests/test_access_matrix.py` |
 | CI calls exactly the chain, and every guard rule fails on its bad examples | `tests/test_check_script.py`, `tests/test_guards.py` |
 
 One overlap is kept on purpose: `tests/test_smoke.py::test_django_system_checks_pass` runs the system checks that the chain's `deploy` step runs too, so that `uv run pytest`, the quick loop, catches a broken setting without the whole chain.

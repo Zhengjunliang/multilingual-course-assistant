@@ -209,10 +209,6 @@ def test_logging_out_ends_the_session(student: User) -> None:
     assert client.get(ME_URL).json()["authenticated"] is False
 
 
-def test_logging_out_needs_a_login() -> None:
-    assert APIClient().post(LOGOUT_URL).status_code == 403
-
-
 def test_a_student_can_change_the_interface_language(student: User) -> None:
     response = logged_in().patch(ME_URL, {"locale": "zh-hans"}, format="json")
     student.refresh_from_db()
@@ -258,10 +254,6 @@ def test_only_the_language_can_be_changed_through_me(
     }
     assert (student.username, student.is_superuser, student.is_staff) == (USERNAME, False, False)
     assert not RoleAssignment.objects.exists()
-
-
-def test_changing_a_language_needs_a_login() -> None:
-    assert APIClient().patch(ME_URL, {"locale": "en"}, format="json").status_code == 403
 
 
 def test_the_django_locale_maps_onto_the_one_rag_speaks() -> None:

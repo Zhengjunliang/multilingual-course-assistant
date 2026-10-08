@@ -236,6 +236,15 @@ def test_every_exemption_names_a_route() -> None:
     assert set(DELEGATED) <= namespaces
 
 
+def served(view: type[APIView]) -> set[str]:
+    """The methods a view answers itself: HEAD follows GET, and OPTIONS is DRF's metadata."""
+    return {
+        m.upper()
+        for m in view.http_method_names
+        if m not in {"head", "options"} and hasattr(view, m)
+    }
+
+
 def scoped_views() -> dict[str, type[ScopedObjectView]]:
     """The scoped views the URL tree mounts, by route name."""
     return {
@@ -260,14 +269,10 @@ def test_every_permission_guards_a_route() -> None:
 def test_each_scoped_view_maps_every_method_it_serves() -> None:
     """A method a scoped view serves but does not map would be refused to everyone."""
     views = scoped_views()
-    # HEAD follows GET, so it needs no entry of its own.
-    served = {
-        name: {m.upper() for m in view.http_method_names if m != "head" and hasattr(view, m)}
-        for name, view in views.items()
-    }
+    methods = {name: served(view) for name, view in views.items()}
 
-    assert served
-    assert served == {name: set(view.scope_map) for name, view in views.items()}
+    assert methods
+    assert methods == {name: set(view.scope_map) for name, view in views.items()}
 
 
 def test_whoever_may_act_on_a_scope_may_see_it() -> None:
