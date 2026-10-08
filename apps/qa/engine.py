@@ -24,8 +24,9 @@ belongs to the HTTP layer and never appears in this file.
 
 **No query runs in this file, and that is a rule rather than a coincidence.**
 The conversation history arrives already sliced, as `rag.answer.Turn` — plain
-data — and the conversation id arrives as an integer, because this module emits
-the `start` event and that event carries one. Loading either is the view's job
+data — and the conversation id arrives as an integer, or None for an anonymous
+question, because this module emits the `start` event and that event carries
+it. Loading either is the view's job
 (apps/qa/conversations.py), and `tests/test_qa_api.py` asserts that answering a
 question touches no database at all.
 """
@@ -51,6 +52,7 @@ if TYPE_CHECKING:
     from qdrant_client import QdrantClient
 
     from rag.answer import Turn
+    from rag.chunk import EditionKey
     from rag.index import DenseEncoder, SparseEncoder
     from rag.llm import ChatStreamer, Completer
     from rag.search import Reranker
@@ -136,9 +138,11 @@ class Engine:
     def stream(
         self,
         question: str,
-        conversation_id: int,
+        conversation_id: int | None,
         locale: str | None = None,
         history: Sequence[Turn] = (),
+        *,
+        scope: Sequence[EditionKey] | None,
     ) -> Iterator[Event]:
         """Route, retrieve, generate — the read-only three quarters of `rag.agent`.
 
@@ -146,6 +150,10 @@ class Engine:
         writes them into the *shared* index, which the roadmap puts behind an
         account and a rate limit, and three fetches at tens of seconds each do
         not belong in one synchronous request.
+
+        `scope` is the slides editions the caller may be answered from, with
+        `rag.search.search`'s meaning, and is required for the same reason it
+        is there: it decides what a caller can read, so every call states it.
 
         Everything up to `StartEvent` can still fail into a status code, which
         is why routing and retrieval happen before the first `yield` rather than
@@ -206,9 +214,7 @@ class Engine:
                 self.dense,
                 self.sparse,
                 self.reranker,
-                # `None`: every edition; the caller's scope, computed from their
-                # programme, is `#36` (docs/data-model.md).
-                scope=None,
+                scope=scope,
                 limit=TOP_K,
                 collections=available,
             )
@@ -313,9 +319,11 @@ _HOLDER = _Holder()
 
 def stream_answer(
     question: str,
-    conversation_id: int,
+    conversation_id: int | None,
     locale: str | None = None,
     history: Sequence[Turn] = (),
+    *,
+    scope: Sequence[EditionKey] | None,
 ) -> Generator[Event, None, None]:
     """One question at a time, on the one set of models this process loaded.
 
@@ -353,6 +361,6 @@ def stream_answer(
     try:
         if _HOLDER.engine is None:
             _HOLDER.engine = build_engine()
-        yield from _HOLDER.engine.stream(question, conversation_id, locale, history)
+        yield from _HOLDER.engine.stream(question, conversation_id, locale, history, scope=scope)
     finally:
         _HOLDER.lock.release()

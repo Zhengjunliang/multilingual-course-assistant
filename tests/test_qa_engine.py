@@ -31,6 +31,7 @@ from apps.qa.contract import EndEvent, Event, StartEvent
 from apps.qa.engine import Engine
 from rag.agent import RouteDecision
 from rag.answer import Turn
+from rag.chunk import EditionKey
 from rag.index import ensure_collection, index_chunks, open_client
 
 CONVERSATION_ID = 7
@@ -53,9 +54,11 @@ class CountingEngine:
     def stream(
         self,
         question: str,
-        conversation_id: int,
+        conversation_id: int | None,
         locale: str | None = None,
         history: Sequence[Turn] = (),
+        *,
+        scope: Sequence[EditionKey] | None,
     ) -> Iterator[Event]:
         with self.guard:
             self.inside += 1
@@ -79,7 +82,7 @@ def drain(question: str = "What is an ORM?") -> None:
     than through `stream_answer` directly: calling a generator function only
     builds the generator, so a thread that stopped there would take no lock and
     the two tests would pass against a deleted one."""
-    list(engine_module.stream_answer(question, CONVERSATION_ID))
+    list(engine_module.stream_answer(question, CONVERSATION_ID, scope=None))
 
 
 def test_the_engine_answers_without_touching_the_database(tmp_path: Path) -> None:
@@ -107,6 +110,7 @@ def test_the_engine_answers_without_touching_the_database(tmp_path: Path) -> Non
             "How does it differ?",
             CONVERSATION_ID,
             history=[Turn(question="What is an ORM?", answer="It maps objects to tables.")],
+            scope=None,
         )
     )
     qdrant.close()
@@ -121,7 +125,7 @@ def test_a_stream_nobody_reads_takes_no_lock() -> None:
     still available. Building one and dropping it must cost nothing."""
     engine_module._HOLDER.engine = cast("Engine", CountingEngine())
 
-    unread = engine_module.stream_answer("What is an ORM?", CONVERSATION_ID)
+    unread = engine_module.stream_answer("What is an ORM?", CONVERSATION_ID, scope=None)
     try:
         assert engine_module._HOLDER.lock.acquire(blocking=False)
         engine_module._HOLDER.lock.release()

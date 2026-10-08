@@ -18,14 +18,14 @@ retrieval, and until it returns nothing has been sent. Everything after it — a
 model server that dies halfway through an answer — travels as an `error` event
 under a 200 that was already committed.
 
-**CSRF, and why this file does nothing about it.** That debt is paid, and it
-was paid in configuration rather than here: `SessionAuthentication` plus
-`IsAuthenticated` are the project-wide defaults (config/settings.py), so a
-request that reaches this view carries a session cookie and DRF has already
-enforced the token against it. The browser sends that token as `X-CSRFToken`,
-the header DRF's `CSRF_HEADER_NAME` names by default, reading it from the cookie
-`GET /api/auth/me` issues. Nothing about the stream is special here; it is the
-same rule every endpoint follows.
+**CSRF, for a caller with a session and for one without.** A logged-in request
+is checked by `SessionAuthentication`, the project-wide default
+(config/settings.py), while it authenticates the caller. An anonymous one is
+not, because that class checks only the callers it finds, so the permission
+class below runs the same check for them (apps/accounts/permissions.py). The
+browser sends the token as `X-CSRFToken`, the header Django's
+`CSRF_HEADER_NAME` names by default, reading it from the cookie
+`GET /api/auth/me` issues to anyone. Nothing about the stream is special here.
 
 **WSGI is a load-bearing assumption, and this is the file it bears on.** Under
 `WSGI_APPLICATION` a synchronous iterator is consumed on the thread that served
@@ -47,11 +47,11 @@ from django.http import StreamingHttpResponse
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import AllowAnyWithCsrf
 from apps.qa.contract import (
     EndEvent,
     ErrorEvent,
@@ -135,10 +135,13 @@ class _EventStream:
     It is also where the answer is saved, because this object is the only thing
     that sees every way a stream can stop: an `end` event, an `error` event in
     its place, or a reader who left. All three settle the row — what differs is
-    only whether the text in it is complete.
+    only whether the text in it is complete. An anonymous answer has no row,
+    `answer_pk` is None, and the stream is the same without the write.
     """
 
-    def __init__(self, first: Event, rest: Generator[Event, None, None], answer_pk: int) -> None:
+    def __init__(
+        self, first: Event, rest: Generator[Event, None, None], answer_pk: int | None
+    ) -> None:
         self._first = first
         self._rest = rest
         self._answer_pk = answer_pk
@@ -177,7 +180,7 @@ class _EventStream:
         response is being closed, and an exception escaping that path replaces
         an answer the reader already has with a traceback.
         """
-        if self._settled:
+        if self._settled or self._answer_pk is None:
             return
         self._settled = True
         try:
@@ -192,6 +195,12 @@ class AskView(APIView):
     The reply is `text/event-stream`: one `start` event carrying the routing
     decision and the excerpts the answer will be grounded in, then one `token`
     event per piece of generated text, then `end`.
+
+    Anyone may ask. A logged-in caller's question and answer are filed in a
+    conversation, which supplies the next question's history. An anonymous
+    caller's are filed nowhere, the view making no query of its own, and its
+    client sends the history back with each question instead; it is answered
+    from the campus pages alone, never from course material.
     """
 
     # A tuple because ruff's RUF012 objects to a mutable class attribute, and
@@ -199,12 +208,15 @@ class AskView(APIView):
     # `Accept: */*`, which is what curl sends — gets plain JSON for the error
     # bodies; the SSE framing is for whoever explicitly asked for the stream.
     renderer_classes = (JSONRenderer, ServerSentEventRenderer)
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (AllowAnyWithCsrf,)
 
     # Its own bucket, separate from the login endpoints': what limits this one
     # is a GPU that answers about two questions a minute, and what limits those
     # is how fast a password can be guessed. A single rate covering both would
-    # be wrong for whichever it was not chosen for (config/settings.py).
+    # be wrong for whichever it was not chosen for (config/settings.py). The
+    # scoped throttle counts a logged-in caller by account and an anonymous one
+    # by address, so a campus behind one NAT shares one anonymous budget
+    # (docs/security.md).
     throttle_scope = "ask"
 
     def unavailable(
@@ -233,12 +245,26 @@ class AskView(APIView):
         payload.is_valid(raise_exception=True)
         validated = payload.validated_data
 
-        # The cast is the one apps/accounts/views.py explains: pyright has no
-        # django-stubs plugin, so `request.user` is the abstract base to it.
-        conversation = open_conversation(cast("User", request.user), validated["conversation"])
-        history = recent_turns(conversation)
+        if request.user.is_authenticated:
+            # The cast is the one apps/accounts/views.py explains: pyright has
+            # no django-stubs plugin, so `request.user` is the abstract base to it.
+            conversation = open_conversation(cast("User", request.user), validated["conversation"])
+            history = recent_turns(conversation)
+            conversation_id = conversation.pk
+            # Every edition until the caller's own scope is computed from their
+            # programme, which is `#36` (docs/data-model.md).
+            scope = None
+        else:
+            conversation = None
+            history = validated["history"]
+            conversation_id = None
+            # No edition: course material is for students with an account, and
+            # an empty scope skips the slides collection without querying it.
+            scope = ()
 
-        events = stream_answer(validated["question"], conversation.pk, validated["locale"], history)
+        events = stream_answer(
+            validated["question"], conversation_id, validated["locale"], history, scope=scope
+        )
         try:
             # Routing and retrieval happen inside this call — see the module
             # docstring: it is the last moment a status code is still on offer.
@@ -255,15 +281,18 @@ class AskView(APIView):
         #
         # The cast states what apps/qa/contract.py already does: a stream is one
         # `start`, then tokens, then a terminator.
-        try:
-            answer_pk = record_exchange(conversation, cast("StartEvent", first))
-        except ConversationGoneError:
-            # Closed here rather than left to garbage collection: closing is
-            # what runs the engine's `finally` and frees the one answer slot.
-            events.close()
-            # A list, as the serializer's own refusal of an unknown id has it
-            # (apps/qa/serializers.py): one error, one shape, whenever it is found.
-            raise ValidationError({"conversation_id": [_("No such conversation.")]}) from None
+        answer_pk = None
+        if conversation is not None:
+            try:
+                answer_pk = record_exchange(conversation, cast("StartEvent", first))
+            except ConversationGoneError:
+                # Closed here rather than left to garbage collection: closing is
+                # what runs the engine's `finally` and frees the one answer slot.
+                events.close()
+                # A list, as the serializer's own refusal of an unknown id has
+                # it (apps/qa/serializers.py): one error, one shape, whenever it
+                # is found.
+                raise ValidationError({"conversation_id": [_("No such conversation.")]}) from None
 
         return StreamingHttpResponse(
             _EventStream(first, events, answer_pk),

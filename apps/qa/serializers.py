@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Any
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from apps.qa.models import Conversation, Message
+from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
+from rag.answer import Turn
 from rag.chunk import normalize_locale
 
 if TYPE_CHECKING:
@@ -28,18 +29,55 @@ if TYPE_CHECKING:
 # change that; it only says whose cost it is.
 MAX_QUESTION_CHARS = 1000
 
+# How long an earlier answer in an anonymous `history` may be. The prompt keeps
+# only the first `rag.answer.HISTORY_ANSWER_CHARS` of it either way; ten times
+# that leaves a client room to send its answers cut at this cap and no more,
+# and bounds what the server reads and holds for text no prompt will see.
+MAX_HISTORY_ANSWER_CHARS = 4000
+
 # How much of the first question becomes a sidebar row's label. Long enough to
 # tell two threads about the same lecture apart, short enough not to wrap.
 TITLE_CHARS = 60
 
 
+class TurnSerializer(serializers.Serializer):
+    """One earlier exchange, as an anonymous client sends it back.
+
+    Untrusted, like everything in a request body: the client may send an answer
+    the model never wrote. What that buys is limited to the forger's own
+    answer, since nothing is stored and nobody else reads it, and less than a
+    question could say: the router sees only the questions, and generation sees
+    each exchange quoted (rag/answer.py, `format_history`). So the turns are
+    bounded rather than signed. The answer may be empty, as a stored one is
+    when its stream failed before the first token.
+    """
+
+    question = serializers.CharField(max_length=MAX_QUESTION_CHARS, trim_whitespace=True)
+    answer = serializers.CharField(max_length=MAX_HISTORY_ANSWER_CHARS, allow_blank=True)
+
+
 class AskRequest(serializers.Serializer):
-    """A question, optionally continuing a conversation. The rest is inferred."""
+    """A question, optionally continuing a conversation. The rest is inferred.
+
+    A conversation continues in one of two ways, and a request uses the one
+    that matches its caller. A logged-in caller names a stored conversation by
+    `conversation_id`, and the server reads the history from it. An anonymous
+    caller has nothing stored and sends `history` itself, its last few
+    exchanges, oldest first: the cap is the window a stored conversation is
+    cut to (`HISTORY_WINDOW_TURNS`), so the prompt is built the same way on
+    both paths.
+    """
 
     question = serializers.CharField(max_length=MAX_QUESTION_CHARS, trim_whitespace=True)
     # Omitted or null starts a new conversation; the id of the one that was
     # started comes back in the `start` event.
     conversation_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    # No default: `validate` tells an omitted history from an empty one, and a
+    # logged-in caller may send neither. The list spelled out rather than
+    # `many=True`, which builds the same one but whose stub drops `max_length`.
+    history = serializers.ListSerializer(
+        child=TurnSerializer(), required=False, max_length=HISTORY_WINDOW_TURNS
+    )
     # Optional: with no locale the engine detects one from the question itself,
     # which is what the CLI does. An empty string is not a locale — `allow_null`
     # without `allow_blank` makes "omitted" and "null" the only ways to say
@@ -60,24 +98,42 @@ class AskRequest(serializers.Serializer):
             raise serializers.ValidationError(str(exc)) from exc
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        """Resolve the conversation id into the row, or refuse it.
+        """Take the history from where the caller keeps it, and refuse the other source.
 
-        One message for "no such conversation" and for "that one is not yours",
-        because they must not be distinguishable: a client that could tell them
-        apart could count how many conversations exist and whose they are. What
-        is left is a request for something the caller has no way to name, which
-        is what a 400 says.
+        Each caller has one source, and a request naming the other is a 400
+        rather than a field quietly ignored: an anonymous caller has no stored
+        conversation to continue, and a logged-in caller's history is the
+        stored one, which a client-sent copy could only contradict.
+
+        For a logged-in caller, the conversation id becomes the row, or a
+        refusal. One message for "no such conversation" and for "that one is
+        not yours", because they must not be distinguishable: a client that
+        could tell them apart could count how many conversations exist and whose
+        they are. What is left is a request for something the caller has no way
+        to name, which is what a 400 says.
 
         The lookup only runs when an id was actually sent. That is what keeps
         the everyday first question of a conversation — and every test in
         tests/test_qa_api.py that does not name one — free of a query.
         """
+        request: Request = self.context["request"]
         attrs["conversation"] = None
+        if not request.user.is_authenticated:
+            if attrs.get("conversation_id") is not None:
+                raise serializers.ValidationError(
+                    {"conversation_id": _("Without an account, send the history instead.")}
+                )
+            attrs["history"] = [Turn(**turn) for turn in attrs.get("history", [])]
+            return attrs
+
+        if "history" in attrs:
+            raise serializers.ValidationError(
+                {"history": _("With an account, send the conversation_id instead.")}
+            )
         conversation_id = attrs.get("conversation_id")
         if conversation_id is None:
             return attrs
 
-        request: Request = self.context["request"]
         conversation = Conversation.objects.filter(pk=conversation_id, owner=request.user).first()
         if conversation is None:
             raise serializers.ValidationError({"conversation_id": _("No such conversation.")})

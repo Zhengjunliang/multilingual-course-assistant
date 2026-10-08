@@ -15,7 +15,7 @@ POST catalog:programme-secretariat          hide       hide     deny        hide
 DELETE catalog:programme-secretariat-member hide       hide     deny        hide              deny  hide    allow deny     deny
 GET catalog:programmes                      allow      allow    allow       allow             allow allow   allow deny     deny
 POST catalog:set-current                    allow      deny     allow       hide              allow hide    allow deny     deny
-POST qa:ask                                 allow      allow    allow       allow             allow allow   allow deny     deny
+POST qa:ask                                 allow      allow    allow       allow             allow allow   allow allow    allow
 DELETE qa:conversation                      hide       hide     hide        hide              hide  allow   hide  deny     deny
 GET qa:conversation                         hide       hide     hide        hide              hide  allow   hide  deny     deny
 GET qa:conversations                        allow      allow    allow       allow             allow allow   allow deny     deny

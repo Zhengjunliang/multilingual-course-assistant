@@ -10,13 +10,16 @@ without dragging a TypeScript toolchain into the Python suite, the same trade
 
 What it deliberately does not check is the types. A `number` where the server
 sends a string is the frontend's own `tsc` problem; this gate exists so that the
-names cannot silently disagree.
+names cannot silently disagree. Nullability is the one exception, because `tsc`
+cannot see it from the client's side: a field the server may send as `null`
+but the mirror types without it compiles cleanly and fails at run time, in the
+branch nobody wrote.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, get_args
 
 import pytest
 
@@ -50,6 +53,13 @@ MIRRORED: tuple[type[BaseModel], ...] = (
 )
 
 FIELDS = [(model.__name__, field) for model in MIRRORED for field in model.model_fields]
+
+NULLABLE = {
+    (model.__name__, field)
+    for model in MIRRORED
+    for field, info in model.model_fields.items()
+    if type(None) in get_args(info.annotation)
+}
 
 
 def declaration(mirror: str, name: str) -> str | None:
@@ -92,4 +102,7 @@ def test_the_mirror_declares_every_model_without_fields(
 def test_the_mirror_declares_every_field(mirror: str, model_name: str, field: str) -> None:
     body = declaration(mirror, model_name)
     assert body is not None, f"{model_name} has fields but no interface in {MIRROR.name}"
-    assert f"{field}:" in body, f"{model_name}.{field} is missing from {MIRROR.name}"
+    line = next((line for line in body.splitlines() if line.strip().startswith(f"{field}:")), None)
+    assert line is not None, f"{model_name}.{field} is missing from {MIRROR.name}"
+    nullable = (model_name, field) in NULLABLE
+    assert ("| null" in line) == nullable, f"{model_name}.{field} nullable is {nullable} in Python"
