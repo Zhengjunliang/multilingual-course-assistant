@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import logging
+import re
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -98,7 +99,7 @@ from rag.llm import (
     Message,
     build_completer,
     complete_json,
-    neutralize,
+    inert_url,
     quote,
 )
 from rag.parse import build_converter
@@ -315,6 +316,25 @@ def gate_sample(url: str, response: Response) -> str:
     return sample
 
 
+# A Content-Type as RFC 9110 writes one (section 8.3), its parameter values
+# tokens only, since a quoted one could hold a sentence. A token is a run of
+# tchar (section 5.6.2).
+_TCHARS = r"[!#$%&'*+.^_`|~0-9A-Za-z-]+"
+_MEDIA_TYPE = re.compile(rf"{_TCHARS}/{_TCHARS}")
+_CONTENT_TYPE = re.compile(rf"{_TCHARS}/{_TCHARS}(?:[ \t]*;[ \t]*{_TCHARS}={_TCHARS})*")
+
+
+def inert_content_type(content_type: str) -> str:
+    """The header as the gate may read it outside the quote: whole when it is
+    a media type with token parameters, as servers send it; otherwise its
+    type and subtype alone, or nothing, since the rest is the server's free
+    text."""
+    if _CONTENT_TYPE.fullmatch(content_type):
+        return content_type
+    head = content_type.partition(";")[0].strip()
+    return head if _MEDIA_TYPE.fullmatch(head) else ""
+
+
 def judge_relevance(
     completer: Completer,
     url: str,
@@ -329,7 +349,8 @@ def judge_relevance(
     ephemeral branch hands the same chunks back either way.
 
     The page text is quoted; the URL and the content type stand outside the
-    quote, and both are the server's to write, so both are neutralized.
+    quote, and both are the server's to write, so neither reaches the model
+    as free text (`inert_url`, `inert_content_type`).
     """
     page_text = (
         quote(text_sample) if text_sample else "(no text: judge from the URL and filename alone)"
@@ -339,8 +360,8 @@ def judge_relevance(
         {
             "role": "user",
             "content": (
-                f"url: {neutralize(url)}\n"
-                f"content-type: {neutralize(content_type)}\n"
+                f"url: {inert_url(url)}\n"
+                f"content-type: {inert_content_type(content_type)}\n"
                 f"fetched for: {trigger or 'a link the student pasted'}\n"
                 f"page text: {page_text}"
             ),

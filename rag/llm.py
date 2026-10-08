@@ -30,7 +30,7 @@ earlier turn the browser sent back — enters a prompt through `quote()`, and
 every system prompt that reads such text carries `QUOTED_CLAUSE`
 (docs/decisions.md, 2026-10-08, *Text the project did not write enters every
 prompt as quoted material*). `neutralize()` is what keeps the text from closing
-its own block.
+its own block, and `inert_url()` is how a URL stands outside one.
 """
 
 from __future__ import annotations
@@ -38,6 +38,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+import urllib.parse
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from pydantic import BaseModel, ValidationError
@@ -185,9 +186,22 @@ QUOTED_CLAUSE = (
 )
 
 # The opening and closing tag, matched on the NFKC form so that a fullwidth
-# less-than sign (U+FF1C) or its small form (U+FE64) is found too; IGNORECASE
-# does not change lengths.
-_TAG = re.compile(r"</?quoted", re.IGNORECASE)
+# less-than sign (U+FF1C) or its small form (U+FE64) is found too, with
+# whitespace allowed where a lenient reader would skip it; IGNORECASE does not
+# change lengths.
+_TAG = re.compile(r"<\s*/?\s*quoted", re.IGNORECASE)
+
+# Unicode's Default_Ignorable_Code_Point outside the Cf category, which is
+# dropped whole: the combining grapheme joiner, the Hangul fillers, the
+# variation selectors and the reserved ranges a renderer must not show.
+_IGNORABLE = re.compile(
+    "[\u034f\u115f\u1160\u17b4\u17b5\u180b-\u180f\u2065\u3164\ufe00-\ufe0f\uffa0"
+    "\ufff0-\ufff8\U000e0000-\U000e0fff]"
+)
+
+
+def _invisible(char: str) -> bool:
+    return unicodedata.category(char) == "Cf" or _IGNORABLE.match(char) is not None
 
 
 def neutralize(text: str) -> str:
@@ -196,16 +210,19 @@ def neutralize(text: str) -> str:
     NFKC is used to find a tag, never to rewrite the text: each character is
     folded on its own, so every folded character maps back to the one it came
     from, and only the characters of a tag are replaced. The rest stays byte for
-    byte, `…`, n² and x₁ included. Invisible format characters (a zero-width
-    space, a soft hyphen) fold to nothing, so they cannot split a tag either.
-    The replacement opens with `(`, which no tag can grow from.
+    byte, `…`, n² and x₁ included. Invisible characters (a zero-width space, a
+    soft hyphen, a combining grapheme joiner, a variation selector) fold to
+    nothing, so they cannot split a tag either. The replacement opens with `(`,
+    which no tag can grow from. A letter that only looks like one of the tag's,
+    the Cyrillic o (U+043E), is not folded by NFKC and is not caught: docs/security.md,
+    row LLM01:2026, says why that is accepted.
     """
     folded: list[str] = []
     origin: list[int] = []
     for index, char in enumerate(text):
-        if unicodedata.category(char) == "Cf":
-            continue
         for piece in unicodedata.normalize("NFKC", char):
+            if _invisible(piece):
+                continue
             folded.append(piece)
             origin.append(index)
     pieces: list[str] = []
@@ -224,3 +241,18 @@ def quote(text: str) -> str:
     answer, and a page shows them as text (docs/decisions.md, 2026-10-08).
     """
     return f"<quoted>\n{neutralize(text)}\n</quoted>"
+
+
+def inert_url(url: str) -> str:
+    """`url` as it may stand outside a quoted block, where a reader takes text
+    for the project's own.
+
+    A crawled link keeps whatever its page wrote (`urljoin` in rag/crawl.py),
+    spaces and brackets included, so a query string could read as a sentence
+    or end a `[marker]` early. Percent-encoding everything RFC 3986 does not
+    allow in a URL, non-ASCII letters too, plus the square brackets it allows
+    only around an IPv6 host, leaves no space, bracket, angle bracket or word
+    in another script. `%` is kept, so an escape the URL holds is not encoded
+    twice; any other valid ASCII URL comes back unchanged.
+    """
+    return urllib.parse.quote(url, safe="/:?#@!$&'()*+,;=%~")
