@@ -153,9 +153,17 @@ describe("the source strip", () => {
     expect(html).toContain("shrink-0");
   });
 
-  it.each(["slides", "web", "legacy"])(
-    "offers the PDF page and the edition of a %s card only when it has them",
-    (shape) => {
+  it.each([
+    {
+      shape: "slides",
+      page: `href="/api/sources/${"ab".repeat(32)}#page=3" target="_blank"`,
+      edition: "B028451 · 2025-2026",
+    },
+    { shape: "web", page: null, edition: null },
+    { shape: "legacy", page: null, edition: null },
+  ])(
+    "offers the PDF page and the edition of a $shape card only when it has them",
+    ({ shape, page, edition }) => {
       const slides = { ...citation("[deck.pdf p.3]", 3), course: "B028451" };
       const card: Citation =
         shape === "slides"
@@ -184,15 +192,11 @@ describe("the source strip", () => {
           onSelect={() => {}}
         />,
       );
-      // Prefixes, so a card built from a missing field — `/api/sources/undefined`,
-      // `B028451 · ` — counts as offered and fails the other two shapes.
-      expect(html.includes('href="/api/sources/')).toBe(shape === "slides");
-      expect(html.includes("B028451 ·")).toBe(shape === "slides");
-      if (shape === "slides") {
-        expect(html).toContain(`href="/api/sources/${"ab".repeat(32)}#page=3"`);
-        expect(html).toContain("B028451 · 2025-2026");
-      }
-      if (shape === "slides") expect(html).toContain('target="_blank"');
+      // Matched from a prefix, so a card built from a missing field —
+      // `/api/sources/undefined`, `B028451 · ` — counts as offered and fails
+      // the other two shapes.
+      expect(html.match(/href="\/api\/sources\/[^"]*" target="[^"]*"/)?.[0] ?? null).toBe(page);
+      expect(html.match(/B028451 ·[^<]*/)?.[0] ?? null).toBe(edition);
     },
   );
 

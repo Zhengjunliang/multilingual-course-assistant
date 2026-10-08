@@ -17,7 +17,15 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "suspicious": {
+        "noFocusedTests": "error",
+        "noSkippedTests": "error"
+      },
+      "nursery": {
+        "noConditionalExpect": "error",
+        "useExpect": "error"
+      }
     }
   },
   "assist": {
