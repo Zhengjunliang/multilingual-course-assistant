@@ -1,6 +1,6 @@
 # Testing
 
-This file owns two things: when a test may be deleted, and which tests stay whatever those criteria say. How the suite runs is the `tests` step of [scripts/check.py](../scripts/check.py); what each test checks is the test's own business.
+This file owns four things: when a test may be deleted, which tests stay whatever those criteria say, where a regression test goes, and what a test may fake. How the suite runs is the `tests` step of [scripts/check.py](../scripts/check.py); what each test checks is the test's own business.
 
 ## When a test may be deleted
 
@@ -32,3 +32,20 @@ Each of these is the only guard of what it protects. One that meets a criterion 
 | CI calls exactly the chain, and every guard rule fails on its bad examples | `tests/test_check_script.py`, `tests/test_guards.py` |
 
 One overlap is kept on purpose: `tests/test_smoke.py::test_django_system_checks_pass` runs the system checks that the chain's `deploy` step runs too, so that `uv run pytest`, the quick loop, catches a broken setting without the whole chain.
+
+## Where a regression test goes
+
+A fix brings the test that was red before it, and the commit says it was. The test goes in the test file of the unit the fix protects, never in a file of its own: a new row of the parametrised table that covers the behaviour when there is one, with an `id` that names the input (`id="zero-width-space"`), otherwise a test named for the behaviour that broke. The issue number goes in the commit (`Closes #158`), not in the id or the name: a failure has to say what broke, criterion (d), and a number says only where to read about it.
+
+## What a test may fake
+
+A test runs the project's own code and fakes only what is outside it or cannot be had on demand:
+
+- **Out of process**: the LLM endpoint (`rag.llm.build_completer`, `rag.llm.build_streamer`, `openai.OpenAI`), HTTP fetches (`rag.crawl.HttpxFetcher`), git and other binaries (`subprocess.run`).
+- **Time**: the clock (`time.monotonic`) and the wait between fetches (`rag.live.shared_throttle`, replaced by a `Throttle` with no interval).
+- **Too heavy for the unit loop**: the embedding encoders and the reranker (`StubDense` and `StubSparse` in `tests/test_index.py`), the document converters and the chunker (`rag.live.build_converter`, `rag.live.chunk_document`).
+- **A failure no input produces**: an encoder that cannot load, a Qdrant that refuses, a build slow enough for two requests to meet (`tests/test_qa_api.py`, `tests/test_qa_engine.py`).
+
+Two things are never faked. The database is the PostgreSQL test database Django creates, the engine production runs. Qdrant is a real embedded index under `tmp_path` (`rag.index.open_client` with a directory). Pointing a setting or a directory at the test's own, such as `PARSED_DIR` at `tmp_path` or a shorter queue timeout, is not a fake.
+
+A fake of the project's own code outside these cases checks how the code is called, not what it does (*Software Engineering at Google*, chapter 12, *Test State, Not Interactions*). It is written only where no outcome can show the behaviour, and its docstring says why, as `tests/test_qa_api.py` does for the wrapper that keeps the engine's generator alive.
