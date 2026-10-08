@@ -43,10 +43,33 @@ export class AskFailed extends Error {
   }
 }
 
+/**
+ * The server's caps on a request (apps/qa/serializers.py and the history window
+ * of apps/qa/models.py), mirrored so a client can stay inside them rather than
+ * meet a 400. `tests/test_qa_contract.py` fails when either side moves alone.
+ */
+export const MAX_QUESTION_CHARS = 1000;
+export const HISTORY_WINDOW_TURNS = 3;
+export const MAX_HISTORY_ANSWER_CHARS = 4000;
+
+/** One earlier exchange, as an anonymous client sends it back. */
+export interface HistoryTurn {
+  question: string;
+  /** Empty when the answer never arrived. */
+  answer: string;
+}
+
+/**
+ * A question, and how it continues a conversation: a signed-in reader names the
+ * stored one, a visitor sends the history itself. Each is refused with a 400
+ * from the other kind of caller.
+ */
 export interface AskBody {
   question: string;
   /** Omitted starts a new conversation; the id comes back in the `start` event. */
   conversation_id?: number | null;
+  /** A visitor's last exchanges, oldest first, at most `HISTORY_WINDOW_TURNS`. */
+  history?: HistoryTurn[];
   /** Omitted means "decide for me" — the engine detects it from the question. */
   locale?: string;
 }

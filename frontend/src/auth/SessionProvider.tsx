@@ -10,6 +10,12 @@
  * The account's `locale` drives the interface, so this is also where i18next is
  * pointed at a language. `User.locale` is the single source for that; the
  * switch in the header writes to the account and the account writes back here.
+ *
+ * Signing in, signing up and signing out also empty the visitor's thread
+ * (features/chat/visitorThread.ts). It is not carried into the account, and a
+ * reader who signs out of a shared computer leaves no thread for the next one.
+ * Only these three: the first `readSession` answering "nobody" is a reload, and
+ * a visitor's thread is meant to survive one.
  */
 
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
@@ -17,6 +23,7 @@ import { useTranslation } from "react-i18next";
 
 import type { Account } from "@/api/account";
 import { logIn, logOut, readSession, register, setAccountLocale } from "@/api/account";
+import { clearVisitorThread } from "@/features/chat/visitorThread";
 import type { UiLocale } from "@/i18n";
 
 interface SessionValue {
@@ -75,11 +82,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo<SessionValue>(
     () => ({
       account,
-      logIn: async (username, password) => adopt((await logIn(username, password)).user),
-      register: async (username, password, locale) =>
-        adopt((await register(username, password, locale)).user),
+      logIn: async (username, password) => {
+        const session = await logIn(username, password);
+        clearVisitorThread();
+        adopt(session.user);
+      },
+      register: async (username, password, locale) => {
+        const session = await register(username, password, locale);
+        clearVisitorThread();
+        adopt(session.user);
+      },
       logOut: async () => {
         await logOut();
+        clearVisitorThread();
         forget();
       },
       chooseLocale: async (locale) => {

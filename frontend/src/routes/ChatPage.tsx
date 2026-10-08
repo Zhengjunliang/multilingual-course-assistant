@@ -37,13 +37,13 @@ export default function ChatPage() {
   const { t } = useTranslation();
   const { conversationId } = useParams();
   const navigate = useNavigate();
-  const { forget } = useSession();
+  const { account, forget } = useSession();
   const { refreshConversations, setBusy } = useShell();
 
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [unreadable, setUnreadable] = useState(false);
 
-  const ask = useAsk();
+  const ask = useAsk(account === null);
   const { turns, waiting, submit, adopt, reset, stop } = ask;
   const loaded = useRef<string | null>(null);
   const previousId = useRef<number | null>(null);
