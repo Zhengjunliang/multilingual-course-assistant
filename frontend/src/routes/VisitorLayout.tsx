@@ -37,6 +37,7 @@ export default function VisitorLayout() {
       setCrumbs: nothing,
       refreshConversations: nothing,
       setBusy: nothing,
+      setStop: nothing,
     }),
     [homeLabel],
   );

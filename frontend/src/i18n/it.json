@@ -26,9 +26,9 @@
     "delete": "Elimina «{{title}}»",
     "deleteTitle": "Eliminare questa conversazione?",
     "deleteBody": "«{{title}}» e le sue risposte vengono eliminate definitivamente.",
+    "deleteBodyAnswering": "«{{title}}» e le sue risposte vengono eliminate definitivamente. La risposta in corso si interrompe.",
     "deleteConfirm": "Elimina",
     "cancel": "Annulla",
-    "deleteBusy": "Attendi che la risposta sia completa",
     "deleteFailed": "Non è stato possibile eliminare la conversazione."
   },
   "account": {

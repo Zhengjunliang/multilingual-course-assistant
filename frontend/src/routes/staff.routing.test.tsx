@@ -155,6 +155,10 @@ let conversations: ConversationSummary[] = [];
 const asked: string[] = [];
 /** Whether the answer stream was told to stop. */
 let stopped = false;
+/** Whether it had been, when a conversation's delete reached the server; `null` before any. */
+let stoppedAtDelete: boolean | null = null;
+/** The next list of conversations, read as `body` and answered once `gate` opens. */
+let lateList: { body: ConversationSummary[]; gate: Promise<void> } | null = null;
 /** Secretariat staff revoked during a case, as the server would forget them. */
 const revoked = new Set<string>();
 /** Reads of the programme list that fail before one succeeds, as a server error would. */
@@ -209,10 +213,25 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   asked.push(`${method} ${path}`);
   const scope = SCOPE[reader?.username ?? ""] ?? [];
   const programme = scope.find((p) => path.startsWith(`/api/catalog/programmes/${p.code}`));
-  if (method === "GET" && path === "/api/conversations") return json(conversations);
+  if (method === "GET" && path === "/api/conversations") {
+    if (lateList === null) return json(conversations);
+    const { body, gate } = lateList;
+    lateList = null;
+    await gate;
+    return json(body);
+  }
   if (method === "POST" && path === "/api/ask") {
-    conversations = [{ id: 9, locale: "it", created_at: "2026-10-05T09:00:00Z", title: "q" }];
+    conversations = [
+      { id: 9, locale: "it", created_at: "2026-10-05T09:00:00Z", title: "q" },
+      ...conversations,
+    ];
     return endlessAnswer(init.signal);
+  }
+  if (method === "DELETE" && path.startsWith("/api/conversations/")) {
+    stoppedAtDelete = stopped;
+    const id = Number(path.slice("/api/conversations/".length));
+    conversations = conversations.filter((listed) => listed.id !== id);
+    return new Response(null, { status: 204 });
   }
   if (path === "/api/catalog/programmes") {
     if (failures > 0) {
@@ -332,6 +351,8 @@ beforeEach(() => {
   conversations = [{ id: 7, locale: "it", created_at: "2026-10-04T10:00:00Z", title: "ORM" }];
   asked.length = 0;
   stopped = false;
+  stoppedAtDelete = null;
+  lateList = null;
   revoked.clear();
   failures = 0;
   switchable = true;
@@ -857,21 +878,112 @@ describe("the shell across pages", () => {
     expect(seen).toEqual([true, null, "/staff/programmes/B047"]);
   });
 
-  it("stops an answer when the reader leaves for a staff page, and frees its delete", async () => {
+  it("stops an answer when the reader leaves for a staff page", async () => {
     reader = SECRETARIAT;
     const { container, unmount } = page("/");
     await settle();
-    // A suggestion asks at once, which is the shortest way to ask.
-    click(container.querySelector<HTMLButtonElement>("main button"));
-    await settle();
-    const deleteOf9 = () =>
-      container.querySelector<HTMLButtonElement>('aside button[aria-label="Elimina «q»"]');
-    const whileAnswering = deleteOf9()?.disabled;
+    await askFromTheFrontDoor(container);
+    const whileAnswering = stopped;
     click(container.querySelector<HTMLAnchorElement>('aside nav[aria-label="Gestione"] a'));
     await settle();
-    const afterLeaving = deleteOf9()?.disabled;
     unmount();
 
-    expect([whileAnswering, stopped, afterLeaving]).toEqual([true, true, false]);
+    expect([whileAnswering, stopped]).toEqual([false, true]);
+  });
+});
+
+/** A suggestion asks at once, which is the shortest way to ask; the answer never ends. */
+async function askFromTheFrontDoor(container: HTMLElement) {
+  click(container.querySelector<HTMLButtonElement>("main button"));
+  await settle();
+}
+
+/**
+ * Deletes the sidebar row titled `title` through its confirmation: whether its
+ * button could be pressed, and what the confirmation said.
+ */
+function deleteRow(container: HTMLElement, title: string) {
+  const button = container.querySelector<HTMLButtonElement>(
+    `aside button[aria-label="Elimina «${title}»"]`,
+  );
+  const pressable = button !== null && !button.disabled;
+  click(button);
+  const dialog = document.body.querySelector('[role="alertdialog"]');
+  const said = document.getElementById(dialog?.getAttribute("aria-describedby") ?? "")?.textContent;
+  click(
+    [...(dialog?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find(
+      (candidate) => candidate.textContent === i18n.t("sidebar.deleteConfirm"),
+    ),
+  );
+  return { pressable, said };
+}
+
+describe("deleting while an answer is written", () => {
+  it("deletes the conversation being answered, saying so, and stops the answer first", async () => {
+    reader = STUDENT;
+    const { container, unmount, path } = page("/");
+    await settle();
+    await askFromTheFrontDoor(container);
+    const offered = deleteRow(container, "q");
+    await settle();
+    const seen = {
+      ...offered,
+      stoppedAtDelete,
+      path: path(),
+      row: container.querySelector('aside a[href="/c/9"]'),
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      pressable: true,
+      said: i18n.t("sidebar.deleteBodyAnswering", { title: "q" }),
+      stoppedAtDelete: true,
+      path: "/",
+      row: null,
+    });
+  });
+
+  it("keeps the deleted conversation off the list when an older list arrives last", async () => {
+    reader = STUDENT;
+    const { container, unmount } = page("/");
+    await settle();
+    await askFromTheFrontDoor(container);
+    // The stopped answer asks for the list; the server reads it before the
+    // delete lands, and its reply comes in after the list asked for later.
+    let answer = () => {};
+    lateList = {
+      body: [...conversations],
+      gate: new Promise((resolve) => {
+        answer = resolve;
+      }),
+    };
+    deleteRow(container, "q");
+    await settle();
+    const late = lateList === null;
+    answer();
+    await settle();
+    const row = container.querySelector('aside a[href="/c/9"]');
+    unmount();
+
+    expect({ late, row }).toEqual({ late: true, row: null });
+  });
+
+  it("leaves the answer be when another conversation is deleted", async () => {
+    reader = STUDENT;
+    const { container, unmount, path } = page("/");
+    await settle();
+    await askFromTheFrontDoor(container);
+    const offered = deleteRow(container, "ORM");
+    await settle();
+    const seen = { ...offered, stoppedAtDelete, stopped, path: path() };
+    unmount();
+
+    expect(seen).toEqual({
+      pressable: true,
+      said: i18n.t("sidebar.deleteBody", { title: "ORM" }),
+      stoppedAtDelete: false,
+      stopped: false,
+      path: "/c/9",
+    });
   });
 });

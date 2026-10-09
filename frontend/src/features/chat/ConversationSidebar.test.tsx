@@ -1,14 +1,12 @@
 // @vitest-environment jsdom
 
 /**
- * The sidebar's delete action, where the page cannot show it.
+ * The sidebar's delete action, where the page cannot show it: where focus
+ * goes when the question is cancelled.
  *
  * Deleting through the dialog, and where the page goes afterwards, is asserted
- * on the whole application in routes/ChatPage.routing.test.tsx. What that test
- * cannot stage is an answer in progress: the one state in which a row must not
- * offer its delete, since the question would be refused and the half answer
- * lost. That takes a `busy` prop, so it is asserted here, beside where focus
- * goes when the question is cancelled.
+ * on the whole application: in routes/ChatPage.routing.test.tsx, and with an
+ * answer being written in routes/staff.routing.test.tsx.
  */
 
 import { act } from "react";
@@ -33,20 +31,6 @@ function deleteButton(title: string) {
 }
 
 describe("the conversation sidebar", () => {
-  it("offers no delete for a conversation whose answer is being written", () => {
-    const { unmount } = mount(
-      <MemoryRouter>
-        <ConversationSidebar conversations={ROWS} busy={7} onDelete={async () => true} />
-      </MemoryRouter>,
-    );
-    const busy = deleteButton("Che cos'è un ORM?");
-    const idle = deleteButton("Quando scadono le tasse?");
-    const disabled = [busy?.disabled, idle?.disabled];
-    unmount();
-
-    expect(disabled).toEqual([true, false]);
-  });
-
   it("hands focus back to the delete button when the question is cancelled", async () => {
     const { unmount } = mount(
       <MemoryRouter>

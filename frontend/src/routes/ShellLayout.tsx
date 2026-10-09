@@ -7,14 +7,15 @@
  * renders for itself: the sidebar is wired once, so moving between the chat
  * and a staff page neither fetches the conversations again nor flashes an
  * empty list. The conversations, deleting one, and the conversation being
- * answered live here for that reason; the chat reports the last of these
- * (routes/shell.ts). Leaving the chat unmounts it, which stops an answer
- * being written (features/chat/useAsk.ts), as leaving for any other page did.
+ * answered live here for that reason; the chat reports the last of these and
+ * how to stop its answer (routes/shell.ts), since deleting the conversation
+ * being answered stops the answer first. Leaving the chat unmounts it, which
+ * stops an answer being written (features/chat/useAsk.ts).
  * The toasts the staff pages raise live here too, so one outlasts the page
  * that raised it.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useMatch, useNavigate } from "react-router-dom";
 
@@ -43,6 +44,12 @@ export default function ShellLayout() {
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [busy, setBusy] = useState<number | null>(null);
+  // A ref, not state: nothing is drawn from it, and `setState(stop)` would
+  // call `stop` as an updater.
+  const stopAnswer = useRef<(() => void) | null>(null);
+  const setStop = useCallback((stop: (() => void) | null) => {
+    stopAnswer.current = stop;
+  }, []);
   const [crumbs, setCrumbs] = useState<readonly Crumb[]>([]);
   const [programmes, setProgrammes] = useState<{ data: Programme[] | null; error: unknown }>({
     data: null,
@@ -58,9 +65,18 @@ export default function ShellLayout() {
     [forget],
   );
 
+  // Only the list asked for last is kept. Two can cross on the wire: a
+  // stopped answer asks for the list while the delete that stopped it is
+  // still on its way, and that older list, arriving last, would bring the
+  // deleted conversation back.
+  const lastAsked = useRef(0);
   const refreshConversations = useCallback(() => {
+    lastAsked.current += 1;
+    const asked = lastAsked.current;
     listConversations()
-      .then(setConversations)
+      .then((list) => {
+        if (asked === lastAsked.current) setConversations(list);
+      })
       .catch((error: unknown) => refused(error));
   }, [refused]);
 
@@ -89,9 +105,13 @@ export default function ShellLayout() {
   // Leaving a deleted conversation is decided here, where the list is, and
   // only once the server has said it is gone: navigating first would show an
   // empty page for a conversation that may still exist. `replace` so the back
-  // button does not lead to it.
+  // button does not lead to it. The conversation being answered has its
+  // answer stopped first, as the confirmation told the reader
+  // (ConversationSidebar.tsx): left running, it would go on writing into a
+  // conversation that is gone. Any other conversation leaves the answer be.
   const onDelete = useCallback(
     async (id: number) => {
+      if (busy === id) stopAnswer.current?.();
       try {
         await deleteConversation(id);
       } catch (error) {
@@ -108,7 +128,7 @@ export default function ShellLayout() {
       refreshConversations();
       return true;
     },
-    [open, navigate, refreshConversations, refused],
+    [busy, open, navigate, refreshConversations, refused],
   );
 
   const items = useMemo(
@@ -127,8 +147,9 @@ export default function ShellLayout() {
       setCrumbs,
       refreshConversations,
       setBusy,
+      setStop,
     }),
-    [programmes, items, homeLabel, refreshConversations],
+    [programmes, items, homeLabel, refreshConversations, setStop],
   );
 
   const sidebar = ({ onNavigate, onCollapse }: SidebarControls) => (
