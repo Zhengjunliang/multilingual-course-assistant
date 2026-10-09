@@ -67,20 +67,33 @@ test.beforeEach(async ({ page }) => {
   }, MOVING_PROPERTIES);
 });
 
-/** Everything that has moved since the page opened, named well enough to find it. */
+/**
+ * Everything that has moved since the page opened, named well enough to find it.
+ *
+ * The record alone is not enough: its events are sent with the frame after an
+ * animation starts, so one that began a moment ago is not in it yet. What the
+ * document is animating now covers that moment, and what a script animates
+ * through the Web Animations API, which sends no events at all.
+ */
 function moved(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
+  return page.evaluate((properties) => {
     const recorded = (window as unknown as { __moved: string[] }).__moved;
-    // The Web Animations API fires no animation events: what a script
-    // animates is read off the document instead.
-    const scripted = document
-      .getAnimations()
-      .filter(
-        (animation) => !(animation instanceof CSSAnimation || animation instanceof CSSTransition),
-      )
-      .map(() => "a scripted animation");
-    return [...recorded, ...scripted];
-  });
+    const where = (target: Element | null | undefined) =>
+      target ? `${target.tagName.toLowerCase()}.${[...target.classList].join(".")}` : "?";
+    const now = document.getAnimations().flatMap((animation) => {
+      const target = (animation.effect as KeyframeEffect | null)?.target;
+      if (animation instanceof CSSTransition) {
+        return properties.includes(animation.transitionProperty)
+          ? [`transition of ${animation.transitionProperty} on ${where(target)}`]
+          : [];
+      }
+      if (animation instanceof CSSAnimation) {
+        return [`animation ${animation.animationName} on ${where(target)}`];
+      }
+      return [`a scripted animation on ${where(target)}`];
+    });
+    return [...new Set([...recorded, ...now])];
+  }, MOVING_PROPERTIES);
 }
 
 for (const screen of SCREENS) {
