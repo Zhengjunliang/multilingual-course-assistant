@@ -56,7 +56,7 @@ const covers = (spans: readonly Span[], point: number) =>
  */
 const CHINESE_FACES = ["PingFang SC", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei"];
 
-/** What Chinese draws full width and a Latin face narrow: the dash, the quotes, the ellipsis. */
+/** What a Latin face draws narrow and a Chinese one wider, the quotes full width: the dash, the quotes, the ellipsis. */
 const PUNCTUATION = [0x2014, 0x2018, 0x2019, 0x201c, 0x201d, 0x2026];
 
 describe("the stylesheet", () => {
@@ -80,9 +80,10 @@ describe("Chinese text", () => {
       return spans === undefined || PUNCTUATION.some((point) => covers(spans, point));
     });
 
-    expect({ hasChineseFace: first !== -1, drawsIt }).toEqual({
+    expect({ hasChineseFace: first !== -1, drawsIt, fallback: families.at(-1) }).toEqual({
       hasChineseFace: true,
       drawsIt: [],
+      fallback: "sans-serif",
     });
   });
 

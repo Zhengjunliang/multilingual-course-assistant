@@ -74,7 +74,7 @@
  * only: the head of the Chinese stack (`--font-sans-zh`). Figtree also draws
  * the general punctuation block, quotes, the ellipsis and the dash, in their
  * narrow Latin shapes; in Chinese those must come from the Chinese face, which
- * draws them full width. Held to U+0000-00FF, this face hands every other
+ * draws them wider, the quotes full width. Held to U+0000-00FF, this face hands every other
  * character to the faces after it. It is the file Figtree already uses, so a
  * page that needs both names reads it from the cache.
  */
