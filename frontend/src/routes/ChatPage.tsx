@@ -14,10 +14,11 @@
  * reverse must not be read as a new id either: leaving `/c/7` for `/` renders
  * once with the URL at `/` and the hook still holding 7, before the reset lands.
  *
- * The page tells the frame three things: that the list of conversations
- * changed, which conversation is being answered, and how to stop that answer,
- * which the frame does before deleting the conversation. Unmounting clears the
- * last two, since leaving stops the answer.
+ * The page tells the frame two things: that the list of conversations
+ * changed, and which conversation is being answered, whose delete the sidebar
+ * warns will stop it. Unmounting clears the second, since leaving stops the
+ * answer; deleting the conversation being answered stops it too, since the
+ * frame then leaves it for `/` and the page resets.
  *
  * A visitor, on `/` only (auth/RequireSession.tsx), gets the same page with no
  * stored conversation behind it: the thread is the tab's, and with no sidebar
@@ -45,7 +46,7 @@ export default function ChatPage() {
   const { conversationId } = useParams();
   const navigate = useNavigate();
   const { account, forget, recheck } = useSession();
-  const { refreshConversations, setBusy, setStop } = useShell();
+  const { refreshConversations, setBusy } = useShell();
 
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [unreadable, setUnreadable] = useState(false);
@@ -134,10 +135,6 @@ export default function ChatPage() {
 
   useEffect(() => setBusy(busy), [busy, setBusy]);
   useEffect(() => () => setBusy(null), [setBusy]);
-  useEffect(() => {
-    setStop(stop);
-    return () => setStop(null);
-  }, [stop, setStop]);
 
   // Before the first question the page is a front door: heading, suggestions
   // and the composer together in the middle of the screen. After it, the
