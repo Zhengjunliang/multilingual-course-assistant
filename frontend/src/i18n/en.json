@@ -82,8 +82,9 @@
     "title": "Sources",
     "empty": "No excerpts were retrieved for this question.",
     "uncited": "retrieved, not cited",
+    "badge": "Source {{number}}: {{marker}}",
     "page": "page {{page}}",
-    "openPage": "Open page {{page}} of {{file}} in a new tab",
+    "openPage": "page {{page}} of {{file}}, in a new tab",
     "fetched": "fetched on {{date}}",
     "more": "+{{count}}"
   },

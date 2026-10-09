@@ -34,11 +34,13 @@ import {
   useContext,
   useMemo,
 } from "react";
+import { useTranslation } from "react-i18next";
 import Markdown, { type Components, type ExtraProps, type Options } from "react-markdown";
 import remarkCjkFriendly from "remark-cjk-friendly";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
+import { Tooltip } from "@/components/ui/tooltip";
 import { type Badge, remarkPills, withoutPills } from "@/lib/markers";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +58,7 @@ const PillContext = createContext<Pills | null>(null);
  * numbers, and this never throws on the rest either.
  */
 function CitationPill({ number }: { number?: string }) {
+  const { t } = useTranslation();
   const pills = useContext(PillContext);
   const badge = pills?.badges.find((candidate) => String(candidate.number) === number);
   if (pills === null || badge === undefined) return <>{number}</>;
@@ -72,14 +75,19 @@ function CitationPill({ number }: { number?: string }) {
     // its own header). `--mark`
     // against `--canvas` is a gated pair for this reason, so the pill cannot
     // quietly dissolve into the paragraph.
-    <button
-      type="button"
-      onClick={() => pills.onBadgeClick(badge.marker)}
-      title={badge.marker}
-      className="mx-0.5 rounded-full bg-mark px-tight align-baseline font-medium text-caption text-ink transition-colors hover:bg-accent hover:text-accent-ink"
-    >
-      {badge.number}
-    </button>
+    //
+    // The marker is in the name as well as the hint: a hint is never the only
+    // place something is said (components/ui/tooltip.tsx).
+    <Tooltip content={<span className="font-mono">{badge.marker}</span>}>
+      <button
+        type="button"
+        onClick={() => pills.onBadgeClick(badge.marker)}
+        aria-label={t("citations.badge", { number: badge.number, marker: badge.marker })}
+        className="mx-0.5 rounded-full bg-mark px-tight align-baseline font-medium text-caption text-ink transition-colors hover:bg-accent hover:text-accent-ink"
+      >
+        {badge.number}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -156,7 +164,6 @@ function Link({ href, children, node }: ComponentProps<"a"> & ExtraProps) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      title={href}
       className="break-all underline decoration-muted underline-offset-2 hover:decoration-ink"
     >
       {children}

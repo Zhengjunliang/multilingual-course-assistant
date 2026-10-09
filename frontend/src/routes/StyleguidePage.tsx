@@ -46,6 +46,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip } from "@/components/ui/tooltip";
 
 // Written out whole: Tailwind finds a class by reading the source, so a class
 // assembled from `rounded-${corner}` would never be generated.
@@ -221,6 +222,21 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
             { key: "logout", icon: LogOut, label: "Esci", onSelect: () => {} },
           ]}
         />
+      </Specimen>
+
+      <Specimen
+        name="Tooltip"
+        note="Opens for a pointer that rests and for keyboard focus, closes on Escape; ink with canvas lettering, the inverse of either theme. It opens in a portal, so it follows the page theme. It only repeats what the name or the visible text already says."
+      >
+        <Tooltip content="[PPM 3]">
+          <button
+            type="button"
+            aria-label="Fonte 1: [PPM 3]"
+            className="rounded-full bg-mark px-tight font-medium text-caption text-ink"
+          >
+            1
+          </button>
+        </Tooltip>
       </Specimen>
 
       <Specimen
