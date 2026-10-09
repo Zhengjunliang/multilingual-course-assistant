@@ -11,8 +11,12 @@ import { defineConfig, devices } from "@playwright/test";
  * `/static/`, where Django serves it, but `vite preview` serves from `/`; and a
  * separate folder leaves `dist/`, which `runserver` serves, as the chain built it.
  * The bytes are the same apart from that prefix, which is what the budget reads.
+ *
+ * Built and served afresh on every run, on a port nothing else uses: 4173,
+ * `vite preview`'s default, may already be serving `dist/`, and a reused server
+ * would test some other build than the one the budget reads.
  */
-const PORT = 4173;
+const PORT = 4317;
 const CI = process.env.CI !== undefined;
 
 export default defineConfig({
@@ -33,6 +37,6 @@ export default defineConfig({
   webServer: {
     command: `vite build --base / --outDir dist-e2e && vite preview --outDir dist-e2e --host 127.0.0.1 --port ${PORT} --strictPort`,
     url: `http://127.0.0.1:${PORT}`,
-    reuseExistingServer: !CI,
+    reuseExistingServer: false,
   },
 });

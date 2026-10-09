@@ -9,7 +9,7 @@
 import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test } from "./api";
-import { arrange, SCREENS } from "./screens";
+import { SCREENS, visit } from "./screens";
 
 const WCAG_22_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
@@ -19,9 +19,7 @@ for (const colorScheme of ["light", "dark"] as const) {
 
     for (const screen of SCREENS) {
       test(`${screen.path} as a ${screen.as}: axe finds nothing`, async ({ page, api }) => {
-        arrange(api, screen);
-        await page.goto(screen.path);
-        await page.waitForLoadState("networkidle");
+        await visit(page, api, screen);
         await expect(page.locator("html")).toHaveAttribute("data-theme", colorScheme);
         const { violations } = await new AxeBuilder({ page }).withTags(WCAG_22_AA).analyze();
         const found = violations.map(
