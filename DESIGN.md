@@ -235,10 +235,12 @@ Fumetto is drawn by `components/Mascot.tsx` from the one drawing in `frontend/sr
 | `avatar` | Beside every answer, at `size-avatar`; the mark (`MascotMark`, the head on its tile) beside the app's name in the sidebar |
 | `welcome` | The empty chat and the sign-in and registration screens, at `size-mascot` |
 | `thinking` | Beside an answer until its first word, pulsing |
-| `error` | Beside an answer that failed |
+| `error` | Beside an answer that failed, and on the panel of a page that broke |
 | `notFound` | An address the application does not have, and a staff page whose object cannot be read |
 
 A pose appears only where words beside it say what it means. Colours, sizes, clear space and what the mark may never be combined with are in [frontend/brand/README.md](frontend/brand/README.md).
+
+A screen with nothing of its own to show is one panel, `components/StatusPanel.tsx`: the pose at `size-mascot`, a heading, one sentence and the ways on. An address that names no page shows it with the way to the start; a page that broke while drawing shows it with a reload first and the start second, its words a live region, inside the frame when only the page broke and over the window when the frame did. No screen of this kind is drawn another way, and none is blank.
 
 ## Do's and Don'ts
 

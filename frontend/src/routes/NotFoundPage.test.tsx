@@ -22,6 +22,8 @@ describe("an address the application does not have", () => {
   it("is told it was not found, with the way back to the start", () => {
     const html = at("/no/such/page");
 
+    // The same panel as the error screens (RouteError.test.tsx).
+    expect(html).toContain("data-status-panel");
     expect(html).toContain("Pagina non trovata");
     expect(html).toContain('href="/"');
     expect(html).toContain("Torna all&#x27;inizio");

@@ -97,6 +97,12 @@
     "body": "A questo indirizzo non c'è nessuna pagina: il link potrebbe essere sbagliato o non più valido.",
     "home": "Torna all'inizio"
   },
+  "crash": {
+    "title": "Questa pagina si è bloccata",
+    "body": "Qualcosa è andato storto mentre la pagina si apriva. Ricaricala; se succede ancora, torna all'inizio.",
+    "reload": "Ricarica la pagina",
+    "home": "Torna all'inizio"
+  },
   "staff": {
     "cancel": "Annulla",
     "breadcrumb": "Percorso",
