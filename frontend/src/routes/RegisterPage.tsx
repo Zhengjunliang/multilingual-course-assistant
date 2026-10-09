@@ -7,12 +7,8 @@ import { useSession } from "@/auth/useSession";
 import { PasswordField } from "@/components/PasswordField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UI_LOCALES, type UiLocale } from "@/i18n";
+import { DEFAULT_UI_LOCALE, isUiLocale, type UiLocale } from "@/i18n";
 import { AuthLayout } from "./AuthLayout";
-
-function isUiLocale(value: string): value is UiLocale {
-  return (UI_LOCALES as readonly string[]).includes(value);
-}
 
 export default function RegisterPage() {
   const { t, i18n } = useTranslation();
@@ -27,7 +23,7 @@ export default function RegisterPage() {
 
   // Whatever language they are reading this page in becomes the account's, so
   // the first answer arrives in it without a settings page being found first.
-  const locale: UiLocale = isUiLocale(i18n.language) ? i18n.language : "it";
+  const locale: UiLocale = isUiLocale(i18n.language) ? i18n.language : DEFAULT_UI_LOCALE;
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();

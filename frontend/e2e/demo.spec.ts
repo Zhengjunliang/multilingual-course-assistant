@@ -3,6 +3,7 @@
  * order it is shown, run on every pull request so the demo cannot break unseen.
  */
 
+import en from "../src/i18n/en.json" with { type: "json" };
 import it from "../src/i18n/it.json" with { type: "json" };
 import { expect, test } from "./api";
 import {
@@ -13,6 +14,17 @@ import {
   STUDENT,
   slidesStream,
 } from "./fixtures";
+
+test.describe("a visitor whose browser asks for English", () => {
+  test.use({ locale: "en-GB" });
+
+  test("is greeted in English, and the page says so", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByRole("heading", { name: en.empty.title })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  });
+});
 
 test.describe("a signed-in student", () => {
   test.beforeEach(({ api }) => api.signIn(STUDENT));

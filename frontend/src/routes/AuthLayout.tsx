@@ -2,15 +2,16 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Mascot } from "@/components/Mascot";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
-import { UI_LOCALES, type UiLocale } from "@/i18n";
+import { chooseUiLocale, UI_LOCALES, type UiLocale } from "@/i18n";
 
 /**
  * The frame around the two forms that come before a session.
  *
  * The language switch is here as well as in the application header, and it has
  * to be: before a login there is no account to read `User.locale` from, and a
- * student who cannot read the login page cannot get past it. This one changes
- * i18next only — there is nothing yet to save it to.
+ * student who cannot read the login page cannot get past it. This one
+ * remembers the choice on this screen only (i18n/index.ts): there is no
+ * account yet to save it to.
  */
 export function AuthLayout({ heading, children }: { heading: string; children: ReactNode }) {
   const { t, i18n } = useTranslation();
@@ -29,7 +30,7 @@ export function AuthLayout({ heading, children }: { heading: string; children: R
           locales={UI_LOCALES}
           value={i18n.language}
           label={t("account.language")}
-          onChange={(locale: UiLocale) => void i18n.changeLanguage(locale)}
+          onChange={(locale: UiLocale) => void chooseUiLocale(locale)}
         />
       </div>
     </div>

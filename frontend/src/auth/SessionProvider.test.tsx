@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/api/account";
 import { readVisitorThread, writeVisitorThread } from "@/features/chat/visitorThread";
+import i18n from "@/i18n";
 import { mount } from "@/test/mount";
 import { SessionProvider } from "./SessionProvider";
 import { useSession } from "./useSession";
@@ -42,13 +43,15 @@ function json(body: unknown, status = 200): Response {
 
 /** Whether `me` finds a session another tab opened. */
 let signedInElsewhere = false;
+/** The account a login or a registration signs in. */
+let account: Account = ACCOUNT;
 
 /** Nobody is signed in until a login or a registration says otherwise. */
 async function fakeAuth(input: RequestInfo | URL): Promise<Response> {
   const path = String(input);
   if (path === "/api/auth/logout") return new Response(null, { status: 204 });
   if (path === "/api/auth/login" || path === "/api/auth/register" || signedInElsewhere) {
-    return json({ authenticated: true, user: ACCOUNT });
+    return json({ authenticated: true, user: account });
   }
   return json({ authenticated: false, user: null });
 }
@@ -112,6 +115,37 @@ describe("a visitor's thread and the account", () => {
 
     expect(signedIn).toBeNull();
     expect(readVisitorThread()).toEqual(THREAD);
+  });
+});
+
+describe("the interface language and the account", () => {
+  beforeEach(() => {
+    account = { ...ACCOUNT, locale: "en" };
+    localStorage.clear();
+    vi.stubGlobal("fetch", fakeAuth);
+  });
+
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    account = ACCOUNT;
+    localStorage.clear();
+    await i18n.changeLanguage("it");
+  });
+
+  it("takes the account's language, remembers it, and keeps it after signing out", async () => {
+    const page = mount(
+      <SessionProvider>
+        <Probe />
+      </SessionProvider>,
+    );
+    await settle();
+    await act(() => session.logIn("ada", "secret"));
+    const signedIn = [i18n.language, localStorage.getItem("mca.locale")];
+    await act(() => session.logOut());
+    const signedOut = [i18n.language, localStorage.getItem("mca.locale")];
+    page.unmount();
+
+    expect({ signedIn, signedOut }).toEqual({ signedIn: ["en", "en"], signedOut: ["en", "en"] });
   });
 });
 

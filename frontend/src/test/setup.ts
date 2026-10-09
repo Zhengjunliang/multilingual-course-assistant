@@ -33,6 +33,23 @@
  */
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+/**
+ * The browser's languages, pinned to Italian before anything imports the
+ * catalogues.
+ *
+ * The interface starts in the first of `navigator.languages` it speaks
+ * (i18n/index.ts), and both environments have a value of their own: jsdom
+ * says `en-US`, and Node answers from the machine's locale. Left alone, every
+ * test that reads an Italian string would pass on one machine and fail on
+ * another. This file runs before each test file's imports, so i18next starts
+ * in Italian everywhere; `configurable` lets a test that is about the browser's
+ * languages set its own.
+ */
+Object.defineProperty(globalThis.navigator, "languages", {
+  value: ["it-IT"],
+  configurable: true,
+});
+
 if (typeof window !== "undefined") {
   if (typeof window.matchMedia !== "function") {
     window.matchMedia = (query: string): MediaQueryList =>

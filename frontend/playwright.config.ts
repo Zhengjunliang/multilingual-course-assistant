@@ -31,6 +31,10 @@ export default defineConfig({
   reporter: CI ? [["github"], ["list"]] : "list",
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
+    // The interface starts in the browser's language (src/i18n/index.ts), and
+    // a browser's default follows the machine's: pinned, so the specs read
+    // Italian on every runner. A spec about another language sets its own.
+    locale: "it-IT",
     trace: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
