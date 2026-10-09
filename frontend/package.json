@@ -6,13 +6,14 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "biome check src scripts vite.config.ts biome.json package.json tsconfig.json",
-    "format": "biome format --write src scripts vite.config.ts biome.json package.json tsconfig.json",
+    "lint": "biome check src e2e scripts vite.config.ts playwright.config.ts biome.json package.json tsconfig.json",
+    "format": "biome format --write src e2e scripts vite.config.ts playwright.config.ts biome.json package.json tsconfig.json",
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
     "check:design": "node scripts/design-md.mjs --check",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.23",
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
     "@google/design.md": "0.4.0",
+    "@playwright/test": "^1.63.0",
     "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.4",
