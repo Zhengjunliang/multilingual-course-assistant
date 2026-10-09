@@ -6,9 +6,12 @@
  * Interface Guidelines suggest a dissolve in place of motion: what WCAG 2.3.3
  * guards against is motion, and a fading hover moves nothing.
  *
- * Every screen is read at rest, and the chat twice more mid-answer, because
- * that is when the interface animates: the mascot's thinking pose before the
- * first word, the cursor while words arrive.
+ * Every animation and transition is recorded as it starts, from the page's
+ * first frame, so one that has already finished is caught as surely as one
+ * that loops; a reading of what runs at a single moment would miss the first
+ * kind. Every screen is checked at rest, and the chat twice more mid-answer,
+ * when the interface animates: the mascot's thinking pose before the first
+ * word, the cursor while words arrive.
  */
 
 import type { Page } from "@playwright/test";
@@ -16,52 +19,74 @@ import type { Page } from "@playwright/test";
 import it from "../src/i18n/it.json" with { type: "json" };
 import { expect, test } from "./api";
 import { CAMPUS_QUESTION, campusStream, STUDENT } from "./fixtures";
-import { arrange, SCREENS } from "./screens";
+import { SCREENS, visit } from "./screens";
 
 const MOVING_PROPERTIES = [
   "transform",
   "translate",
   "scale",
   "rotate",
-  "inset",
   "top",
   "right",
   "bottom",
   "left",
+  "width",
+  "height",
+  "min-width",
+  "min-height",
+  "max-width",
+  "max-height",
+  "block-size",
+  "inline-size",
 ];
 
 test.use({ reducedMotion: "reduce" });
 
-/** What is moving on the page now, named well enough to find it. */
-function moving(page: Page): Promise<string[]> {
-  return page.evaluate((properties) => {
-    const where = (animation: Animation) => {
-      const target = (animation.effect as KeyframeEffect | null)?.target;
-      return target ? `${target.tagName.toLowerCase()}.${[...target.classList].join(".")}` : "?";
-    };
-    return document
-      .getAnimations()
-      .filter((animation) => animation.playState === "running")
-      .flatMap((animation) => {
-        if (animation instanceof CSSTransition) {
-          return properties.includes(animation.transitionProperty)
-            ? [`transition of ${animation.transitionProperty} on ${where(animation)}`]
-            : [];
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript((properties) => {
+    const moved: string[] = [];
+    Object.assign(window, { __moved: moved });
+    const where = (target: EventTarget | null) =>
+      target instanceof Element
+        ? `${target.tagName.toLowerCase()}.${[...target.classList].join(".")}`
+        : "?";
+    document.addEventListener(
+      "animationstart",
+      (event) => moved.push(`animation ${event.animationName} on ${where(event.target)}`),
+      true,
+    );
+    document.addEventListener(
+      "transitionrun",
+      (event) => {
+        if (properties.includes(event.propertyName)) {
+          moved.push(`transition of ${event.propertyName} on ${where(event.target)}`);
         }
-        if (animation instanceof CSSAnimation) {
-          return [`animation ${animation.animationName} on ${where(animation)}`];
-        }
-        return [`a scripted animation on ${where(animation)}`];
-      });
+      },
+      true,
+    );
   }, MOVING_PROPERTIES);
+});
+
+/** Everything that has moved since the page opened, named well enough to find it. */
+function moved(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const recorded = (window as unknown as { __moved: string[] }).__moved;
+    // The Web Animations API fires no animation events: what a script
+    // animates is read off the document instead.
+    const scripted = document
+      .getAnimations()
+      .filter(
+        (animation) => !(animation instanceof CSSAnimation || animation instanceof CSSTransition),
+      )
+      .map(() => "a scripted animation");
+    return [...recorded, ...scripted];
+  });
 }
 
 for (const screen of SCREENS) {
   test(`${screen.path} as a ${screen.as}: nothing moves at rest`, async ({ page, api }) => {
-    arrange(api, screen);
-    await page.goto(screen.path);
-    await page.waitForLoadState("networkidle");
-    expect(await moving(page)).toEqual([]);
+    await visit(page, api, screen);
+    expect(await moved(page)).toEqual([]);
   });
 }
 
@@ -78,13 +103,13 @@ test.describe("the chat mid-answer", () => {
     api.holdAnswer(campusStream(7).slice(0, 1));
     await ask(page);
     await expect(page.getByText(it.status.thinking)).toBeVisible();
-    expect(await moving(page)).toEqual([]);
+    expect(await moved(page)).toEqual([]);
   });
 
   test("while the words arrive: nothing moves", async ({ page, api }) => {
     api.holdAnswer(campusStream(7).slice(0, 2));
     await ask(page);
     await expect(page.getByText(it.status.streaming)).toBeAttached();
-    expect(await moving(page)).toEqual([]);
+    expect(await moved(page)).toEqual([]);
   });
 });

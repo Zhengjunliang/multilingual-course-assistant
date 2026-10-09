@@ -3,10 +3,12 @@
  *
  * What counts is what the browser fetches to draw `/`: the page, its
  * stylesheets, its scripts and the fonts it uses, each read from the build and
- * compressed with brotli at quality 11, the way a server would send it. A chunk
- * loaded only when an answer needs it (`MathMarkdown`, which brings KaTeX) is
- * left out by name, so a heavy feature can wait behind `import()` without
- * spending the budget.
+ * compressed with brotli at quality 11, the way a server would send it. The
+ * count starts once the screen is drawn and its fonts are in, so nothing it
+ * needs is still on its way. A chunk an answer loads only when it needs it
+ * (`MathMarkdown`, which brings KaTeX) must not be among them: it is not left
+ * out of the sum, it is required to be absent, since leaving it out would hide
+ * the very regression of it reaching the first screen.
  *
  * Two limits. The critical path may not grow by more than a tenth over what it
  * weighed on 9 October 2026: a ratchet against drift, not a target. The scripts
@@ -22,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import { brotliCompressSync } from "node:zlib";
 
 import { expect, test } from "./api";
+import { SCREENS, visit } from "./screens";
 
 const BUILD = fileURLToPath(new URL("../dist-e2e/", import.meta.url));
 const COUNTED = new Set(["document", "stylesheet", "script", "font"]);
@@ -32,7 +35,7 @@ const MEASURED_CRITICAL_PATH = 296_704;
 const CRITICAL_PATH_LIMIT = Math.round(MEASURED_CRITICAL_PATH * 1.1);
 const SCRIPT_LIMIT = 300 * 1024;
 
-test("a visitor's first screen stays within its byte budget", async ({ page, baseURL }) => {
+test("a visitor's first screen stays within its byte budget", async ({ page, api, baseURL }) => {
   const origin = new URL(baseURL ?? "").origin;
   const fetched: { path: string; type: string }[] = [];
   page.on("requestfinished", (request) => {
@@ -42,20 +45,23 @@ test("a visitor's first screen stays within its byte budget", async ({ page, bas
       fetched.push({ path: url.pathname, type: request.resourceType() });
     }
   });
-  await page.goto("/");
-  await page.waitForLoadState("networkidle");
+  const home = SCREENS.find(({ path, as }) => path === "/" && as === "visitor");
+  if (home === undefined) throw new Error("no visitor's / among the screens");
+  await visit(page, api, home);
 
-  const weights = fetched
-    .filter(({ path }) => !LAZY.test(path))
-    .map(({ path, type }) => {
-      const file = path === "/" ? "index.html" : path.slice(1);
-      return { path, type, bytes: brotliCompressSync(readFileSync(BUILD + file)).length };
-    });
+  expect(
+    fetched.filter(({ path }) => LAZY.test(path)),
+    "chunks that must stay lazy",
+  ).toEqual([]);
+  const weights = fetched.map(({ path, type }) => {
+    const file = path === "/" ? "index.html" : path.slice(1);
+    return { path, type, bytes: brotliCompressSync(readFileSync(BUILD + file)).length };
+  });
   console.table(weights);
 
   const total = (rows: typeof weights) => rows.reduce((sum, { bytes }) => sum + bytes, 0);
   expect(weights.map(({ type }) => type)).toEqual(
-    expect.arrayContaining(["document", "stylesheet", "script"]),
+    expect.arrayContaining(["document", "stylesheet", "script", "font"]),
   );
   expect(total(weights), "critical path, brotli bytes").toBeLessThanOrEqual(CRITICAL_PATH_LIMIT);
   expect(

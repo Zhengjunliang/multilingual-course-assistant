@@ -3,6 +3,7 @@
  * the server's shapes (`src/api/*.ts`), which `tests/test_qa_contract.py` and
  * `tests/test_catalog_contract.py` hold to the Python side: a field renamed on
  * the server breaks `tsc` here before it can make a test pass for nothing.
+ * Which endpoint answers which of them is written in `e2e/api.ts`.
  */
 
 import type { Account, Session } from "@/api/account";

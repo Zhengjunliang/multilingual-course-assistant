@@ -13,6 +13,7 @@ import type { AddressInfo } from "node:net";
 import { test as base, expect, type Page, type Request } from "@playwright/test";
 
 import type { Account, Session } from "@/api/account";
+import type { Course, Edition, Programme, StudyPlanCourse } from "@/api/catalog";
 import type { AskBody } from "@/api/client";
 import type { AnswerEvent } from "@/api/contract";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
@@ -38,7 +39,7 @@ export class Api {
   private readonly servers: Server[] = [];
 
   constructor(private readonly page: Page) {
-    this.on("GET", "/api/auth/me", () => ({ json: VISITOR }));
+    this.json<Session>("/api/auth/me", VISITOR);
   }
 
   async install(): Promise<void> {
@@ -93,30 +94,37 @@ export class Api {
     this.handlers.set(`${method} ${path}`, handler);
   }
 
+  /**
+   * `GET path` answers `body`. The type argument is what the client's function
+   * for that endpoint returns (`src/api/*.ts`), so which endpoint answers which
+   * shape is written once, here, and a fixture of the wrong shape fails `tsc`.
+   */
+  private json<T>(path: string, body: T): void {
+    this.on("GET", path, () => ({ json: body }));
+  }
+
   /** Signed in as `account`, with no stored conversations. */
   signIn(account: Account): void {
     const session: Session = { authenticated: true, user: account };
-    this.on("GET", "/api/auth/me", () => ({ json: session }));
-    this.on("GET", "/api/conversations", () => ({ json: [] satisfies ConversationSummary[] }));
+    this.json<Session>("/api/auth/me", session);
+    this.json<ConversationSummary[]>("/api/conversations", []);
   }
 
   /** One stored conversation, listed in the sidebar and readable at `/c/<id>`. */
   conversation(detail: ConversationDetail): void {
     const { messages: _, ...summary } = detail;
-    this.on("GET", "/api/conversations", () => ({ json: [summary] }));
-    this.on("GET", `/api/conversations/${detail.id}`, () => ({ json: detail }));
+    this.json<ConversationSummary[]>("/api/conversations", [summary]);
+    this.json<ConversationDetail>(`/api/conversations/${detail.id}`, detail);
   }
 
   /** The catalogue behind every staff page. */
   catalog(): void {
-    this.on("GET", "/api/catalog/programmes", () => ({ json: [PROGRAMME] }));
-    this.on("GET", `/api/catalog/programmes/${PROGRAMME.code}`, () => ({ json: PROGRAMME }));
-    this.on("GET", `/api/catalog/programmes/${PROGRAMME.code}/courses`, () => ({
-      json: STUDY_PLAN,
-    }));
-    this.on("GET", `/api/catalog/courses/${COURSE.code}`, () => ({ json: COURSE }));
-    this.on("GET", "/api/catalog/editions", () => ({ json: [EDITION] }));
-    this.on("GET", `/api/catalog/editions/${EDITION.id}`, () => ({ json: EDITION }));
+    this.json<Programme[]>("/api/catalog/programmes", [PROGRAMME]);
+    this.json<Programme>(`/api/catalog/programmes/${PROGRAMME.code}`, PROGRAMME);
+    this.json<StudyPlanCourse[]>(`/api/catalog/programmes/${PROGRAMME.code}/courses`, STUDY_PLAN);
+    this.json<Course>(`/api/catalog/courses/${COURSE.code}`, COURSE);
+    this.json<Edition[]>("/api/catalog/editions", [EDITION]);
+    this.json<Edition>(`/api/catalog/editions/${EDITION.id}`, EDITION);
   }
 
   /** Every question gets this stream, whole. */

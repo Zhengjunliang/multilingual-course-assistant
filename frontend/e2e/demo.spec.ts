@@ -17,7 +17,7 @@ import {
 test.describe("a signed-in student", () => {
   test.beforeEach(({ api }) => api.signIn(STUDENT));
 
-  test("asks about the campus and gets an answer above its source", async ({ page, api }) => {
+  test("asks about the campus and gets an answer with its source", async ({ page, api }) => {
     api.answer(campusStream(7));
     await page.goto("/");
     await page.getByLabel(it.ask.label).fill(CAMPUS_QUESTION);
