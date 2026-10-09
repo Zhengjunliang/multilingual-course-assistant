@@ -70,6 +70,24 @@
 }
 
 /*
+ * The same Figtree file under a second name, for Latin letters and digits
+ * only: the head of the Chinese stack (`--font-sans-zh`). Figtree also draws
+ * the general punctuation block, quotes, the ellipsis and the dash, in their
+ * narrow Latin shapes; in Chinese those must come from the Chinese face, which
+ * draws them full width. Held to U+0000-00FF, this face hands every other
+ * character to the faces after it. It is the file Figtree already uses, so a
+ * page that needs both names reads it from the cache.
+ */
+@font-face {
+  font-family: "Figtree Latin";
+  src: url("/fonts/Figtree-Variable.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF;
+}
+
+/*
  * Semantic colours, not raw palette steps.
  *
  * Every component below names what a colour is *for* — surface, muted text, a
@@ -147,6 +165,16 @@
   --font-serif:
     "Fraunces", ui-serif, Georgia, "PingFang SC", "Source Han Sans SC", "Noto Sans CJK SC",
     "Microsoft YaHei UI", "Microsoft YaHei", serif;
+  /* Chinese, wherever the text is Chinese (the rules below the body's): Figtree
+     for Latin letters and digits alone, then the Chinese faces at once. No
+     system or generic family comes before them, because the first family that
+     has a character draws it, and Segoe UI, which `system-ui` is on Windows,
+     draws quotes and the ellipsis narrow. YaHei's quotes, ellipsis and dash
+     are full width (read from msyh.ttc); DengXian's quotes are not, so it is
+     not here. */
+  --font-sans-zh:
+    "Figtree Latin", "PingFang SC", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei UI",
+    "Microsoft YaHei", sans-serif;
 
   /* Interior rhythm. Named by how close things are, not by a step number. */
   --spacing-hair: 0.25rem;
@@ -286,8 +314,34 @@ body {
   margin: 0;
   background-color: var(--canvas);
   color: var(--ink);
-  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Which stack sets the text, by its language, wherever it is. The root takes
+ * the interface's language from `<html lang>` (i18n/index.ts) and everything
+ * inherits from it. The body declares no family of its own: a declaration
+ * there would cut that inheritance off for everything inside it, Radix's
+ * portals included, and the Chinese interface would set its text in the
+ * Latin stack. An element whose `lang` names another language takes that
+ * language's stack back, so an Italian excerpt in the Chinese interface keeps
+ * Figtree's quotes and a Chinese answer in the Italian interface gets
+ * full-width ones. `[lang]` and not `*`: a rule on every element would stop a
+ * heading's `font-serif` reaching its `<strong>`. In `base`, so that a font
+ * class on the same element still wins.
+ */
+@layer base {
+  :root {
+    font-family: var(--font-sans);
+  }
+
+  [lang]:lang(zh) {
+    font-family: var(--font-sans-zh);
+  }
+
+  [lang]:not(:lang(zh)) {
+    font-family: var(--font-sans);
+  }
 }
 
 /*
@@ -308,14 +362,17 @@ input::-ms-reveal {
  * `:lang(zh)`, because a property is inherited: an English answer inside the
  * Chinese interface would inherit the Chinese settings from the page around it.
  *
- * The stack is the sans one. Windows has no system serif for Chinese worth
- * choosing, so Chinese is drawn by a sans face, and the Latin letters and
- * digits inside Chinese text follow it instead of mixing Fraunces into the
- * line; DeepSeek, Kimi and Qwen Chat set Chinese in a sans throughout.
+ * The stack is the Chinese one, `--font-sans-zh`, under a serif or a sans
+ * class alike. Windows has no system serif for Chinese worth choosing, so
+ * Chinese is drawn by a sans face, and the Latin letters and digits inside
+ * Chinese text follow it instead of mixing Fraunces into the line; DeepSeek,
+ * Kimi and Qwen Chat set Chinese in a sans throughout. These are utilities,
+ * so they win over the language rules above on an element that has both.
  */
 @layer utilities {
-  .font-serif:lang(zh) {
-    font-family: var(--font-sans);
+  .font-serif:lang(zh),
+  .font-sans:lang(zh) {
+    font-family: var(--font-sans-zh);
   }
 
   .text-reading:lang(zh) {
