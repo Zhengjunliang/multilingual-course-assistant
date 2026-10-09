@@ -1,7 +1,8 @@
 {
   "app": {
     "title": "Course assistant",
-    "subtitle": "Ask about the course material or about the university."
+    "subtitle": "Ask about the course material or about the university.",
+    "notifications": "Notifications"
   },
   "auth": {
     "logInTitle": "Sign in to ask about your courses",
