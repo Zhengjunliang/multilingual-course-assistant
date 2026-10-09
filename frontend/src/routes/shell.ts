@@ -5,9 +5,9 @@
  * Down: the programmes the caller may view, from which the Gestione group,
  * the landing of `/staff` and the breadcrumb's root follow (features/staff/landing.ts),
  * and the way back a "not found" page offers. Up: the breadcrumb a staff
- * page sets in the header, and the three things only the chat knows — that
- * its list of conversations changed, which conversation is being answered,
- * and how to stop that answer, which deleting the conversation does first.
+ * page sets in the header, and the two things only the chat knows — that its
+ * list of conversations changed, and which conversation is being answered,
+ * whose delete the sidebar must warn stops that answer.
  */
 
 import { createContext, useContext, useEffect } from "react";
@@ -34,8 +34,6 @@ export interface Shell {
   refreshConversations: () => void;
   /** The conversation being answered, or `null`; the chat clears it when it unmounts. */
   setBusy: (id: number | null) => void;
-  /** How to stop the answer being written, or `null`; the chat clears it when it unmounts. */
-  setStop: (stop: (() => void) | null) => void;
 }
 
 export const ShellContext = createContext<Shell | null>(null);

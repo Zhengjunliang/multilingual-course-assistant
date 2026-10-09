@@ -14,7 +14,8 @@ interface ConversationSidebarProps {
   /**
    * The conversation whose answer is queued, streaming or retrying; `null`
    * when nothing is being answered. It can be deleted all the same: the
-   * confirmation says the answer stops, and the layout stops it first.
+   * confirmation says the answer stops, which it does when the layout leaves
+   * the deleted conversation.
    */
   busy: number | null;
   /**

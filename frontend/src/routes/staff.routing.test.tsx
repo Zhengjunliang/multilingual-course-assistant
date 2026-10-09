@@ -157,6 +157,8 @@ const asked: string[] = [];
 let stopped = false;
 /** Whether it had been, when a conversation's delete reached the server; `null` before any. */
 let stoppedAtDelete: boolean | null = null;
+/** Whether the server refuses a conversation's delete, as a server error would. */
+let deleteRefused = false;
 /** The next list of conversations, read as `body` and answered once `gate` opens. */
 let lateList: { body: ConversationSummary[]; gate: Promise<void> } | null = null;
 /** Secretariat staff revoked during a case, as the server would forget them. */
@@ -229,6 +231,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   }
   if (method === "DELETE" && path.startsWith("/api/conversations/")) {
     stoppedAtDelete = stopped;
+    if (deleteRefused) return json({ detail: "Server error." }, 500);
     const id = Number(path.slice("/api/conversations/".length));
     conversations = conversations.filter((listed) => listed.id !== id);
     return new Response(null, { status: 204 });
@@ -352,6 +355,7 @@ beforeEach(() => {
   asked.length = 0;
   stopped = false;
   stoppedAtDelete = null;
+  deleteRefused = false;
   lateList = null;
   revoked.clear();
   failures = 0;
@@ -919,7 +923,7 @@ function deleteRow(container: HTMLElement, title: string) {
 }
 
 describe("deleting while an answer is written", () => {
-  it("deletes the conversation being answered, saying so, and stops the answer first", async () => {
+  it("deletes the conversation being answered, saying so, and then stops the answer", async () => {
     reader = STUDENT;
     const { container, unmount, path } = page("/");
     await settle();
@@ -929,6 +933,7 @@ describe("deleting while an answer is written", () => {
     const seen = {
       ...offered,
       stoppedAtDelete,
+      stopped,
       path: path(),
       row: container.querySelector('aside a[href="/c/9"]'),
     };
@@ -937,10 +942,30 @@ describe("deleting while an answer is written", () => {
     expect(seen).toEqual({
       pressable: true,
       said: i18n.t("sidebar.deleteBodyAnswering", { title: "q" }),
-      stoppedAtDelete: true,
+      stoppedAtDelete: false,
+      stopped: true,
       path: "/",
       row: null,
     });
+  });
+
+  it("keeps the answer coming when the server refuses the delete", async () => {
+    reader = STUDENT;
+    deleteRefused = true;
+    const { container, unmount, path } = page("/");
+    await settle();
+    await askFromTheFrontDoor(container);
+    deleteRow(container, "q");
+    await settle();
+    const seen = {
+      stopped,
+      path: path(),
+      row: container.querySelector('aside a[href="/c/9"]') !== null,
+      said: document.body.textContent?.includes(i18n.t("sidebar.deleteFailed")),
+    };
+    unmount();
+
+    expect(seen).toEqual({ stopped: false, path: "/c/9", row: true, said: true });
   });
 
   it("keeps the deleted conversation off the list when an older list arrives last", async () => {
@@ -948,8 +973,8 @@ describe("deleting while an answer is written", () => {
     const { container, unmount } = page("/");
     await settle();
     await askFromTheFrontDoor(container);
-    // The stopped answer asks for the list; the server reads it before the
-    // delete lands, and its reply comes in after the list asked for later.
+    // The next list is read by the server before the delete lands, and its
+    // reply comes in after the list asked for after it.
     let answer = () => {};
     lateList = {
       body: [...conversations],
