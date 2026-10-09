@@ -1,10 +1,13 @@
 /**
- * The three catalogues must carry exactly the same keys.
+ * The three catalogues must carry exactly the same keys, and Chinese strings
+ * take Chinese punctuation.
  *
  * A missing key does not crash — i18next falls back and the reader sees Italian
  * inside an English page — so nothing else would catch it. Translation quality
  * still needs eyes; this only guarantees that every string has a slot in every
- * language.
+ * language, and that a Chinese string writes the full-width comma, colon,
+ * semicolon, question and exclamation marks rather than the Latin ones, which
+ * the Chinese face draws narrow.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -16,10 +19,15 @@ import { fileURLToPath } from "node:url";
 // which `join` then turns into "D:\D:\…".
 const CATALOGUE_DIR = fileURLToPath(new URL("../src/i18n", import.meta.url));
 
-function flatten(value, prefix = "") {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return [prefix];
+const CHINESE_CATALOGUE = "zh-hans.json";
+const HAN = /\p{Script=Han}/u;
+const LATIN_MARK = /[,:;?!]/;
+
+/** Each leaf of a catalogue as [key, value]. */
+function entries(value, prefix = "") {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return [[prefix, value]];
   return Object.entries(value).flatMap(([key, child]) =>
-    flatten(child, prefix ? `${prefix}.${key}` : key),
+    entries(child, prefix ? `${prefix}.${key}` : key),
   );
 }
 
@@ -29,11 +37,11 @@ if (files.length === 0) {
   process.exit(1);
 }
 
+const entriesByFile = new Map(
+  files.map((name) => [name, entries(JSON.parse(readFileSync(join(CATALOGUE_DIR, name), "utf8")))]),
+);
 const keysByFile = new Map(
-  files.map((name) => [
-    name,
-    new Set(flatten(JSON.parse(readFileSync(join(CATALOGUE_DIR, name), "utf8")))),
-  ]),
+  [...entriesByFile].map(([name, leaves]) => [name, new Set(leaves.map(([key]) => key))]),
 );
 
 const everyKey = new Set([...keysByFile.values()].flatMap((keys) => [...keys]));
@@ -48,5 +56,18 @@ for (const [name, keys] of keysByFile) {
   }
 }
 
+const latinMarks = (entriesByFile.get(CHINESE_CATALOGUE) ?? []).filter(
+  ([, value]) => typeof value === "string" && HAN.test(value) && LATIN_MARK.test(value),
+);
+if (latinMarks.length > 0) {
+  failed = true;
+  console.error(
+    `${CHINESE_CATALOGUE} writes Latin punctuation in ${latinMarks.length} Chinese string(s):`,
+  );
+  for (const [key, value] of latinMarks) console.error(`  ${key}: ${value}`);
+}
+
 if (failed) process.exit(1);
-console.log(`${files.length} catalogues, ${everyKey.size} keys, all present.`);
+console.log(
+  `${files.length} catalogues, ${everyKey.size} keys, all present; Chinese strings take Chinese punctuation.`,
+);
