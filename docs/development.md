@@ -56,7 +56,7 @@ uv run python scripts/check.py hooks types   # only these two
 
 | Step | Runs |
 | ---- | ---- |
-| `hooks` | every hook of `.pre-commit-config.yaml` except `uv-lock`, over every tracked file: file hygiene, `detect-private-key`, ruff lint and format, typos, zizmor and actionlint over the workflows, and the repository's own guards, each named with its rule in `CLAUDE.md`, section 5 |
+| `hooks` | every hook of `.pre-commit-config.yaml` except `uv-lock` and `biome` (the `frontend` step runs Biome), over every tracked file: file hygiene, `detect-private-key`, ruff lint and format, typos, zizmor and actionlint over the workflows, and the repository's own guards, each named with its rule in `CLAUDE.md`, section 5 |
 | `frontend` | biome, `tsc`, catalogue keys, colour contrast, `DESIGN.md`'s tokens and linter, vitest, production build |
 | `types` | `pyright` |
 | `deploy` | `manage.py check --deploy --fail-level WARNING`, which runs the ordinary system checks too |

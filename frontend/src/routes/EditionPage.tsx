@@ -82,7 +82,7 @@ export default function EditionPage() {
             {data.is_current && <Badge>{t("staff.current")}</Badge>}
           </>
         }
-        title={course.name}
+        heading={course.name}
         caps
         sub={t("staff.edition.sub", {
           year,

@@ -12,7 +12,7 @@ import { UI_LOCALES, type UiLocale } from "@/i18n";
  * student who cannot read the login page cannot get past it. This one changes
  * i18next only — there is nothing yet to save it to.
  */
-export function AuthLayout({ title, children }: { title: string; children: ReactNode }) {
+export function AuthLayout({ heading, children }: { heading: string; children: ReactNode }) {
   const { t, i18n } = useTranslation();
 
   return (
@@ -21,7 +21,7 @@ export function AuthLayout({ title, children }: { title: string; children: React
         <div className="flex flex-col items-center gap-hair text-center">
           <Mascot pose="welcome" className="size-mascot" />
           <h1 className="font-semibold font-serif text-display text-ink">{t("app.title")}</h1>
-          <p className="text-body text-muted">{title}</p>
+          <p className="text-body text-muted">{heading}</p>
         </div>
         {children}
         <LocaleSwitch

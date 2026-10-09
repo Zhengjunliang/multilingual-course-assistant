@@ -1,0 +1,17 @@
+// No JSX element carries a `title` attribute (DESIGN.md, "Components"): the
+// browser's hint opens for a resting mouse alone, never for keyboard focus or
+// a touch, and screen readers announce it inconsistently. A hint is a
+// `Tooltip` (src/components/ui/tooltip.tsx). GritQL cannot tell a DOM element
+// from a component, so a component's own prop is named `heading`, never
+// `title`; an element that truly needs the attribute, such as an iframe's
+// accessible name, carries `biome-ignore lint/plugin: <why>`.
+// src/test/no-title-attribute.test.ts holds this pattern to both spellings.
+language js
+
+or { `title={$value}`, `title="$value"` } as $attribute where {
+  register_diagnostic(
+    span=$attribute,
+    message="No title attribute: a hint is a Tooltip, and what it says belongs in the visible text or the accessible name too.",
+    severity="error"
+  )
+}

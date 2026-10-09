@@ -13,10 +13,10 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 interface PageHeadProps {
-  /** A line above the title: the code of what the page shows. */
+  /** A line above the heading: the code of what the page shows. */
   eyebrow?: ReactNode;
-  title: string;
-  /** Whether the title is a catalogue name, printed in capitals as the catalogue prints it. */
+  heading: string;
+  /** Whether the heading is a catalogue name, printed in capitals as the catalogue prints it. */
   caps?: boolean;
   sub?: ReactNode;
   /** Whether to name where the study plans come from. */
@@ -24,7 +24,7 @@ interface PageHeadProps {
   actions?: ReactNode;
 }
 
-export function PageHead({ eyebrow, title, caps, sub, source, actions }: PageHeadProps) {
+export function PageHead({ eyebrow, heading, caps, sub, source, actions }: PageHeadProps) {
   const { t } = useTranslation();
   return (
     <header className="flex flex-wrap items-start gap-snug border-line border-b pb-gutter">
@@ -39,7 +39,7 @@ export function PageHead({ eyebrow, title, caps, sub, source, actions }: PageHea
             caps && "uppercase",
           )}
         >
-          {title}
+          {heading}
         </h1>
         {sub !== undefined && <p className="text-body text-muted">{sub}</p>}
         {source && (
@@ -55,19 +55,19 @@ export function PageHead({ eyebrow, title, caps, sub, source, actions }: PageHea
 }
 
 interface SectionProps {
-  title: string;
+  heading: string;
   sub?: ReactNode;
   /** Beside the heading: the section's one action. */
   right?: ReactNode;
   children: ReactNode;
 }
 
-export function Section({ title, sub, right, children }: SectionProps) {
+export function Section({ heading, sub, right, children }: SectionProps) {
   return (
     <section className="flex flex-col gap-snug">
       <div className="flex flex-wrap items-end gap-snug">
         <div className="flex min-w-0 flex-1 flex-col gap-hair">
-          <h2 className="font-semibold font-serif text-ink text-title">{title}</h2>
+          <h2 className="font-semibold font-serif text-ink text-title">{heading}</h2>
           {sub !== undefined && <p className="text-body text-muted">{sub}</p>}
         </div>
         {right}

@@ -106,7 +106,7 @@ export function ChatShell({ sidebar, leading, controls, children }: ChatShellPro
           {sidebar(slot)}
         </aside>
       )}
-      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen} title={t("sidebar.title")}>
+      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen} heading={t("sidebar.title")}>
         {sidebar(slot)}
       </Sheet>
 

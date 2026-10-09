@@ -16,7 +16,7 @@ function open(onConfirm: () => Promise<boolean>, onOpenChange = vi.fn()) {
     <AlertDialog
       open
       onOpenChange={onOpenChange}
-      title="Rimuovere mrossi?" // spellchecker:disable-line
+      heading="Rimuovere mrossi?" // spellchecker:disable-line
       description="mrossi non insegnerà più B028451 2025-2026." // spellchecker:disable-line
       cancelLabel="Annulla"
       confirmLabel="Rimuovi"

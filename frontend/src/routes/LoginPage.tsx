@@ -38,7 +38,7 @@ export default function LoginPage() {
   };
 
   return (
-    <AuthLayout title={t("auth.logInTitle")}>
+    <AuthLayout heading={t("auth.logInTitle")}>
       <form className="flex flex-col gap-gutter" onSubmit={(event) => void onSubmit(event)}>
         <div className="flex flex-col gap-hair">
           <label className="font-medium text-body text-ink" htmlFor="username">

@@ -104,7 +104,7 @@ export function AssignDialog({
       onOpenChange={(open) => {
         if (!open && !running) close();
       }}
-      title={t(teacher ? "staff.assign.teacher" : "staff.assign.secretariat")}
+      heading={t(teacher ? "staff.assign.teacher" : "staff.assign.secretariat")}
       description={description}
       closeLabel={t("staff.cancel")}
       onCloseAutoFocus={onCloseAutoFocus}

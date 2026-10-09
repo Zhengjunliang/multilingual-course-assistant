@@ -109,12 +109,12 @@ export default function CoursePage() {
             {course.code_source === "cineca-only" && <span>{t("staff.plan.integrated")}</span>}
           </>
         }
-        title={course.name}
+        heading={course.name}
         caps
         sub={programmeLine(course.entries, i18n.language)}
         source
       />
-      <Section title={t("staff.course.inPlan")}>
+      <Section heading={t("staff.course.inPlan")}>
         <div className={cn("grid gap-snug", listing.length > 1 && "md:grid-cols-2")}>
           {listing.map((programme) => (
             <PlanCard
@@ -131,7 +131,7 @@ export default function CoursePage() {
           </Note>
         )}
       </Section>
-      <Section title={t("staff.course.editions")} sub={t("staff.course.editionsSub")}>
+      <Section heading={t("staff.course.editions")} sub={t("staff.course.editionsSub")}>
         <Table frameClassName="rounded-card border border-line bg-surface sm:[&_tbody:last-child_tr:last-child]:border-b-0">
           <TableHeader>
             <TableRow>

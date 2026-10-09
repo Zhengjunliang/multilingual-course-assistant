@@ -21,7 +21,7 @@ import { mount } from "@/test/mount";
 
 function open(isOpen: boolean) {
   return mount(
-    <Sheet open={isOpen} onOpenChange={() => {}} title="Le tue conversazioni">
+    <Sheet open={isOpen} onOpenChange={() => {}} heading="Le tue conversazioni">
       <p>Che cos'è un ORM?</p>
     </Sheet>,
   );

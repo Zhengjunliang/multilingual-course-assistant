@@ -37,10 +37,10 @@ interface AccountDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-tight">
-      <h3 className="font-medium text-caption text-muted">{title}</h3>
+      <h3 className="font-medium text-caption text-muted">{heading}</h3>
       {children}
     </section>
   );
@@ -55,14 +55,14 @@ export function AccountDialog({ open, onOpenChange }: AccountDialogProps) {
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={t("account.title")}
+      heading={t("account.title")}
       closeLabel={t("account.close")}
     >
-      <Section title={t("account.profile")}>
+      <Section heading={t("account.profile")}>
         <p className="text-body text-ink">{account?.username ?? ""}</p>
       </Section>
 
-      <Section title={t("account.theme")}>
+      <Section heading={t("account.theme")}>
         <p className="text-caption text-muted">{t("account.themeCaption")}</p>
         <div className="flex flex-wrap gap-tight">
           {THEMES.map((option) => {
@@ -87,7 +87,7 @@ export function AccountDialog({ open, onOpenChange }: AccountDialogProps) {
         </div>
       </Section>
 
-      <Section title={t("account.language")}>
+      <Section heading={t("account.language")}>
         <LocaleSwitch
           className="self-start"
           locales={UI_LOCALES}
