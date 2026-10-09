@@ -18,7 +18,7 @@ function open(isOpen: boolean) {
     <Dialog
       open={isOpen}
       onOpenChange={() => {}}
-      title="Account"
+      heading="Account"
       description="Gestisci le tue preferenze." // spellchecker:disable-line
       closeLabel="Chiudi"
     >

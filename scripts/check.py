@@ -69,12 +69,14 @@ STEPS: tuple[Step, ...] = (
     # .pre-commit-config.yaml over every tracked file, so what a commit has to
     # pass and what the chain runs are one definition. CI runs this step in a
     # job of its own, beside the rest, since it needs neither torch nor the
-    # database. uv-lock is skipped here and only here: it resolves over the
-    # network, and CI's `uv sync --locked` is the same gate.
+    # database. uv-lock and biome are skipped here and only here: uv-lock
+    # resolves over the network, and CI's `uv sync --locked` is the same gate;
+    # biome needs Node, and the `frontend` step runs the same Biome with the
+    # same configuration over the same paths.
     Step(
         "hooks",
         ((PYTHON, "-m", "pre_commit", "run", "--all-files", "--show-diff-on-failure"),),
-        env={"SKIP": "uv-lock"},
+        env={"SKIP": "uv-lock,biome"},
         hint=(
             "A hook that rewrites files (ruff, whitespace) fails the run that "
             "rewrote them: review the diff above, `git add`, and run again."

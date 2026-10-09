@@ -21,8 +21,8 @@ interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Visible, unlike the drawer's: a dialog is a place, and it says which. */
-  title: string;
-  /** One line under the title. Radix wants a description or an explicit opt-out. */
+  heading: string;
+  /** One line under the heading. Radix wants a description or an explicit opt-out. */
   description?: string;
   /** Labels the close button for a reader who cannot see the cross. */
   closeLabel: string;
@@ -37,7 +37,7 @@ interface DialogProps {
 export function Dialog({
   open,
   onOpenChange,
-  title,
+  heading,
   description,
   closeLabel,
   onCloseAutoFocus,
@@ -57,10 +57,10 @@ export function Dialog({
           <div className="flex items-start justify-between gap-snug">
             <div className="flex min-w-0 flex-col gap-hair">
               <RadixDialog.Title className="font-semibold font-serif text-ink text-title">
-                {title}
+                {heading}
               </RadixDialog.Title>
               {description === undefined ? (
-                <RadixDialog.Description className="sr-only">{title}</RadixDialog.Description>
+                <RadixDialog.Description className="sr-only">{heading}</RadixDialog.Description>
               ) : (
                 <RadixDialog.Description className="text-caption text-muted">
                   {description}

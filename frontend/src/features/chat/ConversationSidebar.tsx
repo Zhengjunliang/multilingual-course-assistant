@@ -191,7 +191,7 @@ export function ConversationSidebar({
         onOpenChange={(open) => {
           if (!open) close();
         }}
-        title={t("sidebar.deleteTitle")}
+        heading={t("sidebar.deleteTitle")}
         description={
           pending === null
             ? ""

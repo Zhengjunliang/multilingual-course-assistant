@@ -127,6 +127,16 @@ repos:
         entry: python -m scripts.guards commit-history
         pass_filenames: false
         always_run: true
+      # The frontend's linter, formatter and import order (frontend/biome.json),
+      # on the staged files of the paths `npm run lint` checks, so its rules,
+      # the ban on title attributes among them, hold at commit time and not
+      # only in the chain. Node, as the frontend needs: the script says why it
+      # runs Biome from frontend/.
+      - id: biome
+        name: the frontend passes Biome
+        language: system
+        entry: node frontend/scripts/biome-staged.mjs
+        files: ^frontend/((src|e2e|scripts)/.*\.(ts|tsx|js|mjs|json|css)|(vite\.config\.ts|playwright\.config\.ts|biome\.json|package\.json|tsconfig\.json))$
       # Agent rule 6 of CLAUDE.md: one correct implementation, with the old
       # versions in git history rather than beside the file. A `v2` or later
       # counts, since it implies a `v1` beside it; a lone `v1` may be an API's.

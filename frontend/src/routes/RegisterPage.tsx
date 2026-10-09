@@ -53,7 +53,7 @@ export default function RegisterPage() {
   const messagesFor = (field: string) => fields[field] ?? [];
 
   return (
-    <AuthLayout title={t("auth.registerTitle")}>
+    <AuthLayout heading={t("auth.registerTitle")}>
       <form className="flex flex-col gap-gutter" onSubmit={(event) => void onSubmit(event)}>
         <div className="flex flex-col gap-hair">
           <label className="font-medium text-body text-ink" htmlFor="username">

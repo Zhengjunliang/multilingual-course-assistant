@@ -3,8 +3,9 @@
  * for keyboard focus, and Escape closes it.
  *
  * The one way this interface shows a hint. The browser's `title` attribute is
- * not one: it opens for a resting mouse alone, never for focus or a touch, and
- * screen readers announce it inconsistently. A hint can still be missed, since
+ * not one, and the linter refuses it (biome-plugins/no-title-attribute.grit):
+ * it opens for a resting mouse alone, never for focus or a touch, and screen
+ * readers announce it inconsistently. A hint can still be missed, since
  * a touch screen has no pointer to rest, so it only ever repeats what the
  * visible text or the accessible name already says (DESIGN.md, "Components").
  *

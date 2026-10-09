@@ -364,7 +364,7 @@ export default function StyleguidePage() {
           <Button className="self-start" onClick={() => setDrawer(true)}>
             Open the Sheet
           </Button>
-          <Sheet open={drawer} onOpenChange={setDrawer} title="Sheet specimen">
+          <Sheet open={drawer} onOpenChange={setDrawer} heading="Sheet specimen">
             <div className="flex flex-col gap-tight p-gutter">
               <p className="text-body text-ink">
                 The drawer renders in a portal at the end of the document, which is why it follows
@@ -382,7 +382,7 @@ export default function StyleguidePage() {
           <Dialog
             open={dialog}
             onOpenChange={setDialog}
-            title="Dialog specimen"
+            heading="Dialog specimen"
             description="A centred window, not a drawer."
             closeLabel="Close"
           >
@@ -398,7 +398,7 @@ export default function StyleguidePage() {
           <AlertDialog
             open={alert}
             onOpenChange={setAlert}
-            title="AlertDialog specimen"
+            heading="AlertDialog specimen"
             description="Removing mrossi from B028451 2025-2026 cannot be undone from here."
             cancelLabel="Cancel"
             confirmLabel="Remove"

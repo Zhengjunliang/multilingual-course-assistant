@@ -78,7 +78,7 @@ export function SetCurrentDialog({
         setRefusal(null);
         onClose();
       }}
-      title={t("staff.setCurrent.title")}
+      heading={t("staff.setCurrent.title")}
       description={edition?.course.name ?? ""}
       cancelLabel={t("staff.cancel")}
       confirmLabel={t("staff.setCurrent.action")}

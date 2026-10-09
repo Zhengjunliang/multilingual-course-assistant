@@ -32,8 +32,8 @@ interface AlertDialogProps {
   open: boolean;
   /** Called with false when the reader cancels, and after a confirmation that succeeded. */
   onOpenChange: (open: boolean) => void;
-  title: string;
-  /** What will happen, naming the thing it happens to. Read out with the title. */
+  heading: string;
+  /** What will happen, naming the thing it happens to. Read out with the heading. */
   description: string;
   cancelLabel: string;
   confirmLabel: string;
@@ -51,7 +51,7 @@ interface AlertDialogProps {
 export function AlertDialog({
   open,
   onOpenChange,
-  title,
+  heading,
   description,
   cancelLabel,
   confirmLabel,
@@ -97,7 +97,7 @@ export function AlertDialog({
         >
           <div className="flex flex-col gap-hair">
             <RadixAlertDialog.Title className="font-semibold font-serif text-ink text-title">
-              {title}
+              {heading}
             </RadixAlertDialog.Title>
             <RadixAlertDialog.Description className="text-body text-muted">
               {description}

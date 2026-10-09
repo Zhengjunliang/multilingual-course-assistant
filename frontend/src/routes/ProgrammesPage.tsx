@@ -44,7 +44,7 @@ export default function ProgrammesPage() {
   return (
     <>
       <PageHead
-        title={t("staff.programmes.title")}
+        heading={t("staff.programmes.title")}
         sub={account?.is_superuser ? t("staff.programmes.sub") : t("staff.programmes.subScoped")}
         source
       />

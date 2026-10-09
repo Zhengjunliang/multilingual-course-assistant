@@ -14,17 +14,17 @@ interface SheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Read out when the drawer opens; it has no visible heading of its own. */
-  title: string;
+  heading: string;
   children: ReactNode;
 }
 
-export function Sheet({ open, onOpenChange, title, children }: SheetProps) {
+export function Sheet({ open, onOpenChange, heading, children }: SheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-backdrop bg-black/40" />
         <Dialog.Content className="fixed inset-y-0 left-0 z-floating flex w-72 max-w-[85vw] flex-col border-line border-r bg-surface shadow-overlay">
-          <Dialog.Title className="sr-only">{title}</Dialog.Title>
+          <Dialog.Title className="sr-only">{heading}</Dialog.Title>
           {children}
         </Dialog.Content>
       </Dialog.Portal>

@@ -59,7 +59,7 @@ export default function ProgrammePage() {
     <>
       <PageHead
         eyebrow={<Code>{programme.code}</Code>}
-        title={programme.name}
+        heading={programme.name}
         caps
         sub={
           programme.curricula.length > 0
@@ -68,11 +68,11 @@ export default function ProgrammePage() {
         }
         source
       />
-      <Section title={t("staff.plan.title")} sub={t("staff.plan.sub", { count: plan.length })}>
+      <Section heading={t("staff.plan.title")} sub={t("staff.plan.sub", { count: plan.length })}>
         <StudyPlanTable rows={plan} programme={programme} />
       </Section>
       <Section
-        title={t("staff.secretariat.title")}
+        heading={t("staff.secretariat.title")}
         sub={t("staff.secretariat.sub")}
         right={members.assign}
       >

@@ -82,7 +82,7 @@ export function RevokeDialog({
         setRefusal(null);
         onClose();
       }}
-      title={t("staff.revoke.title")}
+      heading={t("staff.revoke.title")}
       description={revoking?.sentence ?? ""}
       cancelLabel={t("staff.cancel")}
       confirmLabel={t("staff.revoke.action")}
