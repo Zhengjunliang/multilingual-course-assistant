@@ -67,6 +67,14 @@ export default defineConfig(({ command }) => ({
     // "vitest" by name. That keeps tsconfig's `types` array as it is and leaves
     // biome with no undeclared identifiers to shrug at.
     include: ["src/**/*.test.{ts,tsx}"],
+    // `npm run test:coverage`, by hand only: the baseline #89 records, a signal
+    // rather than a gate, so no step of the chain pays for it. Every source file
+    // counts, not only those a test imports, or untested files would vanish
+    // from the number instead of lowering it.
+    coverage: {
+      include: ["src/**/*.{ts,tsx}"],
+      reporter: ["text-summary"],
+    },
   },
 
   server: {

@@ -21,6 +21,7 @@ node_modules/
 dist/
 dist-e2e/
 test-results/
+coverage/
 build/
 .vite/
 *.tsbuildinfo
