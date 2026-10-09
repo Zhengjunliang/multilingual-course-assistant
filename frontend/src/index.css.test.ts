@@ -56,7 +56,10 @@ const covers = (spans: readonly Span[], point: number) =>
  */
 const CHINESE_FACES = ["PingFang SC", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei"];
 
-/** What a Latin face draws narrow and a Chinese one wider, the quotes full width: the dash, the quotes, the ellipsis. */
+/**
+ * What a Latin face draws in Latin shapes and a Chinese one in its own, the
+ * quotes full width: the dash, the quotes, the ellipsis.
+ */
 const PUNCTUATION = [0x2014, 0x2018, 0x2019, 0x201c, 0x201d, 0x2026];
 
 describe("the stylesheet", () => {
