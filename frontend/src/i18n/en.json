@@ -97,6 +97,12 @@
     "body": "There is no page at this address: the link may be mistyped or out of date.",
     "home": "Back to the start"
   },
+  "crash": {
+    "title": "This page stopped working",
+    "body": "Something went wrong while the page was opening. Reload it; if it happens again, go back to the start.",
+    "reload": "Reload the page",
+    "home": "Back to the start"
+  },
   "staff": {
     "cancel": "Cancel",
     "breadcrumb": "Breadcrumb",

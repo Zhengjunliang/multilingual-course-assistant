@@ -8,9 +8,12 @@ import { AnswerMarkdown } from "./AnswerMarkdown";
 /**
  * KaTeX, fetched with the first answer that needs it.
  *
- * A chunk that fails to load falls back to the answer without typesetting: the
- * page has no error boundary, and a thrown import would take the whole chat
- * down to show one formula.
+ * A chunk that fails to load falls back to the answer without typesetting
+ * rather than throwing. The route's error panel would catch a throw, but it
+ * would take the whole answer away for the sake of its formulas, which are
+ * only its typesetting. Nor is the page reloaded, the other usual remedy: the
+ * chunk loads once the answer is complete, and a reload would pull the answer
+ * from under a reader who has just started on it.
  */
 const MathMarkdown = lazy(() =>
   import("./MathMarkdown").catch(() => ({ default: AnswerMarkdown })),

@@ -11,6 +11,7 @@ import NotFoundPage from "@/routes/NotFoundPage";
 import ProgrammePage from "@/routes/ProgrammePage";
 import ProgrammesPage from "@/routes/ProgrammesPage";
 import RegisterPage from "@/routes/RegisterPage";
+import RouteError from "@/routes/RouteError";
 import ShellLayout from "@/routes/ShellLayout";
 import StaffLanding, { StaffNotFound } from "@/routes/StaffLanding";
 import StaffLayout from "@/routes/StaffLayout";
@@ -21,6 +22,12 @@ import VisitorLayout from "@/routes/VisitorLayout";
  * The route tree, as data. `main.tsx` builds the browser's router from it and
  * the routing tests build a memory router from the same array, so what a test
  * walks is what a reader walks.
+ *
+ * A page that throws is caught at two depths (RouteError.tsx). Inside the
+ * frame, a route with no path and no element holds every page under the
+ * shell: its error takes the page's place and the sidebar stays. The route
+ * around the whole tree catches the rest, the frame itself included, over the
+ * whole window. Moving to another address clears either.
  *
  * Five routes, the staff pages, and a page for every other address; two of the
  * five are the same page.
@@ -49,36 +56,46 @@ import VisitorLayout from "@/routes/VisitorLayout";
  * courses, editions — not roles.
  */
 export const routes: RouteObject[] = [
-  { path: "/login", element: <LoginPage /> },
-  { path: "/register", element: <RegisterPage /> },
-  { path: "/styleguide", element: <StyleguidePage /> },
   {
-    element: (
-      <RequireSession visitor={<VisitorLayout />}>
-        <ShellLayout />
-      </RequireSession>
-    ),
+    errorElement: <RouteError full />,
     children: [
-      { path: "/", element: <ChatPage /> },
-      { path: "/c/:conversationId", element: <ChatPage /> },
+      { path: "/login", element: <LoginPage /> },
+      { path: "/register", element: <RegisterPage /> },
+      { path: "/styleguide", element: <StyleguidePage /> },
       {
-        path: "/staff",
         element: (
-          <RequireStaff>
-            <StaffLayout />
-          </RequireStaff>
+          <RequireSession visitor={<VisitorLayout />}>
+            <ShellLayout />
+          </RequireSession>
         ),
         children: [
-          { index: true, element: <StaffLanding /> },
-          { path: "programmes", element: <ProgrammesPage /> },
-          { path: "programmes/:code", element: <ProgrammePage /> },
-          { path: "courses/:code", element: <CoursePage /> },
-          { path: "editions/:id", element: <EditionPage /> },
-          { path: "mine", element: <MinePage /> },
-          { path: "*", element: <StaffNotFound /> },
+          {
+            errorElement: <RouteError />,
+            children: [
+              { path: "/", element: <ChatPage /> },
+              { path: "/c/:conversationId", element: <ChatPage /> },
+              {
+                path: "/staff",
+                element: (
+                  <RequireStaff>
+                    <StaffLayout />
+                  </RequireStaff>
+                ),
+                children: [
+                  { index: true, element: <StaffLanding /> },
+                  { path: "programmes", element: <ProgrammesPage /> },
+                  { path: "programmes/:code", element: <ProgrammePage /> },
+                  { path: "courses/:code", element: <CoursePage /> },
+                  { path: "editions/:id", element: <EditionPage /> },
+                  { path: "mine", element: <MinePage /> },
+                  { path: "*", element: <StaffNotFound /> },
+                ],
+              },
+            ],
+          },
         ],
       },
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
-  { path: "*", element: <NotFoundPage /> },
 ];
