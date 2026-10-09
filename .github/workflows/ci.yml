@@ -160,7 +160,9 @@ jobs:
   # too slow for the local loop, and this job is the only place it runs.
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # About twice this job's run with all four specs, 68 s (tests 34 s,
+    # Chromium 17 s), rounded up to minutes.
+    timeout-minutes: 3
     steps:
       # As in `hooks`, the token is not left in .git/config: nothing here needs it.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
