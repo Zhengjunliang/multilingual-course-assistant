@@ -150,12 +150,17 @@ describe("the order of a turn", () => {
 });
 
 describe("the answer's language", () => {
-  it("is marked on the prose, which is set as reading text", () => {
-    // A Chinese answer in the Italian interface: `lang` is what gives it the
-    // Chinese leading in index.css, and what a screen reader switches voice on.
+  it("is marked on the question and on the prose, which is set as reading text", () => {
+    // A Chinese exchange in the Italian interface: `lang` is what gives it the
+    // Chinese stack and leading in index.css, and what a screen reader
+    // switches voice on.
     const { container, unmount } = mount(
       <TurnView
-        turn={turn({ answer: "学费九月三十日截止。[Excerpt 1]", locale: "zh" })}
+        turn={turn({
+          question: "学费什么时候截止？",
+          answer: "学费九月三十日截止。[Excerpt 1]",
+          locale: "zh",
+        })}
         live={false}
         thinking={false}
         highlighted={null}
@@ -163,19 +168,22 @@ describe("the answer's language", () => {
         visitor={false}
       />,
     );
-    const prose = container.querySelector('[lang="zh"]');
+    const prose = container.querySelector('div[lang="zh"]');
     const marked = [...container.querySelectorAll("[lang]")].map((element) =>
       element.getAttribute("lang"),
     );
     const classes = [...(prose?.classList ?? [])];
     const text = prose?.textContent;
+    const question = container.querySelector("article > p")?.getAttribute("lang");
     unmount();
 
     expect(text).toContain("学费九月三十日截止");
     expect(classes).toEqual(expect.arrayContaining(["font-serif", "text-reading"]));
     // The route line and the sources are the interface's and the excerpts' own
-    // languages; only the answer says "zh". Citation cards carry their own.
-    expect(marked.filter((lang) => lang === "zh")).toHaveLength(1);
+    // languages; only the question and the answer say "zh". Citation cards
+    // carry their own.
+    expect(question).toBe("zh");
+    expect(marked.filter((lang) => lang === "zh")).toHaveLength(2);
   });
 });
 
