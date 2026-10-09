@@ -4,6 +4,7 @@ import { Link, Navigate } from "react-router-dom";
 
 import { ApiError } from "@/api/http";
 import { useSession } from "@/auth/useSession";
+import { PasswordField } from "@/components/PasswordField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UI_LOCALES, type UiLocale } from "@/i18n";
@@ -77,13 +78,11 @@ export default function RegisterPage() {
           <label className="font-medium text-body text-ink" htmlFor="password">
             {t("auth.password")}
           </label>
-          <Input
+          <PasswordField
             id="password"
-            type="password"
             autoComplete="new-password"
-            required
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={setPassword}
           />
           {messagesFor("password").map((message) => (
             <p key={message} className="text-body text-warn-ink">

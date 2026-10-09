@@ -4,6 +4,7 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 
 import { ApiError } from "@/api/http";
 import { useSession } from "@/auth/useSession";
+import { PasswordField } from "@/components/PasswordField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthLayout } from "./AuthLayout";
@@ -56,13 +57,11 @@ export default function LoginPage() {
           <label className="font-medium text-body text-ink" htmlFor="password">
             {t("auth.password")}
           </label>
-          <Input
+          <PasswordField
             id="password"
-            type="password"
             autoComplete="current-password"
-            required
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={setPassword}
           />
         </div>
 
