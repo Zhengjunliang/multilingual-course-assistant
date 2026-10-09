@@ -236,6 +236,8 @@ The primitives live in `frontend/src/components/ui/`, in the shadcn manner (Radi
 
 A hint is a `Tooltip`, the inverse of the page (canvas lettering on ink), opened by a resting pointer or by keyboard focus and closed by Escape; the browser's `title` attribute is never one, and a lint rule refuses it at commit time (`frontend/biome-plugins/no-title-attribute.grit`). A component's own prop for its heading is `heading`, never `title`; an element that truly needs the attribute, such as an iframe named by it, carries a suppression with its reason. A touch screen cannot open a hint, so a hint only repeats what the visible text or the accessible name says: a citation badge's name carries its marker, a page link's name its file, and a marker too long for its card wraps rather than being cut.
 
+A password is typed into `components/PasswordField.tsx`, after GOV.UK's Password input: a Show or Hide button beside the field, named for the password, with a status line a screen reader announces. The letters are hidden again when the form is sent and when the page returns from the back-forward cache, and Edge's own eye in the field is hidden, so there is one way to show them.
+
 Fumetto is drawn by `components/Mascot.tsx` from the one drawing in `frontend/src/brand/fumetto.ts`, always decorative (`aria-hidden`), in the accent's line:
 
 | Pose | Where |

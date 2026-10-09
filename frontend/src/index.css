@@ -291,6 +291,16 @@ body {
 }
 
 /*
+ * Edge draws an eye of its own inside a password input. The password field
+ * has its own button for that (components/PasswordField.tsx), and a second
+ * way to show the letters, one the form does not hide again when it is sent,
+ * would be one too many.
+ */
+input::-ms-reveal {
+  display: none;
+}
+
+/*
  * Chinese takes its own stack and its own leading wherever it is Chinese: an
  * answer whose `lang` says so, or anything in the Chinese interface. Rules
  * rather than classes at each use, so a new place that sets reading text or a
