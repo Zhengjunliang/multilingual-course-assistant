@@ -4,16 +4,15 @@
  */
 
 import it from "../src/i18n/it.json" with { type: "json" };
+import { expect, test } from "./api";
 import {
   CAMPUS_QUESTION,
   campusStream,
-  expect,
   SLIDES_CITATION,
   SLIDES_QUESTION,
   STUDENT,
   slidesStream,
-  test,
-} from "./api";
+} from "./fixtures";
 
 test.describe("a signed-in student", () => {
   test.beforeEach(({ api }) => api.signIn(STUDENT));
