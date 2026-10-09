@@ -802,6 +802,23 @@ def test_a_reader_who_leaves_still_leaves_the_answer_behind(index: QdrantClient)
     assert text != "An ORM maps objects."
 
 
+def test_a_conversation_deleted_mid_answer_leaves_nothing_behind(index: QdrantClient) -> None:
+    """The sidebar's delete of the conversation being answered: the answer is
+    stopped, the delete arrives, and the server settles the answer after it.
+    The rows go with the conversation, and the settling write finds nothing to
+    write and raises nothing."""
+    install_engine(index, SLIDES_ROUTE, ["An ORM ", "maps objects."])
+    response = ask_the_view()
+
+    read_one(response)  # the start event: both rows are written
+    deleted = client_for().delete(f"{CONVERSATIONS_URL}/{only_conversation().pk}")
+    finish(response)
+
+    assert deleted.status_code == 204
+    assert not Conversation.objects.exists()
+    assert not Message.objects.exists()
+
+
 def test_a_refused_question_leaves_no_message_behind(tmp_path: Path) -> None:
     """A 503 happens before the first event, which is exactly why the rows are
     written after it. Written earlier, every refusal would deposit a question

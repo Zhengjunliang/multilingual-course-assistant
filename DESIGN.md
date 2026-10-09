@@ -258,5 +258,6 @@ A screen with nothing of its own to show is one panel, `components/StatusPanel.t
 - Do keep the warning hue for failure and destruction; don't use it for emphasis.
 - Do add a colour pair to `palette.mjs` before a screen composes it.
 - Do let a table stack on a phone; don't let a page scroll sideways.
+- Do let a control act and say what will follow, as deleting the conversation being answered says that its answer stops; don't disable a control to say why it cannot act, and where it truly cannot, say why beside it. A control is disabled only while its own request is on its way, so that it is not sent twice.
 - Don't use the university's mark, its lettering or its page furniture (a blue band, uppercase navigation, square frames): only its blue.
 - Don't move anything a reader with reduced motion would see move.

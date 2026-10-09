@@ -12,8 +12,9 @@ import { cn } from "@/lib/utils";
 interface ConversationSidebarProps {
   conversations: readonly ConversationSummary[];
   /**
-   * The conversation whose answer is queued, streaming or retrying, which
-   * cannot be deleted until it settles; `null` when nothing is being answered.
+   * The conversation whose answer is queued, streaming or retrying; `null`
+   * when nothing is being answered. It can be deleted all the same: the
+   * confirmation says the answer stops, and the layout stops it first.
    */
   busy: number | null;
   /**
@@ -165,16 +166,15 @@ export function ConversationSidebar({
                   </NavLink>
                   {/* Shown on hover or focus where there is a fine pointer to
                     hover with; always on a touch screen, whatever its width.
-                    Disabled while this conversation's answer is being written:
-                    the question would be refused and the half answer lost. */}
+                    Never disabled, not even while this conversation's answer
+                    is being written: the confirmation says that answer stops
+                    (DESIGN.md, "Do's and Don'ts"). */}
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     className="shrink-0 pointer-fine:opacity-0 pointer-fine:focus-visible:opacity-100 pointer-fine:group-hover:opacity-100"
                     aria-label={t("sidebar.delete", { title: titleOf(conversation) })}
-                    title={busy === conversation.id ? t("sidebar.deleteBusy") : undefined}
-                    disabled={busy === conversation.id}
                     onClick={(event) => ask(conversation, event.currentTarget)}
                   >
                     <Trash2 aria-hidden className="size-icon" />
@@ -192,7 +192,13 @@ export function ConversationSidebar({
           if (!open) close();
         }}
         title={t("sidebar.deleteTitle")}
-        description={pending === null ? "" : t("sidebar.deleteBody", { title: titleOf(pending) })}
+        description={
+          pending === null
+            ? ""
+            : t(busy === pending.id ? "sidebar.deleteBodyAnswering" : "sidebar.deleteBody", {
+                title: titleOf(pending),
+              })
+        }
         cancelLabel={t("sidebar.cancel")}
         confirmLabel={t("sidebar.deleteConfirm")}
         onConfirm={confirm}

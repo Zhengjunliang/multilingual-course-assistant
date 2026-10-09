@@ -26,9 +26,9 @@
     "delete": "删除「{{title}}」",
     "deleteTitle": "删除这个会话？",
     "deleteBody": "「{{title}}」及其回答将被永久删除。",
+    "deleteBodyAnswering": "「{{title}}」及其回答将被永久删除。正在生成的回答会停止。",
     "deleteConfirm": "删除",
     "cancel": "取消",
-    "deleteBusy": "请等回答完成",
     "deleteFailed": "无法删除这个会话。"
   },
   "account": {

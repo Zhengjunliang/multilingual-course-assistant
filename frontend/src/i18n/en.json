@@ -26,9 +26,9 @@
     "delete": "Delete \"{{title}}\"",
     "deleteTitle": "Delete this conversation?",
     "deleteBody": "\"{{title}}\" and its answers are deleted for good.",
+    "deleteBodyAnswering": "\"{{title}}\" and its answers are deleted for good. The answer being written stops.",
     "deleteConfirm": "Delete",
     "cancel": "Cancel",
-    "deleteBusy": "Wait for the answer to finish",
     "deleteFailed": "The conversation could not be deleted."
   },
   "account": {
