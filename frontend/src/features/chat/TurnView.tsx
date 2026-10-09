@@ -87,7 +87,14 @@ export const TurnView = memo(function TurnView({
 
   return (
     <article className="flex flex-col gap-gutter">
-      <p className="ml-auto max-w-prose whitespace-pre-wrap rounded-bubble rounded-br-chip bg-mark px-gutter py-tight text-ink">
+      {/* In the language it was asked in, the one the answer is written in:
+          the font follows `lang` (index.css), so an Italian question keeps
+          its narrow quotes in the Chinese interface and a Chinese one gets
+          full-width ones in any other, and a screen reader its voice. */}
+      <p
+        lang={turn.locale ?? undefined}
+        className="ml-auto max-w-prose whitespace-pre-wrap rounded-bubble rounded-br-chip bg-mark px-gutter py-tight text-ink"
+      >
         {turn.question}
       </p>
 
