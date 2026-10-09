@@ -50,13 +50,11 @@ function declarationsFor(selector: RegExp): string[] {
 const covers = (spans: readonly Span[], point: number) =>
   spans.some(([from, to]) => from <= point && point <= to);
 
-const CHINESE_FACES = [
-  "PingFang SC",
-  "Source Han Sans SC",
-  "Noto Sans CJK SC",
-  "Microsoft YaHei UI",
-  "Microsoft YaHei",
-];
+/**
+ * The Chinese faces that draw the quotes full width. Microsoft YaHei UI is not
+ * one: msyh.ttc holds it beside YaHei, with quotes 0.38 em wide.
+ */
+const CHINESE_FACES = ["PingFang SC", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei"];
 
 /** What Chinese draws full width and a Latin face narrow: the dash, the quotes, the ellipsis. */
 const PUNCTUATION = [0x2014, 0x2018, 0x2019, 0x201c, 0x201d, 0x2026];
@@ -68,13 +66,16 @@ describe("the stylesheet", () => {
 });
 
 describe("Chinese text", () => {
-  it("takes its punctuation from a Chinese face: no family ahead of one may draw it", () => {
+  it("takes its punctuation from a Chinese face: no other family before the generic one may draw it", () => {
     const families = stack("font-sans-zh");
     const first = families.findIndex((family) => CHINESE_FACES.includes(family));
     const known = faces(CSS);
-    // A family not served from here, a system or a generic one, may draw
-    // anything, so it counts as drawing the punctuation.
-    const drawsIt = families.slice(0, Math.max(first, 0)).filter((family) => {
+    // Whichever Chinese face is installed draws the punctuation, so every
+    // family before the generic fallback is checked, not only those ahead of
+    // the first Chinese face. A family not served from here, a system one,
+    // may draw anything, so it counts as drawing the punctuation.
+    const drawsIt = families.slice(0, -1).filter((family) => {
+      if (CHINESE_FACES.includes(family)) return false;
       const spans = known.get(family);
       return spans === undefined || PUNCTUATION.some((point) => covers(spans, point));
     });
