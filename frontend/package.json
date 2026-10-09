@@ -37,6 +37,7 @@
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@biomejs/biome": "^2.5.15",
     "@google/design.md": "0.4.0",
     "@playwright/test": "^1.63.0",
