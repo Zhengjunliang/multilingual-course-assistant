@@ -169,12 +169,13 @@
      for Latin letters and digits alone, then the Chinese faces at once. No
      system or generic family comes before them, because the first family that
      has a character draws it, and Segoe UI, which `system-ui` is on Windows,
-     draws quotes and the ellipsis narrow. YaHei's quotes, ellipsis and dash
-     are full width (read from msyh.ttc); DengXian's quotes are not, so it is
-     not here. */
+     draws quotes and the ellipsis narrow. YaHei's quotes and dash are full
+     width and its ellipsis 0.81 em (read from msyh.ttc); YaHei UI, in the
+     same file, draws the quotes 0.38 em and DengXian 0.36 em, so neither is
+     here. */
   --font-sans-zh:
-    "Figtree Latin", "PingFang SC", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei UI",
-    "Microsoft YaHei", sans-serif;
+    "Figtree Latin", "PingFang SC", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei",
+    sans-serif;
 
   /* Interior rhythm. Named by how close things are, not by a step number. */
   --spacing-hair: 0.25rem;
