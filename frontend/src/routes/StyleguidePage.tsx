@@ -121,7 +121,7 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
       <Specimen
         name="Type"
-        note="Fraunces for headings and the answer, at the reading size; Figtree for every control. Chinese falls through to the system's faces."
+        note="Fraunces for headings and the answer, at the reading size; Figtree for every control. Chinese is set in the system's Chinese faces, its punctuation full width, with Figtree for its Latin letters; text in another language keeps its own quotes, whichever language the page is in."
       >
         <div className="flex max-w-prose flex-col gap-tight">
           <p className="font-semibold font-serif text-ink text-title">
@@ -137,6 +137,13 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
           </p>
           <p lang="zh-hans" className="font-serif text-ink text-reading">
             学习率决定了沿负梯度方向每一步的大小；学习率过大会导致损失震荡。
+          </p>
+          <p lang="zh-hans" className="text-body text-ink">
+            课件里说“学习率不宜过大”……否则——损失会震荡。原文是{" "}
+            <span lang="it">“il tasso non deve essere troppo alto”</span>。
+          </p>
+          <p lang="en" className="text-body text-ink">
+            The slides say “keep the rate small”… or else — the loss oscillates.
           </p>
         </div>
       </Specimen>
