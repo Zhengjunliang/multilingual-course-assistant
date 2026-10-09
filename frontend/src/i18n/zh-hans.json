@@ -88,9 +88,9 @@
     "title": "来源",
     "empty": "这个问题没有检索到任何片段。",
     "uncited": "检索到，但答案没有引用",
-    "badge": "来源 {{number}}: {{marker}}",
+    "badge": "来源 {{number}}：{{marker}}",
     "page": "第 {{page}} 页",
-    "openPage": "第 {{page}} 页, {{file}}, 在新标签页中打开",
+    "openPage": "第 {{page}} 页，{{file}}，在新标签页中打开",
     "fetched": "抓取于 {{date}}",
     "more": "+{{count}}"
   },
@@ -101,12 +101,12 @@
   },
   "notFound": {
     "title": "页面不存在",
-    "body": "这个地址上没有页面, 链接可能写错了或已经失效。",
+    "body": "这个地址上没有页面，链接可能写错了或已经失效。",
     "home": "返回首页"
   },
   "crash": {
     "title": "页面出错了",
-    "body": "打开这个页面时出了问题。请重新加载, 如果还是不行, 返回首页。",
+    "body": "打开这个页面时出了问题。请重新加载，如果还是不行，返回首页。",
     "reload": "重新加载",
     "home": "返回首页"
   },
@@ -121,7 +121,7 @@
       "mine": "我的课程"
     },
     "setCurrent": {
-      "title": "设为当前版本?",
+      "title": "设为当前版本？",
       "done": "当前版本已更新",
       "action": "设为当前",
       "becomes": "<b>{{year}}</b> 成为当前版本。",
@@ -133,18 +133,18 @@
       "empty": "你负责的范围内没有专业。",
       "code": "代码",
       "name": "名称",
-      "sub": "本站的全部学位专业, 及其教学秘书处。",
+      "sub": "本站的全部学位专业，及其教学秘书处。",
       "subScoped": "你所在教学秘书处的学位专业。",
       "curriculum": "方向",
       "courses": "课程",
       "secretariat": "教学秘书处",
       "none": "无",
-      "footnote": "同时列在多个专业学习计划里的课程, 在每个专业各计一次。"
+      "footnote": "同时列在多个专业学习计划里的课程，在每个专业各计一次。"
     },
     "error": {
       "no_such_user": "没有这个名字的用户。",
       "already_held": "该用户在这里已有此角色。",
-      "switch_needs_both": "还需要对当前版本的权限: 请联系教学秘书。",
+      "switch_needs_both": "还需要对当前版本的权限：请联系教学秘书。",
       "required": "请输入用户名。",
       "blank": "请输入用户名。",
       "not_authenticated": "会话已结束，请重新登录。",
@@ -156,9 +156,9 @@
     "you": "你",
     "plan": {
       "title": "课程",
-      "sub_one": "学习计划, 按年级排列: {{count}} 门课程。",
-      "sub_other": "学习计划, 按年级排列: {{count}} 门课程。",
-      "curricula": "方向: {{list}}",
+      "sub_one": "学习计划，按年级排列：{{count}} 门课程。",
+      "sub_other": "学习计划，按年级排列：{{count}} 门课程。",
+      "curricula": "方向：{{list}}",
       "search": "按名称或代码搜索",
       "searchLabel": "搜索课程",
       "filter": "方向",
@@ -174,10 +174,10 @@
       "both": "两个方向都有",
       "every": "所有方向都有",
       "only": "仅 {{list}}",
-      "twoCodes": "两个代码, 同一门课",
-      "codes": "{{count}} 个代码, 同一门课",
-      "integrated": "综合课程: 代码取自 Cineca 目录",
-      "alsoIn": "也在以下专业的学习计划中: {{list}}",
+      "twoCodes": "两个代码，同一门课",
+      "codes": "{{count}} 个代码，同一门课",
+      "integrated": "综合课程：代码取自 Cineca 目录",
+      "alsoIn": "也在以下专业的学习计划中：{{list}}",
       "noMatch": "没有符合搜索的课程。",
       "noCurriculum": "该方向没有课程。"
     },
@@ -189,22 +189,22 @@
     },
     "refusal": {
       "notFound": "未找到",
-      "notFoundBody": "此页面不存在, 或你的账号看不到它。",
+      "notFoundBody": "此页面不存在，或你的账号看不到它。",
       "home": "返回首页",
       "mine": "返回我的课程",
       "forbidden": "缺少权限",
       "cannot": {
-        "assignTeacher": "你能看到这个版本, 但不能指派教师。",
+        "assignTeacher": "你能看到这个版本，但不能指派教师。",
         "assignSecretariat": "只有管理员能指派教学秘书。",
-        "setCurrent": "你能看到这个版本, 但不能把它设为当前版本。"
+        "setCurrent": "你能看到这个版本，但不能把它设为当前版本。"
       }
     },
     "open": "打开",
     "current": "当前",
     "course": {
       "inPlan": "所在学习计划",
-      "twoCodesBoth": "两个代码, 同一门课: 每个版本对两个方向都有效。",
-      "twoCodesAll": "两个代码, 同一门课: 每个版本对所有方向都有效。",
+      "twoCodesBoth": "两个代码，同一门课：每个版本对两个方向都有效。",
+      "twoCodesAll": "两个代码，同一门课：每个版本对所有方向都有效。",
       "sharedBoth": "两个学位专业的秘书处都管理这门课。",
       "sharedAll": "全部 {{count}} 个学位专业的秘书处都管理这门课。",
       "editions": "版本",
@@ -222,14 +222,14 @@
       "title": "我的课程",
       "sub": "你作为教师被指派的版本。",
       "empty": "没有指派的课程。",
-      "note": "一门课程最多有一个当前版本; 更换它需要对两个版本都有权限。"
+      "note": "一门课程最多有一个当前版本；更换它需要对两个版本都有权限。"
     },
     "assign": {
       "teacher": "指派教师",
       "secretariat": "指派秘书",
       "username": "用户名",
       "placeholder": "例如 luca.verdi",
-      "hint": "此人登录用的名字; 账号必须存在。",
+      "hint": "此人登录用的名字；账号必须存在。",
       "submit": "指派",
       "running": "正在指派…",
       "doneTeacher": "已指派教师",
@@ -238,11 +238,11 @@
     "revoke": {
       "action": "撤销",
       "actionLabel": "撤销 {{username}}",
-      "title": "撤销该角色?",
+      "title": "撤销该角色？",
       "teacher": "{{username}} 将不再是 {{course}} {{year}} 版本的教师。",
       "secretariat": "{{username}} 将不再属于 {{programme}} 的教学秘书处。",
       "done": "已撤销角色",
-      "gone": "{{username}} 已不再拥有此角色: 它已在别处被撤销。"
+      "gone": "{{username}} 已不再拥有此角色：它已在别处被撤销。"
     },
     "retry": "重试"
   }
