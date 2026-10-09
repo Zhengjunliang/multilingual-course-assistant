@@ -2,11 +2,12 @@
  * The language menu: a globe and the language in use, opening on the languages
  * the product speaks, each written in itself.
  *
- * It exists twice on screen and must not exist twice in the source. The header
- * writes the choice to the account (`User.locale`); the login frame only tells
- * i18next, because before a session there is nothing to write to. That
- * difference is the `onChange` they each pass — everything a reader sees is the
- * same, and keeping it the same is exactly what two copies would stop doing.
+ * It exists in three frames and must not exist three times in the source. The
+ * signed-in header writes the choice to the account (`User.locale`); the
+ * sign-in pages and the visitor's header remember it on this screen only
+ * (i18n/index.ts), because before a session there is nothing to write to.
+ * That difference is the `onChange` each passes — everything a reader sees is
+ * the same, and keeping it the same is exactly what copies would stop doing.
  *
  * A globe and a menu rather than a row of codes, the way MDN and GitHub Docs
  * offer their languages: a row grows with every language, and `zh-hans` means

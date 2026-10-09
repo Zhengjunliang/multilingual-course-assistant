@@ -5,7 +5,10 @@
  * No sidebar. A visitor has no stored conversation to list and no staff page
  * to open, and the page is the functional minimum: how a visitor's frame
  * should look, and what it should say about what an account adds, is the
- * front-end design's question, `#136`.
+ * front-end design's question, `#136`. The language menu is in the header, as
+ * on the sign-in pages: the interface starts in the browser's language, and a
+ * reader for whom that is the wrong one must be able to change it before
+ * anything else (i18n/index.ts).
  *
  * It hands the chat the same `Shell` the signed-in frame does
  * (routes/shell.ts), with nothing behind the calls a visitor's chat makes:
@@ -19,12 +22,14 @@ import { useTranslation } from "react-i18next";
 import { Link, Outlet } from "react-router-dom";
 
 import { buttonVariants } from "@/components/ui/button";
+import { LocaleSwitch } from "@/components/ui/locale-switch";
+import { chooseUiLocale, UI_LOCALES, type UiLocale } from "@/i18n";
 import { type Shell, ShellContext } from "./shell";
 
 const nothing = () => {};
 
 export default function VisitorLayout() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const homeLabel = t("staff.refusal.home");
 
   const shell = useMemo<Shell>(
@@ -48,6 +53,12 @@ export default function VisitorLayout() {
         {/* The signed-in header's row (features/chat/ChatShell.tsx), with the
             two ways in where the account menu would be. */}
         <header className="flex shrink-0 items-center justify-end gap-snug px-gutter py-snug">
+          <LocaleSwitch
+            locales={UI_LOCALES}
+            value={i18n.language}
+            label={t("account.language")}
+            onChange={(locale: UiLocale) => void chooseUiLocale(locale)}
+          />
           <Link to="/login" className={buttonVariants({ variant: "ghost" })}>
             {t("auth.logIn")}
           </Link>

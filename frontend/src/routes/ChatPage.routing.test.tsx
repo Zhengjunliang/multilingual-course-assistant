@@ -336,6 +336,41 @@ describe("a visitor's addresses", () => {
     expect(rechecked).toBe(1);
   });
 
+  it("offers the language menu, and remembers only the language chosen there", async () => {
+    const { container, unmount } = page("/", null);
+    await settle();
+    const before = localStorage.getItem("mca.locale");
+    const trigger = container.querySelector<HTMLButtonElement>(
+      'header button[aria-haspopup="menu"]',
+    );
+    act(() => {
+      trigger?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, ctrlKey: false }),
+      );
+    });
+    const english = [...document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+      (entry) => entry.getAttribute("lang") === "en",
+    );
+    act(() => english?.click());
+    await settle();
+    const seen = {
+      before,
+      after: localStorage.getItem("mca.locale"),
+      page: document.documentElement.lang,
+      heading: container.querySelector("main h2")?.textContent,
+    };
+    unmount();
+    await act(() => i18n.changeLanguage("it"));
+    localStorage.clear();
+
+    expect(seen).toEqual({
+      before: null,
+      after: "en",
+      page: "en",
+      heading: i18n.t("empty.title", { lng: "en" }),
+    });
+  });
+
   it.each(["/c/7", "/staff", "/staff/programmes"])("sends %s to the login page", async (path) => {
     const { unmount, path: where } = page(path, null);
     await settle();

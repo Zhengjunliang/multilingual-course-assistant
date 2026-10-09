@@ -8,8 +8,10 @@
  * moment of blank.
  *
  * The account's `locale` drives the interface, so this is also where i18next is
- * pointed at a language. `User.locale` is the single source for that; the
- * switch in the header writes to the account and the account writes back here.
+ * pointed at a language once a reader signs in, and where that language is
+ * remembered on this screen (i18n/index.ts). `User.locale` is the single
+ * source for a signed-in reader; the switch in the header writes to the
+ * account and the account writes back here.
  *
  * Signing in, signing up and signing out also empty the visitor's thread
  * (features/chat/visitorThread.ts), here or in another tab (`recheck`). It is
@@ -20,12 +22,11 @@
  */
 
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import type { Account } from "@/api/account";
 import { logIn, logOut, readSession, register, setAccountLocale } from "@/api/account";
 import { clearVisitorThread } from "@/features/chat/visitorThread";
-import type { UiLocale } from "@/i18n";
+import { chooseUiLocale, type UiLocale } from "@/i18n";
 
 interface SessionValue {
   /** `null` means nobody is signed in — an ordinary state, not a failure. */
@@ -51,17 +52,15 @@ interface SessionValue {
 export const SessionContext = createContext<SessionValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const { i18n } = useTranslation();
   const [account, setAccount] = useState<Account | null>(null);
   const [asked, setAsked] = useState(false);
 
-  const adopt = useCallback(
-    (next: Account | null) => {
-      setAccount(next);
-      if (next !== null) void i18n.changeLanguage(next.locale);
-    },
-    [i18n],
-  );
+  const adopt = useCallback((next: Account | null) => {
+    setAccount(next);
+    // The account's language is a choice its reader made, so it is
+    // remembered on this screen too, and outlasts signing out.
+    if (next !== null) void chooseUiLocale(next.locale);
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -112,7 +111,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // Applied locally first: the request is a round trip, and a language
         // switch that lags behind the click reads as a broken button. The
         // account is still the source — this only stops it looking slow.
-        void i18n.changeLanguage(locale);
+        void chooseUiLocale(locale);
         adopt((await setAccountLocale(locale)).user);
       },
       forget,
@@ -128,7 +127,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [account, adopt, forget, i18n],
+    [account, adopt, forget],
   );
 
   const { recheck } = value;
