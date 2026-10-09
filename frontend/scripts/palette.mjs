@@ -35,6 +35,7 @@ export const TEXT = 4.5;
 
 export const PAIRS = [
   { front: "ink", back: "canvas", min: TEXT, where: "index.css body rule" },
+  { front: "canvas", back: "ink", min: TEXT, where: "tooltip.tsx content" },
   {
     front: "ink",
     back: "surface",

@@ -82,8 +82,9 @@
     "title": "Fonti",
     "empty": "Nessun estratto recuperato per questa domanda.",
     "uncited": "recuperata, non citata",
+    "badge": "Fonte {{number}}: {{marker}}",
     "page": "pagina {{page}}",
-    "openPage": "Apri la pagina {{page}} di {{file}} in una nuova scheda",
+    "openPage": "pagina {{page}} di {{file}}, in una nuova scheda",
     "fetched": "recuperata il {{date}}",
     "more": "+{{count}}"
   },

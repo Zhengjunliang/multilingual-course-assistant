@@ -215,7 +215,7 @@ function Highlighting({ of }: { of: Turn }) {
 describe("a badge in the answer", () => {
   it("rings the source of the pill a reader clicks, and keeps focus on the pill", () => {
     const { container, unmount } = mount(<Highlighting of={turn()} />);
-    const pill = container.querySelector<HTMLButtonElement>('button[title="[Excerpt 1]"]');
+    const pill = container.querySelector<HTMLButtonElement>('button[aria-label$="[Excerpt 1]"]');
     if (pill === null) throw new Error("the answer has no badge for [Excerpt 1]");
 
     act(() => {

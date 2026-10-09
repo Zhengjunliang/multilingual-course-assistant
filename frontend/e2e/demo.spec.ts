@@ -44,7 +44,8 @@ test.describe("a signed-in student", () => {
       "href",
       `/api/sources/${SLIDES_CITATION.source_sha256}#page=12`,
     );
-    await expect(pageLink).toHaveAttribute("title", /basi-di-dati-05\.pdf/);
+    // The file is in the name, not only in the hint a touch screen cannot open.
+    await expect(pageLink).toHaveAccessibleName(/^pagina 12 .*basi-di-dati-05\.pdf/);
     await expect(card.getByText("B003 · 2025-2026")).toBeVisible();
   });
 });

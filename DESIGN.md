@@ -78,6 +78,9 @@ components:
   ink-on-canvas:
     backgroundColor: '{colors.canvas}'
     textColor: '{colors.ink}'
+  canvas-on-ink:
+    backgroundColor: '{colors.ink}'
+    textColor: '{colors.canvas}'
   ink-on-surface:
     backgroundColor: '{colors.surface}'
     textColor: '{colors.ink}'
@@ -124,6 +127,9 @@ components:
   ink-on-canvas-dark:
     backgroundColor: '{colors.canvas-dark}'
     textColor: '{colors.ink-dark}'
+  canvas-on-ink-dark:
+    backgroundColor: '{colors.ink-dark}'
+    textColor: '{colors.canvas-dark}'
   ink-on-surface-dark:
     backgroundColor: '{colors.surface-dark}'
     textColor: '{colors.ink-dark}'
@@ -227,6 +233,8 @@ Icons come from Lucide, at `size-icon` beside text and `size-icon-lg` standing a
 ## Components
 
 The primitives live in `frontend/src/components/ui/`, in the shadcn manner (Radix underneath, variants through `cva`), each exported from one file; `/styleguide` shows every one of them in both themes side by side, and its test fails on a primitive it does not show. Screens compose primitives and do not restyle them. A link that looks like a button uses `buttonVariants`.
+
+A hint is a `Tooltip`, the inverse of the page (canvas lettering on ink), opened by a resting pointer or by keyboard focus and closed by Escape; the browser's `title` attribute is never one. A touch screen cannot open a hint, so a hint only repeats what the visible text or the accessible name says: a citation badge's name carries its marker, a page link's name its file, and a marker too long for its card wraps rather than being cut.
 
 Fumetto is drawn by `components/Mascot.tsx` from the one drawing in `frontend/src/brand/fumetto.ts`, always decorative (`aria-hidden`), in the accent's line:
 

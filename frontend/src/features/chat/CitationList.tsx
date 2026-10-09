@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { Citation } from "@/api/contract";
 import { sourceHref } from "@/api/sources";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { Badge } from "@/lib/markers";
 import { cn, scrollBehavior } from "@/lib/utils";
 
@@ -112,7 +113,10 @@ export function CitationList({
                           {number}
                         </button>
                       )}
-                      <span className="truncate font-mono text-caption" title={citation.marker}>
+                      {/* Whole, wrapped across lines: a marker cut short
+                          would leave the rest only in a hint, which a touch
+                          screen cannot open. */}
+                      <span className="min-w-0 font-mono text-caption wrap-anywhere">
                         {citation.marker}
                       </span>
                     </CardTitle>
@@ -122,19 +126,23 @@ export function CitationList({
                       ) : citation.kind === "slides" && citation.source_sha256 != null ? (
                         // The page a slides excerpt came from, in the browser's
                         // own viewer. A card stored before the key existed has
-                        // nothing to open and keeps the plain label.
-                        <a
-                          href={sourceHref(citation.source_sha256, citation.page)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={t("citations.openPage", {
-                            page: citation.page,
-                            file: citation.source_file,
-                          })}
-                          className="underline decoration-muted underline-offset-2 hover:text-ink hover:decoration-ink"
-                        >
-                          {t("citations.page", { page: citation.page })}
-                        </a>
+                        // nothing to open and keeps the plain label. Its name
+                        // starts with the words it shows and carries the file,
+                        // which the hint shows to the eye.
+                        <Tooltip content={citation.source_file}>
+                          <a
+                            href={sourceHref(citation.source_sha256, citation.page)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={t("citations.openPage", {
+                              page: citation.page,
+                              file: citation.source_file,
+                            })}
+                            className="underline decoration-muted underline-offset-2 hover:text-ink hover:decoration-ink"
+                          >
+                            {t("citations.page", { page: citation.page })}
+                          </a>
+                        </Tooltip>
                       ) : (
                         t("citations.page", { page: citation.page })
                       )}

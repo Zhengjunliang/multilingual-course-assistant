@@ -202,6 +202,41 @@ describe("the source strip", () => {
     },
   );
 
+  it("names the page link by the words it shows, and by its file", () => {
+    // The name starts with what a speech user reads off the screen (WCAG
+    // 2.5.3), and carries the file the hint shows to the eye, since a touch
+    // screen cannot open the hint.
+    const { container, unmount } = mounted(CITATIONS, null);
+    const link = container.querySelector('a[href^="/api/sources/"]');
+    const seen = {
+      shown: link?.textContent,
+      name: link?.getAttribute("aria-label"),
+      title: link?.hasAttribute("title"),
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      shown: "pagina 3",
+      name: "pagina 3 di deck.pdf, in una nuova scheda",
+      title: false,
+    });
+  });
+
+  it("shows a long marker whole, wrapped across lines rather than cut", () => {
+    const marker =
+      "[https://www.unifi.it/didattica/calendario-esami-sessione-invernale.html · 2026-09-20]";
+    const { container, unmount } = mounted([citation(marker, 1)], null);
+    const span = [...container.querySelectorAll("span")].find((s) => s.textContent === marker);
+    const seen = {
+      wraps: span?.classList.contains("wrap-anywhere"),
+      cut: span?.classList.contains("truncate"),
+      title: span?.hasAttribute("title"),
+    };
+    unmount();
+
+    expect(seen).toEqual({ wraps: true, cut: false, title: false });
+  });
+
   it("keeps the excerpt short until there is width for it", () => {
     // The card moved above the answer in this stage. Five lines of excerpt at
     // 390px would put the first line of the answer below the fold.
