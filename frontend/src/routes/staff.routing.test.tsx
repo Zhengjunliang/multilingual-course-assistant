@@ -973,8 +973,10 @@ describe("deleting while an answer is written", () => {
     const { container, unmount } = page("/");
     await settle();
     await askFromTheFrontDoor(container);
-    // The next list is read by the server before the delete lands, and its
-    // reply comes in after the list asked for after it.
+    // The next list's reply carries the deleted conversation, as one the
+    // server read before the delete landed would, and comes in after the
+    // reply to the list asked for after it: whichever request it answers,
+    // the list asked for last is the one kept.
     let answer = () => {};
     lateList = {
       body: [...conversations],

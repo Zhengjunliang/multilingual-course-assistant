@@ -104,7 +104,10 @@ export default function ShellLayout() {
   // the way to `/`), as the confirmation told the reader
   // (ConversationSidebar.tsx): once the delete has gone through, and not
   // before, since a delete the server refuses leaves the conversation open
-  // and its answer still arriving. Any other conversation leaves it be.
+  // and its answer still arriving. The one exception is a conversation being
+  // left: for the moment the next one takes to load, the answer runs on, and
+  // the next one's arrival stops it (ChatPage.tsx, `adopt`). Any other
+  // conversation leaves the answer be.
   const onDelete = useCallback(
     async (id: number) => {
       try {
