@@ -7,7 +7,8 @@
  * still needs eyes; this only guarantees that every string has a slot in every
  * language, and that a Chinese string writes the full-width comma, colon,
  * semicolon, question and exclamation marks rather than the Latin ones, which
- * the Chinese face draws narrow.
+ * Figtree draws narrow: the Chinese stack hands it U+0000-00FF. An
+ * interpolation, a nested key and a time such as 8:30 keep their Latin marks.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -22,6 +23,8 @@ const CATALOGUE_DIR = fileURLToPath(new URL("../src/i18n", import.meta.url));
 const CHINESE_CATALOGUE = "zh-hans.json";
 const HAN = /\p{Script=Han}/u;
 const LATIN_MARK = /[,:;?!]/;
+/** i18next's `{{value, format}}` and `$t(key, options)`, and a time. */
+const NOT_PROSE = /\{\{[^}]*\}\}|\$t\([^)]*\)|\d:\d/g;
 
 /** Each leaf of a catalogue as [key, value]. */
 function entries(value, prefix = "") {
@@ -56,8 +59,13 @@ for (const [name, keys] of keysByFile) {
   }
 }
 
+if (!entriesByFile.has(CHINESE_CATALOGUE)) {
+  failed = true;
+  console.error(`no ${CHINESE_CATALOGUE} in src/i18n: its punctuation went unchecked`);
+}
 const latinMarks = (entriesByFile.get(CHINESE_CATALOGUE) ?? []).filter(
-  ([, value]) => typeof value === "string" && HAN.test(value) && LATIN_MARK.test(value),
+  ([, value]) =>
+    typeof value === "string" && HAN.test(value) && LATIN_MARK.test(value.replace(NOT_PROSE, "")),
 );
 if (latinMarks.length > 0) {
   failed = true;
@@ -69,5 +77,5 @@ if (latinMarks.length > 0) {
 
 if (failed) process.exit(1);
 console.log(
-  `${files.length} catalogues, ${everyKey.size} keys, all present; Chinese strings take Chinese punctuation.`,
+  `${files.length} catalogues, ${everyKey.size} keys, all present; no Latin , : ; ? ! in a Chinese string.`,
 );
