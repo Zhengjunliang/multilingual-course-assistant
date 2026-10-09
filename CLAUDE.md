@@ -50,6 +50,7 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 | vitest test titles (string literals) | English | `review` |
 | Markdown prose | English | `language` |
 | Every tracked file | no known misspelling | `typos` |
+| Frontend sources (TypeScript, CSS, JSON) | Biome's rules and format, and no JSX `title` attribute (`DESIGN.md`) | `biome` |
 | Status markers, temporal wording, links between files | the conventions below | `doc-conventions` |
 | Links, document paths, decision references, paths a status marker cites | they resolve | `doc-references` |
 | Commit messages | English Conventional Commits, no AI signature | `commit-msg`, `commit-history` |
