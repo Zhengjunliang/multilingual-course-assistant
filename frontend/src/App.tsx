@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import type { RouteObject } from "react-router-dom";
 
 import { RequireSession } from "@/auth/RequireSession";
 import { RequireStaff } from "@/auth/RequireStaff";
@@ -18,13 +18,22 @@ import StyleguidePage from "@/routes/StyleguidePage";
 import VisitorLayout from "@/routes/VisitorLayout";
 
 /**
+ * The route tree, as data. `main.tsx` builds the browser's router from it and
+ * the routing tests build a memory router from the same array, so what a test
+ * walks is what a reader walks.
+ *
  * Five routes, the staff pages, and a page for every other address; two of the
  * five are the same page.
  *
  * `/` and `/c/:conversationId` both render the chat because a new conversation
  * and a stored one differ only in whether the thread starts empty — the page
  * itself, the composer and the sidebar are one thing, and splitting them would
- * be two components to keep identical.
+ * be two components to keep identical. A reader's first question moves from
+ * one to the other while its answer is still being written, and React keeps
+ * the page mounted across that move only because the two routes are siblings
+ * of the same shape: neither may gain a parent, a wrapper or an
+ * `errorElement` the other lacks (ChatPage.routing.test.tsx fails if the page
+ * is rebuilt).
  *
  * `/styleguide` sits outside `RequireSession` with the two public routes: it
  * renders the component layer against no data at all, so a session would gate
@@ -34,44 +43,42 @@ import VisitorLayout from "@/routes/VisitorLayout";
  * the staff pages share its sidebar, whose "Gestione" group opens the staff
  * pages. A reader without an account gets `/` alone, in `VisitorLayout`, and
  * the login page for every other address; one guard decides both, so `/` and
- * `/c/:conversationId` stay one route tree and a signed-in reader's first
- * question moves between them without the page being rebuilt mid-answer. `/staff/*` is open to an account holding a role or the superuser
- * (`RequireStaff`); `/staff` lands on the account's first Gestione item, and
- * the pages are objects — programmes, courses, editions — not roles.
+ * `/c/:conversationId` stay one route tree. `/staff/*` is open to an account
+ * holding a role or the superuser (`RequireStaff`); `/staff` lands on the
+ * account's first Gestione item, and the pages are objects — programmes,
+ * courses, editions — not roles.
  */
-export default function App() {
-  return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/styleguide" element={<StyleguidePage />} />
-      <Route
-        element={
-          <RequireSession visitor={<VisitorLayout />}>
-            <ShellLayout />
-          </RequireSession>
-        }
-      >
-        <Route path="/" element={<ChatPage />} />
-        <Route path="/c/:conversationId" element={<ChatPage />} />
-        <Route
-          path="/staff"
-          element={
-            <RequireStaff>
-              <StaffLayout />
-            </RequireStaff>
-          }
-        >
-          <Route index element={<StaffLanding />} />
-          <Route path="programmes" element={<ProgrammesPage />} />
-          <Route path="programmes/:code" element={<ProgrammePage />} />
-          <Route path="courses/:code" element={<CoursePage />} />
-          <Route path="editions/:id" element={<EditionPage />} />
-          <Route path="mine" element={<MinePage />} />
-          <Route path="*" element={<StaffNotFound />} />
-        </Route>
-      </Route>
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
-  );
-}
+export const routes: RouteObject[] = [
+  { path: "/login", element: <LoginPage /> },
+  { path: "/register", element: <RegisterPage /> },
+  { path: "/styleguide", element: <StyleguidePage /> },
+  {
+    element: (
+      <RequireSession visitor={<VisitorLayout />}>
+        <ShellLayout />
+      </RequireSession>
+    ),
+    children: [
+      { path: "/", element: <ChatPage /> },
+      { path: "/c/:conversationId", element: <ChatPage /> },
+      {
+        path: "/staff",
+        element: (
+          <RequireStaff>
+            <StaffLayout />
+          </RequireStaff>
+        ),
+        children: [
+          { index: true, element: <StaffLanding /> },
+          { path: "programmes", element: <ProgrammesPage /> },
+          { path: "programmes/:code", element: <ProgrammePage /> },
+          { path: "courses/:code", element: <CoursePage /> },
+          { path: "editions/:id", element: <EditionPage /> },
+          { path: "mine", element: <MinePage /> },
+          { path: "*", element: <StaffNotFound /> },
+        ],
+      },
+    ],
+  },
+  { path: "*", element: <NotFoundPage /> },
+];

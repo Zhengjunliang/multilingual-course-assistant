@@ -5,17 +5,17 @@
  *
  * The URL is the page's state (ChatPage.tsx says why), and the bugs worth
  * catching live between two effects that both read it in the same commit — no
- * test of one component in isolation sees them. So this mounts `App` behind a
- * memory router and fakes the network at `fetch`, the HTTP boundary, with a
+ * test of one component in isolation sees them. So this mounts the app's routes
+ * in a memory router and fakes the network at `fetch`, the HTTP boundary, with a
  * small in-memory server. The assertions are about what a reader sees: the
  * path, and which conversations the sidebar lists.
  */
 
 import { act, type ReactNode, useState } from "react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import App from "@/App";
+import { routes } from "@/App";
 import type { Account } from "@/api/account";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
@@ -108,10 +108,6 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   return json({ detail: "Not found." }, 404);
 }
 
-function Pathname() {
-  return <output>{useLocation().pathname}</output>;
-}
-
 const STUDENT: Account = {
   id: 1,
   username: "junliang",
@@ -120,8 +116,14 @@ const STUDENT: Account = {
   roles: [],
 };
 
-function page(path: string, account: Account | null = STUDENT): Mounted {
-  return mount(
+interface Page extends Mounted {
+  /** Where the router is, as the address bar shows it. */
+  path: () => string;
+}
+
+function page(path: string, account: Account | null = STUDENT): Page {
+  const router = createMemoryRouter(routes, { initialEntries: [path] });
+  const mounted = mount(
     <ThemeProvider>
       <SessionContext
         value={{
@@ -136,13 +138,11 @@ function page(path: string, account: Account | null = STUDENT): Mounted {
           },
         }}
       >
-        <MemoryRouter initialEntries={[path]}>
-          <App />
-          <Pathname />
-        </MemoryRouter>
+        <RouterProvider router={router} />
       </SessionContext>
     </ThemeProvider>,
   );
+  return { ...mounted, path: () => router.state.location.pathname };
 }
 
 /** Lets every pending fetch, body read and state update land. */
@@ -152,10 +152,6 @@ async function settle() {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
   }
-}
-
-function pathname(container: HTMLElement) {
-  return container.querySelector("output")?.textContent;
 }
 
 function openNewConversation(container: HTMLElement) {
@@ -219,6 +215,8 @@ describe("the chat page's address", () => {
     gone?: string;
     /** A sidebar row that must still be there afterwards. */
     kept?: string;
+    /** A request the step must not cause. */
+    unrequested?: string;
   }
 
   it.each<Case>([
@@ -230,7 +228,15 @@ describe("the chat page's address", () => {
       lands: "/",
       early: true,
     },
-    { name: "asking on / moves to /c/9", from: "/", step: askFromTheFrontDoor, lands: "/c/9" },
+    {
+      name: "asking on / moves to /c/9",
+      from: "/",
+      step: askFromTheFrontDoor,
+      lands: "/c/9",
+      // A page rebuilt by the move would read the conversation it is still
+      // writing, and drop the answer on screen for what the server has so far.
+      unrequested: "GET /api/conversations/9",
+    },
     {
       name: "deleting the open conversation",
       from: "/c/7",
@@ -262,24 +268,27 @@ describe("the chat page's address", () => {
       gone: "/c/7",
     },
   ])("$name lands on $lands, and stays there", async (scenario) => {
-    const { from, step, lands, early, failing, deletedElsewhere, gone, kept } = scenario;
+    const { from, step, lands, early, failing, deletedElsewhere, gone, kept, unrequested } =
+      scenario;
     deleteFails = failing === true;
-    const { container, unmount } = page(from);
+    const { container, unmount, path } = page(from);
     if (!early) await settle();
     if (deletedElsewhere !== undefined) {
       conversations = conversations.filter((listed) => listed.id !== deletedElsewhere);
     }
 
+    const before = requested.length;
     step(container);
     await settle();
-    const landed = pathname(container);
+    const landed = path();
     // A second round: a bounce is an effect reacting to the first landing.
     await settle();
-    const stayed = pathname(container);
+    const stayed = path();
     const row = (href: string) => container.querySelector(`aside a[href="${href}"]`);
     const goneRow = gone === undefined ? null : row(gone);
     const keptRow = kept === undefined ? undefined : row(kept);
     const saidFailed = document.body.textContent?.includes(i18n.t("sidebar.deleteFailed"));
+    const unwanted = unrequested !== undefined && requested.slice(before).includes(unrequested);
     unmount();
 
     expect(landed).toBe(lands);
@@ -291,6 +300,7 @@ describe("the chat page's address", () => {
     // A refused delete says so, which a missed click would not; nothing else
     // ever does.
     expect(saidFailed).toBe(failing === true);
+    expect(unwanted).toBe(false);
   });
 });
 
@@ -308,11 +318,11 @@ describe("a visitor's addresses", () => {
   });
 
   it("is the chat on /, with no list of conversations and the ways to an account", async () => {
-    const { container, unmount } = page("/", null);
+    const { container, unmount, path } = page("/", null);
     await settle();
     askFromTheFrontDoor(container);
     await settle();
-    const landed = pathname(container);
+    const landed = path();
     const sidebar = container.querySelector("aside");
     const links = [...container.querySelectorAll("header a")].map((a) => a.getAttribute("href"));
     unmount();
@@ -327,9 +337,9 @@ describe("a visitor's addresses", () => {
   });
 
   it.each(["/c/7", "/staff", "/staff/programmes"])("sends %s to the login page", async (path) => {
-    const { container, unmount } = page(path, null);
+    const { unmount, path: where } = page(path, null);
     await settle();
-    const landed = pathname(container);
+    const landed = where();
     unmount();
 
     expect(landed).toBe("/login");
@@ -370,9 +380,7 @@ describe("another account signed in under the page", () => {
     const { unmount } = mount(
       <ThemeProvider>
         <SwitchingSession>
-          <MemoryRouter initialEntries={["/"]}>
-            <App />
-          </MemoryRouter>
+          <RouterProvider router={createMemoryRouter(routes)} />
         </SwitchingSession>
       </ThemeProvider>,
     );

@@ -3,8 +3,8 @@
 /**
  * The staff pages inside the chat shell, asked of the whole application.
  *
- * As in ChatPage.routing.test.tsx, `App` is mounted behind a memory router
- * with the network faked at `fetch`. The assertions are what a reader of each
+ * As in ChatPage.routing.test.tsx, the app's routes are mounted in a memory
+ * router with the network faked at `fetch`. The assertions are what a reader of each
  * kind sees: the sidebar's groups and their order, where `/staff` lands, the
  * pages' headings and copy, and the breadcrumb; and what the shell keeps
  * across pages — the conversations it does not fetch again, the drawer a
@@ -12,10 +12,10 @@
  */
 
 import { act, type ReactNode, useState } from "react";
-import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import App from "@/App";
+import { routes } from "@/App";
 import type { Account } from "@/api/account";
 import type { Course, Edition, Programme, StudyPlanCourse } from "@/api/catalog";
 import type { ConversationSummary } from "@/api/conversations";
@@ -161,6 +161,8 @@ const revoked = new Set<string>();
 let failures = 0;
 /** Whether a switch by the reader would pass, as `can_set_current` says per edition. */
 let switchable = true;
+/** Holds every read of one edition until it settles, as a slow server would. */
+let held: Promise<void> | null = null;
 
 /** An edition as the server would answer it now. */
 function served(e: Edition): Edition {
@@ -232,6 +234,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   }
   const one = EDITIONS.find((e) => path === `/api/catalog/editions/${e.id}`);
   if (one !== undefined) {
+    await held;
     // Secretariat staff may assign a teacher; the teacher may not.
     const assigns = scope.length > 0 ? ["edition.assign_teacher"] : [];
     return json({ ...served(one), permissions: [...assigns, ...one.permissions] });
@@ -246,15 +249,6 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return json({ ...programme, secretariat });
   }
   return json({ detail: { message: "Not found.", code: "not_found" } }, 404);
-}
-
-/** Moves the router as the history would, without a link on the page. */
-let go: (path: string) => void = () => {};
-
-function Pathname() {
-  go = useNavigate();
-  const { pathname, search } = useLocation();
-  return <output data-search={search}>{pathname}</output>;
 }
 
 /** The session, which a visitor's sign-in fills with `signsInAs`. */
@@ -277,17 +271,27 @@ function Session({ children }: { children: ReactNode }) {
   );
 }
 
-function page(path: string): Mounted {
-  return mount(
+interface Page extends Mounted {
+  /** Where the router is, as the address bar shows it: the path and its query. */
+  path: () => string;
+  /** Moves the router as the history would, without a link on the page. */
+  go: (to: string) => Promise<void>;
+}
+
+function page(path: string): Page {
+  const router = createMemoryRouter(routes, { initialEntries: [path] });
+  const mounted = mount(
     <ThemeProvider>
       <Session>
-        <MemoryRouter initialEntries={[path]}>
-          <App />
-          <Pathname />
-        </MemoryRouter>
+        <RouterProvider router={router} />
       </Session>
     </ThemeProvider>,
   );
+  return {
+    ...mounted,
+    path: () => `${router.state.location.pathname}${router.state.location.search}`,
+    go: (to) => router.navigate(to),
+  };
 }
 
 async function settle() {
@@ -331,6 +335,7 @@ beforeEach(() => {
   revoked.clear();
   failures = 0;
   switchable = true;
+  held = null;
   vi.stubGlobal("fetch", fakeApi);
 });
 
@@ -367,11 +372,11 @@ describe("the Gestione group and /staff", () => {
     ],
   ])("for %s", async (_, who, items, lands) => {
     reader = who;
-    const { container, unmount } = page("/staff");
+    const { container, unmount, path } = page("/staff");
     await settle();
     const seen = {
       items: gestione(container),
-      lands: text(container.querySelector("output")),
+      lands: path(),
       // The heading over the conversations is there only when Gestione is.
       heading: text(container.querySelector('nav[aria-label="Le tue conversazioni"] p')),
       programmesAsked: asked.includes("GET /api/catalog/programmes"),
@@ -414,15 +419,14 @@ describe("signing in", () => {
   ])("from %s", async (_, start, lands) => {
     reader = null;
     signsInAs = SECRETARIAT;
-    const { container, unmount } = page(start);
+    const { container, unmount, path } = page(start);
     await settle();
-    const output = () => container.querySelector("output");
-    const asked = text(output());
+    const asked = path();
     act(() => {
       container.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true }));
     });
     await settle();
-    const landed = `${text(output())}${output()?.dataset.search ?? ""}`;
+    const landed = path();
     unmount();
 
     expect([asked, landed]).toEqual(["/login", lands]);
@@ -572,10 +576,10 @@ describe("a course, an edition, and a teacher's own courses", () => {
 
   it("lists a teacher's own courses, newest year first", async () => {
     reader = TEACHER;
-    const { container, unmount } = page("/staff");
+    const { container, unmount, path } = page("/staff");
     await settle();
     const seen = {
-      path: text(container.querySelector("output")),
+      path: path(),
       cards: [...container.querySelectorAll("main h2")].map(text),
       rows: [...container.querySelectorAll("main li")].map((li) => [
         li.querySelector("a")?.getAttribute("href"),
@@ -664,11 +668,16 @@ describe("a course, an edition, and a teacher's own courses", () => {
 
   it("shows nothing of one edition while the next is read", async () => {
     reader = SECRETARIAT;
-    const { container, unmount } = page("/staff/editions/5?programme=B047");
+    const { container, unmount, go } = page("/staff/editions/5?programme=B047");
     await settle();
     const before = crumbs(container).at(-1);
-    act(() => go("/staff/editions/4?programme=B047"));
+    let answer = () => {};
+    held = new Promise((resolve) => {
+      answer = resolve;
+    });
+    await act(() => go("/staff/editions/4?programme=B047"));
     const during = [text(container.querySelector("main h1")), crumbs(container).at(-1)];
+    answer();
     await settle();
     const after = crumbs(container).at(-1);
     unmount();
@@ -820,14 +829,14 @@ describe("a write from a page", () => {
 describe("the shell across pages", () => {
   it("does not fetch the conversations again between the chat and a staff page", async () => {
     reader = SECRETARIAT;
-    const { container, unmount } = page("/");
+    const { container, unmount, path } = page("/");
     await settle();
     click(container.querySelector<HTMLAnchorElement>('aside nav[aria-label="Gestione"] a'));
     await settle();
-    const onStaff = text(container.querySelector("output"));
+    const onStaff = path();
     click(container.querySelector<HTMLAnchorElement>('aside a[href="/"]'));
     await settle();
-    const back = text(container.querySelector("output"));
+    const back = path();
     unmount();
 
     expect([onStaff, back]).toEqual(["/staff/programmes/B047", "/"]);
@@ -836,17 +845,13 @@ describe("the shell across pages", () => {
 
   it("closes the narrow-screen drawer when a Gestione link is followed", async () => {
     reader = SECRETARIAT;
-    const { container, unmount } = page("/");
+    const { container, unmount, path } = page("/");
     await settle();
     click(container.querySelector<HTMLButtonElement>('button[aria-label="Apri le conversazioni"]'));
     const drawer = document.body.querySelector('[role="dialog"]');
     click(drawer?.querySelector<HTMLAnchorElement>('nav[aria-label="Gestione"] a'));
     await settle();
-    const seen = [
-      Boolean(drawer),
-      document.body.querySelector('[role="dialog"]'),
-      text(container.querySelector("output")),
-    ];
+    const seen = [Boolean(drawer), document.body.querySelector('[role="dialog"]'), path()];
     unmount();
 
     expect(seen).toEqual([true, null, "/staff/programmes/B047"]);

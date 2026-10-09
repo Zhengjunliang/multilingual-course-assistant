@@ -4,22 +4,18 @@
  * assertion that matters is that it no longer does.
  *
  * No session: the page sits outside `RequireSession`, so a string render of
- * `App` reaches it with no provider, and would fail loudly if it ever moved
+ * the routes reaches it with no provider, and would fail loudly if it ever moved
  * behind the gate.
  */
 
-import { MemoryRouter } from "react-router-dom";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
-import App from "@/App";
+import { routes } from "@/App";
 import { render } from "@/test/render";
 
 function at(path: string): string {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-    </MemoryRouter>,
-  );
+  return render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />);
 }
 
 describe("an address the application does not have", () => {
