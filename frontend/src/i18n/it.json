@@ -1,7 +1,8 @@
 {
   "app": {
     "title": "Assistente del corso",
-    "subtitle": "Chiedi del materiale del corso o delle informazioni di ateneo."
+    "subtitle": "Chiedi del materiale del corso o delle informazioni di ateneo.",
+    "notifications": "Notifiche"
   },
   "auth": {
     "logInTitle": "Accedi per chiedere dei tuoi corsi",

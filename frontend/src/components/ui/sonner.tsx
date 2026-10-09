@@ -14,20 +14,26 @@
  * Sonner keeps its toasts in one store for the whole page and shows those
  * still open to the next Toaster that mounts, so this one dismisses them as it
  * goes: a toast shown just before signing out would greet the next sign-in.
+ *
+ * The live region is named in the interface's language; Sonner's own name is
+ * English, and it appends the shortcut that reaches the region.
  */
 
 import { type CSSProperties, useContext, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Toaster as Sonner, toast } from "sonner";
 
 import { ThemeContext } from "@/theme/ThemeProvider";
 
 export function Toaster() {
+  const { t } = useTranslation();
   const theme = useContext(ThemeContext);
   useEffect(() => () => void toast.dismiss(), []);
   return (
     <Sonner
       theme={theme?.resolved ?? "system"}
       position="bottom-right"
+      containerAriaLabel={t("app.notifications")}
       style={
         {
           "--normal-bg": "var(--surface)",
