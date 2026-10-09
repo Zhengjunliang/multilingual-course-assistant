@@ -1,16 +1,18 @@
 /**
  * The rule against `title` attributes (biome-plugins/no-title-attribute.grit)
- * is switched on, still finds both spellings, and still yields to a
- * suppression.
+ * is switched on, finds every spelling of the attribute and nothing else
+ * named `title`, and yields to a suppression.
  *
- * Biome's own engine matches a GritQL pattern, and a Biome release that
- * changed how a snippet matches would switch the rule off without a word:
- * every file would simply pass. So a fixture goes through the same Biome and
- * the same pattern file, and exactly its two unsuppressed attributes must be
- * reported. It is linted in a directory of its own, with every other rule off,
- * because inside `frontend/` it would have to be a file the linted paths
- * leave out, and Biome skips such a file even when it is named; and lint on
- * stdin reports no diagnostics, only that there are some.
+ * Biome's own engine matches a GritQL pattern. A Biome release that changed
+ * how it matches could switch the rule off without a word, every file simply
+ * passing, or widen it until it refused ordinary code at commit time. So a
+ * fixture goes through the same Biome and the same pattern file, and exactly
+ * its three unsuppressed attributes must be reported: not the variable, the
+ * assignment or the default named `title` beside them. It is linted in a
+ * directory of its own, with every other rule off, because inside `frontend/`
+ * it would have to be a file the linted paths leave out, and Biome skips such
+ * a file even when it is named; and lint on stdin reports no diagnostics,
+ * only that there are some.
  */
 
 import { spawnSync } from "node:child_process";
@@ -24,11 +26,19 @@ const PLUGIN = "./biome-plugins/no-title-attribute.grit";
 const FRONTEND = fileURLToPath(new URL("../..", import.meta.url));
 const BIOME = join(FRONTEND, "node_modules/@biomejs/biome/bin/biome");
 
-const FIXTURE = `export function Fixture() {
+const FIXTURE = `export function Fixture(note: (title?: string) => void) {
+  let title = "a variable";
+  title = "an assignment";
+  function headed(title = "a default") {
+    return title;
+  }
+  note(title);
+  headed();
   return (
     <>
       <span title={"an expression"}>a</span>
       <abbr title="a literal">b</abbr>
+      <abbr title>c</abbr>
       {/* biome-ignore lint/plugin: an iframe is named by its title */}
       <iframe title="suppressed" src="about:blank" />
       <Dialog heading="a component's own prop" />
@@ -46,7 +56,7 @@ describe("the rule against title attributes", () => {
     expect(config.plugins).toContain(PLUGIN);
   });
 
-  it("reports both spellings, and nothing a suppression or another name covers", () => {
+  it("reports every spelling of the attribute, and no variable, suppression or prop", () => {
     const dir = mkdtempSync(join(tmpdir(), "no-title-"));
     try {
       writeFileSync(
@@ -67,7 +77,7 @@ describe("the rule against title attributes", () => {
         Number(match[1]),
       );
 
-      expect(lines).toEqual([4, 5]);
+      expect(lines).toEqual([11, 12, 13]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

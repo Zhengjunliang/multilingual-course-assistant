@@ -5,10 +5,14 @@
 // from a component, so a component's own prop is named `heading`, never
 // `title`; an element that truly needs the attribute, such as an iframe's
 // accessible name, carries `biome-ignore lint/plugin: <why>`.
-// src/test/no-title-attribute.test.ts holds this pattern to both spellings.
+// The JSX attribute node itself, not a `title=` snippet: a snippet also
+// matches `let title = "…"`, an assignment or a parameter's default.
+// src/test/no-title-attribute.test.ts holds this pattern to every spelling of
+// the attribute and to none of those.
 language js
 
-or { `title={$value}`, `title="$value"` } as $attribute where {
+JsxAttribute(name = $name) as $attribute where {
+  $name <: `title`,
   register_diagnostic(
     span=$attribute,
     message="No title attribute: a hint is a Tooltip, and what it says belongs in the visible text or the accessible name too.",
