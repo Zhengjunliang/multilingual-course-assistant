@@ -98,8 +98,10 @@ export class Api {
    * `GET path` answers `body`. The type argument is what the client's function
    * for that endpoint returns (`src/api/*.ts`), so which endpoint answers which
    * shape is written once, here, and a fixture of the wrong shape fails `tsc`.
+   * It cannot be left out: `T` is never inferred from `body`, and defaults to
+   * `never`, which no fixture is.
    */
-  private json<T>(path: string, body: T): void {
+  private json<T = never>(path: string, body: NoInfer<T>): void {
     this.on("GET", path, () => ({ json: body }));
   }
 

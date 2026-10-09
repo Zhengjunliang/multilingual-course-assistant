@@ -15,32 +15,38 @@ import { CONVERSATION, COURSE, PROGRAMME, STAFF, STUDENT } from "./fixtures";
 export interface Screen {
   path: string;
   as: "visitor" | "student" | "staff";
-  /** A heading only this screen, fully drawn, shows. */
-  heading: string;
+  /** An element only this screen, fully drawn, shows, by its role and its exact name. */
+  mark: { role: "heading" | "button"; name: string };
 }
 
+const heading = (name: string) => ({ role: "heading", name }) as const;
+
 export const SCREENS: Screen[] = [
-  { path: "/login", as: "visitor", heading: it.app.title },
-  { path: "/register", as: "visitor", heading: it.app.title },
-  { path: "/styleguide", as: "visitor", heading: "Component catalogue" },
-  { path: "/", as: "visitor", heading: it.empty.title },
-  { path: "/", as: "student", heading: it.empty.title },
-  { path: `/c/${CONVERSATION.id}`, as: "student", heading: it.citations.title },
-  { path: "/staff/programmes", as: "staff", heading: it.staff.programmes.title },
-  { path: `/staff/programmes/${PROGRAMME.code}`, as: "staff", heading: PROGRAMME.name },
-  { path: `/staff/courses/${COURSE.code}`, as: "staff", heading: COURSE.name },
-  { path: "/staff/editions/11", as: "staff", heading: COURSE.name },
-  { path: "/staff/mine", as: "staff", heading: it.staff.mine.title },
-  { path: "/staff/nowhere", as: "staff", heading: it.staff.refusal.notFound },
-  { path: "/nowhere", as: "visitor", heading: it.notFound.title },
+  // The two forms share their page heading; their buttons tell them apart.
+  { path: "/login", as: "visitor", mark: { role: "button", name: it.auth.logIn } },
+  { path: "/register", as: "visitor", mark: { role: "button", name: it.auth.register } },
+  { path: "/styleguide", as: "visitor", mark: heading("Component catalogue") },
+  { path: "/", as: "visitor", mark: heading(it.empty.title) },
+  { path: "/", as: "student", mark: heading(it.empty.title) },
+  { path: `/c/${CONVERSATION.id}`, as: "student", mark: heading(it.citations.title) },
+  { path: "/staff/programmes", as: "staff", mark: heading(it.staff.programmes.title) },
+  { path: `/staff/programmes/${PROGRAMME.code}`, as: "staff", mark: heading(PROGRAMME.name) },
+  // A course and its edition share the course's name as their title.
+  { path: `/staff/courses/${COURSE.code}`, as: "staff", mark: heading(it.staff.course.editions) },
+  { path: "/staff/editions/11", as: "staff", mark: heading(it.staff.edition.teachers) },
+  { path: "/staff/mine", as: "staff", mark: heading(it.staff.mine.title) },
+  { path: "/staff/nowhere", as: "staff", mark: heading(it.staff.refusal.notFound) },
+  { path: "/nowhere", as: "visitor", mark: heading(it.notFound.title) },
 ];
 
 /**
  * Opens `screen` and waits until it is the screen named, drawn and settled.
  *
- * The address and the heading are checked rather than trusted: a guard that
- * sent the reader elsewhere, or a page stuck loading, would otherwise have the
- * floors judge some other screen and pass.
+ * The mark and the address are checked rather than trusted: a guard that sent
+ * the reader elsewhere, or a page stuck loading, would otherwise have the floors
+ * judge some other screen and pass. The address is read last, once the network
+ * is quiet: every redirect waits for `/api/auth/me`, so read straight after
+ * `goto` it would still be the one asked for.
  */
 export async function visit(page: Page, api: Api, screen: Screen): Promise<void> {
   if (screen.as === "student") {
@@ -51,8 +57,9 @@ export async function visit(page: Page, api: Api, screen: Screen): Promise<void>
     api.catalog();
   }
   await page.goto(screen.path);
-  await expect.poll(() => new URL(page.url()).pathname).toBe(screen.path);
-  await expect(page.getByRole("heading", { name: screen.heading }).first()).toBeVisible();
+  const { role, name } = screen.mark;
+  await expect(page.getByRole(role, { name, exact: true }).first()).toBeVisible();
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await page.waitForLoadState("networkidle");
+  expect(new URL(page.url()).pathname, "where the screen ended up").toBe(screen.path);
 }
