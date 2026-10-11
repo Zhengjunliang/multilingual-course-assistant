@@ -47,8 +47,13 @@ export const SCREENS: Screen[] = [
  * judge some other screen and pass. The address is read last, once the network
  * is quiet: every redirect waits for `/api/auth/me`, so read straight after
  * `goto` it would still be the one asked for.
+ *
+ * The entry is judged at rest, its intro already seen: the intro plays on a
+ * visitor's first visit only (src/features/entry/intro.ts), and motion.spec.ts
+ * checks that first visit on its own.
  */
 export async function visit(page: Page, api: Api, screen: Screen): Promise<void> {
+  await page.addInitScript(() => localStorage.setItem("mca.intro", "seen"));
   if (screen.as === "student") {
     api.signIn(STUDENT);
     api.conversation(CONVERSATION);

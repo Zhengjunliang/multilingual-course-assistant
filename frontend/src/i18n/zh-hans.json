@@ -63,6 +63,7 @@
     "cancel": "停止"
   },
   "entry": {
+    "skip": "跳过",
     "caption": "用任何语言提问。",
     "chip": {
       "enrolment": "注册的截止日期是什么时候？",
