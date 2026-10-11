@@ -125,6 +125,15 @@ export const BLUE_DARK = "#62A4DF";
 export const CANVAS = "#FAFCFE";
 export const CANVAS_DARK = "#07090C";
 
+/**
+ * The name the product shows itself by: the page's title, the manifest, the
+ * sidebar and the sign-in screens. It leaves out the university's name, whose
+ * 2026 guidelines for its mark protect the word however it is written and let
+ * a student use it only to print the thesis (#173). A proper name, so every
+ * interface language shows it as it is.
+ */
+export const APP_NAME = "UniGuide AI";
+
 const circle = ({ cx, cy, r }: Circle, fill: string) =>
   `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}"/>`;
 
@@ -228,8 +237,8 @@ const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.to
 /** The web app manifest, listing the icons scripts/brand.mjs rasterises. */
 function manifest(): string {
   const app = {
-    name: "Multilingual Course Assistant",
-    short_name: "Course Assistant",
+    name: APP_NAME,
+    short_name: "UniGuide",
     start_url: "/",
     display: "standalone",
     background_color: CANVAS,

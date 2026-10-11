@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { APP_NAME } from "@/brand/fumetto";
 import { Mascot } from "@/components/Mascot";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { chooseUiLocale, UI_LOCALES, type UiLocale } from "@/i18n";
@@ -21,7 +22,7 @@ export function AuthLayout({ heading, children }: { heading: string; children: R
       <div className="flex w-full max-w-sm flex-col gap-room">
         <div className="flex flex-col items-center gap-hair text-center">
           <Mascot pose="welcome" className="size-mascot" />
-          <h1 className="font-semibold font-serif text-display text-ink">{t("app.title")}</h1>
+          <h1 className="font-semibold font-serif text-display text-ink">{APP_NAME}</h1>
           <p className="text-body text-muted">{heading}</p>
         </div>
         {children}

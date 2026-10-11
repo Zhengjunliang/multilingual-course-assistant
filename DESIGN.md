@@ -1,6 +1,6 @@
 ---
 version: 'alpha'
-name: 'Multilingual Course Assistant'
+name: 'UniGuide AI'
 description: 'A university lab tool in the university''s blue on greys tinted toward it, with a serif for reading. Generated from frontend/src/index.css by frontend/scripts/design-md.mjs.'
 colors:
   primary: '{colors.accent}'
@@ -175,7 +175,7 @@ components:
     backgroundColor: '{colors.warn-line-dark}'
 ---
 
-# Multilingual Course Assistant — design rules
+# UniGuide AI — design rules
 
 The rules for how the interface looks, for whoever writes a screen, person or agent. The YAML block above is generated from [frontend/src/index.css](frontend/src/index.css) by `node scripts/design-md.mjs` (run from `frontend/`) and is never edited by hand; `npm run check:design` fails while it is stale or while the format's linter reports anything. The format is Google's DESIGN.md (outside the repository: the `@google/design.md` package), whose section titles the linter reads. Why the interface looks this way is [docs/decisions.md](docs/decisions.md), 2026-10-07; this file says how to apply it.
 

@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { CANVAS, CANVAS_DARK, writtenFiles } from "./fumetto";
+import { APP_NAME, CANVAS, CANVAS_DARK, writtenFiles } from "./fumetto";
 
 // `fileURLToPath`, not `URL.pathname`: on Windows the latter yields "/D:/…".
 const FRONTEND = fileURLToPath(new URL("../../", import.meta.url));
@@ -42,5 +42,11 @@ describe("the cat's files", () => {
     );
 
     expect(themeColours).toEqual([CANVAS, CANVAS_DARK]);
+  });
+
+  it("name the page as the manifest does", () => {
+    const html = onDisk("index.html") ?? "";
+
+    expect(html.match(/<title>(.*)<\/title>/)?.[1]).toBe(APP_NAME);
   });
 });

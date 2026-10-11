@@ -1,6 +1,6 @@
 # Fumetto, the project's cat
 
-The mark of Multilingual Course Assistant and the mascot of its interface: a cat whose head is a speech bubble. Released under CC0 ([LICENSE](LICENSE)), apart from the code's MIT licence; how it was made, the candidates and why this one was chosen are in [PROVENANCE.md](PROVENANCE.md).
+The mark of UniGuide AI and the mascot of its interface: a cat whose head is a speech bubble. Released under CC0 ([LICENSE](LICENSE)), apart from the code's MIT licence; how it was made, the candidates and why this one was chosen are in [PROVENANCE.md](PROVENANCE.md).
 
 ## The files
 
