@@ -2,7 +2,7 @@
 
 Ask about a university course or about the campus in any language, and the answer comes back in that language, citing the slide or web page it was drawn from, even when the material is in another language: an English question over the university's Italian web pages, an Italian one over English slides. Retrieval-augmented generation over open-weights models (the Qwen family), with a Django + React website in front; generating or grading exercises is ⛔ out of scope.
 
-![A question asked in Chinese about the exam sessions, answered in Chinese from the university's Italian and English web pages, with the excerpts it drew on shown above the answer](.github/assets/chat.png)
+![A question asked in Chinese about the exam sessions, answered in Chinese from the School of Engineering's Italian and English documents, under one folded line saying the search took 10 seconds, each claim followed by a pill naming the site it came from, and a copy button and a sources button under the answer](.github/assets/chat.png)
 
 Bachelor's thesis in Information Engineering at the University of Florence, supervised by Prof. Marco Bertini. MIT licence.
 
