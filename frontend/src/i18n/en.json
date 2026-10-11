@@ -8,6 +8,7 @@
     "registerTitle": "Create an account",
     "username": "Username",
     "password": "Password",
+    "passwordHint": "At least 8 characters.",
     "showPassword": "Show password",
     "logIn": "Sign in",
     "register": "Register",

@@ -57,7 +57,8 @@ export const PAIRS = [
     front: "muted",
     back: "surface",
     min: TEXT,
-    where: "SourcesPanel.tsx where a source is and its excerpt, in the panel and the hover card",
+    where:
+      "SourcesPanel.tsx where a source is and its excerpt, LineField.tsx a field's underline and label",
   },
   { front: "ink", back: "sidebar", min: TEXT, where: "ConversationSidebar.tsx title and rows" },
   {
@@ -100,6 +101,12 @@ export const PAIRS = [
       "badge.tsx state word, ConversationSidebar.tsx open conversation, ManagementNav.tsx current page",
   },
   { front: "warn-ink", back: "warn", min: TEXT, where: "TurnView.tsx:110 failure box" },
+  {
+    front: "warn-ink",
+    back: "surface",
+    min: TEXT,
+    where: "AuthLayout.tsx a refusal on the sign-in card, LineField.tsx a refused field's line",
+  },
   { front: "accent-ink", back: "warn-ink", min: TEXT, where: "button.tsx destructive variant" },
 ];
 

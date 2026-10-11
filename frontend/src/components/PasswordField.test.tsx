@@ -21,6 +21,7 @@ function Form() {
     <form onSubmit={(event) => event.preventDefault()}>
       <PasswordField
         id="password"
+        label="Password"
         autoComplete="current-password"
         value={password}
         onChange={setPassword}

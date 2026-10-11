@@ -2,20 +2,23 @@
 
 /**
  * The two ways into an account: both take the password through PasswordField,
- * with the button that shows it and the autocomplete a password manager reads
- * (what the field does is components/PasswordField.test.tsx's subject), and a
- * registration carries the language the page is read in.
+ * with the eye that shows it and the autocomplete a password manager reads
+ * (what the field does is components/PasswordField.test.tsx's subject); a
+ * refused sign-in empties the password and an accepted one shows its check
+ * before it leaves (routes/landing.ts); a registration carries the language
+ * the page is read in.
  */
 
 import { act } from "react";
-import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
 import { mount } from "@/test/mount";
 import { render } from "@/test/render";
 import LoginPage from "./LoginPage";
+import { ACCEPTED_FOR } from "./landing";
 import RegisterPage from "./RegisterPage";
 
 const VISITOR = {
@@ -59,6 +62,68 @@ function type(input: HTMLInputElement | null, value: string) {
     input?.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
+
+function signIn(logIn: () => Promise<void>) {
+  return mount(
+    <SessionContext value={{ ...VISITOR, logIn }}>
+      <MemoryRouter initialEntries={["/login"]}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<p id="front" />} />
+        </Routes>
+      </MemoryRouter>
+    </SessionContext>,
+  );
+}
+
+async function send(container: HTMLElement) {
+  type(container.querySelector<HTMLInputElement>("#username"), "ada");
+  type(container.querySelector<HTMLInputElement>("#password"), "segreta");
+  await act(async () => {
+    container.querySelector("form")?.requestSubmit();
+  });
+}
+
+describe("a sign-in", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("refused: the password is emptied and focused, and described by what was said", async () => {
+    const { container, unmount } = signIn(async () => {
+      throw new Error("refused");
+    });
+    await send(container);
+    const field = container.querySelector<HTMLInputElement>("#password");
+    const described = document.getElementById(field?.getAttribute("aria-describedby") ?? "");
+    const after = {
+      value: field?.value,
+      focused: document.activeElement === field,
+      invalid: field?.getAttribute("aria-invalid"),
+      says: described?.textContent?.endsWith(i18n.t("auth.failed")),
+    };
+    unmount();
+
+    expect(after).toEqual({ value: "", focused: true, invalid: "true", says: true });
+  });
+
+  it("accepted: the check shows, and then the page leaves for where the reader was going", async () => {
+    vi.useFakeTimers();
+    const { container, unmount } = signIn(async () => {});
+    await send(container);
+    const checking = {
+      busy: container.querySelector("button[type=submit]")?.getAttribute("aria-disabled"),
+      left: container.querySelector("#front") !== null,
+    };
+    await act(async () => {
+      vi.advanceTimersByTime(ACCEPTED_FOR);
+    });
+    const left = container.querySelector("#front") !== null;
+    unmount();
+
+    expect({ checking, left }).toEqual({ checking: { busy: "true", left: false }, left: true });
+  });
+});
 
 describe("a registration", () => {
   it("makes the language the page is read in the account's", async () => {
