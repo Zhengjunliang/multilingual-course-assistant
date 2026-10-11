@@ -1,5 +1,5 @@
 import { ArrowUp, Square } from "lucide-react";
-import { type FormEvent, type KeyboardEvent, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MAX_QUESTION_CHARS } from "@/api/client";
@@ -20,6 +20,13 @@ interface ComposerProps {
    * the stop button to be got right.
    */
   placement?: "hero" | "foot";
+  /**
+   * Where the field's top stood under the entry, given once, as the composer
+   * moves to the foot: the box travels from there (`travel`, index.css)
+   * rather than jumping. A new object each time, so each first question
+   * travels.
+   */
+  travelFrom?: { top: number } | null;
 }
 
 /**
@@ -55,9 +62,28 @@ function WaitingLine({ waiting }: { waiting: Waiting }) {
   }
 }
 
-export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: ComposerProps) {
+export function Composer({
+  waiting,
+  onSubmit,
+  onStop,
+  placement = "foot",
+  travelFrom = null,
+}: ComposerProps) {
   const { t } = useTranslation();
   const [question, setQuestion] = useState("");
+  const [travelling, setTravelling] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+
+  // Measured after the move and before it is painted: the distance from
+  // where the field stands now to where it stood is where the box starts.
+  useLayoutEffect(() => {
+    if (travelFrom === null || field.current === null || box.current === null) return;
+    const distance = travelFrom.top - field.current.getBoundingClientRect().top;
+    if (distance === 0) return;
+    box.current.style.setProperty("--travel-from", `${distance}px`);
+    setTravelling(true);
+  }, [travelFrom]);
 
   const busy =
     waiting.phase === "queued" || waiting.phase === "streaming" || waiting.phase === "retrying";
@@ -84,11 +110,10 @@ export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: Comp
   };
 
   return (
+    // Under the entry the column around it already keeps the gutter, so the
+    // box is as wide there as at the foot and travels without changing width.
     <form
-      className={cn(
-        "w-full px-gutter",
-        placement === "foot" ? "border-line border-t bg-ground py-gutter" : "py-0",
-      )}
+      className={cn("w-full", placement === "foot" && "border-line border-t bg-ground p-gutter")}
       onSubmit={onFormSubmit}
     >
       {/* One shell holding the field and its button, rather than a bare
@@ -100,10 +125,15 @@ export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: Comp
           button takes its fill: the only moving colour on an otherwise still
           screen, and it lands exactly where the next action is. */}
       <div
+        ref={box}
         className={cn(
           "mx-auto flex max-w-4xl flex-col gap-tight rounded-bubble border bg-pill p-snug transition-colors",
           ready ? "border-accent" : "border-transparent",
+          travelling && "travel",
         )}
+        onAnimationEnd={(event) => {
+          if (event.animationName === "travel") setTravelling(false);
+        }}
       >
         <label className="sr-only" htmlFor="question">
           {t("ask.label")}
@@ -117,6 +147,7 @@ export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: Comp
             stays at the foot as the question grows, where the caret is. */}
         <div className="flex items-end gap-snug">
           <Textarea
+            ref={field}
             id="question"
             rows={1}
             value={question}
