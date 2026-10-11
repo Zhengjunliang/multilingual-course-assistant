@@ -96,10 +96,27 @@ function moved(page: Page): Promise<string[]> {
   }, MOVING_PROPERTIES);
 }
 
+/**
+ * The living cat's drawing, every attribute of it, once per cat on the page.
+ *
+ * It moves on `requestAnimationFrame` (components/LivingMascot.tsx), which
+ * neither the events above nor `document.getAnimations()` can see, so the
+ * drawing itself is read twice and compared. A quarter of a second is fifteen
+ * frames, and a living cat's tail moves on every one of them.
+ */
+function catDrawings(page: Page): Promise<string[]> {
+  return page
+    .locator("[data-living-mascot]")
+    .evaluateAll((cats) => cats.map((cat) => cat.innerHTML));
+}
+
 for (const screen of SCREENS) {
   test(`${screen.path} as a ${screen.as}: nothing moves at rest`, async ({ page, api }) => {
     await visit(page, api, screen);
     expect(await moved(page)).toEqual([]);
+    const cats = await catDrawings(page);
+    if (cats.length > 0) await page.waitForTimeout(250);
+    expect(await catDrawings(page), "the living cat's drawing").toEqual(cats);
   });
 }
 
