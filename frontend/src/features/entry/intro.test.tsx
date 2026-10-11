@@ -129,6 +129,27 @@ describe("the entry's intro", () => {
     expect(focused).toBe(true);
   });
 
+  it("leaves the focus where a reader moved it after Skip when the intro ends", () => {
+    systemReducesMotion(false);
+    const question = document.createElement("textarea");
+    question.id = "question";
+    document.body.append(question);
+    const page = entry();
+    const chip = () =>
+      [...page.container.querySelectorAll("button")].find((button) =>
+        button.textContent?.includes("iscrizione"),
+      );
+    act(() => page.skip()?.focus());
+    act(() => page.skip()?.blur());
+    act(() => chip()?.focus());
+    act(() => vi.advanceTimersByTime(INTRO.length * 1000 + 10));
+    const focused = document.activeElement === chip();
+    page.unmount();
+    question.remove();
+
+    expect(focused).toBe(true);
+  });
+
   it("plays once: a second visit opens on the caption at rest", () => {
     systemReducesMotion(false);
     localStorage.setItem("mca.intro", "seen");

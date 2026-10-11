@@ -130,10 +130,8 @@ export default function ChatPage() {
   // The first question leaves the entry (#173): it is sent at once, and the
   // entry stays a moment longer, while the cat hops and the entry recedes
   // (`recede`, index.css), before the thread takes its place. With reduced
-  // motion the thread is there at once. While it recedes its chips can still
-  // be pressed, and a second question would abort the first; it is ignored.
+  // motion the thread is there at once.
   const onSubmit = (question: string) => {
-    if (leaving) return;
     if (empty && !reduced) {
       setLeaving(true);
       setHops((count) => count + 1);
@@ -192,7 +190,17 @@ export default function ChatPage() {
         }
       >
         {entry ? (
-          <EntryScreen onPick={onSubmit} visitor={visitor} hops={hops} />
+          // While the entry recedes its chips can still be pressed, and a
+          // second question would abort the first: a chip does nothing then.
+          // The composer needs no such guard, since it sends nothing while
+          // the first question is on its way.
+          <EntryScreen
+            onPick={(question) => {
+              if (!leaving) onSubmit(question);
+            }}
+            visitor={visitor}
+            hops={hops}
+          />
         ) : (
           <div className="mx-auto flex max-w-4xl flex-col gap-room">
             {visitor && (

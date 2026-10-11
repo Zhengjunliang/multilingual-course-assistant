@@ -65,13 +65,15 @@ export function EntryScreen({ onPick, visitor, hops = 0 }: EntryScreenProps) {
 
   // A keyboard reader resting on Skip when the intro ends by itself would be
   // left on the page's body as the button goes; the question box takes the
-  // focus instead. Cleared only when the focus moves to another element: a
-  // removed button may or may not report its blur.
+  // focus instead. Cleared only when the focus moves to another element, as
+  // a removed button may or may not report its blur, and acted on only when
+  // the focus is indeed lost, so a reader who has moved on keeps their place.
   const onSkip = useRef(false);
   useEffect(() => {
     if (intro.playing || !onSkip.current) return;
     onSkip.current = false;
-    document.getElementById("question")?.focus();
+    const active = document.activeElement;
+    if (active === null || active === document.body) document.getElementById("question")?.focus();
   }, [intro.playing]);
 
   return (
@@ -80,7 +82,8 @@ export function EntryScreen({ onPick, visitor, hops = 0 }: EntryScreenProps) {
     // and the three things a reader looks at first sit on three different axes.
     <div className="flex w-full max-w-4xl flex-col items-center gap-room text-center">
       {/* First in the page's order, so the keyboard reaches it before the
-          intro is over; fixed in the corner, so the eye finds it there. */}
+          intro is over; fixed in the corner, so the eye finds it there, and
+          lifted, so what comes after it in the page never paints over it. */}
       {intro.playing && (
         <Button
           type="button"
@@ -92,7 +95,7 @@ export function EntryScreen({ onPick, visitor, hops = 0 }: EntryScreenProps) {
           onBlur={(event) => {
             if (event.relatedTarget !== null) onSkip.current = false;
           }}
-          className="hover-sketch fixed right-gutter bottom-gutter rounded-full text-ink"
+          className="hover-sketch fixed right-gutter bottom-gutter z-lifted rounded-full text-ink"
         >
           {t("entry.skip")}
         </Button>
