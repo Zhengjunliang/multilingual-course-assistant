@@ -534,6 +534,24 @@
 }
 
 /*
+ * A password manager filling a field fires no input event, so the living cat
+ * (components/LivingMascot.tsx) hears of it from this one-millisecond
+ * animation's start, as MUI's InputBase does. It changes nothing a reader
+ * sees, and it is not started under reduced motion, where the cat is still.
+ */
+@keyframes autofill {
+  from {
+    outline-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  input:is(:autofill, :-webkit-autofill) {
+    animation: autofill 1ms;
+  }
+}
+
+/*
  * The process line while the search runs (features/chat/ProcessLine.tsx): a
  * band sweeping across muted words, as Perplexity's "Ricerca in corso" and
  * ChatGPT's "Thinking" do (read 11 October 2026), so the line says it is

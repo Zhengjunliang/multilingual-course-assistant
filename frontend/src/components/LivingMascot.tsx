@@ -4,6 +4,10 @@
  * pointer, or the text being typed, and rest on the question box when nobody
  * moves; it smiles while the pointer is on the send button, hops when a
  * question goes, and falls asleep after ten idle seconds until something moves.
+ * On a sign-in form (#183) it shuts its eyes and turns aside while a password
+ * is typed, peeks with one eye while the letters are shown, watches the form
+ * being sent, frowns at a refusal, glances at the fields a password manager
+ * fills, and smiles when it lands on the entry.
  * components/mascotLife.ts decides all of that; this draws it.
  *
  * One `requestAnimationFrame` loop changes the drawing's attributes in place,
@@ -18,10 +22,15 @@
  * without one by the author's choice, and the system's reduced motion is the
  * only way to still it.
  *
- * The send button is marked `data-mascot-cheer` (features/chat/Composer.tsx)
- * rather than handed in, and the cat asks each frame whether the pointer is on
- * it, so the composer need not know the cat exists and a button that goes away
- * under the pointer leaves no smile behind.
+ * What the cat reacts to is marked on the page rather than handed in, and the
+ * cat asks each frame, so a control need not know the cat exists and one that
+ * goes away leaves no reaction behind: `data-mascot-cheer` on the send button
+ * and the sign-in button (a smile while the pointer is on it),
+ * `data-mascot-busy` on the sign-in button while it is sent (the eyes on it),
+ * and `data-mascot-away` around a password field and its eye
+ * (components/PasswordField.tsx). A password manager's fill fires no input
+ * event, so index.css starts a one-millisecond `autofill` animation on a
+ * filled field, after MUI's InputBase, and its `animationstart` is the sign.
  */
 
 import { useEffect, useId, useRef } from "react";
@@ -29,27 +38,42 @@ import { useEffect, useId, useRef } from "react";
 import { DETAIL_STROKE, HEAD, LIVING, outline, STROKE } from "@/brand/fumetto";
 import { useReducedMotion } from "@/lib/useReducedMotion";
 import { cn } from "@/lib/utils";
-import { born, hop, type Life, live, type Pose, poke, STILL, TIMING } from "./mascotLife";
+import {
+  born,
+  frown,
+  glance,
+  glancing,
+  hop,
+  type Life,
+  live,
+  type Pose,
+  poke,
+  STILL,
+  TIMING,
+  twitch,
+  welcome as welcomed,
+} from "./mascotLife";
 
 const NO_HOVER = "(hover: none)";
 const LINE = { strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
+const SIDES = ["left", "right"] as const;
+const EYE_PARTS = ["blink", "open", "droop", "happy", "shut"] as const;
 
 const parts = [
   "body",
   "outline",
   "look",
-  "blink",
-  "open",
-  "happy",
-  "asleep",
   "pupil-left",
   "pupil-right",
   "face",
   "mouth",
+  "flat",
   "yawn",
   "whiskers",
   "stars",
   "zs",
+  ...SIDES.flatMap((side) => EYE_PARTS.map((part) => `${part}-${side}` as const)),
 ] as const;
 type Parts = Record<(typeof parts)[number], SVGElement>;
 
@@ -77,10 +101,6 @@ function draw(p: Parts, pose: Pose, now: number | null): void {
     `translate(0 ${fixed(pose.hop)}) rotate(${degrees(pose.tilt)} 32 50) ` +
       `translate(32 56) scale(${fixed(1 + pose.breath / 2, 4)} ${fixed(1 + pose.breath, 4)}) translate(-32 -56)`,
   );
-  p.blink.setAttribute(
-    "transform",
-    `translate(0 39) scale(1 ${fixed(pose.blink, 3)}) translate(0 -39)`,
-  );
   p.look.setAttribute(
     "transform",
     `translate(${fixed(pose.eyeX * 0.55)} ${fixed(pose.eyeY * 0.45)})`,
@@ -90,11 +110,20 @@ function draw(p: Parts, pose: Pose, now: number | null): void {
   p["pupil-left"].setAttribute("cy", fixed(left.cy + pose.eyeY * 0.6));
   p["pupil-right"].setAttribute("cx", fixed(right.cx + pose.eyeX * 0.6));
   p["pupil-right"].setAttribute("cy", fixed(right.cy + pose.eyeY * 0.6));
+  for (const side of SIDES) {
+    const eye = pose.eyes[side];
+    p[`blink-${side}`].setAttribute(
+      "transform",
+      `translate(0 39) scale(1 ${fixed(pose.blink, 3)}) translate(0 -39)`,
+    );
+    show(p[`open-${side}`], eye === "open");
+    show(p[`droop-${side}`], eye === "droop");
+    show(p[`happy-${side}`], eye === "happy");
+    show(p[`shut-${side}`], eye === "shut");
+  }
   p.whiskers.setAttribute("transform", `rotate(${degrees(pose.whisker)} 52 42)`);
-  show(p.open, pose.eyes.right === "open");
-  show(p.happy, pose.eyes.right === "happy");
-  show(p.asleep, pose.eyes.right === "shut");
-  show(p.mouth, pose.mouth !== "yawn");
+  show(p.mouth, pose.mouth === "smile");
+  show(p.flat, pose.mouth === "flat");
   show(p.yawn, pose.mouth === "yawn");
 
   // The stars twinkle in turn, from a third of their strength to all of it.
@@ -142,12 +171,21 @@ function sketch(p: Parts, since: number | null): void {
   p.stars.style.opacity = face;
 }
 
+const centre = (element: Element) => {
+  const r = element.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+};
+
 interface LivingMascotProps {
   className?: string;
   /** The id of the field the eyes rest on when nobody moves: the question box. */
   restOn?: string;
   /** Changes each time a question is sent, and the cat hops. */
   hops?: number;
+  /** Changes each time a sign-in form is refused, and the cat frowns. */
+  refusals?: number;
+  /** The cat has just jumped here from a sign-in form: it smiles. Read when it appears. */
+  welcome?: boolean;
   /**
    * The intro (features/entry/): the cat arrives drawn in one stroke. Read
    * when the cat appears; never under reduced motion, which skips the intro.
@@ -155,11 +193,19 @@ interface LivingMascotProps {
   drawIn?: boolean;
 }
 
-export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: LivingMascotProps) {
+export function LivingMascot({
+  className,
+  restOn,
+  hops = 0,
+  refusals = 0,
+  welcome = false,
+  drawIn = false,
+}: LivingMascotProps) {
   const svg = useRef<SVGSVGElement>(null);
   const life = useRef<Life | null>(null);
   const reduced = useReducedMotion();
   const sketching = useRef(drawIn);
+  const welcoming = useRef(welcome);
   const mask = `fumetto-${useId().replace(/[^\w-]/g, "")}`;
 
   useEffect(() => {
@@ -176,8 +222,12 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
     const clock = () => performance.now() / 1000;
     const cat = born(clock(), Math.random);
     life.current = cat;
+    if (welcoming.current) welcomed(cat, clock());
+    welcoming.current = false;
     const noHover = window.matchMedia(NO_HOVER);
     const pointer = { x: 0, y: 0, at: Number.NEGATIVE_INFINITY };
+    /** The fields a password manager has just filled, in the order it filled them. */
+    const filled: Element[] = [];
     let frame = 0;
     let last = 0;
     let sketchFrom: number | null = null;
@@ -190,8 +240,16 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
       const active = document.activeElement;
       const field =
         active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active : null;
+      const hidden = active?.closest("[data-mascot-away]") ?? null;
+      const sending = document.querySelector("[data-mascot-busy]");
+      const step = glancing(cat, now);
+      const glancedAt = step === null ? undefined : (filled[step] ?? filled.at(-1));
       let target: { x: number; y: number } | null = null;
-      if (field !== null) {
+      if (glancedAt !== undefined) {
+        target = centre(glancedAt);
+      } else if (sending !== null) {
+        target = centre(sending);
+      } else if (field !== null) {
         const r = field.getBoundingClientRect();
         const caret = field.selectionStart ?? field.value.length;
         target = { x: r.left + Math.min(r.width - 10, 12 + caret * 8), y: r.top + r.height / 2 };
@@ -205,9 +263,9 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
         gaze: target === null ? null : { x: target.x - face.x, y: target.y - face.y },
         typing: field !== null,
         cheer: document.querySelector("[data-mascot-cheer]:hover") !== null,
-        away: false,
-        peek: false,
-        busy: false,
+        away: hidden !== null,
+        peek: hidden?.querySelector("input")?.type === "text",
+        busy: sending !== null,
       };
     };
 
@@ -244,12 +302,24 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
       poke(cat, pointer.at);
     };
     const onInput = () => poke(cat, clock());
+    const onTyped = () => twitch(cat);
+    const onFilled = (event: AnimationEvent) => {
+      if (event.animationName !== "autofill" || !(event.target instanceof Element)) return;
+      const now = clock();
+      if (glancing(cat, now) === null) {
+        filled.length = 0;
+        glance(cat, now);
+      }
+      if (!filled.includes(event.target)) filled.push(event.target);
+    };
     const onVisibility = () => (document.visibilityState === "visible" ? start() : stop());
 
     window.addEventListener("pointermove", onPointer);
     window.addEventListener("pointerdown", onPointer);
     window.addEventListener("keydown", onInput);
     window.addEventListener("wheel", onInput, { passive: true });
+    document.addEventListener("input", onTyped, true);
+    document.addEventListener("animationstart", onFilled, true);
     document.addEventListener("visibilitychange", onVisibility);
     start();
     return () => {
@@ -259,6 +329,8 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
       window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("keydown", onInput);
       window.removeEventListener("wheel", onInput);
+      document.removeEventListener("input", onTyped, true);
+      document.removeEventListener("animationstart", onFilled, true);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [reduced, restOn]);
@@ -271,6 +343,14 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
     hopsSeen.current = hops;
     if (life.current !== null) hop(life.current, performance.now() / 1000);
   }, [hops]);
+
+  // The same for a refusal: a form that opens has been refused by nobody.
+  const refusalsSeen = useRef(refusals);
+  useEffect(() => {
+    if (refusals === refusalsSeen.current) return;
+    refusalsSeen.current = refusals;
+    if (life.current !== null) frown(life.current, performance.now() / 1000);
+  }, [refusals]);
 
   // The intro ending, by Skip or by itself, ends the drawing in with it.
   useEffect(() => {
@@ -307,31 +387,41 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
           />
           <g data-part="face" style={drawIn ? { opacity: 0 } : undefined}>
             <g data-part="look">
-              <g data-part="blink">
-                <g
-                  data-part="open"
-                  mask={`url(#${mask})`}
-                  fill="currentColor"
-                  strokeWidth={1}
-                  strokeLinejoin="round"
-                >
-                  {LIVING.eyes.map((d) => (
-                    <path key={d} d={d} />
-                  ))}
+              {SIDES.map((side, i) => (
+                <g key={side}>
+                  <g data-part={`blink-${side}`}>
+                    <g
+                      mask={`url(#${mask})`}
+                      fill="currentColor"
+                      strokeWidth={1}
+                      strokeLinejoin="round"
+                    >
+                      <path data-part={`open-${side}`} d={LIVING.eyes[i]} />
+                      <path data-part={`droop-${side}`} d={LIVING.droopingEyes[i]} display="none" />
+                    </g>
+                  </g>
+                  <path
+                    data-part={`happy-${side}`}
+                    d={LIVING.happyEyes[i]}
+                    strokeWidth={DETAIL_STROKE}
+                    display="none"
+                  />
+                  <path
+                    data-part={`shut-${side}`}
+                    d={LIVING.sleepingEyes[i]}
+                    strokeWidth={DETAIL_STROKE}
+                    display="none"
+                  />
                 </g>
-              </g>
-              <g data-part="happy" strokeWidth={DETAIL_STROKE} display="none">
-                {LIVING.happyEyes.map((d) => (
-                  <path key={d} d={d} />
-                ))}
-              </g>
-              <g data-part="asleep" strokeWidth={DETAIL_STROKE} display="none">
-                {LIVING.sleepingEyes.map((d) => (
-                  <path key={d} d={d} />
-                ))}
-              </g>
+              ))}
             </g>
             <path data-part="mouth" d={LIVING.mouth} strokeWidth={DETAIL_STROKE} />
+            <path
+              data-part="flat"
+              d={LIVING.flatMouth}
+              strokeWidth={DETAIL_STROKE}
+              display="none"
+            />
             <path data-part="yawn" d={LIVING.yawn} strokeWidth={DETAIL_STROKE} display="none" />
             <path data-part="whiskers" d={LIVING.whiskers} strokeWidth={DETAIL_STROKE} />
           </g>

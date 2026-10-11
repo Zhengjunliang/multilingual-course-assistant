@@ -35,8 +35,11 @@ interface AuthLayoutProps {
  * form on a card with no border, lifted by `shadow-overlay`, the living cat's
  * head sitting on the card's top edge, its chin on the edge and the bubble's
  * tail hooked over it, as the author chose on a prototype after Darin
- * Senneff's Yeti sign-in and Telegram Web's monkey. The cat is the entry's (#173), alive
- * and as large, with no intro: the sign-in screens are the entry's other door.
+ * Senneff's Yeti sign-in and Telegram Web's monkey. The cat is the entry's
+ * (#173), alive and as large, with no intro: the sign-in screens are the
+ * entry's other door. Its eyes rest on the username when nobody moves, and it
+ * answers the form (components/LivingMascot.tsx): a refusal is the card's
+ * shake and the cat's frown at once.
  *
  * The language switch is here as well as in the application header, and it has
  * to be: before a login there is no account to read `User.locale` from, and a
@@ -64,7 +67,11 @@ export function AuthLayout({ heading, children, footer, refusals }: AuthLayoutPr
   return (
     <div className="flex min-h-full flex-col items-center justify-center px-gutter py-room">
       <div className="flex w-full max-w-[25rem] flex-col items-center [--cat:var(--spacing-entry-cat-sm)] md:[--cat:var(--spacing-entry-cat)]">
-        <LivingMascot className="relative z-lifted w-(--cat)" />
+        <LivingMascot
+          restOn="username"
+          refusals={refusals}
+          className="relative z-lifted w-(--cat)"
+        />
         <div
           ref={card}
           className="mt-[calc(var(--cat)*-12/76)] flex w-full flex-col gap-room rounded-bubble bg-surface px-room pt-[calc(var(--cat)*4/76+var(--spacing-room))] pb-room shadow-overlay md:px-[2.125rem]"
@@ -104,6 +111,8 @@ export function AuthButton({ phase, children }: { phase: Phase; children: string
       type="submit"
       aria-disabled={phase !== "idle"}
       aria-busy={phase === "busy"}
+      data-mascot-cheer
+      data-mascot-busy={phase === "busy" || undefined}
       className="group relative h-auto rounded-full py-gutter aria-disabled:cursor-progress"
     >
       <span className={cn("inline-flex items-center", (turning || accepted) && "opacity-0")}>
