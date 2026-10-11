@@ -144,6 +144,7 @@ class Engine:
         history: Sequence[Turn] = (),
         *,
         scope: Sequence[EditionKey] | None,
+        asked_at: float | None = None,
     ) -> Iterator[Event]:
         """Route, retrieve, generate — the read-only three quarters of `rag.agent`.
 
@@ -155,6 +156,10 @@ class Engine:
         `scope` is the slides editions the caller may be answered from, with
         `rag.search.search`'s meaning, and is required for the same reason it
         is there: it decides what a caller can read, so every call states it.
+
+        `asked_at` is the `time.monotonic()` reading `StartEvent.search_ms`
+        counts from: `stream_answer` passes the moment the question reached the
+        queue; a direct caller, which has no queue, leaves it to this call.
 
         Everything up to `StartEvent` can still fail into a status code, which
         is why routing and retrieval happen before the first `yield` rather than
@@ -169,7 +174,7 @@ class Engine:
         from qdrant_client.http.exceptions import ResponseHandlingException
 
         answer_locale = locale or detect_locale(question)
-        started = time.monotonic()
+        started = time.monotonic() if asked_at is None else asked_at
 
         try:
             # An unusable router *reply* is already a routing decision — `route`
@@ -356,7 +361,11 @@ def stream_answer(
     tens of seconds. Waiting without a ceiling turns a burst into sockets held
     until the worker is killed — which reaches the caller as a dropped
     connection, the one outcome worse than a refusal.
+
+    The clock for `StartEvent.search_ms` starts before the lock, so the queue
+    and the build are in the seconds the reader is shown.
     """
+    asked_at = time.monotonic()
     if not _HOLDER.lock.acquire(timeout=QUEUE_TIMEOUT_SECONDS):
         raise EngineBusyError(
             _("The question service is busy answering another question. Try again shortly.")
@@ -364,6 +373,8 @@ def stream_answer(
     try:
         if _HOLDER.engine is None:
             _HOLDER.engine = build_engine()
-        yield from _HOLDER.engine.stream(question, conversation_id, locale, history, scope=scope)
+        yield from _HOLDER.engine.stream(
+            question, conversation_id, locale, history, scope=scope, asked_at=asked_at
+        )
     finally:
         _HOLDER.lock.release()

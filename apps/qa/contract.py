@@ -148,12 +148,13 @@ class StartEvent(Event):
     anonymous question, which is filed nowhere: its client keeps the thread and
     sends it back as `history` (apps/qa/serializers.py).
 
-    `search_ms` is how long routing and retrieval took, in milliseconds: from
-    the engine taking up the question to this event. The wait for the engine
-    itself is not in it — a question queued behind another one has not started
-    being searched. The interface shows it as the process line's seconds, and
-    it is stored with the answer so a reopened conversation shows the same
-    number rather than none.
+    `search_ms` is how long the reader waited for this event, in milliseconds:
+    from the question reaching the engine to `start` going out. The wait behind
+    another question and the first question's model loading are in it, as well
+    as routing and retrieval: the interface counts the seconds from the moment
+    the question is asked, and a total that left the queue out would fold a
+    count of 50 into "15". It is stored with the answer so a reopened
+    conversation shows the same number rather than none.
     """
 
     NAME = "start"
