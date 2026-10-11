@@ -1,3 +1,4 @@
+import { ArrowUp, Square } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -90,14 +91,14 @@ export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: Comp
       )}
       onSubmit={onFormSubmit}
     >
-      {/* One shell holding the field and its controls, rather than a
-          bare textarea with buttons loose underneath it. It wears the pill
+      {/* One shell holding the field and its button, rather than a bare
+          textarea with a button loose beside it. It wears the pill
           (`bg-pill`, index.css), the material the interface inherits from
           the question box, in the composer's own corners rather than a pill's
           round ends, which would clip a question of several lines. A border
-          appears in the accent once there is something to send: the only
-          moving colour on an otherwise still screen, and it lands exactly
-          where the next action is. */}
+          appears in the accent once there is something to send, as the send
+          button takes its fill: the only moving colour on an otherwise still
+          screen, and it lands exactly where the next action is. */}
       <div
         className={cn(
           "mx-auto flex max-w-4xl flex-col gap-tight rounded-bubble border bg-pill p-snug transition-colors",
@@ -107,35 +108,58 @@ export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: Comp
         <label className="sr-only" htmlFor="question">
           {t("ask.label")}
         </label>
-        <Textarea
-          id="question"
-          value={question}
-          maxLength={MAX_QUESTION_CHARS}
-          placeholder={t("ask.placeholder")}
-          onChange={(event) => setQuestion(event.target.value)}
-          onKeyDown={onKeyDown}
-          className="min-h-control resize-none border-0 bg-transparent px-hair focus-visible:outline-none"
-        />
-        <div className="flex flex-wrap items-center gap-snug empty:hidden">
-          {/* Absent rather than disabled while there is nothing to send:
-              `disabled:opacity-50` turns the accent fill into a faded slab with
-              its lettering at half strength — unreadable, and the loudest thing
-              on an otherwise empty screen. Enter still sends, and the button
-              appears with the first character. */}
-          {/* `data-mascot-cheer`: the living cat smiles while the pointer is
-              on it (components/LivingMascot.tsx). */}
-          {ready && (
-            <Button type="submit" size="sm" data-mascot-cheer>
-              {t("ask.submit")}
+        {/* The field and its button on one line, as in a message box: one
+            line tall until the question is longer, then growing with it
+            (`field-sizing-content`) up to `max-h-[40vh]`, where it scrolls;
+            a browser without `field-sizing` keeps the one line and scrolls
+            in it. The field is as tall as the button (`min-h-control-icon`),
+            so one line of text and the arrow share a centre, and the button
+            stays at the foot as the question grows, where the caret is. */}
+        <div className="flex items-end gap-snug">
+          <Textarea
+            id="question"
+            rows={1}
+            value={question}
+            maxLength={MAX_QUESTION_CHARS}
+            placeholder={t("ask.placeholder")}
+            onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={onKeyDown}
+            className="field-sizing-content max-h-[40vh] min-h-control-icon min-w-0 flex-1 resize-none border-0 bg-transparent px-hair focus-visible:outline-none"
+          />
+          {/* One round button, as ChatGPT, Claude and Gemini keep theirs: an
+              arrow that sends, and a square that stops while an answer is
+              being written. With nothing to send the arrow
+              is quiet, the mark's grey with a muted glyph, rather than
+              `disabled:opacity-50`, which turns the accent fill into a faded
+              slab, the loudest thing on an otherwise empty screen. Enter
+              sends either way. `data-mascot-cheer`: the living cat smiles
+              while the pointer is on it (components/LivingMascot.tsx), and
+              a disabled button takes no pointer. */}
+          {busy ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="rounded-full"
+              onClick={onStop}
+              aria-label={t("ask.cancel")}
+            >
+              <Square aria-hidden className="size-icon fill-current" />
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!ready}
+              className="rounded-full disabled:bg-mark disabled:text-muted disabled:opacity-100 disabled:shadow-none"
+              aria-label={t("ask.submit")}
+              data-mascot-cheer
+            >
+              <ArrowUp aria-hidden className="size-icon-lg" />
             </Button>
           )}
-          {busy && (
-            <Button type="button" size="sm" variant="outline" onClick={onStop}>
-              {t("ask.cancel")}
-            </Button>
-          )}
-          <WaitingLine waiting={waiting} />
         </div>
+        <WaitingLine waiting={waiting} />
       </div>
     </form>
   );
