@@ -64,13 +64,7 @@
   },
   "entry": {
     "skip": "Skip",
-    "caption": "Ask in any language.",
-    "chip": {
-      "enrolment": "What are the enrolment deadlines?",
-      "calendar": "When does the exam session start?",
-      "material": "Summarise the first lecture of the course.",
-      "library": "When are the libraries open?"
-    }
+    "caption": "Ask in any language."
   },
   "visitor": {
     "courseMaterial": "Course material is for students with an account."

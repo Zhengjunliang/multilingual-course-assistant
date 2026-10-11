@@ -36,7 +36,6 @@ import { Input } from "@/components/ui/input";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { Sheet } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
-import { Suggestion, Suggestions } from "@/components/ui/suggestion";
 import {
   Table,
   TableBody,
@@ -207,17 +206,6 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
           label="Lingua"
           onChange={() => {}}
         />
-      </Specimen>
-
-      <Specimen
-        name="Suggestions"
-        note="A row that scrolls sideways rather than wrapping, so the composer never gets pushed down a line."
-      >
-        <Suggestions>
-          <Suggestion suggestion="Quando scadono le tasse?" />
-          <Suggestion suggestion="Come funziona l'Erasmus?" />
-          <Suggestion suggestion="Suggestion" />
-        </Suggestions>
       </Specimen>
 
       <Specimen name="Avatar" note="A letter in a circle. There is no picture of anyone to load.">

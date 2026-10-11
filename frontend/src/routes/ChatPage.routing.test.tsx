@@ -158,15 +158,15 @@ function openNewConversation(container: HTMLElement) {
   act(() => container.querySelector<HTMLAnchorElement>('a[href="/"]')?.click());
 }
 
-/**
- * A suggestion chip asks its question at once, which is the shortest way to
- * ask. Found by its words: the entry's first button is the cat's pause.
- */
+/** Types a question into the composer under the entry and presses send. */
 function askFromTheFrontDoor(container: HTMLElement) {
-  const chip = [...container.querySelectorAll<HTMLButtonElement>("main button")].find(
-    (button) => button.textContent === i18n.t("entry.chip.enrolment"),
-  );
-  act(() => chip?.click());
+  const field = container.querySelector<HTMLTextAreaElement>("#question");
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+  act(() => {
+    setter?.call(field, "Quali sono le scadenze per l'iscrizione?");
+    field?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  act(() => container.querySelector<HTMLButtonElement>("button[type='submit']")?.click());
 }
 
 /** Deletes a conversation from its sidebar row, through the confirmation alert dialog. */
@@ -371,17 +371,6 @@ describe("a visitor's addresses", () => {
       after: { recede: false, cat: false },
       requested: ["POST /api/ask"],
     });
-  });
-
-  it("asks once when a chip is pressed twice while the entry recedes", async () => {
-    const { container, unmount } = page("/", null);
-    await settle();
-    askFromTheFrontDoor(container);
-    askFromTheFrontDoor(container);
-    await settle();
-    unmount();
-
-    expect(requested).toEqual(["POST /api/ask"]);
   });
 
   it("keeps what is typed while the entry recedes, and the focus with it", async () => {

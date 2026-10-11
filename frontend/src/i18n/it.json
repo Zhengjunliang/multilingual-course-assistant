@@ -64,13 +64,7 @@
   },
   "entry": {
     "skip": "Salta",
-    "caption": "Chiedi in qualsiasi lingua.",
-    "chip": {
-      "enrolment": "Quali sono le scadenze per l'iscrizione?",
-      "calendar": "Quando inizia la sessione d'esame?",
-      "material": "Riassumi la prima lezione del corso.",
-      "library": "Quali sono gli orari delle biblioteche?"
-    }
+    "caption": "Chiedi in qualsiasi lingua."
   },
   "visitor": {
     "courseMaterial": "Il materiale dei corsi è riservato a chi ha un account."
