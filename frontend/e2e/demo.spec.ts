@@ -77,8 +77,11 @@ test("a visitor without an account asks about the campus and gets an answer", as
   expect(api.asked).toEqual([expect.objectContaining({ question: CAMPUS_QUESTION, history: [] })]);
 });
 
-/** The question box on one frame: its top, its width, and whether its field has the focus. */
-type Frame = { top: number; width: number; focused: boolean };
+/**
+ * The question box on one frame: its top, its width, whether its field has
+ * the focus, and whether anything is typed in it.
+ */
+type Frame = { top: number; width: number; focused: boolean; typed: boolean };
 
 test.describe("the first question, sent from the entry", () => {
   test.beforeEach(({ api }) => api.signIn(STUDENT));
@@ -109,11 +112,12 @@ test.describe("the first question, sent from the entry", () => {
             const sample = () => {
               const field = document.getElementById("question");
               const box = field?.closest(".bg-pill")?.getBoundingClientRect();
-              if (field && box) {
+              if (field instanceof HTMLTextAreaElement && box) {
                 frames.push({
                   top: box.top,
                   width: box.width,
                   focused: document.activeElement === field,
+                  typed: field.value !== "",
                 });
               }
               if (landed) Object.assign(window, { __sampled: true });
@@ -130,15 +134,8 @@ test.describe("the first question, sent from the entry", () => {
       const field = page.getByLabel(it.ask.label);
       await field.fill(CAMPUS_QUESTION);
       await field.press("Enter");
-
-      await page.waitForFunction(() =>
-        document
-          .getAnimations()
-          .some(
-            (animation) =>
-              animation instanceof CSSAnimation && animation.animationName === "travel",
-          ),
-      );
+      // Typed at once, while the cat hops and the entry recedes, so the
+      // switch to the conversation and the travel both come after it.
       await page.keyboard.type("e poi");
       await page.waitForFunction(() => (window as unknown as { __sampled: boolean }).__sampled);
 
@@ -154,11 +151,18 @@ test.describe("the first question, sent from the entry", () => {
         tops.filter((top) => top > from + 0.5 && top < to - 0.5).length,
         "frames with the box between its two places",
       ).toBeGreaterThanOrEqual(6);
+      // A box that jumped part of the way and slid the rest would pass the
+      // count above; the travel starts where the box stood.
+      expect(
+        (tops.find((top) => top > from + 0.5) ?? to) - from,
+        "the first step of the travel",
+      ).toBeLessThan((to - from) / 3);
       expect({
         upward: steps.filter((step) => step < -0.5).length,
         widths: [...new Set(frames.map((frame) => Math.round(frame.width)))].length,
         unfocused: frames.filter((frame) => !frame.focused).length,
-      }).toEqual({ upward: 0, widths: 1, unfocused: 0 });
+        typedBeforeLanding: frames.slice(0, -1).some((frame) => frame.typed),
+      }).toEqual({ upward: 0, widths: 1, unfocused: 0, typedBeforeLanding: true });
       await expect(field).toHaveValue("e poi");
       await expect(field).toBeFocused();
     });
