@@ -5,6 +5,7 @@ import { APP_NAME } from "@/brand/fumetto";
 import { LivingMascot } from "@/components/LivingMascot";
 import { Button } from "@/components/ui/button";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
+import { Room } from "@/features/entry/Room";
 import { chooseUiLocale, UI_LOCALES, type UiLocale } from "@/i18n";
 import { useReducedMotion } from "@/lib/useReducedMotion";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,9 @@ interface AuthLayoutProps {
  * remembers the choice on this screen only (i18n/index.ts): there is no
  * account yet to save it to.
  *
+ * Behind it all stands the room (features/entry/Room.tsx), kept clear of the
+ * card's column; on a phone, under it.
+ *
  * The cat's width is `--cat` on the column, so the card can tuck under its
  * chin by the same fraction of it at either size: the drawing's chin is 12 of
  * its 76 units of width above its bottom edge.
@@ -65,8 +69,9 @@ export function AuthLayout({ heading, children, footer, refusals }: AuthLayoutPr
   }, [refusals, reduced]);
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center px-gutter py-room">
-      <div className="flex w-full max-w-[25rem] flex-col items-center [--cat:var(--spacing-entry-cat-sm)] md:[--cat:var(--spacing-entry-cat)]">
+    <div className="relative flex min-h-full flex-col items-center justify-center px-gutter py-room">
+      <Room clear="calc(25rem + 2 * var(--spacing-room))" />
+      <div className="relative flex w-full max-w-[25rem] flex-col items-center [--cat:var(--spacing-entry-cat-sm)] md:[--cat:var(--spacing-entry-cat)]">
         <LivingMascot
           restOn="username"
           refusals={refusals}

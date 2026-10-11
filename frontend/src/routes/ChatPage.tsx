@@ -37,6 +37,7 @@ import { Composer } from "@/features/chat/Composer";
 import { TurnView } from "@/features/chat/TurnView";
 import { useAsk } from "@/features/chat/useAsk";
 import { EntryScreen } from "@/features/entry/EntryScreen";
+import { Room } from "@/features/entry/Room";
 import { useReducedMotion } from "@/lib/useReducedMotion";
 import { cn, scrollBehavior } from "@/lib/utils";
 import { useShell } from "./shell";
@@ -177,7 +178,7 @@ export default function ChatPage() {
     <div
       className={
         entry
-          ? "flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room"
+          ? "relative flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room"
           : "contents"
       }
       onAnimationEnd={(event) => {
@@ -187,10 +188,13 @@ export default function ChatPage() {
         setLeaving(false);
       }}
     >
+      {/* The room stands behind the entry, clear of the question box's width
+          (Composer.tsx), and fades as the entry recedes (#183). */}
+      {entry && <Room clear="calc(48rem + 2 * var(--spacing-room))" leaving={leaving} />}
       <main
         className={cn(
           entry
-            ? "flex w-full justify-center"
+            ? "relative flex w-full justify-center"
             : "arrive min-h-0 flex-1 overflow-y-auto px-gutter py-room",
           leaving && "recede",
         )}
