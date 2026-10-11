@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Citation } from "@/api/contract";
-import { badgesOf, resolveExcerptRefs, segmentAnswer } from "@/lib/markers";
+import {
+  badgesOf,
+  type MdNode,
+  remarkPills,
+  resolveExcerptRefs,
+  segmentAnswer,
+  withoutMarkers,
+  withPills,
+} from "@/lib/markers";
 
 /**
  * A citation with only the field these functions read spelled out.
@@ -115,5 +123,42 @@ describe("segmentAnswer", () => {
     expect(segmentAnswer("nothing cited here", [badge("[PPM 4]", 1)])).toEqual([
       { kind: "text", at: 0, text: "nothing cited here" },
     ]);
+  });
+});
+
+describe("withoutMarkers", () => {
+  it("drops each marker with the spaces that led up to it", () => {
+    const badges = [badge("[PPM 1]", 1), badge("[WEB 2]", 2)];
+
+    expect(
+      withoutMarkers(
+        "Le tasse scadono il 30 settembre [PPM 1] [WEB 2].\n- Prima rata [PPM 1]",
+        badges,
+      ),
+    ).toBe("Le tasse scadono il 30 settembre.\n- Prima rata");
+  });
+});
+
+describe("remarkPills", () => {
+  /** The pills a paragraph of `answer` comes out with, as their `numbers`. */
+  function pills(answer: string, badges: ReturnType<typeof badge>[]): (string | undefined)[] {
+    const paragraph: MdNode = {
+      type: "paragraph",
+      children: [{ type: "text", value: withPills(answer, badges) }],
+    };
+    remarkPills(badges)({ type: "root", children: [paragraph] });
+    return (paragraph.children ?? [])
+      .filter((node) => node.type === "citationPill")
+      .map((node) => node.data?.hProperties?.numbers);
+  }
+
+  const badges = [badge("[PPM 1]", 1), badge("[WEB 2]", 2), badge("[PPM 3]", 3)];
+
+  it("draws pills side by side as one, each source once", () => {
+    expect(pills("Scadono il 30 settembre [PPM 1] [WEB 2][PPM 1].", badges)).toEqual(["1,2"]);
+  });
+
+  it("keeps pills apart where words stand between them", () => {
+    expect(pills("Prima [PPM 1], poi [PPM 3].", badges)).toEqual(["1", "3"]);
   });
 });

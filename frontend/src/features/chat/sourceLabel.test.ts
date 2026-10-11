@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Citation } from "@/api/contract";
 import i18n from "@/i18n";
-import { hostOf, shortName, sourcesOf, titleOf } from "./sourceLabel";
+import { hostOf, shortName, sourceLink, sourcesOf, titleOf } from "./sourceLabel";
 
 const t = i18n.getFixedT("it");
 
@@ -78,5 +78,37 @@ describe("the sources of an answer", () => {
     const again = { ...first, text: "Un altro estratto della stessa pagina." };
 
     expect(sourcesOf([first, slide(3), again])).toEqual([first, slide(3)]);
+  });
+});
+
+describe("where a source opens", () => {
+  it("is a slide's page in the browser's PDF viewer", () => {
+    expect(sourceLink(slide(14))).toBe(`/api/sources/${"ab".repeat(32)}#page=14`);
+    expect(sourceLink({ ...slide(14), source_sha256: null })).toBeNull();
+  });
+
+  it("is a web page quoting the first and last words of the excerpt's longest line", () => {
+    const page = {
+      ...web("https://www.unifi.it/p602.html"),
+      text: "## Iscrizioni\nLe iscrizioni al primo anno si chiudono il 30 settembre, salvo proroghe.",
+    };
+
+    expect(sourceLink(page)).toBe(
+      "https://www.unifi.it/p602.html#:~:text=Le%20iscrizioni%20al%20primo,30%20settembre%2C%20salvo%20proroghe.",
+    );
+  });
+
+  it("quotes a short excerpt whole, escapes a dash, and keeps a fragment already there", () => {
+    const page = { ...web("https://www.unifi.it/p602.html#tasse"), text: "Tasse 2026-2027" };
+
+    expect(sourceLink(page)).toBe(
+      "https://www.unifi.it/p602.html#tasse:~:text=Tasse%202026%2D2027",
+    );
+  });
+
+  it("is a PDF on the web as it is, since a PDF viewer reads no text fragment", () => {
+    const pdf = "https://ingegneria.unifi.it/upload/sub/CALENDARIO_NOV_DIC_2026_LT.pdf";
+
+    expect(sourceLink(web(pdf))).toBe(pdf);
   });
 });

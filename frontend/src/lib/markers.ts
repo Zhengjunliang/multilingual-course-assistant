@@ -38,11 +38,11 @@ export function badgesOf(citations: readonly Citation[]): Badge[] {
  * exact: the generation prompt numbers excerpts from one in citation order
  * (rag/answer.py `Excerpt {number} {marker}:`), so "Excerpt 3" names
  * `citations[2]`. Rewriting the reference into that citation's literal marker
- * BEFORE matching keeps every later step — segmentation, greying, badge
- * tooltips — marker-only, exactly as if the model had complied.
+ * BEFORE matching keeps every later step — segmentation, the pills, the
+ * sources panel's grouping — marker-only, exactly as if the model had complied.
  *
- * A number with no citation behind it is left as prose: inventing a badge for
- * it would be the one thing worse than a grey card.
+ * A number with no citation behind it is left as prose: inventing a pill for
+ * it would send the reader to a source the answer never drew on.
  */
 export function resolveExcerptRefs(answer: string, citations: readonly Citation[]): string {
   return answer.replace(
@@ -106,12 +106,31 @@ export function segmentAnswer(answer: string, badges: readonly Badge[]): Segment
 /**
  * Which markers actually turned up.
  *
- * The complement is the interesting half: a citation that was retrieved and
- * then not used is exactly the signal the error taxonomy wants, so the reader
- * sees it greyed out rather than not at all.
+ * The sources panel lists these first and the rest after them, under a
+ * heading of their own, with no "not cited" mark: no product read on 11
+ * October 2026 marks one, and
+ * the complement — retrieved and then not used — is stored with the answer for
+ * the error taxonomy, not shown as a fault.
  */
 export function citedMarkers(answer: string, badges: readonly Badge[]): Set<string> {
   return new Set(badges.filter((badge) => answer.includes(badge.marker)).map((b) => b.marker));
+}
+
+const SPACE_BEFORE = /[ \t]+$/;
+
+/**
+ * The answer as a reader copies it: the markers gone, with the spaces that led
+ * up to them, so "il 30 settembre [m]." comes out "il 30 settembre.". A
+ * marker means nothing outside this page, and ChatGPT's copy leaves its
+ * citations out the same way.
+ */
+export function withoutMarkers(answer: string, badges: readonly Badge[]): string {
+  let copied = "";
+  for (const segment of segmentAnswer(answer, badges)) {
+    if (segment.kind === "text") copied += segment.text;
+    else copied = copied.replace(SPACE_BEFORE, "");
+  }
+  return copied;
 }
 
 /*
@@ -144,6 +163,8 @@ const PILL_START = new RegExp(`[${PILL_BREAK}${PILL_OPEN}]`);
 // into sentinels after `withPills` had cleaned the answer.
 const SENTINEL_REFERENCES = /&#(?:x0*(?:e000|e001|feff)|0*(?:57344|57345|65279));/gi;
 const WHITESPACE = /\s/;
+/** What may stand between two pills that are drawn as one: space, and BREAK. */
+const GAP = new RegExp(`^[\\s${PILL_BREAK}]*$`);
 
 /**
  * Whether the character before a marker needs BREAK between them.
@@ -224,12 +245,15 @@ const LINKS = new Set(["link", "linkReference"]);
 const IMAGES = new Set(["image", "imageReference"]);
 
 /**
- * Turns the sentinels of `withPills` back into badges, as a remark plugin.
+ * Turns the sentinels of `withPills` back into pills, as a remark plugin.
  *
- * A badge becomes a `citation-pill` element, a name no Markdown, rehype plugin
+ * A pill becomes a `citation-pill` element, a name no Markdown, rehype plugin
  * or KaTeX output can produce, so the component that draws it is the only one
- * that can. Where a badge cannot sit — code, math, raw HTML, a link's text (the
- * badge is a button, and a button inside a link is invalid), an image's alt —
+ * that can. Pills side by side, with nothing but space between them, become
+ * one element carrying every number (`numbers="1,3"`), drawn as «name +1»:
+ * ChatGPT and Open WebUI merge a run of citations the same way (read 11
+ * October 2026). Where a pill cannot sit — code, math, raw HTML, a link's text
+ * (the pill is a link, and a link inside a link is invalid), an image's alt —
  * the sentinel is written back as the marker's own text.
  *
  * Nothing here throws, whatever the model wrote. A number with no badge behind
@@ -250,15 +274,26 @@ export function remarkPills(badges: readonly Badge[]) {
     };
     for (const match of value.matchAll(PILL)) {
       const number = match[1] ?? "";
-      text(value.slice(cursor, match.index));
-      if (byNumber.has(number)) {
-        nodes.push({
-          type: "citationPill",
-          children: [],
-          data: { hName: "citation-pill", hProperties: { number } },
-        });
+      const between = value.slice(cursor, match.index);
+      const last = nodes.at(-1);
+      const numbers = last?.data?.hProperties?.numbers;
+      if (byNumber.has(number) && numbers !== undefined && GAP.test(between)) {
+        // The pill before this one, with only space between: one pill.
+        const listed = numbers.split(",");
+        if (!listed.includes(number) && last?.data?.hProperties !== undefined) {
+          last.data.hProperties.numbers = [...listed, number].join(",");
+        }
       } else {
-        text(number);
+        text(between);
+        if (byNumber.has(number)) {
+          nodes.push({
+            type: "citationPill",
+            children: [],
+            data: { hName: "citation-pill", hProperties: { numbers: number } },
+          });
+        } else {
+          text(number);
+        }
       }
       cursor = match.index + match[0].length;
     }

@@ -1,6 +1,6 @@
 /**
  * What a reader is shown of a source: a short name for its pill, a title for
- * its card, and one entry per source rather than per excerpt.
+ * its card, where it opens, and one entry per source rather than per excerpt.
  *
  * None of it is stored; it is read off the citation. A web page's short name
  * is its host without `www.`, as ChatGPT and Open WebUI write the site's name
@@ -13,6 +13,7 @@
 import type { TFunction } from "i18next";
 
 import type { Citation } from "@/api/contract";
+import { sourceHref } from "@/api/sources";
 
 /** The host a reader recognises, without `www.`; the URL itself if it does not parse. */
 export function hostOf(url: string): string {
@@ -54,4 +55,54 @@ export function sourcesOf(citations: readonly Citation[]): Citation[] {
     seen.add(citation.marker);
     return true;
   });
+}
+
+/** How many words of the excerpt each end of a text fragment quotes. */
+const FRAGMENT_WORDS = 4;
+
+/** Markdown's marks in an excerpt, which the page shows as layout, not as text. */
+const MARKUP = /[#*_`|>]/g;
+
+/** A term of a text fragment, with the characters its syntax reserves escaped. */
+function fragmentTerm(words: readonly string[]): string {
+  return encodeURIComponent(words.join(" ")).replace(/-/g, "%2D");
+}
+
+/**
+ * Where a source opens.
+ *
+ * A slide opens at its page in the browser's PDF viewer (`sourceHref`). A web
+ * page opens with a text fragment, `#:~:text=start,end` (WICG Text
+ * Fragments), quoting the first and last words of the excerpt's longest line,
+ * so the browser scrolls to the passage and highlights it, as Open WebUI does
+ * (read 11 October 2026). One line, because a heading and the paragraph under
+ * it are two blocks on the page, and a term spanning both would not be found.
+ * Where the page does not hold those words verbatim, or the
+ * browser has no text fragments, the page opens at its top, as it did before;
+ * a PDF on the web gets no fragment, since a PDF viewer reads none.
+ *
+ * `null` for a slide stored before its key existed: there is nothing to open.
+ */
+export function sourceLink(citation: Citation): string | null {
+  if (citation.kind === "slides" || citation.url === null) {
+    return citation.source_sha256 == null
+      ? null
+      : sourceHref(citation.source_sha256, citation.page);
+  }
+  let path: string;
+  try {
+    path = new URL(citation.url).pathname;
+  } catch {
+    return citation.url;
+  }
+  const words = citation.text
+    .split("\n")
+    .map((line) => line.replace(MARKUP, " ").split(/\s+/).filter(Boolean))
+    .reduce<string[]>((longest, line) => (line.length > longest.length ? line : longest), []);
+  if (path.toLowerCase().endsWith(".pdf") || words.length === 0) return citation.url;
+  const quoted =
+    words.length <= 2 * FRAGMENT_WORDS
+      ? fragmentTerm(words)
+      : `${fragmentTerm(words.slice(0, FRAGMENT_WORDS))},${fragmentTerm(words.slice(-FRAGMENT_WORDS))}`;
+  return `${citation.url}${citation.url.includes("#") ? "" : "#"}:~:text=${quoted}`;
 }
