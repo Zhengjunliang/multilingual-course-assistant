@@ -106,3 +106,21 @@ export function sourceLink(citation: Citation): string | null {
       : `${fragmentTerm(words.slice(0, FRAGMENT_WORDS))},${fragmentTerm(words.slice(-FRAGMENT_WORDS))}`;
   return `${citation.url}${citation.url.includes("#") ? "" : "#"}:~:text=${quoted}`;
 }
+
+/** How much of an excerpt a card or a row shows, in characters. */
+const EXCERPT_CHARS = 140;
+
+/**
+ * The start of an excerpt as prose: Markdown's marks gone, whitespace
+ * collapsed, cut at a word with an ellipsis once it runs past
+ * `EXCERPT_CHARS`. Cut here rather than clipped by CSS: clipped lines are
+ * still text, laid out under whatever follows, and axe cannot then measure
+ * the excerpt's contrast (frontend/e2e/a11y.spec.ts).
+ */
+export function excerptOf(text: string): string {
+  const prose = text.replace(MARKUP, " ").replace(/\s+/g, " ").trim();
+  if (prose.length <= EXCERPT_CHARS) return prose;
+  const cut = prose.slice(0, EXCERPT_CHARS);
+  const space = cut.lastIndexOf(" ");
+  return `${space > 0 ? cut.slice(0, space) : cut}…`;
+}

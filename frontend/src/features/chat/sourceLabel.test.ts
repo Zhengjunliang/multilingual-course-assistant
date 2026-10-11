@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Citation } from "@/api/contract";
 import i18n from "@/i18n";
-import { hostOf, shortName, sourceLink, sourcesOf, titleOf } from "./sourceLabel";
+import { excerptOf, hostOf, shortName, sourceLink, sourcesOf, titleOf } from "./sourceLabel";
 
 const t = i18n.getFixedT("it");
 
@@ -110,5 +110,21 @@ describe("where a source opens", () => {
     const pdf = "https://ingegneria.unifi.it/upload/sub/CALENDARIO_NOV_DIC_2026_LT.pdf";
 
     expect(sourceLink(web(pdf))).toBe(pdf);
+  });
+});
+
+describe("an excerpt as a card shows it", () => {
+  it("is the prose without Markdown's marks, whole when short", () => {
+    expect(excerptOf("## Iscrizioni\n\n| Rata | 30 settembre |")).toBe(
+      "Iscrizioni Rata 30 settembre",
+    );
+  });
+
+  it("is cut at a word, with an ellipsis, when long", () => {
+    const long = `${"parola ".repeat(30)}fine`;
+    const shown = excerptOf(long);
+
+    expect(shown.endsWith("parola…")).toBe(true);
+    expect(shown.length).toBeLessThanOrEqual(141);
   });
 });

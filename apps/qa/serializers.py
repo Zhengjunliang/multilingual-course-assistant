@@ -151,11 +151,12 @@ class AskRequest(serializers.Serializer):
 class MessageSerializer(serializers.ModelSerializer[Message]):
     """One stored turn, in the shape the interface already knows how to draw.
 
-    `citations` and `route` come back as they were stored, which is the shape
-    the `start` event delivered them in (apps/qa/contract.py). That is the whole
-    point of storing them: a reopened conversation renders through exactly the
-    same code as a live one, badges and greyed-out sources included, instead of
-    a second rendering path for history that would drift from the first.
+    `citations`, `route` and `search_ms` come back as they were stored, which is
+    the shape the `start` event delivered them in (apps/qa/contract.py). That is
+    the whole point of storing them: a reopened conversation renders through
+    exactly the same code as a live one, pills, sources and process line
+    included, instead of a second rendering path for history that would drift
+    from the first.
     """
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]

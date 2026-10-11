@@ -13,7 +13,7 @@
  * that by naming the tag; a mounted turn answers it with `closest`.
  */
 
-import { act, useState } from "react";
+import { act } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
@@ -70,14 +70,7 @@ function view(t: Turn, live = false, thinking = false, visitor = false): string 
   // A router because a visitor's turn may link to the login page.
   return render(
     <MemoryRouter>
-      <TurnView
-        turn={t}
-        live={live}
-        thinking={thinking}
-        highlighted={null}
-        onHighlight={() => {}}
-        visitor={visitor}
-      />
+      <TurnView turn={t} live={live} thinking={thinking} visitor={visitor} />
     </MemoryRouter>,
   );
 }
@@ -113,14 +106,7 @@ describe("the process line", () => {
     // thing in the quietest voice available. Guarding the negative keeps a
     // later tidy-up from putting it back.
     const { container, unmount } = mount(
-      <TurnView
-        turn={turn()}
-        live={false}
-        thinking={false}
-        highlighted={null}
-        onHighlight={() => {}}
-        visitor={false}
-      />,
+      <TurnView turn={turn()} live={false} thinking={false} visitor={false} />,
     );
     const line = container.querySelector("summary")?.closest(TYPE_SIZES);
     if (line == null) throw new Error("no type size is set around the process line");
@@ -133,21 +119,21 @@ describe("the process line", () => {
 });
 
 describe("the order of a turn", () => {
-  it("puts the sources above the answer", () => {
+  it("puts the answer first and its sources after it", () => {
     const html = view(turn());
-    const sources = html.indexOf("Fonti");
+    const line = html.indexOf("Ricerca completata");
     const answer = html.indexOf("La scadenza");
+    const sources = html.indexOf("Fonti");
 
-    expect(sources).toBeGreaterThan(-1);
-    expect(answer).toBeGreaterThan(-1);
-    expect(sources).toBeLessThan(answer);
+    expect(line).toBeGreaterThan(-1);
+    expect([line < answer, answer < sources]).toEqual([true, true]);
   });
 
-  it("shows the sources while the answer is still being written", () => {
-    const html = view(turn({ answer: "", complete: false }), true);
+  it("has nothing under the answer while it is still being written", () => {
+    const html = view(turn({ answer: "La scadenza", complete: false }), true);
 
-    expect(html).toContain("Fonti");
-    expect(html).toContain("Ricerca completata");
+    expect(html).not.toContain("Fonti");
+    expect(html).not.toContain("Copia la risposta");
   });
 });
 
@@ -165,8 +151,6 @@ describe("the answer's language", () => {
         })}
         live={false}
         thinking={false}
-        highlighted={null}
-        onHighlight={() => {}}
         visitor={false}
       />,
     );
@@ -184,9 +168,8 @@ describe("the answer's language", () => {
     // its own on the prose (DESIGN.md, Typography).
     expect(classes).toContain("text-reading");
     expect(classes.some((name) => name.startsWith("font-serif"))).toBe(false);
-    // The route line and the sources are the interface's and the excerpts' own
-    // languages; only the question and the answer say "zh". Citation cards
-    // carry their own.
+    // The process line is the interface's language and each source its own;
+    // only the question and the answer say "zh".
     expect(question).toBe("zh");
     expect(marked.filter((lang) => lang === "zh")).toHaveLength(2);
   });
@@ -210,39 +193,67 @@ describe("the cat beside the answer", () => {
   });
 });
 
-/** The page's wiring of the highlight (ChatPage.tsx), around one turn. */
-function Highlighting({ of }: { of: Turn }) {
-  const [highlighted, setHighlighted] = useState<string | null>(null);
-  return (
-    <TurnView
-      turn={of}
-      live={false}
-      thinking={false}
-      highlighted={highlighted}
-      onHighlight={setHighlighted}
-      visitor={false}
-    />
-  );
+function mounted(of: Turn) {
+  return mount(<TurnView turn={of} live={false} thinking={false} visitor={false} />);
 }
 
-describe("a badge in the answer", () => {
-  it("rings the source of the pill a reader clicks, and keeps focus on the pill", () => {
-    const { container, unmount } = mount(<Highlighting of={turn()} />);
-    const pill = container.querySelector<HTMLButtonElement>('button[aria-label$="[Excerpt 1]"]');
-    if (pill === null) throw new Error("the answer has no badge for [Excerpt 1]");
-
-    act(() => {
-      pill.focus();
-      pill.click();
-    });
-    const card = container.querySelector('[data-marker="[Excerpt 1]"] > *');
-    // The same element, not merely a focused one: a badge rebuilt by the
-    // re-render would leave focus on the body.
-    const focused = document.activeElement;
+describe("a pill in the answer", () => {
+  it("names its source, and a click opens the source in a new tab", () => {
+    const { container, unmount } = mounted(turn());
+    const pill = container.querySelector<HTMLAnchorElement>("a[data-pill]");
+    const seen = {
+      text: pill?.textContent,
+      href: pill?.getAttribute("href"),
+      target: pill?.target,
+      label: pill?.getAttribute("aria-label"),
+    };
     unmount();
 
-    expect(card?.className).toContain("ring-ink");
-    expect(focused).toBe(pill);
+    expect(seen).toEqual({
+      text: "Slide p. 3",
+      href: `/api/sources/${"ab".repeat(32)}#page=3`,
+      target: "_blank",
+      label: "Fonte: Slide p. 3",
+    });
+  });
+});
+
+describe("the row under the answer", () => {
+  it("copies the answer without its markers, and says so", async () => {
+    const written: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (text: string) => void written.push(text) },
+    });
+    const { container, unmount } = mounted(turn());
+    const copy = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Copia la risposta"]',
+    );
+
+    await act(async () => copy?.click());
+    const said = container.querySelector('[role="status"]')?.textContent;
+    unmount();
+
+    expect(written).toEqual(["La scadenza è il 30 settembre."]);
+    expect(said).toBe("Risposta copiata");
+  });
+
+  it("opens the sources, the cited one first and the rest after it, none marked unused", () => {
+    const { container, unmount } = mounted(turn());
+    const open = [...container.querySelectorAll("button")].find((b) => b.textContent === "Fonti");
+
+    act(() => open?.click());
+    const panel = document.body.querySelector('[role="dialog"]');
+    const lists = [...(panel?.querySelectorAll("ol") ?? [])].map((list) =>
+      [...list.querySelectorAll("a")].map((row) => row.getAttribute("href")),
+    );
+    const text = panel?.textContent ?? "";
+    unmount();
+
+    const at = (page: number) => `/api/sources/${"ab".repeat(32)}#page=${page}`;
+    expect(lists).toEqual([[at(3)], [at(4), at(5)]]);
+    expect(text).toContain("Altre consultate"); // spellchecker:disable-line
+    expect(text).not.toContain("non citata");
   });
 });
 

@@ -2,7 +2,7 @@
  * What an answer turns into on screen, read off the markup.
  *
  * Two kinds of claim live here. The Markdown a model writes should read as
- * formatting, with the citation badges surviving the parse wherever they sit.
+ * formatting, with the citation pills surviving the parse wherever they sit.
  * And nothing a model writes may come alive except an absolute http(s) link —
  * a model repeats what a retrieved page told it to, so every case in the
  * "inert" table is an injection that has to stay text.
@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import type { Citation } from "@/api/contract";
 import { PILL_BREAK, PILL_CLOSE, PILL_OPEN } from "@/lib/markers";
 import { render } from "@/test/render";
 import { AnswerStream } from "./AnswerStream";
@@ -21,6 +22,42 @@ const BADGES = [
   { marker: WEB, number: 2 },
 ];
 
+const SLIDE: Citation = {
+  marker: SLIDES,
+  kind: "slides",
+  text: "Lossless compression keeps every bit.",
+  heading_path: ["Compressione"],
+  course: "B028451",
+  academic_year: "2025-2026",
+  locale: "en",
+  score: 0.5,
+  source_file: "PPM-05-compressione.pdf",
+  source_sha256: "ab".repeat(32),
+  page: 3,
+  url: null,
+  fetch_date: null,
+};
+
+const CITATIONS: Citation[] = [
+  SLIDE,
+  {
+    ...SLIDE,
+    marker: WEB,
+    kind: "web",
+    text: "Il calendario delle lezioni.",
+    heading_path: ["Calendario"],
+    locale: "it",
+    source_file: "",
+    source_sha256: null,
+    page: 1,
+    url: "https://www.unifi.it/p602.html",
+    fetch_date: "2026-09-20",
+  },
+];
+
+/** A pill's whole element: the link `CitationPill` draws, marked `data-pill`. */
+const PILL = /<a[^>]*data-pill[^>]*>(.*?)<\/a>/;
+
 function answer(text: string, complete = true): string {
   return render(
     <AnswerStream
@@ -28,7 +65,7 @@ function answer(text: string, complete = true): string {
       badges={BADGES}
       complete={complete}
       live={false}
-      onBadgeClick={() => {}}
+      citations={CITATIONS}
     />,
   );
 }
@@ -68,33 +105,33 @@ describe("an answer", () => {
   });
 
   it.each([
-    ["in a sentence", `Le tasse scadono il 30 settembre ${SLIDES}.`, "settembre <button"],
-    ["that is a web marker", `Vedi il calendario ${WEB}.`, `aria-label="Fonte 2: ${WEB}"`],
+    ["in a sentence", `Le tasse scadono il 30 settembre ${SLIDES}.`, "settembre <a"],
+    ["that is a web marker", `Vedi il calendario ${WEB}.`, 'aria-label="Fonte: unifi.it"'],
     [
       "right after a URL",
       `Vedi https://www.unifi.it/p602.html${SLIDES} per le date.`,
       'href="https://www.unifi.it/p602.html"',
     ],
-    ["opening a bold run", `**${SLIDES} Le tasse** scadono.`, "<strong><button"],
+    ["opening a bold run", `**${SLIDES} Le tasse** scadono.`, "<strong><a"],
     [
       "after a bold run that ends in punctuation",
       `**Nota.**${SLIDES} Le tasse scadono.`,
-      "<strong>Nota.</strong><button",
+      "<strong>Nota.</strong><a",
     ],
     [
       "at the start of the answer",
       `${SLIDES} Le tasse scadono.`,
-      '<p class="whitespace-pre-line"><button',
+      '<p class="whitespace-pre-line"><a',
     ],
     // Two links micromark leaves alone and GFM's later pass finds, running to
     // the next ASCII space: after full-width punctuation, and inside a `[`.
-    ["after a link found late", `详情见官网（www.unifi.it）${WEB}的说明。`, "</a><button"],
-    ["inside an open bracket", `[vedi https://x.it/a${SLIDES}]`, "</a><button"],
+    ["after a link found late", `详情见官网（www.unifi.it）${WEB}的说明。`, "</a><a"],
+    ["inside an open bracket", `[vedi https://x.it/a${SLIDES}]`, "</a><a"],
   ])("makes one pill of a marker %s, with no link inside it", (_, text, around) => {
     const html = answer(text);
 
-    expect(count(html, "<button")).toBe(1);
-    expect(html.match(/<button[^>]*>(.*?)<\/button>/)?.[1]).not.toContain("<a");
+    expect(count(html, "data-pill")).toBe(1);
+    expect(html.match(PILL)?.[1]).not.toContain("<a");
     expect(html).toContain(around);
     expect(html).not.toContain("**");
     expect(html).not.toMatch(SENTINEL);
@@ -106,8 +143,8 @@ describe("an answer", () => {
     const spelled = answer(`Vedi ${PILL_OPEN}1${PILL_CLOSE}.`, false);
 
     expect(html).toContain(SLIDES);
-    expect(html).not.toContain("<button");
-    expect(spelled).not.toContain("<button");
+    expect(html).not.toContain("data-pill");
+    expect(spelled).not.toContain("data-pill");
   });
 
   it("draws the caret after the last word only while words arrive", () => {
@@ -118,7 +155,7 @@ describe("an answer", () => {
           badges={BADGES}
           complete={false}
           live={live}
-          onBadgeClick={() => {}}
+          citations={CITATIONS}
         />,
       );
 
@@ -168,7 +205,7 @@ describe("an answer", () => {
     const html = answer(text);
 
     expect(html).toContain(shown);
-    expect(html).not.toContain("<button");
+    expect(html).not.toContain("data-pill");
     expect(html).not.toMatch(SENTINEL);
   });
 
@@ -240,12 +277,12 @@ describe("an answer", () => {
     ["a relative link", "[calendario](p602.html)", "calendario", "<a"],
     ["an image", "![grafico](https://attacker.example/p.png?q=1)", "grafico", "attacker.example"],
     ["a link with no host", "[x](https://)", ">x<", "<a"],
-    ["a stray private-use character", `a ${PILL_OPEN} b &#xE000; c`, "a  b  c", "<button"],
+    ["a stray private-use character", `a ${PILL_OPEN} b &#xE000; c`, "a  b  c", "data-pill"],
     [
       "a pill spelled with character references",
       "see &#xE000;1&#xE001; now",
       "see 1 now",
-      "<button",
+      "data-pill",
     ],
   ])("keeps %s inert", (_, text, shown, absent) => {
     const html = answer(text);

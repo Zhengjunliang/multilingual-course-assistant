@@ -6,11 +6,12 @@ folders, sharing, edits — is a feature this thesis is not making a claim about
 The sidebar's title is derived from the first message rather than stored,
 because a stored one is a second copy of that text free to disagree with it.
 
-**Why the citations and the routing decision are columns here.** They arrive in
-the `start` event, which exists once and is gone. Reopening a conversation from
-the sidebar replays it from these rows, and without them an older turn comes
-back as bare prose: no source cards, no citation badges, no visible routing
-decision — the three things the interface exists to show. They are stored as
+**Why the citations, the routing decision and the search time are columns
+here.** They arrive in the `start` event, which exists once and is gone.
+Reopening a conversation from the sidebar replays it from these rows, and
+without them an older turn comes back as bare prose: no source pills, no
+sources panel, no line saying where and how long the answer was searched —
+what the interface exists to show. They are stored as
 JSON rather than as a third and fourth table because `Citation` and
 `RouteDecision` are frozen pydantic models that already own those shapes
 (apps/qa/contract.py, rag/agent.py); a Django table would be the same schema

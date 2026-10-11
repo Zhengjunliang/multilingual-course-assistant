@@ -7,8 +7,8 @@
  *
  * - `theme/ThemeProvider.tsx` calls `window.matchMedia` inside a `useState`
  *   initialiser, so it throws before a component can render at all;
- * - `features/chat/CitationList.tsx` calls `scrollIntoView` when the
- *   highlighted card changes;
+ * - `routes/ChatPage.tsx` calls `scrollIntoView` to follow an answer as it
+ *   is written;
  * - Radix positions a dropdown with a `ResizeObserver`.
  *
  * These stubs are deliberately dumb, and the first one has a consequence worth

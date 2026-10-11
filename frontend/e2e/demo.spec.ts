@@ -36,9 +36,13 @@ test.describe("a signed-in student", () => {
     await page.getByRole("button", { name: it.ask.submit }).click();
 
     await expect(page.getByText("entro cinque giorni dall'appello")).toBeVisible();
-    await expect(page.getByText(it.route.unifi_web)).toBeVisible();
-    await expect(page.getByRole("heading", { name: it.citations.title })).toBeVisible();
-    await expect(page.locator('[data-marker="[Excerpt 1]"]')).toBeVisible();
+    // One folded line above the answer: the fixture's search took 2400 ms.
+    await expect(page.getByText(it.process.done.replace("{{seconds}}", "2"))).toBeVisible();
+    // In the answer, a pill naming the site, which opens the page at its passage.
+    const pill = page.locator("a[data-pill]");
+    await expect(pill).toHaveText("unifi.it");
+    await expect(pill).toHaveAttribute("href", /^https:\/\/www\.unifi\.it\/esami#:~:text=/);
+    await expect(page.getByRole("button", { name: it.sources.title })).toBeVisible();
   });
 
   test("asks about the slides and gets a citation naming the file and the page", async ({
@@ -50,15 +54,17 @@ test.describe("a signed-in student", () => {
     await page.getByLabel(it.ask.label).fill(SLIDES_QUESTION);
     await page.getByRole("button", { name: it.ask.submit }).click();
 
-    const card = page.locator('[data-marker="[Excerpt 1]"]');
-    const pageLink = card.getByRole("link", { name: it.citations.page.replace("{{page}}", "12") });
-    await expect(pageLink).toHaveAttribute(
-      "href",
-      `/api/sources/${SLIDES_CITATION.source_sha256}#page=12`,
-    );
-    // The file is in the name, not only in the hint a touch screen cannot open.
-    await expect(pageLink).toHaveAccessibleName(/^pagina 12 .*basi-di-dati-05\.pdf/);
-    await expect(card.getByText("B003 · 2025-2026")).toBeVisible();
+    const slide = `/api/sources/${SLIDES_CITATION.source_sha256}#page=12`;
+    const pill = page.locator("a[data-pill]");
+    await expect(pill).toHaveText("Slide p. 12");
+    await expect(pill).toHaveAttribute("href", slide);
+
+    // The sources panel names the file, the page and the edition.
+    await page.getByRole("button", { name: it.sources.title }).click();
+    const row = page.getByRole("dialog", { name: it.sources.title }).getByRole("link");
+    await expect(row).toHaveAttribute("href", slide);
+    await expect(row).toContainText("basi-di-dati-05.pdf · p. 12");
+    await expect(row).toContainText("B003 · 2025-2026");
   });
 });
 

@@ -18,7 +18,7 @@
  * theme in variables and nowhere else.
  */
 
-import { LogOut, UserRound } from "lucide-react";
+import { Copy, LogOut, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
+import { HoverCard } from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { Sheet } from "@/components/ui/sheet";
@@ -234,15 +235,37 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
         name="Tooltip"
         note="Opens for a pointer that rests and for keyboard focus, closes on Escape; ink with canvas lettering, the inverse of either theme. It opens in a portal, so it follows the page theme. It only repeats what the name or the visible text already says."
       >
-        <Tooltip content="[PPM 3]">
-          <button
-            type="button"
-            aria-label="Fonte 1: [PPM 3]"
-            className="rounded-full bg-mark px-tight font-medium text-caption text-ink"
-          >
-            1
-          </button>
+        <Tooltip content="Copia la risposta">
+          <Button type="button" variant="ghost" size="icon" aria-label="Copia la risposta">
+            <Copy aria-hidden className="size-icon" />
+          </Button>
         </Tooltip>
+      </Specimen>
+
+      <Specimen
+        name="HoverCard"
+        note="Previews where a link goes: it opens for a pointer resting on the link for 200 ms and for keyboard focus, and closes on Escape or when the pointer leaves. Radix keeps it out of the tab order, so what it holds is reachable elsewhere too, and a click follows the link. A card's surface, in a portal that follows the page theme."
+      >
+        <HoverCard
+          content={
+            <>
+              <span className="text-caption text-muted">unifi.it</span>
+              <span className="font-medium">Iscrizioni</span>
+              <span className="line-clamp-2 text-muted">
+                Le iscrizioni al primo anno si chiudono il 30 settembre, salvo proroghe.
+              </span>
+            </>
+          }
+        >
+          <a
+            href="https://www.unifi.it/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="self-start rounded-full bg-mark px-tight font-medium text-caption text-muted transition-colors hover:bg-ink hover:text-canvas data-[state=open]:bg-ink data-[state=open]:text-canvas"
+          >
+            unifi.it
+          </a>
+        </HoverCard>
       </Specimen>
 
       <Specimen

@@ -84,17 +84,19 @@
     "read_other": "Letti {{count}} estratti"
   },
   "sources": {
-    "slide": "Slide p. {{page}}"
-  },
-  "citations": {
+    "slide": "Slide p. {{page}}",
     "title": "Fonti",
-    "empty": "Nessun estratto recuperato per questa domanda.",
-    "uncited": "recuperata, non citata",
-    "badge": "Fonte {{number}}: {{marker}}",
-    "page": "pagina {{page}}",
-    "openPage": "pagina {{page}} di {{file}}, in una nuova scheda",
-    "fetched": "recuperata il {{date}}",
-    "more": "+{{count}}"
+    "others": "Altre consultate",
+    "close": "Chiudi le fonti",
+    "filePage": "{{file}} · p. {{page}}",
+    "openPage": "Apri la pagina",
+    "openSlide": "Apri la slide a pagina {{page}}",
+    "pill_one": "Fonte: {{names}}",
+    "pill_other": "Fonti: {{names}}"
+  },
+  "answer": {
+    "copy": "Copia la risposta",
+    "copied": "Risposta copiata"
   },
   "error": {
     "incomplete": "La risposta si è interrotta prima della fine."

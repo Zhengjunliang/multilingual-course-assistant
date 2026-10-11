@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { Citation } from "@/api/contract";
 import type { Badge } from "@/lib/markers";
 import { withPills } from "@/lib/markers";
 import { AnswerMarkdown } from "./AnswerMarkdown";
@@ -45,7 +46,8 @@ interface AnswerStreamProps {
   complete: boolean;
   /** True while tokens are still arriving, so the caret is shown only then. */
   live: boolean;
-  onBadgeClick: (marker: string) => void;
+  /** The answer's citations, which its pills name and link to. */
+  citations: readonly Citation[];
 }
 
 /**
@@ -57,14 +59,7 @@ interface AnswerStreamProps {
  * a formula is not re-laid out on every token; until KaTeX arrives it shows as
  * its LaTeX source.
  */
-export function AnswerStream({
-  text,
-  lang,
-  badges,
-  complete,
-  live,
-  onBadgeClick,
-}: AnswerStreamProps) {
+export function AnswerStream({ text, lang, badges, complete, live, citations }: AnswerStreamProps) {
   const { t } = useTranslation();
 
   if (!complete) {
@@ -74,7 +69,7 @@ export function AnswerStream({
           text={text}
           lang={lang}
           badges={NO_BADGES}
-          onBadgeClick={onBadgeClick}
+          citations={citations}
           streaming={live}
         />
         {live && <span className="sr-only">{t("status.streaming")}</span>}
@@ -87,7 +82,7 @@ export function AnswerStream({
       text={withPills(text, badges)}
       lang={lang}
       badges={badges}
-      onBadgeClick={onBadgeClick}
+      citations={citations}
     />
   );
   if (!MATH.test(text)) return plain;
@@ -97,7 +92,7 @@ export function AnswerStream({
         text={withPills(text, badges)}
         lang={lang}
         badges={badges}
-        onBadgeClick={onBadgeClick}
+        citations={citations}
       />
     </Suspense>
   );
