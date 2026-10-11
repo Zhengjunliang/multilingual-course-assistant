@@ -35,8 +35,95 @@ export interface Drawing {
   dots: readonly Circle[];
 }
 
-export const HEAD =
-  "M13.5 30.5C12.2 23.5 12.8 16.6 15 10.8C19 13.4 22.4 16.4 25 19.4C29.8 17.9 35.2 17.9 40 19.2C43 15.6 46.6 12.6 50.6 10.6C52.4 16.4 52.6 23 51.2 29.6C55.2 34.6 55.6 42 51.6 47.4C46.6 53.8 38.6 55.8 31.8 55.6C26.4 55.5 21.2 54.6 17.4 52.8L10.4 58.8L12.6 49.6C9.4 44.4 9.6 35.8 13.5 30.5Z";
+type Point = readonly [number, number];
+
+/**
+ * The head's outline as its points: the ends of each curve named for where
+ * they sit, the control points between them numbered in drawing order. Kept
+ * as points, rather than as a path, so the living cat (#173) can turn an ear
+ * or the tail by moving a few of them; at rest they draw `HEAD`.
+ */
+const HEAD_POINTS = {
+  cheekLeft: [13.5, 30.5],
+  c1: [12.2, 23.5],
+  c2: [12.8, 16.6],
+  earLeft: [15, 10.8],
+  c3: [19, 13.4],
+  c4: [22.4, 16.4],
+  browLeft: [25, 19.4],
+  c5: [29.8, 17.9],
+  c6: [35.2, 17.9],
+  browRight: [40, 19.2],
+  c7: [43, 15.6],
+  c8: [46.6, 12.6],
+  earRight: [50.6, 10.6],
+  c9: [52.4, 16.4],
+  c10: [52.6, 23],
+  cheekRight: [51.2, 29.6],
+  c11: [55.2, 34.6],
+  c12: [55.6, 42],
+  jawRight: [51.6, 47.4],
+  c13: [46.6, 53.8],
+  c14: [38.6, 55.8],
+  chin: [31.8, 55.6],
+  c15: [26.4, 55.5],
+  c16: [21.2, 54.6],
+  tailTop: [17.4, 52.8],
+  tailTip: [10.4, 58.8],
+  tailRoot: [12.6, 49.6],
+  c17: [9.4, 44.4],
+  c18: [9.6, 35.8],
+} as const satisfies Record<string, Point>;
+
+type HeadPoint = keyof typeof HEAD_POINTS;
+
+const HEAD_COMMANDS =
+  "M cheekLeft C c1 c2 earLeft C c3 c4 browLeft C c5 c6 browRight C c7 c8 earRight " +
+  "C c9 c10 cheekRight C c11 c12 jawRight C c13 c14 chin C c15 c16 tailTop " +
+  "L tailTip L tailRoot C c17 c18 cheekLeft Z";
+
+/**
+ * What can turn, each about its own pivot. A weight is the share of the turn
+ * a point takes: the ear's tip all of it, the curves into it less the further
+ * they are, so the outline bends at the base instead of breaking there. The
+ * tail is the speech bubble's tip, which sways from its root.
+ */
+export const RIGS = {
+  earLeft: { pivot: [20, 24], weights: { c1: 0.15, c2: 0.6, earLeft: 1, c3: 0.75, c4: 0.35 } },
+  earRight: { pivot: [45, 23], weights: { c7: 0.35, c8: 0.75, earRight: 1, c9: 0.6, c10: 0.15 } },
+  tail: { pivot: [16, 51.5], weights: { tailTip: 1 } },
+} as const satisfies Record<string, { pivot: Point; weights: Partial<Record<HeadPoint, number>> }>;
+
+export type Turns = Partial<Record<keyof typeof RIGS, number>>;
+
+const rotate = ([x, y]: Point, [cx, cy]: Point, angle: number): Point => {
+  const sin = Math.sin(angle);
+  const cos = Math.cos(angle);
+  return [cx + (x - cx) * cos - (y - cy) * sin, cy + (x - cx) * sin + (y - cy) * cos];
+};
+
+/** Two decimals at most, and no trailing zeros: "13.5", not "13.50". */
+const coordinate = (value: number) => String(Number(value.toFixed(2)));
+
+/** The head's outline with each rig turned by its angle, in radians. */
+export function outline(turns: Turns = {}): string {
+  const points: Record<string, Point> = { ...HEAD_POINTS };
+  for (const [rig, angle] of Object.entries(turns)) {
+    const { pivot, weights } = RIGS[rig as keyof typeof RIGS];
+    for (const [name, weight] of Object.entries(weights)) {
+      points[name] = rotate(HEAD_POINTS[name as HeadPoint], pivot, angle * weight);
+    }
+  }
+  return HEAD_COMMANDS.split(" ")
+    .map((word) => {
+      const point = points[word];
+      return point === undefined ? word : `${coordinate(point[0])} ${coordinate(point[1])}`;
+    })
+    .join(" ")
+    .replace(/ ?([MCLZ]) ?/g, "$1");
+}
+
+export const HEAD = outline();
 
 /** Half-lidded: a flat lid line across the top of each eye. */
 const LIDDED = [
