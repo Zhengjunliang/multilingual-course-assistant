@@ -26,6 +26,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { lint } from "@google/design.md/linter";
 
+import { APP_NAME } from "../src/brand/fumetto.ts";
 import { declarations, hex, PAIRS, parseOklch, STYLESHEET, THEMES } from "./palette.mjs";
 
 const DESIGN_MD = fileURLToPath(new URL("../../DESIGN.md", import.meta.url));
@@ -41,7 +42,7 @@ function tokens() {
   const theme = declarations(STYLESHEET, "@theme {");
   const lines = [
     "version: 'alpha'",
-    "name: 'Multilingual Course Assistant'",
+    `name: ${quote(APP_NAME)}`,
     `description: ${quote("A university lab tool in the university's blue on greys tinted toward it, with a serif for reading. Generated from frontend/src/index.css by frontend/scripts/design-md.mjs.")}`,
     "colors:",
     `  primary: ${quote("{colors.accent}")}`,

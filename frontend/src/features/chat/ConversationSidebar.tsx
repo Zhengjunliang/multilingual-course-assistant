@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
 import type { ConversationSummary } from "@/api/conversations";
+import { APP_NAME } from "@/brand/fumetto";
 import { MascotMark } from "@/components/Mascot";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -89,12 +90,12 @@ export function ConversationSidebar({
           hold it, which is the trade the reference interfaces make: the title
           is where the product's own furniture is, and the reading column starts
           at the top of the screen. Beside the mark and at body size: the mark
-          carries the brand, and the longest name, the Italian one, has to fit
-          between it and the collapse button without being cut. */}
+          carries the brand, and the name has to fit between it and the
+          collapse button without being cut. */}
       <div className="flex items-center gap-tight">
         <MascotMark className="size-avatar" />
         <p className="min-w-0 flex-1 truncate py-tight font-semibold font-serif text-body text-ink">
-          {t("app.title")}
+          {APP_NAME}
         </p>
         {/* Only from `lg` up: below that the sidebar is a drawer, and a drawer
             already closes by tapping outside it or pressing Escape. */}
