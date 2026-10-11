@@ -154,8 +154,8 @@ test.describe("the chat mid-answer", () => {
   test("before the first word: nothing moves", async ({ page, api }) => {
     api.holdAnswer(campusStream(7).slice(0, 1));
     await ask(page);
-    // The fixture's search took 2400 ms, which the line rounds to 2 s.
-    await expect(page.getByText(it.process.done.replace("{{seconds}}", "2"))).toBeVisible();
+    // The fixture's search took 2400 ms, which the line shows as 3 s.
+    await expect(page.getByText(it.process.done.replace("{{seconds}}", "3"))).toBeVisible();
     expect(await moved(page)).toEqual([]);
   });
 

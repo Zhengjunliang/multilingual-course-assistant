@@ -2,7 +2,7 @@
 
 /**
  * The process line says how the answer was searched, loudly enough to be
- * read, and the sources sit above the answer rather than under it.
+ * read, and the sources come after the answer rather than above it.
  *
  * Both are assertions about the `start` event being spent rather than stored:
  * the route and the citations arrive together, before the first token, and the
@@ -80,7 +80,7 @@ describe("the process line", () => {
     const html = view(turn());
 
     expect(html).toContain("<details");
-    expect(html).toContain("Ricerca completata · 2 s");
+    expect(html).toContain("Ricerca completata · 3 s");
     expect(html).toContain("Cercato in entrambe le fonti");
     // The count is the start event's citations: RouteDecision has no field
     // for it, and none had to be added.
@@ -213,8 +213,19 @@ describe("a pill in the answer", () => {
       text: "Slide p. 3",
       href: `/api/sources/${"ab".repeat(32)}#page=3`,
       target: "_blank",
-      label: "Fonte: Slide p. 3",
+      label: null,
     });
+  });
+
+  it("merged, is named by what it shows and then every source it stands for", () => {
+    // WCAG 2.5.3: a voice user says what they see, «Slide p. 3 +1».
+    const { container, unmount } = mounted(
+      turn({ answer: "La scadenza è il 30 settembre. [Excerpt 1] [Excerpt 2]" }),
+    );
+    const pills = [...container.querySelectorAll("a[data-pill]")].map((pill) => pill.textContent);
+    unmount();
+
+    expect(pills).toEqual(["Slide p. 3 +1 fonti: Slide p. 3, Slide p. 4"]);
   });
 });
 
@@ -254,6 +265,45 @@ describe("the row under the answer", () => {
     expect(lists).toEqual([[at(3)], [at(4), at(5)]]);
     expect(text).toContain("Altre consultate"); // spellchecker:disable-line
     expect(text).not.toContain("non citata");
+  });
+
+  it("lists every source as one when the answer cited none of them", () => {
+    const { container, unmount } = mounted(turn({ answer: "La scadenza è il 30 settembre." }));
+    const open = [...container.querySelectorAll("button")].find((b) => b.textContent === "Fonti");
+
+    act(() => open?.click());
+    const panel = document.body.querySelector('[role="dialog"]');
+    const lists = [...(panel?.querySelectorAll("ol") ?? [])].map(
+      (list) => list.querySelectorAll("a").length,
+    );
+    const text = panel?.textContent ?? "";
+    unmount();
+
+    expect(lists).toEqual([3]);
+    expect(text).not.toContain("Altre consultate"); // spellchecker:disable-line
+  });
+
+  it("gives focus back to the sources button when the panel closes", async () => {
+    const { container, unmount } = mounted(turn());
+    const open = [...container.querySelectorAll("button")].find((b) => b.textContent === "Fonti");
+
+    act(() => {
+      open?.focus();
+      open?.click();
+    });
+    const close = document.body.querySelector<HTMLButtonElement>(
+      'button[aria-label="Chiudi le fonti"]',
+    );
+    // Radix moves focus back a task after the panel unmounts.
+    await act(async () => {
+      close?.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const focused = document.activeElement === open;
+    const expanded = open?.getAttribute("aria-expanded");
+    unmount();
+
+    expect({ focused, expanded }).toEqual({ focused: true, expanded: "false" });
   });
 });
 

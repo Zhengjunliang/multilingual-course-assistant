@@ -62,9 +62,9 @@ describe("the process line", () => {
     expect([first, later]).toEqual(["Ricerca in corso · 1 s", "Ricerca in corso · 3 s"]);
   });
 
-  it("folds into the server's seconds once it knows where it looked", () => {
+  it("folds into the server's seconds, rounded up as the count is, once it knows where it looked", () => {
     const { container, unmount } = mount(
-      <ProcessLine running route={ROUTE} searchMs={2600} citations={CITATIONS} />,
+      <ProcessLine running route={ROUTE} searchMs={2100} citations={CITATIONS} />,
     );
     const summary = container.querySelector("summary")?.textContent;
     const open = container.querySelector("details")?.open;

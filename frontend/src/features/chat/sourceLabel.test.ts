@@ -106,6 +106,34 @@ describe("where a source opens", () => {
     );
   });
 
+  it("reads the line as the page shows it: no bullet, a link as its text, never a table row", () => {
+    // The shape of a crawled excerpt of ingegneria.unifi.it/p537.html: with
+    // its bullet, the start term "- From 25 march" matched nothing on the page.
+    const bulleted = {
+      ...web("https://ingegneria.unifi.it/p537.html"),
+      text: "The School establishes the following Easter break period:\n- From 25 march to 14 April 2027 (inclusive), with no lessons.",
+    };
+    const linked = {
+      ...web("https://www.unifi.it/p602.html"),
+      text: "1. Compila la [domanda online](https://www.unifi.it/x) entro il 30 settembre",
+    };
+    const tabled = {
+      ...web("https://www.unifi.it/p603.html"),
+      text: "Prima rata, Scadenza = 30 settembre 2026 per tutti gli iscritti al primo anno\nLe rate si pagano online.",
+    };
+
+    expect([sourceLink(bulleted), sourceLink(linked), sourceLink(tabled)]).toEqual([
+      "https://ingegneria.unifi.it/p537.html#:~:text=From%2025%20march%20to,(inclusive)%2C%20with%20no%20lessons.",
+      "https://www.unifi.it/p602.html#:~:text=Compila%20la%20domanda%20online%20entro%20il%2030%20settembre",
+      "https://www.unifi.it/p603.html#:~:text=Le%20rate%20si%20pagano%20online.",
+    ]);
+  });
+
+  it("is nothing for a web address that is not an http(s) URL", () => {
+    expect(sourceLink(web("javascript:alert(1)//"))).toBeNull();
+    expect(sourceLink(web("/relative/page.html"))).toBeNull();
+  });
+
   it("is a PDF on the web as it is, since a PDF viewer reads no text fragment", () => {
     const pdf = "https://ingegneria.unifi.it/upload/sub/CALENDARIO_NOV_DIC_2026_LT.pdf";
 

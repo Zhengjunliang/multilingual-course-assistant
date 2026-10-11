@@ -30,6 +30,7 @@ import {
   Children,
   type ComponentProps,
   createContext,
+  isValidElement,
   type ReactElement,
   type ReactNode,
   useContext,
@@ -84,14 +85,18 @@ function CitationPill({ numbers }: { numbers?: string }) {
   if (first === undefined) return <>{numbers}</>;
 
   const href = sourceLink(first);
-  const label = t("sources.pill", {
-    count: sources.length,
-    names: sources.map((source) => shortName(source, t)).join(", "),
-  });
+  // The name a screen reader and voice control use starts with what the pill
+  // shows (WCAG 2.5.3, label in name); a merged pill then names every source
+  // its «+N» stands for.
   const pill = (
     <span className="whitespace-nowrap">
       {shortName(first, t)}
       {sources.length > 1 && ` +${sources.length - 1}`}
+      {sources.length > 1 && (
+        <span className="sr-only">
+          {` ${t("sources.pill", { names: sources.map((source) => shortName(source, t)).join(", ") })}`}
+        </span>
+      )}
     </span>
   );
   const look =
@@ -129,14 +134,7 @@ function CitationPill({ numbers }: { numbers?: string }) {
           {pill}
         </span>
       ) : (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={label}
-          data-pill
-          className={look}
-        >
+        <a href={href} target="_blank" rel="noopener noreferrer" data-pill className={look}>
           {pill}
         </a>
       )}
@@ -240,6 +238,28 @@ function ListItem({ children }: ComponentProps<"li">) {
   return <li className="whitespace-pre-line">{kept}</li>;
 }
 
+/**
+ * A paragraph that keeps the model's single line breaks (`whitespace-pre-line`):
+ * a line break is one to its reader, and plain Markdown would join the lines.
+ *
+ * A hard break, the two spaces the model ends a line with, reaches here as a
+ * `<br>` and then a newline (remark-rehype writes both), and under
+ * `whitespace-pre-line` the newline breaks the line a second time. The newline
+ * after a `<br>` goes.
+ */
+function Paragraph({ children }: ComponentProps<"p">) {
+  const parts = Children.toArray(children);
+  const kept = parts.flatMap((child, at) => {
+    const before = parts[at - 1];
+    if (typeof child !== "string" || !isValidElement(before) || before.type !== "br") {
+      return [child];
+    }
+    const rest = child.replace(/^\n/, "");
+    return rest === "" ? [] : [rest];
+  });
+  return <p className="whitespace-pre-line">{kept}</p>;
+}
+
 // The class passes through: GFM labels a footnote section with a heading it
 // marks `sr-only`, in English whatever the interface language.
 function heading({ children, className }: { children?: ReactNode; className?: string }) {
@@ -247,9 +267,7 @@ function heading({ children, className }: { children?: ReactNode; className?: st
 }
 
 const COMPONENTS = {
-  // A model's single line break is a line break to its reader; plain Markdown
-  // would join the lines.
-  p: ({ children }) => <p className="whitespace-pre-line">{children}</p>,
+  p: Paragraph,
   ul: ({ children }) => <ul className="flex list-disc flex-col gap-hair pl-gutter">{children}</ul>,
   ol: ({ children }) => (
     <ol className="flex list-decimal flex-col gap-hair pl-gutter">{children}</ol>

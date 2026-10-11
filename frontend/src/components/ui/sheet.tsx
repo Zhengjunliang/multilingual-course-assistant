@@ -11,7 +11,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,12 @@ interface SheetProps {
   closeLabel?: string;
   /** The edge it comes from. The right one is the full width of a phone. */
   side?: "left" | "right";
+  /**
+   * The button that opens it, drawn where the sheet is. Radix returns focus
+   * only to a `Trigger` of its own, and marks it `aria-expanded`; a sheet
+   * opened from state alone leaves focus on the page's body when it closes.
+   */
+  trigger?: ReactElement;
   children: ReactNode;
 }
 
@@ -37,10 +43,12 @@ export function Sheet({
   heading,
   closeLabel,
   side = "left",
+  trigger,
   children,
 }: SheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      {trigger !== undefined && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-backdrop bg-black/40" />
         <Dialog.Content

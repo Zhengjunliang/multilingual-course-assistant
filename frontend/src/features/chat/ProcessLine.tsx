@@ -18,11 +18,12 @@
  * announces, and find-in-page opening it all come with the element.
  */
 
-import { Check, ChevronRight, FileText, Globe, Search } from "lucide-react";
+import { Check, ChevronRight, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Citation, RouteDecision } from "@/api/contract";
+import { SourceIcon } from "./SourcesPanel";
 import { shortName, sourcesOf, titleOf } from "./sourceLabel";
 
 interface ProcessLineProps {
@@ -67,9 +68,12 @@ export function ProcessLine({ running, route, searchMs, citations }: ProcessLine
       <summary className="inline-flex cursor-pointer list-none items-center gap-tight rounded-control text-body text-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
         <Check aria-hidden className="size-icon shrink-0" />
         <span>
+          {/* Up to the next whole second, as the count goes: it shows 3 from
+              the second second on, and 2.1 s shown as 2 would fold a count of
+              3 into fewer. */}
           {searchMs === null
             ? t("process.doneUntimed")
-            : t("process.done", { seconds: Math.max(1, Math.round(searchMs / 1000)) })}
+            : t("process.done", { seconds: Math.max(1, Math.ceil(searchMs / 1000)) })}
         </span>
         <ChevronRight
           aria-hidden
@@ -84,11 +88,7 @@ export function ProcessLine({ running, route, searchMs, citations }: ProcessLine
             <ul className="flex flex-col gap-hair">
               {sources.map((source) => (
                 <li key={source.marker} className="flex min-w-0 items-center gap-tight">
-                  {source.kind === "web" ? (
-                    <Globe aria-hidden className="size-icon shrink-0 text-muted" />
-                  ) : (
-                    <FileText aria-hidden className="size-icon shrink-0 text-muted" />
-                  )}
+                  <SourceIcon citation={source} className="text-muted" />
                   <span lang={source.locale} className="min-w-0 truncate">
                     {titleOf(source)}
                   </span>

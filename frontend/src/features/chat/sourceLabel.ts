@@ -63,6 +63,18 @@ const FRAGMENT_WORDS = 4;
 /** Markdown's marks in an excerpt, which the page shows as layout, not as text. */
 const MARKUP = /[#*_`|>]/g;
 
+/** A list item's bullet or number, which the page draws as a marker, not as text. */
+const LIST_ITEM = /^\s*(?:[-+*]|\d+[.)])\s+/;
+
+/** A Markdown link, of which the page shows only the text. */
+const LINK = /\[([^\]]*)\]\([^)]*\)/g;
+
+/**
+ * A table row as the chunker writes it, "Rata, Scadenza = 30 settembre": the
+ * page shows cells, and no run of its text reads like that.
+ */
+const TABLE_ROW = / = /;
+
 /** A term of a text fragment, with the characters its syntax reserves escaped. */
 function fragmentTerm(words: readonly string[]): string {
   return encodeURIComponent(words.join(" ")).replace(/-/g, "%2D");
@@ -77,11 +89,14 @@ function fragmentTerm(words: readonly string[]): string {
  * so the browser scrolls to the passage and highlights it, as Open WebUI does
  * (read 11 October 2026). One line, because a heading and the paragraph under
  * it are two blocks on the page, and a term spanning both would not be found.
- * Where the page does not hold those words verbatim, or the
+ * The line is read as the page shows it: a list item without its bullet, a
+ * link as its text, and a table row, which the page shows as cells, never
+ * chosen. Where the page does not hold those words verbatim, or the
  * browser has no text fragments, the page opens at its top, as it did before;
  * a PDF on the web gets no fragment, since a PDF viewer reads none.
  *
- * `null` for a slide stored before its key existed: there is nothing to open.
+ * `null` for a slide stored before its key existed, and for a web address
+ * that is not an http(s) URL: there is nothing a pill may open.
  */
 export function sourceLink(citation: Citation): string | null {
   if (citation.kind === "slides" || citation.url === null) {
@@ -89,17 +104,26 @@ export function sourceLink(citation: Citation): string | null {
       ? null
       : sourceHref(citation.source_sha256, citation.page);
   }
-  let path: string;
+  let parsed: URL;
   try {
-    path = new URL(citation.url).pathname;
+    parsed = new URL(citation.url);
   } catch {
-    return citation.url;
+    return null;
   }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
   const words = citation.text
     .split("\n")
-    .map((line) => line.replace(MARKUP, " ").split(/\s+/).filter(Boolean))
+    .filter((line) => !TABLE_ROW.test(line))
+    .map((line) =>
+      line
+        .replace(LIST_ITEM, "")
+        .replace(LINK, "$1")
+        .replace(MARKUP, " ")
+        .split(/\s+/)
+        .filter(Boolean),
+    )
     .reduce<string[]>((longest, line) => (line.length > longest.length ? line : longest), []);
-  if (path.toLowerCase().endsWith(".pdf") || words.length === 0) return citation.url;
+  if (parsed.pathname.toLowerCase().endsWith(".pdf") || words.length === 0) return citation.url;
   const quoted =
     words.length <= 2 * FRAGMENT_WORDS
       ? fragmentTerm(words)

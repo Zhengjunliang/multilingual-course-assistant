@@ -87,26 +87,30 @@ export function AnswerActions({ answer, badges, citations, cited, complete }: An
         {copied ? t("answer.copied") : ""}
       </span>
       {sources.length > 0 && (
-        <>
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="ml-hair inline-flex h-control-sm items-center gap-tight rounded-full border border-line bg-surface pr-snug pl-hair text-caption text-ink transition-colors hover:bg-mark"
-          >
-            <span aria-hidden className="flex">
-              {stacked.map((source) => (
-                <span
-                  key={source.marker}
-                  className="grid size-icon-lg place-items-center rounded-full border-2 border-surface bg-accent-soft text-accent not-first:-ml-1.5 [&>svg]:size-3"
-                >
-                  <SourceIcon citation={source} />
-                </span>
-              ))}
-            </span>
-            {t("sources.title")}
-          </button>
-          <SourcesPanel open={open} onOpenChange={setOpen} citations={citations} cited={cited} />
-        </>
+        <SourcesPanel
+          open={open}
+          onOpenChange={setOpen}
+          citations={citations}
+          cited={cited}
+          trigger={
+            <button
+              type="button"
+              className="ml-hair inline-flex h-control-sm items-center gap-tight rounded-full border border-line bg-surface pr-snug pl-hair text-caption text-ink transition-colors hover:bg-mark"
+            >
+              <span aria-hidden className="flex">
+                {stacked.map((source) => (
+                  <span
+                    key={source.marker}
+                    className="grid size-icon-lg place-items-center rounded-full border-2 border-surface bg-accent-soft text-accent not-first:-ml-1.5 [&>svg]:size-3"
+                  >
+                    <SourceIcon citation={source} />
+                  </span>
+                ))}
+              </span>
+              {t("sources.title")}
+            </button>
+          }
+        />
       )}
     </div>
   );

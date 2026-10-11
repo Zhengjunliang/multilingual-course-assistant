@@ -36,8 +36,9 @@ test.describe("a signed-in student", () => {
     await page.getByRole("button", { name: it.ask.submit }).click();
 
     await expect(page.getByText("entro cinque giorni dall'appello")).toBeVisible();
-    // One folded line above the answer: the fixture's search took 2400 ms.
-    await expect(page.getByText(it.process.done.replace("{{seconds}}", "2"))).toBeVisible();
+    // One folded line above the answer: the fixture's search took 2400 ms,
+    // which the line shows as 3 s, up to the next whole second as it counts.
+    await expect(page.getByText(it.process.done.replace("{{seconds}}", "3"))).toBeVisible();
     // In the answer, a pill naming the site, which opens the page at its passage.
     const pill = page.locator("a[data-pill]");
     await expect(pill).toHaveText("unifi.it");

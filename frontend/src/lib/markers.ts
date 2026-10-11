@@ -32,6 +32,10 @@ export function badgesOf(citations: readonly Citation[]): Badge[] {
   return badges;
 }
 
+/** Two or more excerpt references in one pair of brackets (`resolveExcerptRefs`). */
+const EXCERPT_LIST =
+  /[[(]\s*Excerpt\s+\d+(?:(?:\s*[,;&、]\s*|\s+\p{L}{1,3}\s+|\s*[和与及]\s*)(?:Excerpt\s+)?\d+)+\s*[\])]/gu;
+
 /**
  * The system prompt forbids writing "Excerpt N" and the small quantized model
  * writes it anyway — bracketed, parenthesised, or bare. The reference is still
@@ -41,17 +45,31 @@ export function badgesOf(citations: readonly Citation[]): Badge[] {
  * BEFORE matching keeps every later step — segmentation, the pills, the
  * sources panel's grouping — marker-only, exactly as if the model had complied.
  *
+ * A list in one pair of brackets, "[Excerpt 3 e Excerpt 5]" or "(Excerpt 1,
+ * 2)", becomes its markers side by side, which the pills then draw as one
+ * («name +1»); resolved one by one, the brackets and the "e" would be left
+ * standing between two pills. Between two references of a list may stand a
+ * comma, a semicolon, an ampersand, a word of up to three letters (e, and, et,
+ * y, und) or a Chinese conjunction.
+ *
  * A number with no citation behind it is left as prose: inventing a pill for
  * it would send the reader to a source the answer never drew on.
  */
 export function resolveExcerptRefs(answer: string, citations: readonly Citation[]): string {
-  return answer.replace(
-    /\[Excerpt\s+(\d+)\]|\(Excerpt\s+(\d+)\)|\bExcerpt\s+(\d+)\b/g,
-    (match, bracketed?: string, parenthesised?: string, bare?: string) => {
-      const citation = citations[Number(bracketed ?? parenthesised ?? bare) - 1];
-      return citation === undefined ? match : citation.marker;
-    },
-  );
+  return answer
+    .replace(EXCERPT_LIST, (list) => {
+      const markers = [...list.matchAll(/\d+/g)].map(
+        ([number]) => citations[Number(number) - 1]?.marker,
+      );
+      return markers.every((marker) => marker !== undefined) ? markers.join(" ") : list;
+    })
+    .replace(
+      /\[Excerpt\s+(\d+)\]|\(Excerpt\s+(\d+)\)|\bExcerpt\s+(\d+)\b/g,
+      (match, bracketed?: string, parenthesised?: string, bare?: string) => {
+        const citation = citations[Number(bracketed ?? parenthesised ?? bare) - 1];
+        return citation === undefined ? match : citation.marker;
+      },
+    );
 }
 
 /**
@@ -117,20 +135,29 @@ export function citedMarkers(answer: string, badges: readonly Badge[]): Set<stri
 }
 
 const SPACE_BEFORE = /[ \t]+$/;
+const SPACE_AFTER = /^[ \t]+/;
 
 /**
  * The answer as a reader copies it: the markers gone, with the spaces that led
  * up to them, so "il 30 settembre [m]." comes out "il 30 settembre.". A
+ * marker that opened a line takes the space after it instead, so "[m] Le
+ * tasse" comes out "Le tasse", and the copy ends where the text does. A
  * marker means nothing outside this page, and ChatGPT's copy leaves its
  * citations out the same way.
  */
 export function withoutMarkers(answer: string, badges: readonly Badge[]): string {
   let copied = "";
+  let lineOpened = false;
   for (const segment of segmentAnswer(answer, badges)) {
-    if (segment.kind === "text") copied += segment.text;
-    else copied = copied.replace(SPACE_BEFORE, "");
+    if (segment.kind === "text") {
+      copied += lineOpened ? segment.text.replace(SPACE_AFTER, "") : segment.text;
+      lineOpened = false;
+    } else {
+      copied = copied.replace(SPACE_BEFORE, "");
+      lineOpened = copied === "" || copied.endsWith("\n");
+    }
   }
-  return copied;
+  return copied.trim();
 }
 
 /*
