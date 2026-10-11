@@ -41,7 +41,7 @@ function PlanCard({ entries }: { entries: readonly CurriculumEntry[] }) {
   const programme = entries[0]?.programme;
   const codes = new Set(entries.map((entry) => entry.ad_code)).size;
   return (
-    <Card className="overflow-hidden shadow-none">
+    <Card className="overflow-hidden">
       <h3 className="flex flex-wrap items-baseline gap-tight border-line border-b px-snug py-tight font-medium text-body text-ink">
         <span className="uppercase">{programme?.name}</span>
         <span className="font-mono text-caption text-muted">{programme?.code}</span>

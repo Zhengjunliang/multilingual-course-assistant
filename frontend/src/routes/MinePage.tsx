@@ -62,7 +62,7 @@ export default function MinePage() {
           const course = group[0]?.course;
           if (course === undefined) return null;
           return (
-            <Card key={course.code} className="overflow-hidden shadow-none">
+            <Card key={course.code} className="overflow-hidden">
               <div className="flex flex-col gap-hair border-line border-b px-snug py-tight">
                 <h2 className="font-semibold text-body text-ink uppercase">{course.name}</h2>
                 <p className="text-caption text-muted">
