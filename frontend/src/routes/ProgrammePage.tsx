@@ -76,7 +76,7 @@ export default function ProgrammePage() {
         sub={t("staff.secretariat.sub")}
         right={members.assign}
       >
-        <Card className="overflow-hidden shadow-none">
+        <Card className="overflow-hidden">
           <StaffList
             people={programme.secretariat}
             empty={t("staff.secretariat.empty")}

@@ -90,7 +90,7 @@ export default function EditionPage() {
         })}
         actions={switching.button(data)}
       />
-      <Card className="overflow-hidden shadow-none">
+      <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center gap-snug border-line border-b px-snug py-tight">
           <h2 className="min-w-0 flex-1 font-semibold text-body text-ink">
             {t("staff.edition.teachers")}
