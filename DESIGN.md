@@ -222,9 +222,11 @@ Two shadows, by height: `shadow-raised` for what rests on the page (a card, an o
 
 Three layers, by what sits over what: `z-lifted` for a control above its row's stretched link or a sticky table head, `z-backdrop` for the scrim behind a dialog, `z-floating` for what floats on it. A numbered `z-` index does not appear outside `index.css`.
 
-Motion is spent through six durations (`duration-instant`, `-fast`, `-base`, `-slow`, `-reveal`, `-scene`), a `--stagger` between things arriving in a row, and four curves (`ease-standard`, `-out`, `-emphasized`, `-strong`), named in `index.css` beside the reference interface each was read off; `fast` and `standard` are what every `transition-colors` takes. The one other movement is the cat thinking, a slow pulse while an answer is being prepared. Nothing moves for a reader whose system asks for reduced motion.
+Motion is spent through six durations (`duration-instant`, `-fast`, `-base`, `-slow`, `-reveal`, `-scene`), a `--stagger` between things arriving in a row, and four curves (`ease-standard`, `-out`, `-emphasized`, `-strong`), named in `index.css` beside the reference interface each was read off; `fast` and `standard` are what every `transition-colors` takes. Beyond colour, what moves is the living cat (under Components), the entry's intro writing its caption in (`blur-in`), the entry receding into the conversation and the conversation arriving (`recede`, `arrive`), and the cat beside an answer thinking, a slow pulse while the answer is being prepared. Nothing moves for a reader whose system asks for reduced motion: what moves from script asks `lib/useReducedMotion.ts`, and `frontend/e2e/motion.spec.ts` checks every screen, the living cat's drawing included.
 
-🔜 (M4, #135) Three.js loads only on the entry screens, the empty chat and sign-in, after the first paint, and steps down when frames drop. 🔜 (M4, #136) A first visit is guided once per audience, can be skipped and replayed from the account menu, and stays seen in the browser; an empty screen explains itself.
+The pill (`bg-pill`) is the material of what floats in the page and takes input, the question box first: about half-white over the ground, a one-pixel inner highlight and a soft shadow, and no blur behind it.
+
+🔜 (M4, #136) A first visit is guided once per audience, can be skipped and replayed from the account menu, and stays seen in the browser; an empty screen explains itself.
 
 ## Shapes
 
@@ -234,7 +236,7 @@ Icons come from Lucide, at `size-icon` beside text and `size-icon-lg` standing a
 
 ## Components
 
-The primitives live in `frontend/src/components/ui/`, in the shadcn manner (Radix underneath, variants through `cva`), each exported from one file; `/styleguide` shows every one of them in both themes side by side, and its test fails on a primitive it does not show. Screens compose primitives and do not restyle them. A link that looks like a button uses `buttonVariants`.
+The primitives live in `frontend/src/components/ui/`, in the shadcn manner (Radix underneath, variants through `cva`), each exported from one file; `/styleguide` shows every one of them in both themes side by side, and its test fails on a primitive it does not show. Screens compose primitives and do not restyle them. A link that looks like a button uses `buttonVariants`. Bare text that can be pressed, a suggestion chip or a text button in the visitor's header, shows `hover-sketch` on hover: a one-pixel ink ring turned two degrees, as if drawn round it by hand.
 
 A hint is a `Tooltip`, the inverse of the page (canvas lettering on ink), opened by a resting pointer or by keyboard focus and closed by Escape; the browser's `title` attribute is never one, and a lint rule refuses it at commit time (`frontend/biome-plugins/no-title-attribute.grit`). A component's own prop for its heading is `heading`, never `title`; an element that truly needs the attribute, such as an iframe named by it, carries a suppression with its reason. A touch screen cannot open a hint, so a hint only repeats what the visible text or the accessible name says: a citation badge's name carries its marker, a page link's name its file, and a marker too long for its card wraps rather than being cut.
 
@@ -245,10 +247,12 @@ Fumetto is drawn by `components/Mascot.tsx` from the one drawing in `frontend/sr
 | Pose | Where |
 | ---- | ----- |
 | `avatar` | Beside every answer, at `size-avatar`; the mark (`MascotMark`, the head on its tile) beside the app's name in the sidebar |
-| `welcome` | The empty chat and the sign-in and registration screens, at `size-mascot` |
+| `welcome` | The brand files; the living cat smiles with its eyes and wears its stars |
 | `thinking` | Beside an answer until its first word, pulsing |
 | `error` | Beside an answer that failed, and on the panel of a page that broke |
 | `notFound` | An address the application does not have, and a staff page whose object cannot be read |
+
+Where a screen greets, the entry and the sign-in and registration screens, Fumetto is alive: `components/LivingMascot.tsx`, at `w-entry-cat` (`w-entry-cat-sm` on a phone), its behaviour in `components/mascotLife.ts`. Awake, it blinks, flicks an ear, sways the bubble's tip and breathes, and its eyes go to the pointer, to the caret of the focused field, or to the question box when nobody moves. It smiles while the pointer is on an element marked `data-mascot-cheer`, the send button, and when it hops as a question goes. After ten idle seconds it yawns and sleeps, eyes closed and a "z" rising, until a pointer, key or wheel wakes it with a double blink. A toggle beside it stops it, and the choice is remembered (WCAG 2.2.2); with reduced motion it does not move and the toggle is gone. The face beside an answer is the motionless `Mascot`. A visitor's first visit opens on an intro, once and skippable: the cat drawn in one stroke, then the caption written in six languages before the interface's own, its name the settled caption throughout.
 
 A pose appears only where words beside it say what it means. Colours, sizes, clear space and what the mark may never be combined with are in [frontend/brand/README.md](frontend/brand/README.md).
 
