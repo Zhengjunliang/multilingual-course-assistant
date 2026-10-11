@@ -62,8 +62,8 @@
     "submit": "Ask",
     "cancel": "Stop"
   },
-  "empty": {
-    "title": "What would you like to know?",
+  "entry": {
+    "caption": "Ask in any language.",
     "chip": {
       "enrolment": "What are the enrolment deadlines?",
       "calendar": "When does the exam session start?",

@@ -127,7 +127,7 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
         name="LivingMascot"
         note="Fumetto alive, where a screen greets: it blinks, flicks an ear, sways its tail, follows the pointer and falls asleep after ten idle seconds. The button in its corner stops it; with reduced motion it stands still and the button is gone."
       >
-        <LivingMascot className="size-mascot" />
+        <LivingMascot className="w-mascot" />
       </Specimen>
 
       <Specimen

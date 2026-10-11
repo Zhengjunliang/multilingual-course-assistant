@@ -21,7 +21,7 @@ test.describe("a visitor whose browser asks for English", () => {
   test("is greeted in English, and the page says so", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByRole("heading", { name: en.empty.title })).toBeVisible();
+    await expect(page.getByRole("heading", { name: en.entry.caption })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
   });
 });

@@ -262,7 +262,7 @@ export function LivingMascot({ className, restOn, hops = 0 }: LivingMascotProps)
 
   const [left, right] = LIVING.pupils;
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative aspect-mascot", className)}>
       <svg
         ref={svg}
         viewBox="-6 -18 76 86"

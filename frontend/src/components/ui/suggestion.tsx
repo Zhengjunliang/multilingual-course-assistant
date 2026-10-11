@@ -13,6 +13,11 @@
  *  - upstream's classes name Tailwind's default palette. Here they name this
  *    project's semantic tokens, which is what keeps a component from being
  *    right in one theme and wrong in the other.
+ *
+ * And one change of look (#173): a chip is bare text in ink, and the pointer
+ * draws the hand-drawn outline round it (`hover-sketch`, index.css) instead
+ * of a filled outlined button, which on the entry would be three boxes
+ * louder than the question box under them.
  */
 
 import type { ComponentProps } from "react";
@@ -30,7 +35,12 @@ export function Suggestions({ className, children, ...props }: SuggestionsProps)
     // child inside a scroll container normally puts its start *before* the
     // scrollable area, so the first chip becomes unreachable as soon as three
     // long translations stop fitting. `safe` falls back to start exactly then.
-    <div className={cn("flex w-full justify-center-safe overflow-x-auto", className)} {...props}>
+    // `py-hair`: a scrolling row clips what leaves it, and a long chip's
+    // outline, turned two degrees on hover, leaves it by a few pixels.
+    <div
+      className={cn("flex w-full justify-center-safe overflow-x-auto py-hair", className)}
+      {...props}
+    >
       {/* `w-max` so the row keeps its natural width and scrolls, rather than
           wrapping the chips onto a second line that pushes the composer down. */}
       <div className="flex w-max flex-nowrap items-center gap-tight pb-hair">{children}</div>
@@ -47,7 +57,7 @@ export function Suggestion({
   suggestion,
   onClick,
   className,
-  variant = "outline",
+  variant = "ghost",
   size = "sm",
   children,
   ...props
@@ -55,7 +65,7 @@ export function Suggestion({
   return (
     <Button
       className={cn(
-        "rounded-full px-gutter hover:border-accent hover:bg-surface hover:text-accent",
+        "hover-sketch rounded-full px-gutter text-body text-ink hover:bg-transparent hover:text-ink",
         className,
       )}
       onClick={() => onClick?.(suggestion)}

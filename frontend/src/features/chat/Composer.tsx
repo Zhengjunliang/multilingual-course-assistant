@@ -91,13 +91,17 @@ export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: Comp
       onSubmit={onFormSubmit}
     >
       {/* One shell holding the field and its controls, rather than a
-          bare textarea with buttons loose underneath it. The border is the
-          accent once there is something to send: the only moving colour on an
-          otherwise still screen, and it lands exactly where the next action is. */}
+          bare textarea with buttons loose underneath it. It wears the pill
+          (`bg-pill`, index.css), the material the interface inherits from
+          the question box, in the composer's own corners rather than a pill's
+          round ends, which would clip a question of several lines. A border
+          appears in the accent once there is something to send: the only
+          moving colour on an otherwise still screen, and it lands exactly
+          where the next action is. */}
       <div
         className={cn(
-          "mx-auto flex max-w-4xl flex-col gap-tight rounded-bubble border bg-surface p-snug transition-colors",
-          ready ? "border-accent" : "border-line",
+          "mx-auto flex max-w-4xl flex-col gap-tight rounded-bubble border bg-pill p-snug transition-colors",
+          ready ? "border-accent" : "border-transparent",
         )}
       >
         <label className="sr-only" htmlFor="question">

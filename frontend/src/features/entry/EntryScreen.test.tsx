@@ -1,5 +1,5 @@
 /**
- * The front door has something on it.
+ * The entry has something on it.
  *
  * The check that matters is not "a heading exists" but "a reader who knows
  * nothing about this system is offered both of its knowledge bases before they
@@ -10,14 +10,17 @@
 import { describe, expect, it } from "vitest";
 
 import { render } from "@/test/render";
-import { EmptyState } from "./EmptyState";
+import { EntryScreen } from "./EntryScreen";
 
 const html = (visitor = false): string =>
-  render(<EmptyState onPick={() => {}} visitor={visitor} />);
+  render(<EntryScreen onPick={() => {}} visitor={visitor} />);
 
-describe("the empty state", () => {
-  it("asks the reader a question instead of describing itself", () => {
-    expect(html()).toContain("Cosa vuoi sapere?");
+describe("the entry", () => {
+  it("tells the reader to ask in their own language, under the living cat", () => {
+    const rendered = html();
+
+    expect(rendered).toContain("Chiedi in qualsiasi lingua.");
+    expect(rendered).toContain("data-living-mascot");
   });
 
   it("offers three things to ask", () => {
@@ -44,7 +47,7 @@ describe("the empty state", () => {
   });
 });
 
-describe("the empty state for a visitor", () => {
+describe("the entry for a visitor", () => {
   it("offers three campus questions and no course one", () => {
     // The slides are for an account: a course chip would be a first click
     // that ends in a refusal.

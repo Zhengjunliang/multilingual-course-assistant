@@ -201,6 +201,12 @@
      sidebar, and standing alone where a screen greets or apologises. */
   --spacing-avatar: 1.75rem;
   --spacing-mascot: 6rem;
+  /* The living cat alone on the entry screens (#173), on a phone and from
+     `md` up, and the shape of its drawing, which leaves room above the head
+     for its stars and its "z". */
+  --spacing-entry-cat-sm: 9.75rem;
+  --spacing-entry-cat: 13rem;
+  --aspect-mascot: 76 / 86;
 
   /* Type. Two sizes carry the whole interface today; a third would need a
      reason, and naming them is how that reason has to be argued. */
@@ -342,20 +348,78 @@
  * nothing to fetch, and the browser draws it once as a tile. It never moves,
  * so reduced motion keeps it.
  *
+ * The pill (E17 of #135, after Why Zero's dock) is the question box's
+ * material, which the rest of the interface inherits: about half-white over
+ * the ground, a one-pixel inner highlight and a soft shadow, and no backdrop
+ * blur, which would cost a repaint behind it for nothing the eye sees on
+ * this ground. Translucent, so the contrast of what sits on it depends on
+ * the ground behind; axe measures it there, in both themes
+ * (frontend/e2e/a11y.spec.ts).
+ *
  * Blocks of their own, after the themes': palette.mjs reads the first block of
- * each theme as its colours.
+ * each theme as opaque colours.
  */
 :root {
+  --pill: oklch(100% 0 0 / 0.5);
+  --pill-edge: oklch(100% 0 0 / 0.95);
+  --pill-shadow: 0 4px 18px oklch(25% 0.05 247 / 0.1);
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .19 0 0 0 0 .305 0 0 0 0 .444 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 [data-theme="dark"] {
+  --pill: oklch(30% 0.02 247 / 0.5);
+  --pill-edge: oklch(90% 0.03 247 / 0.13);
+  --pill-shadow: 0 4px 18px oklch(0% 0 0 / 0.35);
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .19 0 0 0 0 .305 0 0 0 0 .444 0 0 0 .056 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 @utility bg-ground {
   background-color: var(--canvas);
   background-image: var(--grain);
+}
+
+@utility bg-pill {
+  background-color: var(--pill);
+  box-shadow:
+    inset 0 0 0 1px var(--pill-edge),
+    var(--pill-shadow);
+}
+
+/*
+ * The hand-drawn outline on hover (E19 of #135, after Ponpon Mania): a
+ * one-pixel ink ring turned two degrees off true, as if drawn round the
+ * control by hand, which carries the cat's line into every page that uses it.
+ * It settles in at `fast`; with reduced motion it only fades in, already
+ * turned, since a fade moves nothing.
+ */
+@utility hover-sketch {
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--ink);
+    border-radius: 9999px;
+    opacity: 0;
+    transform: rotate(-2deg) scale(0.96);
+    transition:
+      opacity var(--transition-duration-fast) var(--ease-standard),
+      transform var(--transition-duration-fast) var(--ease-standard);
+    pointer-events: none;
+  }
+
+  &:hover::after {
+    opacity: 0.8;
+    transform: rotate(-2deg) scale(1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      transform: rotate(-2deg);
+      transition-property: opacity;
+    }
+  }
 }
 
 html,
