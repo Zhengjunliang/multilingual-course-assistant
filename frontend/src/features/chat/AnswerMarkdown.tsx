@@ -57,9 +57,10 @@ const PillContext = createContext<Pills | null>(null);
  * A number with no badge is drawn as the number: the plugin only emits known
  * numbers, and this never throws on the rest either.
  */
-function CitationPill({ number }: { number?: string }) {
+function CitationPill({ numbers }: { numbers?: string }) {
   const { t } = useTranslation();
   const pills = useContext(PillContext);
+  const number = numbers?.split(",")[0];
   const badge = pills?.badges.find((candidate) => String(candidate.number) === number);
   if (pills === null || badge === undefined) return <>{number}</>;
 
