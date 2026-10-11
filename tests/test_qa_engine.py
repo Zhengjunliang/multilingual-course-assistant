@@ -60,6 +60,7 @@ class CountingEngine:
         history: Sequence[Turn] = (),
         *,
         scope: Sequence[EditionKey] | None,
+        asked_at: float | None = None,
     ) -> Iterator[Event]:
         with self.guard:
             self.inside += 1
@@ -145,6 +146,41 @@ def test_the_search_time_spans_routing_and_retrieval(
     qdrant.close()
 
     assert cast("StartEvent", start).search_ms == 1500
+
+
+def test_the_search_time_counts_the_first_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Through `stream_answer`, the seconds start before the lock: the first
+    question waits for the models to load, and the reader counted that wait
+    too. The fake build moves the clock by half a minute."""
+    clock = [10.0]
+    monkeypatch.setattr(engine_module, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    qdrant = open_client(tmp_path / "qdrant")
+    ensure_collection(qdrant, StubDense().dimension())
+    index_chunks(qdrant, [make_chunk(0, ORM_TEXT)], StubDense(), StubSparse())
+
+    def slow_build() -> Engine:
+        clock[0] += 30.0
+        return Engine(
+            client=qdrant,
+            dense=StubDense(),
+            sparse=StubSparse(),
+            reranker=None,
+            completer=ScriptedCompleter([SLIDES_ROUTE]),
+            streamer=ScriptedStreamer(["An answer."]),
+        )
+
+    monkeypatch.setattr(engine_module, "build_engine", slow_build)
+
+    events = engine_module.stream_answer("What is an ORM?", CONVERSATION_ID, scope=None)
+    try:
+        start = next(events)
+    finally:
+        events.close()
+        qdrant.close()
+
+    assert cast("StartEvent", start).search_ms == 30_000
 
 
 def test_a_stream_nobody_reads_takes_no_lock() -> None:
