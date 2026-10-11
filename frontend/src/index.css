@@ -370,6 +370,7 @@
   --pill: oklch(100% 0 0 / 0.5);
   --pill-edge: oklch(100% 0 0 / 0.95);
   --pill-shadow: 0 4px 18px oklch(25% 0.05 247 / 0.1);
+  --room-strength: 0.42;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .19 0 0 0 0 .305 0 0 0 0 .444 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -377,6 +378,7 @@
   --pill: oklch(30% 0.02 247 / 0.5);
   --pill-edge: oklch(90% 0.03 247 / 0.13);
   --pill-shadow: 0 4px 18px oklch(0% 0 0 / 0.35);
+  --room-strength: 0.5;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .19 0 0 0 0 .305 0 0 0 0 .444 0 0 0 .056 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -515,8 +517,8 @@
 /*
  * A line drawing itself in, as the cat's outline does in the entry's intro: a
  * path whose `pathLength` is 1, its one dash slid along it. The check in the
- * sign-in button (routes/AuthLayout.tsx). Under reduced motion the line is
- * there whole from the start.
+ * sign-in button (routes/AuthLayout.tsx), and the room's lines below. Under
+ * reduced motion the line is there whole from the start.
  */
 @keyframes draw {
   from {
@@ -530,6 +532,36 @@
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
+  }
+}
+
+/*
+ * The room behind the entry screens (#183; features/entry/Room.tsx): the
+ * cat's line in the cat's blue, at `--room-strength` (0.42 on the light
+ * ground, 0.5 on the dark one, where the blue is lighter), so it stays behind
+ * what is in front of it. It draws itself in once, each line a stagger after
+ * the one before, as the cat's outline does in the intro; under reduced motion
+ * it is whole from the start.
+ */
+@utility room-lines {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: var(--room-strength);
+}
+
+@utility room-draw {
+  & path {
+    stroke-dasharray: 1;
+    animation: draw var(--transition-duration-scene) var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * var(--stagger));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & path {
+      animation: none;
+    }
   }
 }
 

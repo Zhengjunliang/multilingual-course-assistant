@@ -139,7 +139,10 @@ export function Composer({
     // Under the entry the column around it already keeps the gutter, so the
     // box is as wide there as at the foot and travels without changing width.
     <form
-      className={cn("w-full", placement === "foot" && "border-line border-t bg-ground p-gutter")}
+      className={cn(
+        "relative w-full",
+        placement === "foot" && "border-line border-t bg-ground p-gutter",
+      )}
       onSubmit={onFormSubmit}
     >
       {/* One shell holding the field and its button, rather than a bare
