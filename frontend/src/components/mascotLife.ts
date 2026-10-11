@@ -139,7 +139,7 @@ export interface Pose {
   zs: number[];
 }
 
-/** The cat at rest: what reduced motion and the paused cat show. */
+/** The cat at rest: what reduced motion shows. */
 export const STILL: Pose = {
   turns: { earLeft: 0, earRight: 0, tail: 0 },
   tilt: 0,
