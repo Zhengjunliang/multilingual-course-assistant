@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mount } from "@/test/mount";
 import { EntryScreen } from "./EntryScreen";
-import { INTRO } from "./intro";
+import { INTRO, LINES } from "./intro";
 
 function systemReducesMotion(reduce: boolean) {
   vi.spyOn(window, "matchMedia").mockImplementation(
@@ -34,8 +34,18 @@ function entry(visitor = true) {
       [...container.querySelectorAll("button")].find((button) => button.textContent === "Salta"),
     heading: () => {
       const h2 = container.querySelector("h2");
-      return { name: h2?.getAttribute("aria-label") ?? h2?.textContent, shown: h2?.textContent };
+      const shown = [...(h2?.childNodes ?? [])]
+        .filter((node) => !(node instanceof Element && node.classList.contains("invisible")))
+        .map((node) => node.textContent)
+        .join("");
+      return { name: h2?.getAttribute("aria-label") ?? h2?.textContent, shown };
     },
+    held: () =>
+      [...container.querySelectorAll("h2 > .invisible")].map((line) => ({
+        lang: line.getAttribute("lang"),
+        text: line.textContent,
+        hidden: line.getAttribute("aria-hidden"),
+      })),
   };
 }
 
@@ -74,6 +84,21 @@ describe("the entry's intro", () => {
         skip: false,
       },
     });
+  });
+
+  it("holds every line it writes and the caption unseen, so the heading never changes height", () => {
+    systemReducesMotion(false);
+    const page = entry();
+    const start = page.held();
+    act(() => vi.advanceTimersByTime(INTRO.length * 1000 + 10));
+    const settled = page.held();
+    page.unmount();
+
+    const lines = [...LINES, { lang: "it", text: "Chiedi in qualsiasi lingua." }].map((line) => ({
+      ...line,
+      hidden: "true",
+    }));
+    expect({ start, settled }).toEqual({ start: lines, settled: lines });
   });
 
   it("stops at Skip and hands the focus to the question box", () => {
