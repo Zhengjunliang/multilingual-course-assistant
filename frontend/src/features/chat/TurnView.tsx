@@ -1,16 +1,16 @@
 /**
- * One exchange: the question, how it was searched, its sources, the answer.
+ * One exchange: the question, how it was searched, the answer, its sources.
  *
  * The same component draws a turn arriving token by token and a turn read back
- * out of the database an hour later, which is the reason `citations` and `route`
- * are columns on the message table. A second rendering path for history is a
- * second place for badges and greying to be got wrong.
+ * out of the database an hour later, which is the reason `citations`, `route`
+ * and `search_ms` are columns on the message table. A second rendering path
+ * for history is a second place for pills and sources to be got wrong.
  *
- * Sources sit *above* the answer, not below it. Both arrive in the same
- * `start` event, before the first token, so the reader can see what was found
- * while the answer is still being written — which is the whole difference
- * between waiting at a blank screen and watching work happen. Underneath the
- * answer they were a footnote to something already read.
+ * The answer comes first and its sources after it (#180): no product read on
+ * 11 October 2026 puts them above. Above the answer is one line saying how it
+ * was searched (`ProcessLine`); in it are pills naming the sources; under it,
+ * once it has settled, a copy button and the button to the sources panel
+ * (`AnswerActions`).
  *
  * `memo` because a settled turn has nothing to redraw while another one
  * streams, and parsing its Markdown on every token would be most of the work on
@@ -24,8 +24,8 @@ import { Link } from "react-router-dom";
 
 import { Mascot } from "@/components/Mascot";
 import { badgesOf, citedMarkers, resolveExcerptRefs } from "@/lib/markers";
+import { AnswerActions } from "./AnswerActions";
 import { AnswerStream } from "./AnswerStream";
-import { CitationList } from "./CitationList";
 import { ProcessLine } from "./ProcessLine";
 import type { Turn } from "./useAsk";
 
@@ -39,8 +39,6 @@ interface TurnViewProps {
    * runs before a single event is sent (apps/qa/engine.py).
    */
   thinking: boolean;
-  highlighted: string | null;
-  onHighlight: (marker: string) => void;
   /**
    * Nobody is signed in. A question routed to the slides then finds nothing,
    * because the slides are for an account, and the answer says only that no
@@ -58,14 +56,7 @@ function poseOf(turn: Turn, waiting: boolean) {
   return waiting ? "thinking" : "avatar";
 }
 
-export const TurnView = memo(function TurnView({
-  turn,
-  live,
-  thinking,
-  highlighted,
-  onHighlight,
-  visitor,
-}: TurnViewProps) {
+export const TurnView = memo(function TurnView({ turn, live, thinking, visitor }: TurnViewProps) {
   const { t } = useTranslation();
   // Kept by identity: the answer's badges hang off this array, and a new one on
   // every render would redraw them.
@@ -100,16 +91,6 @@ export const TurnView = memo(function TurnView({
             citations={turn.citations}
           />
 
-          {turn.citations.length > 0 && (
-            <CitationList
-              citations={turn.citations}
-              badges={badges}
-              cited={cited}
-              highlighted={highlighted}
-              onSelect={onHighlight}
-            />
-          )}
-
           {/* Nothing under the process line until the search is over: the
               cat's thinking pose and the line's count say the turn is
               working. Then the caret, alone until the first word. */}
@@ -120,7 +101,17 @@ export const TurnView = memo(function TurnView({
               badges={badges}
               complete={turn.complete}
               live={live}
-              onBadgeClick={onHighlight}
+              citations={turn.citations}
+            />
+          )}
+
+          {!working && (
+            <AnswerActions
+              answer={answer}
+              badges={badges}
+              citations={turn.citations}
+              cited={cited}
+              complete={turn.complete}
             />
           )}
 

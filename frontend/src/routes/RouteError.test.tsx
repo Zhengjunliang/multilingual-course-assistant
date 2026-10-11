@@ -221,13 +221,7 @@ describe("a provider that throws", () => {
 describe("a chunk that fails to load", () => {
   it("leaves the answer on screen, untypeset, rather than throwing", async () => {
     const { container, unmount } = mount(
-      <AnswerStream
-        text="Vedi $$x^2$$."
-        badges={[]}
-        complete
-        live={false}
-        onBadgeClick={() => {}}
-      />,
+      <AnswerStream text="Vedi $$x^2$$." badges={[]} complete live={false} citations={[]} />,
     );
     await settle();
     const seen = {

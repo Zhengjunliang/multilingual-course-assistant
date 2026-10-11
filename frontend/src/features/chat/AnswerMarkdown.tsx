@@ -1,5 +1,5 @@
 /**
- * An answer rendered as Markdown, with its citation markers as badges.
+ * An answer rendered as Markdown, with its citation markers as pills.
  *
  * Models answer in Markdown — lists, bold, tables, code — and the slides they
  * quote hold formulas; shown as plain text, all of it reaches the reader as
@@ -21,10 +21,11 @@
  *
  * The components are one module-level object. Built inside the component, they
  * would be new functions on every render, React would rebuild every element
- * under them, and a badge would lose focus the moment it was clicked. What a
- * badge needs from its answer arrives through `PillContext` instead.
+ * under them, and a pill would lose focus the moment it was clicked. What a
+ * pill needs from its answer arrives through `PillContext` instead.
  */
 
+import { ExternalLink } from "lucide-react";
 import {
   Children,
   type ComponentProps,
@@ -40,55 +41,106 @@ import remarkCjkFriendly from "remark-cjk-friendly";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
-import { Tooltip } from "@/components/ui/tooltip";
+import type { Citation } from "@/api/contract";
+import { HoverCard } from "@/components/ui/hover-card";
 import { type Badge, remarkPills, withoutPills } from "@/lib/markers";
 import { cn } from "@/lib/utils";
+import { SourceSummary } from "./SourcesPanel";
+import { shortName, sourceLink } from "./sourceLabel";
 
 interface Pills {
   badges: readonly Badge[];
-  onBadgeClick: (marker: string) => void;
+  citations: readonly Citation[];
 }
 
 const PillContext = createContext<Pills | null>(null);
 
 /**
- * One badge, drawn where `remarkPills` left a `citation-pill` element.
+ * One pill, drawn where `remarkPills` left a `citation-pill` element: the
+ * name of its first source, «+N» for the rest of a run of them, as ChatGPT and
+ * Open WebUI write a citation into an answer (read 11 October 2026).
  *
- * A number with no badge is drawn as the number: the plugin only emits known
- * numbers, and this never throws on the rest either.
+ * The pill is a link to that first source, and a click follows it: a web page
+ * in a new tab at its passage, a slide at its page. Resting on it or focusing
+ * it opens a card listing every source of the run, each with its own link
+ * (components/ui/hover-card.tsx). The fill is what says "clickable", not a
+ * colour or a border: a blue word inside an answer would read as an ordinary
+ * link (index.css), and `--mark` against `--canvas` is a gated pair so the
+ * pill cannot dissolve into the paragraph. Under the pointer, and while its
+ * card is open, it turns to ink.
+ *
+ * Numbers with no badge are drawn as the numbers: the plugin only emits known
+ * ones, and this never throws on the rest either.
  */
 function CitationPill({ numbers }: { numbers?: string }) {
   const { t } = useTranslation();
   const pills = useContext(PillContext);
-  const number = numbers?.split(",")[0];
-  const badge = pills?.badges.find((candidate) => String(candidate.number) === number);
-  if (pills === null || badge === undefined) return <>{number}</>;
+  const sources = (numbers ?? "")
+    .split(",")
+    .map((number) => pills?.badges.find((badge) => String(badge.number) === number))
+    .map((badge) => pills?.citations.find((citation) => citation.marker === badge?.marker))
+    .filter((citation) => citation !== undefined);
+  const [first] = sources;
+  if (first === undefined) return <>{numbers}</>;
+
+  const href = sourceLink(first);
+  const label = t("sources.pill", {
+    count: sources.length,
+    names: sources.map((source) => shortName(source, t)).join(", "),
+  });
+  const pill = (
+    <span className="whitespace-nowrap">
+      {shortName(first, t)}
+      {sources.length > 1 && ` +${sources.length - 1}`}
+    </span>
+  );
+  const look =
+    "mx-0.5 inline-flex items-center rounded-full bg-mark px-tight align-baseline font-medium text-caption text-muted no-underline transition-colors hover:bg-ink hover:text-canvas data-[state=open]:bg-ink data-[state=open]:text-canvas";
 
   return (
-    // A pill, not a block: it sits inside a sentence, so it is quiet by default
-    // and only fills with the accent under the pointer. Filled with the accent
-    // from the start, a dozen of them would read as a rash across the prose
-    // rather than as places to look.
-    //
-    // The fill is what says "clickable" — not a colour and not a border. A blue
-    // word inside an answer would read as a link to somewhere else (index.css),
-    // and a hairline is too weak to carry the job (check-contrast.mjs says so in
-    // its own header). `--mark`
-    // against `--canvas` is a gated pair for this reason, so the pill cannot
-    // quietly dissolve into the paragraph.
-    //
-    // The marker is in the name as well as the hint: a hint is never the only
-    // place something is said (components/ui/tooltip.tsx).
-    <Tooltip content={<span className="font-mono">{badge.marker}</span>}>
-      <button
-        type="button"
-        onClick={() => pills.onBadgeClick(badge.marker)}
-        aria-label={t("citations.badge", { number: badge.number, marker: badge.marker })}
-        className="mx-0.5 rounded-full bg-mark px-tight align-baseline font-medium text-caption text-ink transition-colors hover:bg-accent hover:text-accent-ink"
-      >
-        {badge.number}
-      </button>
-    </Tooltip>
+    <HoverCard
+      content={sources.map((source) => {
+        const to = sourceLink(source);
+        return (
+          <div key={source.marker} className="flex flex-col gap-hair">
+            <SourceSummary citation={source} />
+            {to !== null && (
+              <a
+                href={to}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-hair self-start text-caption text-accent underline underline-offset-2"
+              >
+                {source.kind === "web"
+                  ? t("sources.openPage")
+                  : t("sources.openSlide", { page: source.page })}
+                <ExternalLink aria-hidden className="size-icon" />
+              </a>
+            )}
+          </div>
+        );
+      })}
+    >
+      {href === null ? (
+        // A slide stored before its key existed has nowhere to go: a plain
+        // pill, which still previews under the pointer; its source is in the
+        // sources panel for everyone else.
+        <span data-pill className={look}>
+          {pill}
+        </span>
+      ) : (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={label}
+          data-pill
+          className={look}
+        >
+          {pill}
+        </a>
+      )}
+    </HoverCard>
   );
 }
 
@@ -243,7 +295,8 @@ export interface AnswerMarkdownProps {
   /** The answer's language: a Chinese answer sets at Chinese leading (index.css). */
   lang?: string;
   badges: readonly Badge[];
-  onBadgeClick: (marker: string) => void;
+  /** The answer's citations, which a pill names and links to. */
+  citations: readonly Citation[];
   rehypePlugins?: Options["rehypePlugins"];
   /** Tokens are still arriving: the caret follows the last word (index.css, `caret-after`). */
   streaming?: boolean;
@@ -253,7 +306,7 @@ export function AnswerMarkdown({
   text,
   lang,
   badges,
-  onBadgeClick,
+  citations,
   rehypePlugins,
   streaming = false,
 }: AnswerMarkdownProps) {
@@ -271,7 +324,7 @@ export function AnswerMarkdown({
     ],
     [badges],
   );
-  const pills = useMemo(() => ({ badges, onBadgeClick }), [badges, onBadgeClick]);
+  const pills = useMemo(() => ({ badges, citations }), [badges, citations]);
 
   // Called as a function, not rendered as an element, so that a throw lands
   // here. Parsing and tree building recurse, and an answer nested a few

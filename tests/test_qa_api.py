@@ -960,7 +960,7 @@ def test_reopening_a_conversation_returns_what_the_stream_delivered(
     index: QdrantClient,
 ) -> None:
     """The guard on the two acceptance items this interface is judged by:
-    citation badges and greyed-out sources have to survive a page reload, which
+    citation pills and the sources panel have to survive a page reload, which
     means coming back from the database in the shape `start` delivered them."""
     install_engine(index, SLIDES_ROUTE, ["An ORM ", SLIDES_MARKER])
     stream = events(ask())

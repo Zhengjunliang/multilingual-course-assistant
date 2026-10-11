@@ -28,7 +28,11 @@ export const SCREENS: Screen[] = [
   { path: "/styleguide", as: "visitor", mark: heading("Component catalogue") },
   { path: "/", as: "visitor", mark: heading(it.entry.caption) },
   { path: "/", as: "student", mark: heading(it.entry.caption) },
-  { path: `/c/${CONVERSATION.id}`, as: "student", mark: heading(it.citations.title) },
+  {
+    path: `/c/${CONVERSATION.id}`,
+    as: "student",
+    mark: { role: "button", name: it.sources.title },
+  },
   { path: "/staff/programmes", as: "staff", mark: heading(it.staff.programmes.title) },
   { path: `/staff/programmes/${PROGRAMME.code}`, as: "staff", mark: heading(PROGRAMME.name) },
   // A course and its edition share the course's name as their title.

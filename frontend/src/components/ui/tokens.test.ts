@@ -16,8 +16,8 @@ import { componentFiles, sourceOf, typeExportsOf, valueExportsOf } from "@/test/
 /**
  * Tailwind steps that say how far rather than what for.
  *
- * Width is deliberately absent. `w-72` on a source card and `max-w-[85vw]` on
- * the drawer are one-off measurements of a layout, not steps on an interior
+ * Width is deliberately absent. `w-72` and `max-w-[85vw]` on the sidebar's
+ * drawer are one-off measurements of a layout, not steps on an interior
  * rhythm two components could disagree about — naming them would invent a
  * vocabulary with one word in it. Heights are here because a control's height
  * is exactly the kind of thing three components have to agree on.

@@ -84,17 +84,19 @@
     "read_other": "读了 {{count}} 个片段"
   },
   "sources": {
-    "slide": "幻灯片第 {{page}} 页"
-  },
-  "citations": {
+    "slide": "幻灯片第 {{page}} 页",
     "title": "来源",
-    "empty": "这个问题没有检索到任何片段。",
-    "uncited": "检索到，但答案没有引用",
-    "badge": "来源 {{number}}：{{marker}}",
-    "page": "第 {{page}} 页",
-    "openPage": "第 {{page}} 页，{{file}}，在新标签页中打开",
-    "fetched": "抓取于 {{date}}",
-    "more": "+{{count}}"
+    "others": "其他参考",
+    "close": "关闭来源",
+    "filePage": "{{file}} · 第 {{page}} 页",
+    "openPage": "打开网页",
+    "openSlide": "打开幻灯片第 {{page}} 页",
+    "pill_one": "来源：{{names}}",
+    "pill_other": "来源：{{names}}"
+  },
+  "answer": {
+    "copy": "复制回答",
+    "copied": "已复制回答"
   },
   "error": {
     "incomplete": "回答在结束之前中断了。"

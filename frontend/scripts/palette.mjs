@@ -35,7 +35,12 @@ export const TEXT = 4.5;
 
 export const PAIRS = [
   { front: "ink", back: "canvas", min: TEXT, where: "index.css body rule" },
-  { front: "canvas", back: "ink", min: TEXT, where: "tooltip.tsx content" },
+  {
+    front: "canvas",
+    back: "ink",
+    min: TEXT,
+    where: "tooltip.tsx content, AnswerMarkdown.tsx citation pill under the pointer or open",
+  },
   {
     front: "ink",
     back: "surface",
@@ -48,7 +53,12 @@ export const PAIRS = [
     min: TEXT,
     where: "EmptyState.tsx subtitle, ChatShell.tsx icon-only buttons (button.tsx ghost)",
   },
-  { front: "muted", back: "surface", min: TEXT, where: "CitationList.tsx:113 excerpt" },
+  {
+    front: "muted",
+    back: "surface",
+    min: TEXT,
+    where: "SourcesPanel.tsx where a source is and its excerpt, in the panel and the hover card",
+  },
   { front: "ink", back: "sidebar", min: TEXT, where: "ConversationSidebar.tsx title and rows" },
   {
     front: "muted",
@@ -60,9 +70,14 @@ export const PAIRS = [
     front: "ink",
     back: "mark",
     min: TEXT,
-    where: "AnswerMarkdown.tsx citation pill, a ghost icon button under the pointer",
+    where: "a ghost icon button under the pointer, SourcesPanel.tsx row title under the pointer",
   },
-  { front: "muted", back: "mark", min: TEXT, where: "CitationList.tsx:113 on a lit card" },
+  {
+    front: "muted",
+    back: "mark",
+    min: TEXT,
+    where: "AnswerMarkdown.tsx citation pill at rest, SourcesPanel.tsx row under the pointer",
+  },
   { front: "accent-ink", back: "accent", min: TEXT, where: "button.tsx default variant" },
   {
     front: "accent",
@@ -74,7 +89,8 @@ export const PAIRS = [
     front: "accent",
     back: "surface",
     min: TEXT,
-    where: "input.tsx focus outline and border",
+    where:
+      "input.tsx focus outline and border, AnswerMarkdown.tsx a source's open link in its hover card",
   },
   {
     front: "accent",

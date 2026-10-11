@@ -1,11 +1,12 @@
 /**
  * `/api/conversations` — the sidebar, and reopening a thread.
  *
- * A stored message carries the same `citations` and `route` the `start` event
- * delivered (apps/qa/models.py says why they are columns). That is what lets a
- * reopened conversation render through the very same components as a live one:
- * badges, greyed-out sources and the routing line all come back, and there is
- * no second rendering path for history to drift from.
+ * A stored message carries the same `citations`, `route` and `search_ms` the
+ * `start` event delivered (apps/qa/models.py says why they are columns). That
+ * is what lets a reopened conversation render through the very same components
+ * as a live one: the pills, the sources and the process line with its seconds
+ * all come back, and there is no second rendering path for history to drift
+ * from.
  */
 
 import type { Citation, RouteDecision } from "./contract";

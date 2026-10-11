@@ -125,10 +125,10 @@
  * one hue: a second hue creeping in fails it, and so does the accent fading to
  * a grey.
  *
- * The link between a citation in the answer and its source card is carried by
- * fill, not colour: a pill wears `--mark`, the highlighted card wears `--mark`
- * with an ink ring. Blue there would read as a link to somewhere else. Those are
- * asserted in CitationList.test.tsx, because no colour gate can see them.
+ * A citation pill in the answer says it can be clicked by fill, not colour:
+ * it wears `--mark`, and ink while its card is open
+ * (features/chat/AnswerMarkdown.tsx). Blue there would read as an ordinary
+ * link inside the prose.
  *
  * `--accent` and `--accent-ink` are two variables because a surface and the ink
  * that sits on it are inverses: white lettering on the deep blue of the light
@@ -575,6 +575,26 @@
     & > :is(ul, ol):last-child > li:last-child::after {
       animation: none;
     }
+  }
+}
+
+/*
+ * The sources panel arriving from the right edge (components/ui/sheet.tsx),
+ * as the #180 prototype draws it: `base`, on the curve for what enters, so it
+ * reads as coming from beside the answer rather than appearing on top of it.
+ * It closes at once. Under reduced motion it is simply there.
+ */
+@keyframes slide-in-right {
+  from {
+    translate: 100% 0;
+  }
+}
+
+@utility slide-in-right {
+  animation: slide-in-right var(--transition-duration-base) var(--ease-emphasized) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
   }
 }
 

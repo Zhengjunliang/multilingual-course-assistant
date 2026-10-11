@@ -48,7 +48,6 @@ export default function ChatPage() {
   const { account, forget, recheck } = useSession();
   const { refreshConversations, setBusy } = useShell();
 
-  const [highlighted, setHighlighted] = useState<string | null>(null);
   const [unreadable, setUnreadable] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [hops, setHops] = useState(0);
@@ -212,8 +211,6 @@ export default function ChatPage() {
                   turn={turn}
                   live={current && waiting.phase === "streaming"}
                   thinking={current && (waiting.phase === "queued" || waiting.phase === "retrying")}
-                  highlighted={highlighted}
-                  onHighlight={setHighlighted}
                   visitor={visitor}
                 />
               );

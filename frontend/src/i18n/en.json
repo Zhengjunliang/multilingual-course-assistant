@@ -84,17 +84,19 @@
     "read_other": "Read {{count}} excerpts"
   },
   "sources": {
-    "slide": "Slide p. {{page}}"
-  },
-  "citations": {
+    "slide": "Slide p. {{page}}",
     "title": "Sources",
-    "empty": "No excerpts were retrieved for this question.",
-    "uncited": "retrieved, not cited",
-    "badge": "Source {{number}}: {{marker}}",
-    "page": "page {{page}}",
-    "openPage": "page {{page}} of {{file}}, in a new tab",
-    "fetched": "fetched on {{date}}",
-    "more": "+{{count}}"
+    "others": "Also consulted",
+    "close": "Close the sources",
+    "filePage": "{{file}} · p. {{page}}",
+    "openPage": "Open the page",
+    "openSlide": "Open the slide at page {{page}}",
+    "pill_one": "Source: {{names}}",
+    "pill_other": "Sources: {{names}}"
+  },
+  "answer": {
+    "copy": "Copy the answer",
+    "copied": "Answer copied"
   },
   "error": {
     "incomplete": "The answer stopped before it was finished."
