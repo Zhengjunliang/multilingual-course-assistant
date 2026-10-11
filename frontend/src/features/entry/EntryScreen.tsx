@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Suggestion, Suggestions } from "@/components/ui/suggestion";
 import { useReducedMotion } from "@/lib/useReducedMotion";
 import { Caption } from "./Caption";
-import { useIntro } from "./intro";
+import { LINES, useIntro } from "./intro";
 
 const CHIPS = ["enrolment", "calendar", "material"] as const;
 const VISITOR_CHIPS = ["enrolment", "calendar", "library"] as const;
@@ -52,11 +52,13 @@ export function EntryScreen({ onPick, visitor, hops = 0 }: EntryScreenProps) {
   // The caption is written in once more when the intro ends, and stays so.
   const played = useRef(intro.playing);
   const caption = t("entry.caption");
+  const settled = { lang: i18n.language, text: caption };
   const writing = intro.playing
     ? (intro.line ?? { lang: i18n.language, text: "" })
     : played.current
-      ? { lang: i18n.language, text: caption }
+      ? settled
       : null;
+  const holds = [...LINES, settled];
 
   const skip = () => {
     intro.skip();
@@ -111,9 +113,8 @@ export function EntryScreen({ onPick, visitor, hops = 0 }: EntryScreenProps) {
         <Caption
           caption={caption}
           writing={writing}
-          // A line's height even before the intro writes its first letter, so
-          // nothing under the caption moves while it does.
-          className="min-h-(--text-display--line-height) font-semibold font-serif text-display text-ink"
+          holds={holds}
+          className="font-semibold font-serif text-display text-ink"
         />
         <p className="text-body text-muted">{t("app.subtitle")}</p>
       </div>
