@@ -546,7 +546,8 @@
  * The caret after the last word of an answer being written
  * (features/chat/AnswerStream.tsx): a block that blinks on and off with no
  * fade, every 1250 ms, as Linear's thread composer does (E9 of #135). It sits
- * at the end of the last paragraph, or of the last item when a list is last,
+ * at the end of the last paragraph, of the last item when a list is last (of
+ * its last paragraph when the list is loose), of a quote's last paragraph,
  * and alone before the first word. Reduced motion keeps it, still.
  */
 @keyframes caret {
@@ -557,8 +558,10 @@
 
 @utility caret-after {
   &:empty::after,
-  & > :last-child:not(ul, ol)::after,
-  & > :is(ul, ol):last-child > li:last-child::after {
+  & > :last-child:not(ul, ol, blockquote)::after,
+  & > :is(ul, ol):last-child > li:last-child:not(:has(> p))::after,
+  & > :is(ul, ol):last-child > li:last-child > p:last-child::after,
+  & > blockquote:last-child > :last-child::after {
     content: "";
     display: inline-block;
     width: 0.5em;
@@ -571,8 +574,10 @@
 
   @media (prefers-reduced-motion: reduce) {
     &:empty::after,
-    & > :last-child:not(ul, ol)::after,
-    & > :is(ul, ol):last-child > li:last-child::after {
+    & > :last-child:not(ul, ol, blockquote)::after,
+    & > :is(ul, ol):last-child > li:last-child:not(:has(> p))::after,
+    & > :is(ul, ol):last-child > li:last-child > p:last-child::after,
+    & > blockquote:last-child > :last-child::after {
       animation: none;
     }
   }

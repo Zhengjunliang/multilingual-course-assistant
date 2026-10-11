@@ -77,6 +77,14 @@ function count(html: string, fragment: string): number {
 const SENTINEL = new RegExp(`[${PILL_OPEN}${PILL_CLOSE}${PILL_BREAK}]`);
 
 describe("an answer", () => {
+  it("breaks a line once where the model ended it with two spaces", () => {
+    // remark-rehype writes a hard break as <br> and a newline after it, and the
+    // paragraph keeps newlines (`whitespace-pre-line`): both would break.
+    const html = answer(`Prima rata entro il 30 settembre. ${SLIDES}  \nSeconda rata entro marzo.`);
+
+    expect(html).toMatch(/<br\/?>Seconda rata/);
+  });
+
   it("renders the Markdown a model writes: lists, bold, tables, code and quotes", () => {
     const html = answer(
       [
@@ -106,7 +114,7 @@ describe("an answer", () => {
 
   it.each([
     ["in a sentence", `Le tasse scadono il 30 settembre ${SLIDES}.`, "settembre <a"],
-    ["that is a web marker", `Vedi il calendario ${WEB}.`, 'aria-label="Fonte: unifi.it"'],
+    ["that is a web marker", `Vedi il calendario ${WEB}.`, 'whitespace-nowrap">unifi.it</span>'],
     [
       "right after a URL",
       `Vedi https://www.unifi.it/p602.html${SLIDES} per le date.`,

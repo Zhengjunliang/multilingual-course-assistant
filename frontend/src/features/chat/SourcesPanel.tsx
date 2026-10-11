@@ -15,19 +15,18 @@
  */
 
 import { FileText, Globe } from "lucide-react";
+import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Citation } from "@/api/contract";
 import { Sheet } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 import { excerptOf, hostOf, sourceLink, sourcesOf, titleOf } from "./sourceLabel";
 
 /** A web page's or a slide's mark, beside its name. */
-export function SourceIcon({ citation }: { citation: Citation }) {
-  return citation.kind === "web" ? (
-    <Globe aria-hidden className="size-icon shrink-0" />
-  ) : (
-    <FileText aria-hidden className="size-icon shrink-0" />
-  );
+export function SourceIcon({ citation, className }: { citation: Citation; className?: string }) {
+  const Icon = citation.kind === "web" ? Globe : FileText;
+  return <Icon aria-hidden className={cn("size-icon shrink-0", className)} />;
 }
 
 /**
@@ -88,15 +87,21 @@ interface SourcesPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   citations: readonly Citation[];
-  /** The markers the finished answer used; `null` while it is unfinished, when all come first. */
+  /** The markers the finished answer used; `null` while it is unfinished, when all are listed as one. */
   cited: ReadonlySet<string> | null;
+  /** The button under the answer that opens it, where focus returns on closing. */
+  trigger: ReactElement;
 }
 
-export function SourcesPanel({ open, onOpenChange, citations, cited }: SourcesPanelProps) {
+export function SourcesPanel({ open, onOpenChange, citations, cited, trigger }: SourcesPanelProps) {
   const { t } = useTranslation();
   const sources = sourcesOf(citations);
-  const used = sources.filter((source) => cited === null || cited.has(source.marker));
-  const others = sources.filter((source) => cited !== null && !cited.has(source.marker));
+  // Split only when the answer cited one of them. One that cited none — the
+  // model left its markers out — would otherwise list everything under "the
+  // rest", below an empty list, as if every source were secondary.
+  const split = sources.some((source) => cited?.has(source.marker));
+  const used = split ? sources.filter((source) => cited?.has(source.marker)) : sources;
+  const others = split ? sources.filter((source) => !cited?.has(source.marker)) : [];
 
   return (
     <Sheet
@@ -105,6 +110,7 @@ export function SourcesPanel({ open, onOpenChange, citations, cited }: SourcesPa
       heading={t("sources.title")}
       closeLabel={t("sources.close")}
       side="right"
+      trigger={trigger}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-tight">
         <ol className="flex flex-col gap-hair">

@@ -60,8 +60,28 @@ describe("resolveExcerptRefs", () => {
     );
   });
 
+  it("rewrites a list in one pair of brackets into markers side by side", () => {
+    // As the model wrote them on 11 October 2026, in Italian, and the other
+    // separators the docstring names.
+    expect(
+      [
+        "a [Excerpt 1 e Excerpt 3].",
+        "b [Excerpt 1, Excerpt 2, Excerpt 3].",
+        "c (Excerpt 2 and 3)",
+        "d [Excerpt 1、Excerpt 2]",
+      ].map((answer) => resolveExcerptRefs(answer, citations)),
+    ).toEqual([
+      "a [PPM 1] [WEB 9].",
+      "b [PPM 1] [PPM 2] [WEB 9].",
+      "c [PPM 2] [WEB 9]",
+      "d [PPM 1] [PPM 2]",
+    ]);
+  });
+
   it("leaves a number with no citation behind it as prose", () => {
     expect(resolveExcerptRefs("see Excerpt 9", citations)).toBe("see Excerpt 9");
+    // In a list, the references it can resolve still become markers.
+    expect(resolveExcerptRefs("[Excerpt 1, Excerpt 9]", citations)).toBe("[[PPM 1], Excerpt 9]");
   });
 
   it("leaves Excerpt 0 as prose", () => {
@@ -136,6 +156,14 @@ describe("withoutMarkers", () => {
         badges,
       ),
     ).toBe("Le tasse scadono il 30 settembre.\n- Prima rata");
+  });
+
+  it("takes the space after a marker that opened a line, and ends where the text does", () => {
+    const badges = [badge("[PPM 1]", 1), badge("[WEB 2]", 2)];
+
+    expect(
+      withoutMarkers("[PPM 1] e [WEB 2] non lo dicono.\n[WEB 2] Le tasse.  \n\n", badges),
+    ).toBe("e non lo dicono.\nLe tasse.");
   });
 });
 
