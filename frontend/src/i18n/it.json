@@ -67,17 +67,24 @@
     "courseMaterial": "Il materiale dei corsi è riservato a chi ha un account."
   },
   "status": {
-    "thinking": "Sto cercando e ragionando…",
     "streaming": "Sto scrivendo la risposta…",
     "retrying": "C'è un'altra domanda in corso. Riprovo tra {{seconds}} secondi ({{attempt}} di {{total}})."
   },
   "route": {
-    "label": "Cercato in",
     "slides": "materiale del corso",
     "unifi_web": "pagine di ateneo",
-    "both": "entrambe le fonti",
-    "sources_one": "{{count}} estratto",
-    "sources_other": "{{count}} estratti"
+    "both": "entrambe le fonti"
+  },
+  "process": {
+    "running": "Ricerca in corso · {{seconds}} s",
+    "done": "Ricerca completata · {{seconds}} s",
+    "doneUntimed": "Ricerca completata",
+    "searchedIn": "Cercato in {{where}}",
+    "read_one": "Letto {{count}} estratto",
+    "read_other": "Letti {{count}} estratti"
+  },
+  "sources": {
+    "slide": "Slide p. {{page}}"
   },
   "citations": {
     "title": "Fonti",

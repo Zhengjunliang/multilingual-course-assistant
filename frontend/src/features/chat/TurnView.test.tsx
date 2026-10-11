@@ -1,15 +1,14 @@
 // @vitest-environment jsdom
 
 /**
- * The route line says where the answer came from, loudly enough to be read, and
- * the sources sit above the answer rather than under it.
+ * The process line says how the answer was searched, loudly enough to be
+ * read, and the sources sit above the answer rather than under it.
  *
  * Both are assertions about the `start` event being spent rather than stored:
  * the route and the citations arrive together, before the first token, and the
- * point of this stage was to put that fact on the screen at the moment it is
- * true.
+ * point is to put that fact on the screen at the moment it is true.
  *
- * The document is for one case. How loud the route line is depends on which
+ * The document is for one case. How loud the process line is depends on which
  * element around it carries a type size, and a string render can only answer
  * that by naming the tag; a mounted turn answers it with `closest`.
  */
@@ -59,6 +58,7 @@ function turn(overrides: Partial<Turn> = {}): Turn {
     answer: "La scadenza è il 30 settembre. [Excerpt 1]",
     citations: [citation("[Excerpt 1]", 3), citation("[Excerpt 2]", 4), citation("[Excerpt 3]", 5)],
     route: ROUTE,
+    searchMs: 2400,
     locale: "it",
     complete: true,
     failure: null,
@@ -82,28 +82,35 @@ function view(t: Turn, live = false, thinking = false, visitor = false): string 
   );
 }
 
-describe("the route line", () => {
-  it("names where the answer was searched", () => {
-    expect(view(turn())).toContain("entrambe le fonti");
+describe("the process line", () => {
+  it("is one folded line, which names where the answer was searched once opened", () => {
+    const html = view(turn());
+
+    expect(html).toContain("<details");
+    expect(html).toContain("Ricerca completata · 2 s");
+    expect(html).toContain("Cercato in entrambe le fonti");
+    // The count is the start event's citations: RouteDecision has no field
+    // for it, and none had to be added.
+    expect(html).toContain("Letti 3 estratti");
   });
 
-  it("counts the excerpts it was given", () => {
-    // The count is not in RouteDecision — its four fields are target, query,
-    // fresh and reason. It comes from the citations of the same start event,
-    // which is why no field had to be added to the contract for this.
-    expect(view(turn())).toContain("3 estratti");
+  it("never shows the router's reason", () => {
+    expect(view(turn())).not.toContain(ROUTE.reason);
   });
 
-  it("is already there before the first token", () => {
-    const html = view(turn({ answer: "", complete: false }), false, true);
+  it("counts the seconds while the server has not said where it looked", () => {
+    const html = view(
+      turn({ route: null, searchMs: null, citations: [], answer: "", complete: false }),
+      false,
+      true,
+    );
 
-    expect(html).toContain("entrambe le fonti");
-    expect(html).toContain("3 estratti");
+    expect(html).toContain("Ricerca in corso · 1 s");
   });
 
   it("is not set in the smallest type on the page", () => {
-    // It used to be `text-muted text-xs`, which said the right thing in the
-    // quietest voice available. Guarding the negative is the only way to keep a
+    // The route line it replaces was once `text-muted text-xs`, the right
+    // thing in the quietest voice available. Guarding the negative keeps a
     // later tidy-up from putting it back.
     const { container, unmount } = mount(
       <TurnView
@@ -115,13 +122,8 @@ describe("the route line", () => {
         visitor={false}
       />,
     );
-    // The deepest element holding the route name comes last in document order;
-    // the nearest one around it with a type size is the line, whatever its tag.
-    const name = [...container.querySelectorAll("*")]
-      .filter((element) => element.textContent?.includes("entrambe le fonti"))
-      .at(-1);
-    const line = name?.closest(TYPE_SIZES);
-    if (line == null) throw new Error("no type size is set around the route line");
+    const line = container.querySelector("summary")?.closest(TYPE_SIZES);
+    if (line == null) throw new Error("no type size is set around the process line");
 
     expect([...line.classList]).toContain("text-body");
     expect([...line.classList]).not.toContain("text-caption");
@@ -142,10 +144,10 @@ describe("the order of a turn", () => {
   });
 
   it("shows the sources while the answer is still being written", () => {
-    const html = view(turn({ answer: "", complete: false }), false, true);
+    const html = view(turn({ answer: "", complete: false }), true);
 
     expect(html).toContain("Fonti");
-    expect(html).toContain("Sto cercando");
+    expect(html).toContain("Ricerca completata");
   });
 });
 

@@ -244,6 +244,8 @@ export interface AnswerMarkdownProps {
   badges: readonly Badge[];
   onBadgeClick: (marker: string) => void;
   rehypePlugins?: Options["rehypePlugins"];
+  /** Tokens are still arriving: the caret follows the last word (index.css, `caret-after`). */
+  streaming?: boolean;
 }
 
 export function AnswerMarkdown({
@@ -252,6 +254,7 @@ export function AnswerMarkdown({
   badges,
   onBadgeClick,
   rehypePlugins,
+  streaming = false,
 }: AnswerMarkdownProps) {
   // remark-cjk-friendly after remark-gfm, as its README asks: it lets bold
   // open and close next to the full-width punctuation of Chinese text.
@@ -289,7 +292,13 @@ export function AnswerMarkdown({
 
   return (
     <PillContext value={pills}>
-      <div lang={lang} className="flex min-w-0 flex-col gap-snug text-ink text-reading">
+      <div
+        lang={lang}
+        className={cn(
+          "flex min-w-0 flex-col gap-snug text-ink text-reading",
+          streaming && "caret-after",
+        )}
+      >
         {body}
       </div>
     </PillContext>

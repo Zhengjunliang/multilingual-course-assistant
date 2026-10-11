@@ -110,6 +110,27 @@ describe("an answer", () => {
     expect(spelled).not.toContain("<button");
   });
 
+  it("draws the caret after the last word only while words arrive", () => {
+    const streaming = (text: string, live: boolean) =>
+      render(
+        <AnswerStream
+          text={text}
+          badges={BADGES}
+          complete={false}
+          live={live}
+          onBadgeClick={() => {}}
+        />,
+      );
+
+    // The caret is the prose's own `::after` (index.css, `caret-after`), so
+    // it follows the last word wherever the last block ends.
+    expect(count(streaming("Le tasse scadono", true), "caret-after")).toBe(1);
+    expect(count(streaming("", true), "caret-after")).toBe(1);
+    // Stopped halfway, the answer is what it is: nothing is still coming.
+    expect(count(streaming("Le tasse scadono", false), "caret-after")).toBe(0);
+    expect(count(answer("Le tasse scadono il 30 settembre."), "caret-after")).toBe(0);
+  });
+
   it("keeps the space between two inline elements of a list item", () => {
     expect(answer("- **Prima rata** *30/09*")).toContain(
       "<strong>Prima rata</strong> <em>30/09</em>",

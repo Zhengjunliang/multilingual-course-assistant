@@ -10,8 +10,9 @@
  * first frame, so one that has already finished is caught as surely as one
  * that loops; a reading of what runs at a single moment would miss the first
  * kind. Every screen is checked at rest, and the chat twice more mid-answer,
- * when the interface animates: the mascot's thinking pose before the first
- * word, the cursor while words arrive.
+ * when the interface animates: the process line's shimmer while the search
+ * runs, the mascot's thinking pose and the lone caret before the first word,
+ * the caret while words arrive.
  */
 
 import type { Page } from "@playwright/test";
@@ -143,10 +144,18 @@ test.describe("the chat mid-answer", () => {
     await page.getByRole("button", { name: it.ask.submit }).click();
   }
 
+  test("while the search runs: nothing moves", async ({ page, api }) => {
+    api.holdAnswer([]);
+    await ask(page);
+    await expect(page.locator(".shimmer")).toBeVisible();
+    expect(await moved(page)).toEqual([]);
+  });
+
   test("before the first word: nothing moves", async ({ page, api }) => {
     api.holdAnswer(campusStream(7).slice(0, 1));
     await ask(page);
-    await expect(page.getByText(it.status.thinking)).toBeVisible();
+    // The fixture's search took 2400 ms, which the line rounds to 2 s.
+    await expect(page.getByText(it.process.done.replace("{{seconds}}", "2"))).toBeVisible();
     expect(await moved(page)).toEqual([]);
   });
 
