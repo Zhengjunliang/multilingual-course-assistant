@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { APP_NAME, CANVAS, CANVAS_DARK, writtenFiles } from "./fumetto";
+import { APP_NAME, CANVAS, CANVAS_DARK, HEAD, outline, writtenFiles } from "./fumetto";
 
 // `fileURLToPath`, not `URL.pathname`: on Windows the latter yields "/D:/…".
 const FRONTEND = fileURLToPath(new URL("../../", import.meta.url));
@@ -44,9 +44,38 @@ describe("the cat's files", () => {
     expect(themeColours).toEqual([CANVAS, CANVAS_DARK]);
   });
 
+  it("draw the head from the same outline the living cat turns", () => {
+    expect(outline()).toBe(HEAD);
+    expect(HEAD).toBe(
+      "M13.5 30.5C12.2 23.5 12.8 16.6 15 10.8C19 13.4 22.4 16.4 25 19.4C29.8 17.9 35.2 17.9 40 19.2C43 15.6 46.6 12.6 50.6 10.6C52.4 16.4 52.6 23 51.2 29.6C55.2 34.6 55.6 42 51.6 47.4C46.6 53.8 38.6 55.8 31.8 55.6C26.4 55.5 21.2 54.6 17.4 52.8L10.4 58.8L12.6 49.6C9.4 44.4 9.6 35.8 13.5 30.5Z",
+    );
+  });
+
   it("name the page as the manifest does", () => {
     const html = onDisk("index.html") ?? "";
 
     expect(html.match(/<title>(.*)<\/title>/)?.[1]).toBe(APP_NAME);
+  });
+});
+
+describe("the outline's rigs", () => {
+  const numbers = (path: string) => path.match(/-?[\d.]+/g) ?? [];
+  const moved = (turned: string) => {
+    const rest = numbers(HEAD);
+    return numbers(turned).flatMap((value, index) => (value === rest[index] ? [] : [index]));
+  };
+
+  it("turn an ear without touching the other ear or the tail", () => {
+    const left = moved(outline({ earLeft: 0.2 }));
+    const right = moved(outline({ earRight: 0.2 }));
+
+    expect(left.length).toBeGreaterThan(0);
+    expect(right.length).toBeGreaterThan(0);
+    expect(left.filter((index) => right.includes(index))).toEqual([]);
+  });
+
+  it("sway the tail by its tip alone", () => {
+    // tailTip is the 26th point of the path: numbers 50 and 51.
+    expect(moved(outline({ tail: 0.3 }))).toEqual([50, 51]);
   });
 });
