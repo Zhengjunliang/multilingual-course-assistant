@@ -24,9 +24,12 @@ import { Link, Outlet } from "react-router-dom";
 import { buttonVariants } from "@/components/ui/button";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { chooseUiLocale, UI_LOCALES, type UiLocale } from "@/i18n";
+import { cn } from "@/lib/utils";
 import { type Shell, ShellContext } from "./shell";
 
 const nothing = () => {};
+
+const SKETCHED = "hover-sketch rounded-full hover:bg-transparent";
 
 export default function VisitorLayout() {
   const { t, i18n } = useTranslation();
@@ -50,15 +53,17 @@ export default function VisitorLayout() {
     <ShellContext value={shell}>
       <div className="flex h-full min-w-0 flex-col">
         {/* The signed-in header's row (features/chat/ChatShell.tsx), with the
-            two ways in where the account menu would be. */}
+            two ways in where the account menu would be. Its text buttons wear
+            the hand-drawn outline on hover, as the entry's chips do (#173). */}
         <header className="flex shrink-0 items-center justify-end gap-snug px-gutter py-snug">
           <LocaleSwitch
+            className={SKETCHED}
             locales={UI_LOCALES}
             value={i18n.language}
             label={t("account.language")}
             onChange={(locale: UiLocale) => void chooseUiLocale(locale)}
           />
-          <Link to="/login" className={buttonVariants({ variant: "ghost" })}>
+          <Link to="/login" className={cn(buttonVariants({ variant: "ghost" }), SKETCHED)}>
             {t("auth.logIn")}
           </Link>
           <Link to="/register" className={buttonVariants()}>
