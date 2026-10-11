@@ -149,7 +149,7 @@ export default function ChatPage() {
   useEffect(() => setBusy(busy), [busy, setBusy]);
   useEffect(() => () => setBusy(null), [setBusy]);
 
-  // Before the first question the page is a front door: heading, suggestions
+  // Before the first question the page is a front door: the cat, the caption
   // and the composer together in the middle of the screen. After it, the
   // composer parks at the foot and the thread owns the space.
   const empty = turns.length === 0 && !unreadable;
@@ -190,17 +190,7 @@ export default function ChatPage() {
         }
       >
         {entry ? (
-          // While the entry recedes its chips can still be pressed, and a
-          // second question would abort the first: a chip does nothing then.
-          // The composer needs no such guard, since it sends nothing while
-          // the first question is on its way.
-          <EntryScreen
-            onPick={(question) => {
-              if (!leaving) onSubmit(question);
-            }}
-            visitor={visitor}
-            hops={hops}
-          />
+          <EntryScreen visitor={visitor} hops={hops} />
         ) : (
           <div className="mx-auto flex max-w-4xl flex-col gap-room">
             {visitor && (

@@ -896,16 +896,15 @@ describe("the shell across pages", () => {
   });
 });
 
-/**
- * A suggestion asks at once, which is the shortest way to ask; the answer
- * never ends. Found by its words: the entry's first button is the cat's pause.
- */
+/** Types a question into the composer under the entry and presses send; the answer never ends. */
 async function askFromTheFrontDoor(container: HTMLElement) {
-  click(
-    [...container.querySelectorAll<HTMLButtonElement>("main button")].find(
-      (button) => button.textContent === i18n.t("entry.chip.enrolment"),
-    ),
-  );
+  const field = container.querySelector<HTMLTextAreaElement>("#question");
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+  act(() => {
+    setter?.call(field, "Quali sono le scadenze per l'iscrizione?");
+    field?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  click(container.querySelector<HTMLButtonElement>("button[type='submit']"));
   await settle();
 }
 

@@ -74,7 +74,7 @@ export const PAIRS = [
     front: "accent",
     back: "surface",
     min: TEXT,
-    where: "input.tsx focus outline and border, suggestion.tsx chip under the pointer",
+    where: "input.tsx focus outline and border",
   },
   {
     front: "accent",

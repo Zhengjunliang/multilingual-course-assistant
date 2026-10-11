@@ -26,7 +26,7 @@ function systemReducesMotion(reduce: boolean) {
 }
 
 function entry(visitor = true) {
-  const mounted = mount(<EntryScreen onPick={() => {}} visitor={visitor} />);
+  const mounted = mount(<EntryScreen visitor={visitor} />);
   const { container } = mounted;
   return {
     ...mounted,
@@ -175,18 +175,17 @@ describe("the entry's intro", () => {
     const question = document.createElement("textarea");
     question.id = "question";
     document.body.append(question);
+    const elsewhere = document.createElement("button");
+    document.body.append(elsewhere);
     const page = entry();
-    const chip = () =>
-      [...page.container.querySelectorAll("button")].find((button) =>
-        button.textContent?.includes("iscrizione"),
-      );
     act(() => page.skip()?.focus());
     act(() => page.skip()?.blur());
-    act(() => chip()?.focus());
+    act(() => elsewhere.focus());
     act(() => vi.advanceTimersByTime(INTRO.length * 1000 + 10));
-    const focused = document.activeElement === chip();
+    const focused = document.activeElement === elsewhere;
     page.unmount();
     question.remove();
+    elsewhere.remove();
 
     expect(focused).toBe(true);
   });
