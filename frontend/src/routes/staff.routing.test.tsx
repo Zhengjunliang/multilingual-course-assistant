@@ -436,6 +436,17 @@ describe("the Gestione group and /staff", () => {
 });
 
 describe("signing in", () => {
+  // Under reduced motion the page leaves as soon as the sign-in is accepted,
+  // with no check to watch first (routes/landing.ts): where it lands is this
+  // test's question, not how long it takes to go.
+  beforeEach(() => {
+    const media = window.matchMedia;
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      ...media(query),
+      matches: query === "(prefers-reduced-motion: reduce)",
+    }));
+  });
+
   it.each([
     // The staff page asked for, its programme included.
     ["a staff page", "/staff/editions/5?programme=B047", "/staff/editions/5?programme=B047"],

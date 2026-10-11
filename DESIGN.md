@@ -119,6 +119,9 @@ components:
   warn-ink-on-warn:
     backgroundColor: '{colors.warn}'
     textColor: '{colors.warn-ink}'
+  warn-ink-on-surface:
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.warn-ink}'
   accent-ink-on-warn-ink:
     backgroundColor: '{colors.warn-ink}'
     textColor: '{colors.accent-ink}'
@@ -167,6 +170,9 @@ components:
     textColor: '{colors.accent-dark}'
   warn-ink-on-warn-dark:
     backgroundColor: '{colors.warn-dark}'
+    textColor: '{colors.warn-ink-dark}'
+  warn-ink-on-surface-dark:
+    backgroundColor: '{colors.surface-dark}'
     textColor: '{colors.warn-ink-dark}'
   accent-ink-on-warn-ink-dark:
     backgroundColor: '{colors.warn-ink-dark}'
@@ -222,7 +228,7 @@ Two shadows, by height: `shadow-raised` for what rests on the page (a card, an o
 
 Three layers, by what sits over what: `z-lifted` for a control above its row's stretched link or a sticky table head, `z-backdrop` for the scrim behind a dialog, `z-floating` for what floats on it. A numbered `z-` index does not appear outside `index.css`.
 
-Motion is spent through six durations (`duration-instant`, `-fast`, `-base`, `-slow`, `-reveal`, `-scene`), a `--stagger` between things arriving in a row, and four curves (`ease-standard`, `-out`, `-emphasized`, `-strong`), named in `index.css` beside the reference interface each was read off; `fast` and `standard` are what every `transition-colors` takes. Beyond colour, what moves is the living cat (under Components), the entry's intro writing its caption in (`blur-in`), the entry receding into the conversation, the conversation arriving and the question box travelling to its foot (`recede`, `arrive`, `travel`), the cat beside an answer thinking, a slow pulse while the answer is being prepared, the process line's words shimmering while the search runs (`shimmer`), the caret blinking after the last word of an answer being written (`caret-after`), and the sources panel arriving from the right (`slide-in-right`). Nothing moves for a reader whose system asks for reduced motion: what moves from script asks `lib/useReducedMotion.ts`, and `frontend/e2e/motion.spec.ts` checks every screen, the living cat's drawing included.
+Motion is spent through six durations (`duration-instant`, `-fast`, `-base`, `-slow`, `-reveal`, `-scene`), a `--stagger` between things arriving in a row, and four curves (`ease-standard`, `-out`, `-emphasized`, `-strong`), named in `index.css` beside the reference interface each was read off; `fast` and `standard` are what every `transition-colors` takes. Beyond colour, what moves is the living cat (under Components), the entry's intro writing its caption in (`blur-in`), the entry receding into the conversation, the conversation arriving and the question box travelling to its foot (`recede`, `arrive`, `travel`), the cat beside an answer thinking, a slow pulse while the answer is being prepared, the process line's words shimmering while the search runs (`shimmer`), the caret blinking after the last word of an answer being written (`caret-after`), the sources panel arriving from the right (`slide-in-right`), a field's label floating up and its line growing, the sign-in button's spinner and its check drawn in (`draw-in`), and the sign-in card shaking once when refused. Nothing moves for a reader whose system asks for reduced motion: what moves from script asks `lib/useReducedMotion.ts`, and `frontend/e2e/motion.spec.ts` checks every screen, the living cat's drawing included.
 
 The pill (`bg-pill`) is the material of what floats in the page and takes input, the question box first: about half-white over the ground, a one-pixel inner highlight and a soft shadow, and no blur behind it, so the grain shows through it at about half its strength, as through glass laid on paper, where a card covers it.
 
@@ -249,6 +255,8 @@ An answer is drawn in one order (`features/chat/TurnView.tsx`), after ChatGPT an
 - **Under a settled answer**, a ghost icon button that copies the answer without its markers, and the sources button, an outlined pill with up to three stacked source marks, which opens the sources panel: a `Sheet` from the right, full width below `sm`, the cited sources first and the rest after them under a heading of their own, never marked as unused, and every source in one list when the answer cited none. Closing it gives focus back to the button.
 
 A password is typed into `components/PasswordField.tsx`, with an eye inside the field, after Edge's own reveal and Material 3's secure text field: a toggle button whose name, "Show password", never changes, its state in `aria-pressed`, which a screen reader announces. Pressing it with a pointer leaves the focus in the field. The letters are hidden again when the form is sent and when the page returns from the back-forward cache, and Edge's own eye in the field is hidden, so there is one way to show them.
+
+The sign-in and registration forms sit on a card with no border (`routes/AuthLayout.tsx`): `surface`, `rounded-bubble` and `shadow-overlay`, the living cat's head sitting on its top edge. Their fields are `components/LineField.tsx`, after Material 3's filled text field: an underline in `muted`, which is the field's only edge, the label inside the field floating up to four fifths of its size on focus, once filled or once a password manager has filled it, and an accent line growing from the left while the focus is in the field, `warn-ink` while the field is refused. The submit button is a full pill: an arrow slides in under the pointer or the focus, a spinner turns while the server decides and a check is drawn in when it accepts, after Stripe Checkout's pay button, and it is `aria-disabled` from the send until the page leaves. What the server refused is a line in `warn-ink` after a disc with "!", tied to its field by `aria-describedby`; a refused sign-in shakes the card once, after the macOS sign-in window, and empties the password. The registration's password carries a hint of its minimum length.
 
 Fumetto is drawn by `components/Mascot.tsx` from the one drawing in `frontend/src/brand/fumetto.ts`, always decorative (`aria-hidden`), in the accent's line:
 

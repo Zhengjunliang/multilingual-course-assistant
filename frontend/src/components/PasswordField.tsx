@@ -1,10 +1,11 @@
 /**
- * A password input whose letters the reader can show, by an eye inside the
- * field, after Microsoft Edge's own reveal button and Material 3's secure
- * text field. The eye is a toggle button: one name that never changes, "Show
- * password", and `aria-pressed` saying whether the letters are shown, as
- * Adrian Roselli has toggle buttons (outside the repository). A screen reader
- * announces the new state itself, so the field needs no status line.
+ * A password field (components/LineField.tsx) whose letters the reader can
+ * show, by an eye inside the field, after Microsoft Edge's own reveal button
+ * and Material 3's secure text field. The eye is a toggle button: one name
+ * that never changes, "Show password", and `aria-pressed` saying whether the
+ * letters are shown, as Adrian Roselli has toggle buttons (outside the
+ * repository). A screen reader announces the new state itself, so the field
+ * needs no status line.
  *
  * Pressing the eye with a pointer leaves the focus in the input, as Edge's
  * does, so the reader goes on typing where they were; from the keyboard the
@@ -31,18 +32,31 @@ import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { LineField } from "@/components/LineField";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 interface PasswordFieldProps {
   id: string;
+  label: string;
   /** `current-password` to sign in, `new-password` to register: what a password manager reads. */
   autoComplete: "current-password" | "new-password";
   value: string;
   onChange: (value: string) => void;
+  /** The password was refused: the field's line turns the warning colour. */
+  invalid?: boolean;
+  /** The ids of what tells the reader about this password: a hint, a refusal. */
+  describedBy?: string;
 }
 
-export function PasswordField({ id, autoComplete, value, onChange }: PasswordFieldProps) {
+export function PasswordField({
+  id,
+  label,
+  autoComplete,
+  value,
+  onChange,
+  invalid = false,
+  describedBy,
+}: PasswordFieldProps) {
   const { t } = useTranslation();
   const [shown, setShown] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -65,10 +79,11 @@ export function PasswordField({ id, autoComplete, value, onChange }: PasswordFie
 
   const Icon = shown ? EyeOff : Eye;
   return (
-    <div className="relative" data-mascot-away>
-      <Input
+    <div data-mascot-away>
+      <LineField
         ref={input}
         id={id}
+        label={label}
         type={shown ? "text" : "password"}
         autoComplete={autoComplete}
         autoCapitalize="none"
@@ -76,21 +91,24 @@ export function PasswordField({ id, autoComplete, value, onChange }: PasswordFie
         required
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="pr-control"
+        aria-invalid={invalid || undefined}
+        aria-describedby={describedBy}
+        trailing={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 bottom-hair"
+            aria-controls={id}
+            aria-label={t("auth.showPassword")}
+            aria-pressed={shown}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setShown(!shown)}
+          >
+            <Icon aria-hidden className="size-icon-lg" />
+          </Button>
+        }
       />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="absolute inset-y-0 right-0 my-auto"
-        aria-controls={id}
-        aria-label={t("auth.showPassword")}
-        aria-pressed={shown}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => setShown(!shown)}
-      >
-        <Icon aria-hidden className="size-icon-lg" />
-      </Button>
     </div>
   );
 }

@@ -8,6 +8,7 @@
     "registerTitle": "注册账号",
     "username": "用户名",
     "password": "密码",
+    "passwordHint": "至少 8 个字符。",
     "showPassword": "显示密码",
     "logIn": "登录",
     "register": "注册",

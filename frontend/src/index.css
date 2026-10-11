@@ -513,6 +513,27 @@
 }
 
 /*
+ * A line drawing itself in, as the cat's outline does in the entry's intro: a
+ * path whose `pathLength` is 1, its one dash slid along it. The check in the
+ * sign-in button (routes/AuthLayout.tsx). Under reduced motion the line is
+ * there whole from the start.
+ */
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@utility draw-in {
+  stroke-dasharray: 1;
+  animation: draw var(--transition-duration-slow) var(--ease-out) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/*
  * The process line while the search runs (features/chat/ProcessLine.tsx): a
  * band sweeping across muted words, as Perplexity's "Ricerca in corso" and
  * ChatGPT's "Thinking" do (read 11 October 2026), so the line says it is

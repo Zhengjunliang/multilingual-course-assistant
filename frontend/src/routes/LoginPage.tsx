@@ -4,10 +4,12 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 
 import { ApiError } from "@/api/http";
 import { useSession } from "@/auth/useSession";
+import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { AuthLayout } from "./AuthLayout";
+import { AuthButton, AuthFailure, AuthLayout } from "./AuthLayout";
+import { useLanding } from "./landing";
+
+const FAILURE = "login-failure";
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -16,72 +18,72 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [failure, setFailure] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   // Wherever `RequireSession` sent this reader from, or the front page.
   const back = (location.state as { from?: string } | null)?.from ?? "/";
-  if (account !== null) return <Navigate to={back} replace />;
+  const landing = useLanding(back);
+  if (account !== null && landing.phase === "idle") return <Navigate to={back} replace />;
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (landing.phase !== "idle") return;
     setFailure(null);
-    setBusy(true);
-    try {
-      await logIn(username, password);
-    } catch (error) {
-      // The server answers wrong password and unknown account identically on
-      // purpose (apps/accounts/serializers.py); this shows whatever it said and
-      // does not try to be more helpful than that.
-      setFailure(error instanceof ApiError ? error.detail : t("auth.failed"));
-    } finally {
-      setBusy(false);
-    }
+    await landing.send(
+      () => logIn(username, password),
+      (error) => {
+        // The server answers wrong password and unknown account identically on
+        // purpose (apps/accounts/serializers.py); this shows whatever it said
+        // and does not try to be more helpful than that. The password goes, as
+        // the macOS sign-in window empties it, and the focus is put back there.
+        setFailure(error instanceof ApiError ? error.detail : t("auth.failed"));
+        setPassword("");
+        document.getElementById("password")?.focus();
+      },
+    );
   };
 
   return (
-    <AuthLayout heading={t("auth.logInTitle")}>
-      <form className="flex flex-col gap-gutter" onSubmit={(event) => void onSubmit(event)}>
-        <div className="flex flex-col gap-hair">
-          <label className="font-medium text-body text-ink" htmlFor="username">
-            {t("auth.username")}
-          </label>
-          <Input
-            id="username"
-            autoComplete="username"
-            required
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-hair">
-          <label className="font-medium text-body text-ink" htmlFor="password">
-            {t("auth.password")}
-          </label>
-          <PasswordField
-            id="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={setPassword}
-          />
-        </div>
-
-        {failure !== null && (
-          <p className="rounded-control border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
-            {failure}
-          </p>
-        )}
-
-        <Button type="submit" disabled={busy}>
-          {t("auth.logIn")}
-        </Button>
+    <AuthLayout
+      heading={t("auth.logInTitle")}
+      refusals={landing.refusals}
+      footer={
+        <>
+          {t("auth.noAccount")}{" "}
+          <Link to="/register" className="font-medium text-ink underline">
+            {t("auth.register")}
+          </Link>
+        </>
+      }
+    >
+      <form className="flex flex-col gap-room" onSubmit={(event) => void onSubmit(event)}>
+        <LineField
+          id="username"
+          label={t("auth.username")}
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          required
+          value={username}
+          onChange={(event) => {
+            setUsername(event.target.value);
+            setFailure(null);
+          }}
+        />
+        <PasswordField
+          id="password"
+          label={t("auth.password")}
+          autoComplete="current-password"
+          value={password}
+          onChange={(value) => {
+            setPassword(value);
+            setFailure(null);
+          }}
+          invalid={failure !== null}
+          describedBy={failure !== null ? FAILURE : undefined}
+        />
+        {failure !== null && <AuthFailure id={FAILURE}>{failure}</AuthFailure>}
+        <AuthButton phase={landing.phase}>{t("auth.logIn")}</AuthButton>
       </form>
-
-      <p className="text-center text-body text-muted">
-        {t("auth.noAccount")}{" "}
-        <Link to="/register" className="font-medium text-ink underline">
-          {t("auth.register")}
-        </Link>
-      </p>
     </AuthLayout>
   );
 }
