@@ -91,11 +91,11 @@ function draw(p: Parts, pose: Pose, now: number | null): void {
   p["pupil-right"].setAttribute("cx", fixed(right.cx + pose.eyeX * 0.6));
   p["pupil-right"].setAttribute("cy", fixed(right.cy + pose.eyeY * 0.6));
   p.whiskers.setAttribute("transform", `rotate(${degrees(pose.whisker)} 52 42)`);
-  show(p.open, pose.eyes === "open");
-  show(p.happy, pose.eyes === "happy");
-  show(p.asleep, pose.eyes === "asleep");
-  show(p.mouth, !pose.yawning);
-  show(p.yawn, pose.yawning);
+  show(p.open, pose.eyes.right === "open");
+  show(p.happy, pose.eyes.right === "happy");
+  show(p.asleep, pose.eyes.right === "shut");
+  show(p.mouth, pose.mouth !== "yawn");
+  show(p.yawn, pose.mouth === "yawn");
 
   // The stars twinkle in turn, from a third of their strength to all of it.
   [...p.stars.children].forEach((star, i) => {
@@ -205,6 +205,9 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
         gaze: target === null ? null : { x: target.x - face.x, y: target.y - face.y },
         typing: field !== null,
         cheer: document.querySelector("[data-mascot-cheer]:hover") !== null,
+        away: false,
+        peek: false,
+        busy: false,
       };
     };
 
