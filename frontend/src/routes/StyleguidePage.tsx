@@ -94,8 +94,11 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
         <Button variant="ghost">ghost</Button>
         <Button variant="destructive">destructive</Button>
         <Button size="sm">sm</Button>
+        {/* A lucide icon, as every icon button in the interface holds: a
+            character such as "●" is a glyph axe takes for an icon font and
+            leaves its contrast unmeasured. */}
         <Button size="icon" aria-label="icon">
-          ●
+          <UserRound aria-hidden className="size-icon-lg" />
         </Button>
         <Button disabled>disabled</Button>
       </Specimen>
