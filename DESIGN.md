@@ -220,7 +220,7 @@ Two shadows, by height: `shadow-raised` for what rests on the page (a card, an o
 
 Three layers, by what sits over what: `z-lifted` for a control above its row's stretched link or a sticky table head, `z-backdrop` for the scrim behind a dialog, `z-floating` for what floats on it. A numbered `z-` index does not appear outside `index.css`.
 
-Motion is one duration and one curve, the defaults every `transition-colors` takes, named in `index.css`. The one other movement is the cat thinking, a slow pulse while an answer is being prepared. Nothing moves for a reader whose system asks for reduced motion. Further effects are chosen in issue #135, each naming its duration and curve beside the defaults.
+Motion is spent through six durations (`duration-instant`, `-fast`, `-base`, `-slow`, `-reveal`, `-scene`), a `--stagger` between things arriving in a row, and four curves (`ease-standard`, `-out`, `-emphasized`, `-strong`), named in `index.css` beside the reference interface each was read off; `fast` and `standard` are what every `transition-colors` takes. The one other movement is the cat thinking, a slow pulse while an answer is being prepared. Nothing moves for a reader whose system asks for reduced motion.
 
 🔜 (M4, #135) Three.js loads only on the entry screens, the empty chat and sign-in, after the first paint, and steps down when frames drop. 🔜 (M4, #136) A first visit is guided once per audience, can be skipped and replayed from the account menu, and stays seen in the browser; an empty screen explains itself.
 

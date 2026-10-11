@@ -238,11 +238,32 @@
   --shadow-overlay:
     0 16px 40px -12px oklch(20% 0.04 247 / 0.28), 0 4px 10px -4px oklch(20% 0.04 247 / 0.12);
 
-  /* Motion: one duration and one curve, which every `transition-colors` here
-     takes. They are Tailwind's own defaults, written out so that they are
-     named in one place; an effect that needs another names it beside them. */
-  --default-transition-duration: 150ms;
-  --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Motion (#173): six durations, a stagger and four curves, each read off a
+     reference interface (#135 holds the readings), as `duration-fast` and
+     `ease-standard`. Instant is a hover (Linear) or a press (Vercel); fast,
+     Vercel's default, is every colour change here and the outlined pill on
+     hover; base and slow are a menu opening (Stripe's navigation, Apple's);
+     reveal is content arriving (Stripe 500 ms, Apple 700 to 900 ms); scene is
+     a whole screen fading (Vercel's canvas). The stagger spaces what arrives
+     in a row, a caption's letters (Apple's 40 ms). The curves: standard,
+     Tailwind's own and Vercel's; out for what settles (Stripe's buttons and
+     links); emphasized for what enters, strong for what crosses the screen
+     (Stripe's two most used). Tailwind's own curves are cleared, so these four
+     are the only ones a class can name. */
+  --transition-duration-instant: 100ms;
+  --transition-duration-fast: 150ms;
+  --transition-duration-base: 240ms;
+  --transition-duration-slow: 320ms;
+  --transition-duration-reveal: 600ms;
+  --transition-duration-scene: 1200ms;
+  --stagger: 40ms;
+  --ease-*: initial;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-strong: cubic-bezier(0.78, 0, 0.22, 1);
+  --default-transition-duration: var(--transition-duration-fast);
+  --default-transition-timing-function: var(--ease-standard);
 
   /* Stacking, by what sits over what: a control lifted over its row's
      stretched link or a sticky table head, the scrim behind a dialog, and
