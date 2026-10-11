@@ -1,5 +1,12 @@
 import { ArrowUp, Square } from "lucide-react";
-import { type FormEvent, type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { MAX_QUESTION_CHARS } from "@/api/client";
@@ -74,16 +81,35 @@ export function Composer({
   const [travelling, setTravelling] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
+  // What the composer mounted with is a travel some earlier composer made:
+  // the page keeps it, and a composer mounted again after a conversation that
+  // could not be read must not slide from there.
+  const travelled = useRef(travelFrom);
 
   // Measured after the move and before it is painted: the distance from
   // where the field stands now to where it stood is where the box starts.
   useLayoutEffect(() => {
+    if (travelFrom === travelled.current) return;
+    travelled.current = travelFrom;
     if (travelFrom === null || field.current === null || box.current === null) return;
     const distance = travelFrom.top - field.current.getBoundingClientRect().top;
     if (distance === 0) return;
     box.current.style.setProperty("--travel-from", `${distance}px`);
     setTravelling(true);
   }, [travelFrom]);
+
+  // Cut short as well as ended, by reduced motion switched on halfway: a
+  // class left behind would make the next travel find it already set and
+  // never start. React has no prop for `animationcancel`.
+  useEffect(() => {
+    const element = box.current;
+    if (element === null) return;
+    const cancelled = (event: AnimationEvent) => {
+      if (event.animationName === "travel") setTravelling(false);
+    };
+    element.addEventListener("animationcancel", cancelled);
+    return () => element.removeEventListener("animationcancel", cancelled);
+  }, []);
 
   const busy =
     waiting.phase === "queued" || waiting.phase === "streaming" || waiting.phase === "retrying";

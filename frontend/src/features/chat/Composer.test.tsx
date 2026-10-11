@@ -81,4 +81,23 @@ describe("the composer", () => {
 
     expect(seen).toEqual({ send: false, stop: true });
   });
+
+  it("does not replay a travel it mounts with", () => {
+    // The page keeps where its last first question started. A composer
+    // mounted again later, after a conversation that could not be read, did
+    // not make that travel and must not slide from there.
+    const { container, unmount } = mount(
+      <Composer
+        waiting={{ phase: "idle" }}
+        onSubmit={() => {}}
+        onStop={() => {}}
+        placement="hero"
+        travelFrom={{ top: 100 }}
+      />,
+    );
+    const travelling = container.querySelector(".travel") !== null;
+    unmount();
+
+    expect(travelling).toBe(false);
+  });
 });
