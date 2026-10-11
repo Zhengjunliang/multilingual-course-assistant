@@ -13,9 +13,14 @@
  * service that is not running does not start because we asked again.
  *
  * A visitor without an account asks the same way and keeps the thread: the
- * server stores nothing for them, so each question carries the recent
- * exchanges back (`historyOf`) and the thread lives in this tab
- * (`visitorThread.ts`).
+ * server stores nothing for them (docs/decisions.md, 2026-09-25, *The data
+ * model is decided on paper*, point 3), so each question carries the recent
+ * exchanges back (`historyOf`). The thread lives in this hook's state and
+ * nowhere else: a reload or a closed tab starts again, as ChatGPT and Gemini do
+ * for a reader who is not signed in (outside the repository, read 11 October
+ * 2026), and on a shared lab computer nothing of it is left for the next
+ * student. Signing in, up or out swaps the layout the chat sits in
+ * (auth/RequireSession.tsx), which unmounts this page and the thread with it.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -30,7 +35,6 @@ import {
 import type { Citation, RouteDecision } from "@/api/contract";
 import type { ConversationDetail, StoredMessage } from "@/api/conversations";
 import { readAnswerEvents } from "@/api/sse";
-import { readVisitorThread, writeVisitorThread } from "./visitorThread";
 
 export const MAX_BUSY_RETRIES = 2;
 
@@ -150,11 +154,11 @@ function sleep(seconds: number, signal: AbortSignal): Promise<void> {
 
 /** `visitor`: nobody is signed in, so nothing is stored and the history travels. */
 export function useAsk(visitor: boolean) {
-  const [state, setState] = useState<AskState>(() => ({
-    turns: visitor ? readVisitorThread() : [],
+  const [state, setState] = useState<AskState>({
+    turns: [],
     waiting: { phase: "idle" },
     conversationId: null,
-  }));
+  });
   const abort = useRef<AbortController | null>(null);
   /**
    * The id the next request will carry.
@@ -172,13 +176,6 @@ export function useAsk(visitor: boolean) {
   // server is suspended on a yield holding its one engine slot until the
   // connection actually drops.
   useEffect(() => () => abort.current?.abort(), []);
-
-  // Written whenever the thread settles, never once per token: a stream
-  // rewrites the last turn dozens of times a second. A reload mid-answer then
-  // finds the question and the answer as of the last settled moment.
-  useEffect(() => {
-    if (visitor && state.waiting.phase !== "streaming") writeVisitorThread(state.turns);
-  }, [visitor, state.turns, state.waiting.phase]);
 
   const adopt = useCallback((conversation: ConversationDetail) => {
     abort.current?.abort();

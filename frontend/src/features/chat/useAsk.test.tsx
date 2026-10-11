@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 
 /**
- * A visitor's thread: what each question carries back, and where the thread
- * lives between questions.
+ * A visitor's thread: what each question carries back, and how long the
+ * thread lasts.
  *
- * The server stores nothing for a visitor, so the two halves that replace the
- * stored conversation are both here — `historyOf`, which is the server's
- * `recent_turns` done on this side, and the tab's `sessionStorage`. The hook is
- * mounted for real and the network faked at `fetch`, as the routing test does,
- * because the request body is the claim.
+ * The server stores nothing for a visitor, so `historyOf` — the server's
+ * `recent_turns` done on this side — is what makes a follow-up a follow-up,
+ * and the thread itself lasts as long as the page. The hook is mounted for
+ * real and the network faked at `fetch`, as the routing test does, because
+ * the request body is the claim.
  */
 
 import { act } from "react";
@@ -18,7 +18,6 @@ import { HISTORY_WINDOW_TURNS, MAX_HISTORY_ANSWER_CHARS } from "@/api/client";
 import type { RouteDecision } from "@/api/contract";
 import { mount } from "@/test/mount";
 import { historyOf, type Turn, useAsk } from "./useAsk";
-import { readVisitorThread, writeVisitorThread } from "./visitorThread";
 
 const ROUTE: RouteDecision = {
   target: "unifi_web",
@@ -118,78 +117,46 @@ describe("a visitor's thread", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.restoreAllMocks();
   });
 
   it("travels with a visitor's question, and a signed-in one names its conversation instead", async () => {
-    writeVisitorThread([turn("Quando scadono le tasse?")]);
-
     const visitor = mount(<Probe visitor />);
+    await act(() => hook.submit("Quando scadono le tasse?"));
+    await settle();
     await act(() => hook.submit("E se pago in ritardo?"));
     await settle();
-    const kept = readVisitorThread();
     visitor.unmount();
 
     const member = mount(<Probe visitor={false} />);
-    const shown = hook.turns.length;
     await act(() => hook.submit("Che cos'è un ORM?"));
     await settle();
     member.unmount();
 
     expect(sent).toEqual([
+      { question: "Quando scadono le tasse?", history: [] },
       {
         question: "E se pago in ritardo?",
-        history: [
-          { question: "Quando scadono le tasse?", answer: "About Quando scadono le tasse?" },
-        ],
+        history: [{ question: "Quando scadono le tasse?", answer: "Entro il 30 novembre." }],
       },
       { question: "Che cos'è un ORM?", conversation_id: null },
     ]);
-    // The new exchange joined the thread the tab keeps, whole.
-    expect(kept.map((exchange) => [exchange.question, exchange.complete])).toEqual([
-      ["Quando scadono le tasse?", true],
-      ["E se pago in ritardo?", true],
-    ]);
-    // Somebody signed in never sees a visitor's thread.
-    expect(shown).toBe(0);
   });
 
-  it("survives a reload, an answer it cut off coming back interrupted", () => {
-    writeVisitorThread([turn("one"), turn("two", { answer: "Entro", complete: false })]);
-
-    const page = mount(<Probe visitor />);
-    const turns = hook.turns;
-    page.unmount();
-
-    expect(turns.map((exchange) => exchange.failure)).toEqual([null, { kind: "incomplete" }]);
-  });
-
-  it("is emptied by a new conversation", () => {
-    writeVisitorThread([turn("one")]);
-
-    const page = mount(<Probe visitor />);
-    act(() => hook.reset());
-    page.unmount();
-
-    expect(readVisitorThread()).toEqual([]);
-  });
-
-  it("is empty, and the page still works, where storage throws", async () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new DOMException("blocked", "SecurityError");
-    });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new DOMException("blocked", "SecurityError");
-    });
-
-    const page = mount(<Probe visitor />);
-    const before = hook.turns.length;
+  it("starts again on a reload, and leaves nothing in the browser behind it", async () => {
+    const before = mount(<Probe visitor />);
     await act(() => hook.submit("Quando scadono le tasse?"));
     await settle();
-    const answered = hook.turns.map((exchange) => exchange.complete);
-    page.unmount();
+    const asked = hook.turns.length;
+    before.unmount();
 
-    expect(before).toBe(0);
-    expect(answered).toEqual([true]);
+    const after = mount(<Probe visitor />);
+    const reloaded = hook.turns.length;
+    after.unmount();
+
+    expect({ asked, reloaded, stored: sessionStorage.length + localStorage.length }).toEqual({
+      asked: 1,
+      reloaded: 0,
+      stored: 0,
+    });
   });
 });
