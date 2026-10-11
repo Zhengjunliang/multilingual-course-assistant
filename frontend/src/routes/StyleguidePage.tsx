@@ -22,6 +22,7 @@ import { LogOut, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { LivingMascot } from "@/components/LivingMascot";
 import { Mascot, MascotMark } from "@/components/Mascot";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Avatar } from "@/components/ui/avatar";
@@ -120,6 +121,13 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
         {(["avatar", "welcome", "thinking", "error", "notFound"] as const).map((pose) => (
           <Mascot key={pose} pose={pose} className="size-mascot" />
         ))}
+      </Specimen>
+
+      <Specimen
+        name="LivingMascot"
+        note="Fumetto alive, where a screen greets: it blinks, flicks an ear, sways its tail, follows the pointer and falls asleep after ten idle seconds. The button in its corner stops it; with reduced motion it stands still and the button is gone."
+      >
+        <LivingMascot className="size-mascot" />
       </Specimen>
 
       <Specimen

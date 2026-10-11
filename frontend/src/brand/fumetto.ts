@@ -139,7 +139,7 @@ const MOUTH = "M29.4 46.8Q31 48.8 32.4 46.8Q33.8 48.8 35.4 46.8";
 /** On the right cheek only: the bubble's tail takes the left. */
 const WHISKERS = "M52.2 40.8L56.8 40.2M52 43.8L56.4 44.2";
 
-const pupils = (dx: number, dy: number): Circle[] => [
+const pupils = (dx: number, dy: number): [Circle, Circle] => [
   { cx: 24.6 + dx, cy: 39.8 + dy, r: 1.7 },
   { cx: 40 + dx, cy: 39.8 + dy, r: 1.7 },
 ];
@@ -196,6 +196,25 @@ export const POSES = {
 } as const satisfies Record<string, Drawing>;
 
 export type Pose = keyof typeof POSES;
+
+/**
+ * The living cat's own shapes (#173), drawn with the poses' and moved by
+ * components/LivingMascot.tsx: it is awake with the avatar's eyes and mouth,
+ * happy with the welcome pose's closed smiling eyes and stars, and asleep with
+ * the eyes closed the other way up, a yawn and a rising "z".
+ */
+export const LIVING = {
+  eyes: LIDDED,
+  pupils: pupils(0, 0),
+  mouth: MOUTH,
+  whiskers: WHISKERS,
+  happyEyes: POSES.welcome.strokes.slice(0, 2),
+  stars: POSES.welcome.fills,
+  sleepingEyes: ["M19.8 38.4Q24.6 42.8 29.4 38.4", "M35.2 38.4Q40 42.8 44.8 38.4"],
+  yawn: "M30 47Q32.4 45.2 34.8 47Q35.2 52 32.4 52.4Q29.6 52 30 47Z",
+  /** One "z", centred on the origin; the cat lets three of them rise. */
+  z: "M-2.5 -2.8H2.5L-2.5 2.8H2.5",
+} as const;
 
 /** The line, and the thinner line of a pose's mouth, whiskers and signs. */
 export const STROKE = 3;
