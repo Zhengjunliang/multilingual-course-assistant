@@ -3,12 +3,13 @@
 /*
  * Fraunces and Figtree, served from this repository.
  *
- * Fraunces, a serif with soft, slightly wonky curves, sets headings and the
- * answer a reader came for; Figtree, a friendly geometric sans, sets every
- * control. A serif for the reading and a sans for the interface is how
- * Claude.ai sets its answers, and this pair was chosen from a specimen in
- * English, Italian and Chinese (#128). Both are under the SIL Open Font
- * License, in the `-OFL.txt` files beside them.
+ * Fraunces, a serif with soft, slightly wonky curves, sets the headings;
+ * Figtree, a friendly geometric sans, sets the answer and every control. The
+ * answer in the interface's sans is how ChatGPT, Gemini and Open WebUI set
+ * theirs (read 11 October 2026, #180): one face from the question box to the
+ * last line of the answer. The pair was chosen from a specimen in English,
+ * Italian and Chinese (#128). Both are under the SIL Open Font License, in the
+ * `-OFL.txt` files beside them.
  *
  * Not a CDN. The demo has to work on a machine with no network, and a webfont
  * fetched from a third party also tells that third party who opened the page —
@@ -218,9 +219,10 @@
   --text-title--line-height: 1.75rem;
   --text-display: 1.875rem;
   --text-display--line-height: 2.25rem;
-  /* The answer, set in the serif: a size up from the interface's body, because
-     a serif reads smaller than a sans at the same size and the answer is what
-     a reader came for. */
+  /* The answer: a size up from the interface's body, because the answer is
+     what a reader came for and is read at length. 16 on 26 px is inside what
+     ChatGPT, Gemini, claude.ai and Open WebUI give theirs, 16–17 px on 24–26
+     (measured 11 October 2026, #180). */
   --text-reading: 1rem;
   --text-reading--line-height: 1.625rem;
   /* The same answer in Chinese, looser: a line of square characters with no
@@ -229,6 +231,9 @@
      (measured 7 October 2026), because an answer is read at length. The rules
      that apply it, and Chinese's own stack, are at the end of this file. */
   --leading-reading-zh: 1.8;
+  /* The answer's column, at most: the same products keep the prose between
+     640 and 720 px wide, about 75 characters of Figtree at the reading size. */
+  --container-reading: 45rem;
 
   /* Corners, by what wears them: a short word, a control, a card or window, a
      message. Softer than the university website's square frames, which a lab

@@ -289,7 +289,7 @@ export function AnswerMarkdown({
 
   return (
     <PillContext value={pills}>
-      <div lang={lang} className="flex min-w-0 flex-col gap-snug font-serif text-ink text-reading">
+      <div lang={lang} className="flex min-w-0 flex-col gap-snug text-ink text-reading">
         {body}
       </div>
     </PillContext>
