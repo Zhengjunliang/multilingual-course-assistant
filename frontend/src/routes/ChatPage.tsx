@@ -35,9 +35,9 @@ import { readConversation } from "@/api/conversations";
 import { useSession } from "@/auth/useSession";
 import { Button } from "@/components/ui/button";
 import { Composer } from "@/features/chat/Composer";
-import { EmptyState } from "@/features/chat/EmptyState";
 import { TurnView } from "@/features/chat/TurnView";
 import { useAsk } from "@/features/chat/useAsk";
+import { EntryScreen } from "@/features/entry/EntryScreen";
 import { scrollBehavior } from "@/lib/utils";
 import { useShell } from "./shell";
 
@@ -155,7 +155,7 @@ export default function ChatPage() {
     <>
       {empty ? (
         <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room">
-          <EmptyState onPick={onSubmit} visitor={visitor} />
+          <EntryScreen onPick={onSubmit} visitor={visitor} />
           {composer}
         </main>
       ) : (

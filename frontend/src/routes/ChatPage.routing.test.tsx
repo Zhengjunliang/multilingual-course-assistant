@@ -158,9 +158,15 @@ function openNewConversation(container: HTMLElement) {
   act(() => container.querySelector<HTMLAnchorElement>('a[href="/"]')?.click());
 }
 
-/** A suggestion chip asks its question at once, which is the shortest way to ask. */
+/**
+ * A suggestion chip asks its question at once, which is the shortest way to
+ * ask. Found by its words: the entry's first button is the cat's pause.
+ */
 function askFromTheFrontDoor(container: HTMLElement) {
-  act(() => container.querySelector<HTMLButtonElement>("main button")?.click());
+  const chip = [...container.querySelectorAll<HTMLButtonElement>("main button")].find(
+    (button) => button.textContent === i18n.t("entry.chip.enrolment"),
+  );
+  act(() => chip?.click());
 }
 
 /** Deletes a conversation from its sidebar row, through the confirmation alert dialog. */
@@ -367,7 +373,7 @@ describe("a visitor's addresses", () => {
       before: null,
       after: "en",
       page: "en",
-      heading: i18n.t("empty.title", { lng: "en" }),
+      heading: i18n.t("entry.caption", { lng: "en" }),
     });
   });
 

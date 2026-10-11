@@ -896,9 +896,16 @@ describe("the shell across pages", () => {
   });
 });
 
-/** A suggestion asks at once, which is the shortest way to ask; the answer never ends. */
+/**
+ * A suggestion asks at once, which is the shortest way to ask; the answer
+ * never ends. Found by its words: the entry's first button is the cat's pause.
+ */
 async function askFromTheFrontDoor(container: HTMLElement) {
-  click(container.querySelector<HTMLButtonElement>("main button"));
+  click(
+    [...container.querySelectorAll<HTMLButtonElement>("main button")].find(
+      (button) => button.textContent === i18n.t("entry.chip.enrolment"),
+    ),
+  );
   await settle();
 }
 

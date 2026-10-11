@@ -62,8 +62,8 @@
     "submit": "提问",
     "cancel": "停止"
   },
-  "empty": {
-    "title": "想知道什么？",
+  "entry": {
+    "caption": "用任何语言提问。",
     "chip": {
       "enrolment": "注册的截止日期是什么时候？",
       "calendar": "考试周从哪天开始？",

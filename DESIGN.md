@@ -74,6 +74,8 @@ spacing:
   icon-lg: '1.25rem'
   avatar: '1.75rem'
   mascot: '6rem'
+  entry-cat-sm: '9.75rem'
+  entry-cat: '13rem'
 components:
   ink-on-canvas:
     backgroundColor: '{colors.canvas}'

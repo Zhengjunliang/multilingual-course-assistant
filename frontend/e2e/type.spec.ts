@@ -35,7 +35,7 @@ test.describe("the Chinese interface", () => {
     page,
   }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: zh.empty.title })).toBeVisible();
+    await expect(page.getByRole("heading", { name: zh.entry.caption })).toBeVisible();
 
     expect(await firstFamilies(page, "it")).toEqual({
       body: "Figtree Latin",
@@ -50,7 +50,7 @@ test.describe("the Italian interface", () => {
     page,
   }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: it.empty.title })).toBeVisible();
+    await expect(page.getByRole("heading", { name: it.entry.caption })).toBeVisible();
 
     expect(await firstFamilies(page, "zh-hans")).toEqual({
       body: "Figtree",

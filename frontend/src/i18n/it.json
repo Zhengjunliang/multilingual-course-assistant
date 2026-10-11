@@ -62,8 +62,8 @@
     "submit": "Chiedi",
     "cancel": "Ferma"
   },
-  "empty": {
-    "title": "Cosa vuoi sapere?",
+  "entry": {
+    "caption": "Chiedi in qualsiasi lingua.",
     "chip": {
       "enrolment": "Quali sono le scadenze per l'iscrizione?",
       "calendar": "Quando inizia la sessione d'esame?",
