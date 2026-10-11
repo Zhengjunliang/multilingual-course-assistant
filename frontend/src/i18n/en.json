@@ -99,9 +99,7 @@
     "more": "+{{count}}"
   },
   "error": {
-    "title": "The answer was not completed",
-    "incomplete": "The answer stopped before it was finished.",
-    "retryAfter": "The service asked us to retry in {{seconds}} seconds."
+    "incomplete": "The answer stopped before it was finished."
   },
   "notFound": {
     "title": "Page not found",
