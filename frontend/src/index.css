@@ -350,10 +350,11 @@
  *
  * The pill (E17 of #135, after Why Zero's dock) is the question box's
  * material, which the rest of the interface inherits: about half-white over
- * the ground, a one-pixel inner highlight and a soft shadow, and no backdrop
- * blur, which would cost a repaint behind it for nothing the eye sees on
- * this ground. Translucent, so the contrast of what sits on it depends on
- * the ground behind; axe measures it there, in both themes
+ * the ground, a one-pixel inner highlight and a soft shadow. Translucent, so
+ * the grain shows through it at about half its strength, as through glass
+ * laid on paper, and no backdrop blur, which would cost a repaint behind it
+ * only to smooth that away. The contrast of what sits on it depends on the
+ * ground behind; axe measures it there, in both themes
  * (frontend/e2e/a11y.spec.ts).
  *
  * Blocks of their own, after the themes': palette.mjs reads the first block of
