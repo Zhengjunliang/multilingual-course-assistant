@@ -40,12 +40,23 @@ function entry(visitor = true) {
         .join("");
       return { name: h2?.getAttribute("aria-label") ?? h2?.textContent, shown };
     },
-    held: () =>
-      [...container.querySelectorAll("h2 > .invisible")].map((line) => ({
-        lang: line.getAttribute("lang"),
-        text: line.textContent,
-        hidden: line.getAttribute("aria-hidden"),
-      })),
+    // Held where the writing is: in the one cell of the heading's grid, cut
+    // into the same graphemes, so that they wrap as it would.
+    held: () => {
+      const h2 = container.querySelector("h2");
+      const cell = (line: Element) =>
+        line.classList.contains("col-start-1") && line.classList.contains("row-start-1");
+      return {
+        grid: h2?.classList.contains("grid"),
+        writingInCell: [...(h2?.children ?? [])].every(cell),
+        lines: [...container.querySelectorAll("h2 > .invisible")].map((line) => ({
+          lang: line.getAttribute("lang"),
+          text: line.textContent,
+          hidden: line.getAttribute("aria-hidden"),
+          cut: line.querySelector(":scope > span > span.inline-block") !== null,
+        })),
+      };
+    },
   };
 }
 
@@ -86,7 +97,7 @@ describe("the entry's intro", () => {
     });
   });
 
-  it("holds every line it writes and the caption unseen, so the heading never changes height", () => {
+  it("holds every line it writes and the caption unseen in the cell the writing takes", () => {
     systemReducesMotion(false);
     const page = entry();
     const start = page.held();
@@ -94,11 +105,16 @@ describe("the entry's intro", () => {
     const settled = page.held();
     page.unmount();
 
-    const lines = [...LINES, { lang: "it", text: "Chiedi in qualsiasi lingua." }].map((line) => ({
-      ...line,
-      hidden: "true",
-    }));
-    expect({ start, settled }).toEqual({ start: lines, settled: lines });
+    const held = {
+      grid: true,
+      writingInCell: true,
+      lines: [...LINES, { lang: "it", text: "Chiedi in qualsiasi lingua." }].map((line) => ({
+        ...line,
+        hidden: "true",
+        cut: true,
+      })),
+    };
+    expect({ start, settled }).toEqual({ start: held, settled: held });
   });
 
   it("stops at Skip and hands the focus to the question box", () => {

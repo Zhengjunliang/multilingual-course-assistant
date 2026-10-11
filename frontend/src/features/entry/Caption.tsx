@@ -45,6 +45,11 @@ function graphemesByWord(lang: string, text: string): string[][] {
   );
 }
 
+interface LineProps extends Written {
+  arrives: boolean;
+  className?: string;
+}
+
 /**
  * One line cut into its words and graphemes; `arrives` blurs each grapheme in
  * after the one before. The serif is named again here: an element with `lang`
@@ -52,11 +57,6 @@ function graphemesByWord(lang: string, text: string): string[][] {
  * says otherwise, and `font-serif` is what turns to the Chinese stack in
  * Chinese.
  */
-interface LineProps extends Written {
-  arrives: boolean;
-  className?: string;
-}
-
 function Line({ lang, text, arrives, className }: LineProps) {
   const words = useMemo(() => graphemesByWord(lang, text), [lang, text]);
   let index = 0;
