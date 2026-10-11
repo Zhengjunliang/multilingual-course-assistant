@@ -67,17 +67,24 @@
     "courseMaterial": "Course material is for students with an account."
   },
   "status": {
-    "thinking": "Searching and thinking…",
     "streaming": "Writing the answer…",
     "retrying": "Another question is being answered. Retrying in {{seconds}} seconds ({{attempt}} of {{total}})."
   },
   "route": {
-    "label": "Searched in",
     "slides": "course material",
     "unifi_web": "university pages",
-    "both": "both sources",
-    "sources_one": "{{count}} excerpt",
-    "sources_other": "{{count}} excerpts"
+    "both": "both sources"
+  },
+  "process": {
+    "running": "Searching · {{seconds}} s",
+    "done": "Search complete · {{seconds}} s",
+    "doneUntimed": "Search complete",
+    "searchedIn": "Searched {{where}}",
+    "read_one": "Read {{count}} excerpt",
+    "read_other": "Read {{count}} excerpts"
+  },
+  "sources": {
+    "slide": "Slide p. {{page}}"
   },
   "citations": {
     "title": "Sources",

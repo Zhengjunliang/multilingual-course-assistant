@@ -67,17 +67,24 @@
     "courseMaterial": "课程资料仅对有账号的学生开放。"
   },
   "status": {
-    "thinking": "正在检索和思考…",
     "streaming": "正在写回答…",
     "retrying": "前面还有人在问。{{seconds}} 秒后重试（第 {{attempt}} 次，共 {{total}} 次）。"
   },
   "route": {
-    "label": "检索范围",
     "slides": "课程材料",
     "unifi_web": "学校网页",
-    "both": "两个来源",
-    "sources_one": "{{count}} 个片段",
-    "sources_other": "{{count}} 个片段"
+    "both": "两个来源"
+  },
+  "process": {
+    "running": "正在检索 · {{seconds}} 秒",
+    "done": "检索完成 · {{seconds}} 秒",
+    "doneUntimed": "检索完成",
+    "searchedIn": "检索了{{where}}",
+    "read_one": "读了 {{count}} 个片段",
+    "read_other": "读了 {{count}} 个片段"
+  },
+  "sources": {
+    "slide": "幻灯片第 {{page}} 页"
   },
   "citations": {
     "title": "来源",

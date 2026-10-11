@@ -53,6 +53,11 @@ export interface Turn {
   citations: Citation[];
   route: RouteDecision | null;
   /**
+   * How long the server searched, from `start` or the stored row; `null` until
+   * then, and for good on an answer stored before the server kept it.
+   */
+  searchMs: number | null;
+  /**
    * The language the answer was written in, from `start` or the stored row;
    * `null` until then. Not the interface's language: a Chinese answer in the
    * Italian interface is set as Chinese.
@@ -84,6 +89,7 @@ function blankTurn(key: string, question: string): Turn {
     answer: "",
     citations: [],
     route: null,
+    searchMs: null,
     locale: null,
     complete: false,
     failure: null,
@@ -109,6 +115,7 @@ function replayed(messages: readonly StoredMessage[]): Turn[] {
     open.answer = message.text;
     open.citations = message.citations;
     open.route = message.route;
+    open.searchMs = message.search_ms;
     open.locale = message.locale;
     open.complete = message.complete;
     if (!message.complete) open.failure = { kind: "incomplete" };
@@ -290,6 +297,7 @@ async function run(
         patch({
           citations: event.data.citations,
           route: event.data.route,
+          searchMs: event.data.search_ms,
           locale: event.data.locale,
         });
         opened.current = event.data.conversation_id;

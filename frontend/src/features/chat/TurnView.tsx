@@ -1,5 +1,5 @@
 /**
- * One exchange: the question, where it was searched, its sources, the answer.
+ * One exchange: the question, how it was searched, its sources, the answer.
  *
  * The same component draws a turn arriving token by token and a turn read back
  * out of the database an hour later, which is the reason `citations` and `route`
@@ -18,7 +18,6 @@
  * answered and keeps every other turn object as it was.
  */
 
-import { Search } from "lucide-react";
 import { memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -27,6 +26,7 @@ import { Mascot } from "@/components/Mascot";
 import { badgesOf, citedMarkers, resolveExcerptRefs } from "@/lib/markers";
 import { AnswerStream } from "./AnswerStream";
 import { CitationList } from "./CitationList";
+import { ProcessLine } from "./ProcessLine";
 import type { Turn } from "./useAsk";
 
 interface TurnViewProps {
@@ -47,14 +47,6 @@ interface TurnViewProps {
    * course material was found; the line under it says why.
    */
   visitor: boolean;
-}
-
-function Thinking() {
-  const { t } = useTranslation();
-  // The cat beside it is what moves: its thinking pose, whose rising dots
-  // pulse. The words stay muted, the quietest voice for the one moment there
-  // is nothing yet to read.
-  return <p className="text-body text-muted">{t("status.thinking")}</p>;
 }
 
 /**
@@ -101,24 +93,12 @@ export const TurnView = memo(function TurnView({
       <div className="flex min-w-0 gap-snug">
         <Mascot pose={poseOf(turn, waiting)} className="size-avatar" />
         <div className="flex min-w-0 max-w-reading flex-1 flex-col gap-snug">
-          {turn.route !== null && (
-            <div className="flex min-w-0 flex-col gap-hair">
-              {/* Body size, not the smallest type on the page. This line is the
-                only place a reader is told where the answer came from, and it
-                used to say so in the quietest voice available. */}
-              <p className="flex flex-wrap items-center gap-tight text-body">
-                <Search aria-hidden className="size-icon shrink-0 text-ink" />
-                <span className="font-medium text-ink">{t(`route.${turn.route.target}`)}</span>
-                <span aria-hidden className="text-line">
-                  •
-                </span>
-                <span className="text-muted">
-                  {t("route.sources", { count: turn.citations.length })}
-                </span>
-              </p>
-              <p className="text-caption text-muted">{turn.route.reason}</p>
-            </div>
-          )}
+          <ProcessLine
+            running={working}
+            route={turn.route}
+            searchMs={turn.searchMs}
+            citations={turn.citations}
+          />
 
           {turn.citations.length > 0 && (
             <CitationList
@@ -130,9 +110,10 @@ export const TurnView = memo(function TurnView({
             />
           )}
 
-          {waiting ? (
-            <Thinking />
-          ) : (
+          {/* Nothing under the process line until the search is over: the
+              cat's thinking pose and the line's count say the turn is
+              working. Then the caret, alone until the first word. */}
+          {(turn.answer !== "" || (live && turn.route !== null)) && (
             <AnswerStream
               text={answer}
               lang={turn.locale ?? undefined}

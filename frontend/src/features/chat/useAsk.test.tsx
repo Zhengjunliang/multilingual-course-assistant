@@ -33,6 +33,7 @@ function turn(question: string, change: Partial<Turn> = {}): Turn {
     answer: `About ${question}`,
     citations: [],
     route: ROUTE,
+    searchMs: 1200,
     locale: "it",
     complete: true,
     failure: null,

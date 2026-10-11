@@ -70,12 +70,14 @@ export function AnswerStream({
   if (!complete) {
     return (
       <div className="flex min-w-0 flex-col">
-        <AnswerMarkdown text={text} lang={lang} badges={NO_BADGES} onBadgeClick={onBadgeClick} />
-        {live && (
-          <span className="mt-hair inline-block h-4 w-2 animate-pulse bg-muted motion-reduce:animate-none">
-            <span className="sr-only">{t("status.streaming")}</span>
-          </span>
-        )}
+        <AnswerMarkdown
+          text={text}
+          lang={lang}
+          badges={NO_BADGES}
+          onBadgeClick={onBadgeClick}
+          streaming={live}
+        />
+        {live && <span className="sr-only">{t("status.streaming")}</span>}
       </div>
     );
   }
