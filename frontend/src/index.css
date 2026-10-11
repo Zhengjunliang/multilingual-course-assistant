@@ -306,6 +306,37 @@
   --warn-ink: oklch(85% 0.09 23);
 }
 
+/*
+ * The grain: a fine, still noise over the ground (#173), so that the empty
+ * screen around the cat reads as paper rather than as a flat fill. It lies on
+ * `--canvas` alone, through `bg-ground` below; a card, a dialog or the sidebar
+ * paints its own fill over it, and an element that shows the ground uses
+ * `bg-ground` rather than `bg-canvas`, so the ground has no flat patches.
+ *
+ * Each theme's tile is the same noise in the accent's hue, oklch(66% 0.053
+ * 247) written as the filter's linear-light values, at its own strength: at
+ * most 7 % over the light ground and 5.6 % over the dark one. Muted text, the
+ * faintest, keeps 6.2:1 in light and 7.9:1 in dark on the strongest pixel,
+ * against 6.6:1 and 8.3:1 on the bare ground. An SVG filter in a data URI:
+ * nothing to fetch, and the browser draws it once as a tile. It never moves,
+ * so reduced motion keeps it.
+ *
+ * Blocks of their own, after the themes': palette.mjs reads the first block of
+ * each theme as its colours.
+ */
+:root {
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .19 0 0 0 0 .305 0 0 0 0 .444 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+[data-theme="dark"] {
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .19 0 0 0 0 .305 0 0 0 0 .444 0 0 0 .056 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@utility bg-ground {
+  background-color: var(--canvas);
+  background-image: var(--grain);
+}
+
 html,
 body,
 #root {
@@ -314,7 +345,7 @@ body,
 
 body {
   margin: 0;
-  background-color: var(--canvas);
+  @apply bg-ground;
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }

@@ -81,7 +81,7 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
   return (
     <div
       data-theme={theme}
-      className="flex min-w-0 flex-1 flex-col gap-room rounded-card border border-line bg-canvas p-gutter"
+      className="flex min-w-0 flex-1 flex-col gap-room rounded-card border border-line bg-ground p-gutter"
     >
       <h2 className="font-semibold font-serif text-ink text-title">{theme}</h2>
 
@@ -355,7 +355,7 @@ export default function StyleguidePage() {
   const [alert, setAlert] = useState(false);
 
   return (
-    <div className="min-h-full bg-canvas p-gutter">
+    <div className="min-h-full bg-ground p-gutter">
       <div className="mx-auto flex max-w-6xl flex-col gap-room">
         <header className="flex flex-col gap-hair">
           <h1 className="font-semibold font-serif text-display text-ink">Component catalogue</h1>

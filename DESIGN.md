@@ -191,13 +191,13 @@ A university lab tool that answers questions about a course and the campus, in t
 
 Every colour is a token with a job, named in `index.css` and used through its utility (`bg-surface`, `text-muted`), never as a raw value or a Tailwind palette step. The dark theme swaps the same names, so no component carries a second set of classes.
 
-- **Grounds**: `canvas` is the page, `surface` a card or a field on it, `sidebar` the conversation column. `mark` is the quiet fill of something under the pointer, a citation pill and a lit source card.
+- **Grounds**: `canvas` is the page, under the grain: a fine noise in the accent's hue that never moves, at most 7 % over the light ground and 5.6 % over the dark one, painted with the ground by `bg-ground`. `surface` is a card or a field on it, `sidebar` the conversation column, and neither carries the grain. `mark` is the quiet fill of something under the pointer, a citation pill and a lit source card.
 - **Text**: `ink` for everything read, `muted` for what supports it (a subtitle, an excerpt, an idle row). There is no third grey.
 - **Lines**: `line` separates, and only that; a card is told apart by its outline, not by a step of fill.
 - **The accent**: `accent` is the university website's blue, `accent-ink` the text that sits on it, `accent-soft` the tint behind where the reader is (the open conversation, the current management page, a state badge).
 - **The warning**: `warn`, `warn-line` and `warn-ink` are the one other hue, for a failure and for confirming that something will be destroyed. Nothing else is red.
 
-A citation and its source card are linked by fill, never by colour: the pill and the lit card wear `mark`, the card is ringed in `ink`. Blue there would read as a link to somewhere else. Every pair of colours the interface puts together is listed in [frontend/scripts/palette.mjs](frontend/scripts/palette.mjs) and held to 4.5:1 in both themes by `npm run check:contrast`; a new pair is added there before it ships.
+A citation and its source card are linked by fill, never by colour: the pill and the lit card wear `mark`, the card is ringed in `ink`. Blue there would read as a link to somewhere else. Every pair of colours the interface puts together is listed in [frontend/scripts/palette.mjs](frontend/scripts/palette.mjs) and held to 4.5:1 in both themes by `npm run check:contrast`; a new pair is added there before it ships. Contrast is measured on the bare ground: on the grain's strongest pixel muted text, the faintest, keeps 6.2:1 in light and 7.9:1 in dark. axe cannot measure text over a background image, so `frontend/e2e/a11y.spec.ts` hides the grain before it runs and fails on any contrast axe leaves unmeasured.
 
 ## Typography
 
@@ -259,6 +259,7 @@ A screen with nothing of its own to show is one panel, `components/StatusPanel.t
 - Do give `accent-soft` to where the reader is; don't give the accent to a setting that is merely true, such as the chosen language.
 - Do keep the warning hue for failure and destruction; don't use it for emphasis.
 - Do add a colour pair to `palette.mjs` before a screen composes it.
+- Do show the ground with `bg-ground`; don't paint `bg-canvas`, which leaves a flat patch in the grain.
 - Do let a table stack on a phone; don't let a page scroll sideways.
 - Do let a control act and say what will follow, as deleting the conversation being answered says that its answer stops; don't disable a control to say why it cannot act, and where it truly cannot, say why beside it. A control is disabled only while its own request is on its way, so that it is not sent twice.
 - Don't use the university's mark, its lettering or its page furniture (a blue band, uppercase navigation, square frames): only its blue.

@@ -25,8 +25,14 @@ const WCAG_22_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
  * background image or a gradient (axe-core's `bgImage` and `bgGradient`), so a
  * check that read violations alone would pass a screen whose contrast it never
  * saw.
+ *
+ * The grain over the ground (index.css) is such an image, on every screen, so
+ * it is taken away first and the contrast is measured on the bare ground;
+ * what the grain's strongest pixel leaves of that contrast is measured once,
+ * in index.css's note on it.
  */
 async function violations(page: Page): Promise<string[]> {
+  await page.addStyleTag({ content: ":root, [data-theme] { --grain: none !important; }" });
   const { violations, incomplete } = await new AxeBuilder({ page }).withTags(WCAG_22_AA).analyze();
   const found = violations.map(
     ({ id, nodes }) => `${id}: ${nodes.map(({ target }) => target.join(" ")).join(", ")}`,
