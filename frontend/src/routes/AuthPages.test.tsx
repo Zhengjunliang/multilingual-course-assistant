@@ -18,7 +18,7 @@ import i18n from "@/i18n";
 import { mount } from "@/test/mount";
 import { render } from "@/test/render";
 import LoginPage from "./LoginPage";
-import { ACCEPTED_FOR } from "./landing";
+import { ACCEPTED_FOR, CROUCH, leapt } from "./landing";
 import RegisterPage from "./RegisterPage";
 
 const VISITOR = {
@@ -63,13 +63,16 @@ function type(input: HTMLInputElement | null, value: string) {
   });
 }
 
-function signIn(logIn: () => Promise<void>) {
+function signIn(logIn: () => Promise<void>, from?: string) {
   return mount(
     <SessionContext value={{ ...VISITOR, logIn }}>
-      <MemoryRouter initialEntries={["/login"]}>
+      <MemoryRouter
+        initialEntries={[{ pathname: "/login", state: from === undefined ? null : { from } }]}
+      >
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<p id="front" />} />
+          <Route path="/c/7" element={<p id="thread" />} />
         </Routes>
       </MemoryRouter>
     </SessionContext>,
@@ -107,7 +110,7 @@ describe("a sign-in", () => {
     expect(after).toEqual({ value: "", focused: true, invalid: "true", says: true });
   });
 
-  it("accepted: the check shows, and then the page leaves for where the reader was going", async () => {
+  it("accepted: the check shows, the cat crouches, and it jumps to the entry", async () => {
     vi.useFakeTimers();
     const { container, unmount } = signIn(async () => {});
     await send(container);
@@ -118,10 +121,36 @@ describe("a sign-in", () => {
     await act(async () => {
       vi.advanceTimersByTime(ACCEPTED_FOR);
     });
-    const left = container.querySelector("#front") !== null;
+    const crouching = {
+      cat: container
+        .querySelector("[data-living-mascot]")
+        ?.parentElement?.classList.contains("crouch"),
+      left: container.querySelector("#front") !== null,
+    };
+    await act(async () => {
+      vi.advanceTimersByTime(CROUCH);
+    });
+    const landed = { left: container.querySelector("#front") !== null, leapt: leapt() };
     unmount();
 
-    expect({ checking, left }).toEqual({ checking: { busy: "true", left: false }, left: true });
+    expect({ checking, crouching, landed }).toEqual({
+      checking: { busy: "true", left: false },
+      crouching: { cat: true, left: false },
+      landed: { left: true, leapt: true },
+    });
+  });
+
+  it("accepted on the way to another page: it goes there after the check, with no jump", async () => {
+    vi.useFakeTimers();
+    const { container, unmount } = signIn(async () => {}, "/c/7");
+    await send(container);
+    await act(async () => {
+      vi.advanceTimersByTime(ACCEPTED_FOR);
+    });
+    const arrived = container.querySelector("#thread") !== null;
+    unmount();
+
+    expect(arrived).toBe(true);
   });
 });
 

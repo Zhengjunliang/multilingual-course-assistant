@@ -46,6 +46,7 @@ export default function LoginPage() {
     <AuthLayout
       heading={t("auth.logInTitle")}
       refusals={landing.refusals}
+      crouching={landing.phase === "crouching"}
       footer={
         <>
           {t("auth.noAccount")}{" "}

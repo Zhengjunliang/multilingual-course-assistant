@@ -566,6 +566,84 @@
 }
 
 /*
+ * The jump from a sign-in form to the entry (#183; routes/landing.ts). The cat
+ * crouches on the card (`crouch`); the page changes in a view transition, in
+ * which the browser moves the cat's snapshot from its place on the card to
+ * its place on the entry in a straight line (`::view-transition-group`) and
+ * `leap` lifts it above both on the way, stretched as it rises and squashed
+ * as it lands; the card's snapshot falls away (`fall`), and what the entry
+ * shows rises into place behind it (`rise`). None of it runs under reduced
+ * motion, where the page changes with no jump.
+ */
+@keyframes crouch {
+  to {
+    transform: translateY(5px) scale(1.07, 0.9);
+  }
+}
+
+@utility crouch {
+  transform-origin: 50% 100%;
+  animation: crouch var(--transition-duration-fast) var(--ease-out) forwards;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes leap {
+  from {
+    transform: translateY(5px) scale(1.07, 0.9);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  45% {
+    transform: translateY(-18vh) scale(0.95, 1.07) rotate(-7deg);
+    animation-timing-function: ease-in-out;
+  }
+  55% {
+    transform: translateY(-18.5vh) rotate(5deg);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5);
+  }
+  86% {
+    transform: translateY(4px) scale(1.09, 0.88);
+    animation-timing-function: ease-out;
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes fall {
+  to {
+    opacity: 0;
+    transform: translateY(60px) scale(0.96);
+  }
+}
+
+::view-transition-group(fumetto) {
+  z-index: 1;
+  animation-duration: 980ms;
+  animation-timing-function: ease-in-out;
+}
+
+::view-transition-image-pair(fumetto) {
+  transform-origin: 50% 100%;
+  animation: leap 980ms both;
+}
+
+::view-transition-old(auth-card) {
+  animation: fall 460ms var(--ease-strong) both;
+}
+
+@utility rise {
+  animation: arrive var(--transition-duration-reveal) var(--ease-emphasized) both;
+  animation-delay: calc(var(--transition-duration-slow) + var(--i, 0) * 2 * var(--stagger));
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/*
  * A password manager filling a field fires no input event, so the living cat
  * (components/LivingMascot.tsx) hears of it from this one-millisecond
  * animation's start, as MUI's InputBase does. It changes nothing a reader

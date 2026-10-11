@@ -67,6 +67,7 @@ export default function RegisterPage() {
     <AuthLayout
       heading={t("auth.registerTitle")}
       refusals={landing.refusals}
+      crouching={landing.phase === "crouching"}
       footer={
         <>
           {t("auth.haveAccount")}{" "}
