@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
 /**
- * The password field shows its letters on request and hides them again when
- * the form is sent or the page comes back from the back-forward cache. Read
- * off a mounted form, since what matters is the input's type at the moment an
- * event reads it. That Edge's own eye is hidden is a rule of index.css, read
- * in index.css.test.ts.
+ * The password field shows its letters on request, from an eye that keeps the
+ * focus in the field, and hides them again when the form is sent or the page
+ * comes back from the back-forward cache. Read off a mounted form, since what
+ * matters is the input's type at the moment an event reads it. That Edge's
+ * own eye is hidden is a rule of index.css, read in index.css.test.ts.
  */
 
 import { act, useState } from "react";
@@ -30,24 +30,22 @@ function Form() {
 }
 
 function parts(container: HTMLElement) {
-  const input = container.querySelector("input");
   const button = container.querySelector("button");
   return {
-    type: input?.type,
-    shows: button?.textContent,
+    type: container.querySelector("input")?.type,
     name: button?.getAttribute("aria-label"),
-    status: container.querySelector('[role="status"]')?.textContent,
+    pressed: button?.getAttribute("aria-pressed"),
   };
 }
 
 describe("a password field", () => {
-  it("shows and hides its letters from a button named for them, and says which", () => {
+  it("shows and hides its letters from a toggle whose name stays and whose state follows them", () => {
     const { container, unmount } = mount(<Form />);
     const button = () => container.querySelector("button");
     const wiring = {
       controls: button()?.getAttribute("aria-controls"),
-      pressed: button()?.hasAttribute("aria-pressed"),
       submits: button()?.type,
+      status: container.querySelectorAll('[role="status"]').length,
     };
     const before = parts(container);
     act(() => button()?.click());
@@ -56,22 +54,25 @@ describe("a password field", () => {
     const hidden = parts(container);
     unmount();
 
+    const name = i18n.t("auth.showPassword");
     expect({ wiring, before, shown, hidden }).toEqual({
-      wiring: { controls: "password", pressed: false, submits: "button" },
-      before: { type: "password", shows: "Mostra", name: "Mostra la password", status: "" },
-      shown: {
-        type: "text",
-        shows: "Nascondi",
-        name: "Nascondi la password",
-        status: i18n.t("auth.passwordShown"),
-      },
-      hidden: {
-        type: "password",
-        shows: "Mostra",
-        name: "Mostra la password",
-        status: i18n.t("auth.passwordHidden"),
-      },
+      wiring: { controls: "password", submits: "button", status: 0 },
+      before: { type: "password", name, pressed: "false" },
+      shown: { type: "text", name, pressed: "true" },
+      hidden: { type: "password", name, pressed: "false" },
     });
+  });
+
+  it("leaves the focus in the field when the eye is pressed with a pointer", () => {
+    const { container, unmount } = mount(<Form />);
+    const input = container.querySelector("input");
+    act(() => input?.focus());
+    const press = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    container.querySelector("button")?.dispatchEvent(press);
+    const kept = press.defaultPrevented;
+    unmount();
+
+    expect(kept).toBe(true);
   });
 
   it("is a password again by the time the form's submit is handled", () => {
@@ -89,11 +90,11 @@ describe("a password field", () => {
     const after = parts(container);
     unmount();
 
-    expect({ before, typeWhenSent, after: after.type, shows: after.shows }).toEqual({
+    expect({ before, typeWhenSent, after: after.type, pressed: after.pressed }).toEqual({
       before: "text",
       typeWhenSent: "password",
       after: "password",
-      shows: "Mostra",
+      pressed: "false",
     });
   });
 
