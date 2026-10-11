@@ -38,7 +38,8 @@ import { Composer } from "@/features/chat/Composer";
 import { TurnView } from "@/features/chat/TurnView";
 import { useAsk } from "@/features/chat/useAsk";
 import { EntryScreen } from "@/features/entry/EntryScreen";
-import { scrollBehavior } from "@/lib/utils";
+import { useReducedMotion } from "@/lib/useReducedMotion";
+import { cn, scrollBehavior } from "@/lib/utils";
 import { useShell } from "./shell";
 
 export default function ChatPage() {
@@ -50,6 +51,9 @@ export default function ChatPage() {
 
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [unreadable, setUnreadable] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [hops, setHops] = useState(0);
+  const reduced = useReducedMotion();
 
   const visitor = account === null;
   const ask = useAsk(visitor);
@@ -122,7 +126,16 @@ export default function ChatPage() {
 
   // A visitor has no list to refresh; what can change under them is the
   // session, signed in from another tab.
+  //
+  // The first question leaves the entry (#173): it is sent at once, and the
+  // entry stays a moment longer, while the cat hops and the entry recedes
+  // (`recede`, index.css), before the thread takes its place. With reduced
+  // motion the thread is there at once.
   const onSubmit = (question: string) => {
+    if (empty && !reduced) {
+      setLeaving(true);
+      setHops((count) => count + 1);
+    }
     void submit(question).then(visitor ? recheck : refreshConversations);
   };
 
@@ -141,26 +154,35 @@ export default function ChatPage() {
   // composer parks at the foot and the thread owns the space. The composer is
   // the same component in both — it moves, it is not duplicated.
   const empty = turns.length === 0 && !unreadable;
+  const entry = empty || leaving;
 
   const composer = (
     <Composer
       waiting={waiting}
       onSubmit={onSubmit}
       onStop={stop}
-      placement={empty ? "hero" : "foot"}
+      placement={entry ? "hero" : "foot"}
     />
   );
 
   return (
     <>
-      {empty ? (
-        <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room">
-          <EntryScreen onPick={onSubmit} visitor={visitor} />
+      {entry ? (
+        <main
+          className={cn(
+            "flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room",
+            leaving && "recede",
+          )}
+          onAnimationEnd={(event) => {
+            if (event.animationName === "recede") setLeaving(false);
+          }}
+        >
+          <EntryScreen onPick={onSubmit} visitor={visitor} hops={hops} />
           {composer}
         </main>
       ) : (
         <>
-          <main className="min-h-0 flex-1 overflow-y-auto px-gutter py-room">
+          <main className="arrive min-h-0 flex-1 overflow-y-auto px-gutter py-room">
             <div className="mx-auto flex max-w-4xl flex-col gap-room">
               {visitor && (
                 <Button type="button" variant="ghost" className="self-start" onClick={reset}>

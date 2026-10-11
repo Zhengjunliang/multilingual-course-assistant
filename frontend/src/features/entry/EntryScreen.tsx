@@ -41,9 +41,11 @@ interface EntryScreenProps {
   onPick: (question: string) => void;
   /** Nobody is signed in, so every chip asks about the campus. */
   visitor: boolean;
+  /** Changes each time a question is sent from here, and the cat hops. */
+  hops?: number;
 }
 
-export function EntryScreen({ onPick, visitor }: EntryScreenProps) {
+export function EntryScreen({ onPick, visitor, hops = 0 }: EntryScreenProps) {
   const { t, i18n } = useTranslation();
   const reduced = useReducedMotion();
   const intro = useIntro(visitor && !reduced);
@@ -69,6 +71,7 @@ export function EntryScreen({ onPick, visitor }: EntryScreenProps) {
       <div className="flex flex-col items-center gap-tight">
         <LivingMascot
           restOn="question"
+          hops={hops}
           drawIn={intro.playing}
           className="w-entry-cat-sm md:w-entry-cat"
         />

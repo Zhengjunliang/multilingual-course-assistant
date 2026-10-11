@@ -342,6 +342,58 @@ describe("a visitor's addresses", () => {
     expect(rechecked).toBe(1);
   });
 
+  it("keeps the entry while it recedes after the first question, then shows the thread", async () => {
+    const { container, unmount } = page("/", null);
+    await settle();
+    askFromTheFrontDoor(container);
+    await settle();
+    const receding = {
+      recede: container.querySelector("main.recede") !== null,
+      cat: container.querySelector("[data-living-mascot]") !== null,
+    };
+    // A browser sends `animationend`. jsdom has no `AnimationEvent`, and React
+    // then listens for the prefixed name instead, so both are sent; React
+    // hears one of them.
+    act(() => {
+      for (const name of ["animationend", "webkitAnimationEnd"]) {
+        const done = Object.assign(new Event(name, { bubbles: true }), { animationName: "recede" });
+        container.querySelector("main.recede")?.dispatchEvent(done);
+      }
+    });
+    const after = {
+      recede: container.querySelector("main.recede") !== null,
+      cat: container.querySelector("[data-living-mascot]") !== null,
+    };
+    unmount();
+
+    expect({ receding, after, requested }).toEqual({
+      receding: { recede: true, cat: true },
+      after: { recede: false, cat: false },
+      requested: ["POST /api/ask"],
+    });
+  });
+
+  it("shows the thread at once with reduced motion", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query) =>
+        ({
+          matches: query.includes("reduce"),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+    const { container, unmount } = page("/", null);
+    await settle();
+    askFromTheFrontDoor(container);
+    await settle();
+    const cat = container.querySelector("[data-living-mascot]") !== null;
+    unmount();
+    vi.restoreAllMocks();
+
+    expect(cat).toBe(false);
+  });
+
   it("offers the language menu, and remembers only the language chosen there", async () => {
     const { container, unmount } = page("/", null);
     await settle();

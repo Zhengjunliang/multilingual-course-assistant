@@ -445,6 +445,55 @@
   }
 }
 
+/*
+ * The entry receding into the conversation (E10 of #135, after Linear's board
+ * fading behind its thread; routes/ChatPage.tsx): once the cat has hopped,
+ * 420 ms as mascotLife.ts's `TIMING.hop`, the whole entry fades, rises and
+ * loses its top and bottom edges under a mask. The mask's edge is a
+ * registered property so that it can be animated. The conversation then
+ * arrives from a little lower. Neither moves under reduced motion, where the
+ * page does not wait for the first and the second stands still.
+ */
+@property --recede-edge {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes recede {
+  to {
+    opacity: 0;
+    transform: translateY(-1.5rem);
+    --recede-edge: 6rem;
+  }
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+}
+
+@utility recede {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black var(--recede-edge),
+    black calc(100% - var(--recede-edge)),
+    transparent
+  );
+  animation: recede var(--transition-duration-reveal) var(--ease-strong) 420ms both;
+}
+
+@utility arrive {
+  animation: arrive var(--transition-duration-reveal) var(--ease-emphasized) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 html,
 body,
 #root {
