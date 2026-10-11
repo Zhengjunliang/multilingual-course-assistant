@@ -40,6 +40,7 @@ import { EntryScreen } from "@/features/entry/EntryScreen";
 import { Room } from "@/features/entry/Room";
 import { useReducedMotion } from "@/lib/useReducedMotion";
 import { cn, scrollBehavior } from "@/lib/utils";
+import { leapt } from "./landing";
 import { useShell } from "./shell";
 
 export default function ChatPage() {
@@ -53,6 +54,8 @@ export default function ChatPage() {
   const [leaving, setLeaving] = useState(false);
   const [hops, setHops] = useState(0);
   const [travelFrom, setTravelFrom] = useState<{ top: number } | null>(null);
+  // Whether the cat has just jumped here from a sign-in form (#183).
+  const [landed] = useState(leapt);
   const reduced = useReducedMotion();
 
   const visitor = account === null;
@@ -163,6 +166,7 @@ export default function ChatPage() {
       onStop={stop}
       placement={entry ? "hero" : "foot"}
       travelFrom={travelFrom}
+      rise={landed}
     />
   );
 
@@ -200,7 +204,7 @@ export default function ChatPage() {
         )}
       >
         {entry ? (
-          <EntryScreen visitor={visitor} hops={hops} />
+          <EntryScreen visitor={visitor} hops={hops} landed={landed} />
         ) : (
           <div className="mx-auto flex max-w-3xl flex-col gap-room">
             {unreadable && <p className="text-body text-muted">{t("sidebar.unreadable")}</p>}

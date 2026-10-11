@@ -34,6 +34,8 @@ interface ComposerProps {
    * travels.
    */
   travelFrom?: { top: number } | null;
+  /** The entry has just been landed on from a sign-in form: the box rises into place. */
+  rise?: boolean;
 }
 
 /**
@@ -75,6 +77,7 @@ export function Composer({
   onStop,
   placement = "foot",
   travelFrom = null,
+  rise = false,
 }: ComposerProps) {
   const { t } = useTranslation();
   const [question, setQuestion] = useState("");
@@ -142,6 +145,7 @@ export function Composer({
       className={cn(
         "relative w-full",
         placement === "foot" && "border-line border-t bg-ground p-gutter",
+        rise && "rise [--i:2]",
       )}
       onSubmit={onFormSubmit}
     >

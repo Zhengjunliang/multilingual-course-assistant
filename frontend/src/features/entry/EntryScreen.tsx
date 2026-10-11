@@ -23,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import { LivingMascot } from "@/components/LivingMascot";
 import { Button } from "@/components/ui/button";
 import { useReducedMotion } from "@/lib/useReducedMotion";
+import { cn } from "@/lib/utils";
 import { Caption } from "./Caption";
 import { LINES, useIntro } from "./intro";
 
@@ -31,9 +32,14 @@ interface EntryScreenProps {
   visitor: boolean;
   /** Changes each time a question is sent from here, and the cat hops. */
   hops?: number;
+  /**
+   * The cat has just jumped here from a sign-in form (routes/landing.ts): it
+   * smiles, and the caption and the line rise into place under it.
+   */
+  landed?: boolean;
 }
 
-export function EntryScreen({ visitor, hops = 0 }: EntryScreenProps) {
+export function EntryScreen({ visitor, hops = 0, landed = false }: EntryScreenProps) {
   const { t, i18n } = useTranslation();
   const reduced = useReducedMotion();
   const intro = useIntro(visitor && !reduced);
@@ -91,19 +97,22 @@ export function EntryScreen({ visitor, hops = 0 }: EntryScreenProps) {
         </Button>
       )}
 
+      {/* Named for the view transition a sign-in lands here by: the cat on the
+          sign-in card is the same name (routes/AuthLayout.tsx). */}
       <LivingMascot
         restOn="question"
         hops={hops}
+        welcome={landed}
         drawIn={intro.playing}
-        className="w-entry-cat-sm md:w-entry-cat"
+        className="w-entry-cat-sm [view-transition-name:fumetto] md:w-entry-cat"
       />
       <Caption
         caption={caption}
         writing={writing}
         holds={holds}
-        className="font-semibold font-serif text-display text-ink"
+        className={cn("font-semibold font-serif text-display text-ink", landed && "rise [--i:0]")}
       />
-      <p className="text-body text-muted">{t("app.subtitle")}</p>
+      <p className={cn("text-body text-muted", landed && "rise [--i:1]")}>{t("app.subtitle")}</p>
     </div>
   );
 }

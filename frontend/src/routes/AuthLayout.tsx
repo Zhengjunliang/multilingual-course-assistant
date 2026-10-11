@@ -29,6 +29,8 @@ interface AuthLayoutProps {
   footer: ReactNode;
   /** Changes each time the server refuses the form, and the card shakes. */
   refusals: number;
+  /** The form was accepted and the cat crouches, about to jump to the entry. */
+  crouching?: boolean;
 }
 
 /**
@@ -51,11 +53,21 @@ interface AuthLayoutProps {
  * Behind it all stands the room (features/entry/Room.tsx), kept clear of the
  * card's column; on a phone, under it.
  *
+ * The cat and the card are named for the view transition that takes an
+ * accepted form to the entry (routes/landing.ts): the cat flies, the card
+ * falls away.
+ *
  * The cat's width is `--cat` on the column, so the card can tuck under its
  * chin by the same fraction of it at either size: the drawing's chin is 12 of
  * its 76 units of width above its bottom edge.
  */
-export function AuthLayout({ heading, children, footer, refusals }: AuthLayoutProps) {
+export function AuthLayout({
+  heading,
+  children,
+  footer,
+  refusals,
+  crouching = false,
+}: AuthLayoutProps) {
   const { t, i18n } = useTranslation();
   const reduced = useReducedMotion();
   const card = useRef<HTMLDivElement>(null);
@@ -75,11 +87,14 @@ export function AuthLayout({ heading, children, footer, refusals }: AuthLayoutPr
         <LivingMascot
           restOn="username"
           refusals={refusals}
-          className="relative z-lifted w-(--cat)"
+          className={cn(
+            "relative z-lifted w-(--cat) [view-transition-name:fumetto]",
+            crouching && "crouch",
+          )}
         />
         <div
           ref={card}
-          className="mt-[calc(var(--cat)*-12/76)] flex w-full flex-col gap-room rounded-bubble bg-surface px-room pt-[calc(var(--cat)*4/76+var(--spacing-room))] pb-room shadow-overlay md:px-[2.125rem]"
+          className="mt-[calc(var(--cat)*-12/76)] flex [view-transition-name:auth-card] w-full flex-col gap-room rounded-bubble bg-surface px-room pt-[calc(var(--cat)*4/76+var(--spacing-room))] pb-room shadow-overlay md:px-[2.125rem]"
         >
           <div className="flex flex-col items-center gap-hair text-center">
             <h1 className="font-semibold font-serif text-display text-ink">{APP_NAME}</h1>
@@ -110,7 +125,7 @@ export function AuthLayout({ heading, children, footer, refusals }: AuthLayoutPr
 export function AuthButton({ phase, children }: { phase: Phase; children: string }) {
   const reduced = useReducedMotion();
   const turning = phase === "busy" && !reduced;
-  const accepted = phase === "accepted" && !reduced;
+  const accepted = (phase === "accepted" || phase === "crouching") && !reduced;
   return (
     <Button
       type="submit"
