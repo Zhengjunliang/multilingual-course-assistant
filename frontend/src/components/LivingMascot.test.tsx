@@ -81,6 +81,27 @@ describe("the living cat", () => {
     });
   });
 
+  it("hops for a question sent while it stands there, not for one sent before it appeared", () => {
+    systemReducesMotion(false);
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn((callback: FrameRequestCallback) => frames.push(callback)),
+    );
+    const { container, unmount } = mount(<LivingMascot hops={1} />);
+    const body = () => container.querySelector('[data-part="body"]')?.getAttribute("transform");
+    const run = () =>
+      act(() => {
+        for (const frame of frames.splice(0)) frame(performance.now());
+      });
+    run();
+    run();
+    const lifted = body()?.match(/^translate\(0 (-?[\d.]+)\)/)?.[1];
+    unmount();
+
+    expect(Number(lifted)).toBe(0);
+  });
+
   it("comes back paused when it was left paused", () => {
     systemReducesMotion(false);
     const frames = vi.fn(() => 1);

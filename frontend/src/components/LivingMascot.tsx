@@ -275,9 +275,21 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
     };
   }, [reduced, paused, restOn]);
 
+  // Only a change counts: a cat that appears after a question went, as the
+  // entry does again for a new conversation, has nothing to hop for.
+  const hopsSeen = useRef(hops);
   useEffect(() => {
-    if (hops > 0 && life.current !== null) hop(life.current, performance.now() / 1000);
+    if (hops === hopsSeen.current) return;
+    hopsSeen.current = hops;
+    if (life.current !== null) hop(life.current, performance.now() / 1000);
   }, [hops]);
+
+  // The intro ending, by Skip or by itself, ends the drawing in with it.
+  useEffect(() => {
+    if (drawIn || !sketching.current) return;
+    sketching.current = false;
+    if (svg.current !== null) sketch(find(svg.current), null);
+  }, [drawIn]);
 
   const togglePaused = () => {
     const next = !paused;

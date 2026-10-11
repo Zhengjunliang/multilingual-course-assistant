@@ -348,7 +348,7 @@ describe("a visitor's addresses", () => {
     askFromTheFrontDoor(container);
     await settle();
     const receding = {
-      recede: container.querySelector("main.recede") !== null,
+      recede: container.querySelector(".recede") !== null,
       cat: container.querySelector("[data-living-mascot]") !== null,
     };
     // A browser sends `animationend`. jsdom has no `AnimationEvent`, and React
@@ -357,11 +357,11 @@ describe("a visitor's addresses", () => {
     act(() => {
       for (const name of ["animationend", "webkitAnimationEnd"]) {
         const done = Object.assign(new Event(name, { bubbles: true }), { animationName: "recede" });
-        container.querySelector("main.recede")?.dispatchEvent(done);
+        container.querySelector(".recede")?.dispatchEvent(done);
       }
     });
     const after = {
-      recede: container.querySelector("main.recede") !== null,
+      recede: container.querySelector(".recede") !== null,
       cat: container.querySelector("[data-living-mascot]") !== null,
     };
     unmount();
@@ -371,6 +371,45 @@ describe("a visitor's addresses", () => {
       after: { recede: false, cat: false },
       requested: ["POST /api/ask"],
     });
+  });
+
+  it("asks once when a chip is pressed twice while the entry recedes", async () => {
+    const { container, unmount } = page("/", null);
+    await settle();
+    askFromTheFrontDoor(container);
+    askFromTheFrontDoor(container);
+    await settle();
+    unmount();
+
+    expect(requested).toEqual(["POST /api/ask"]);
+  });
+
+  it("keeps what is typed while the entry recedes, and the focus with it", async () => {
+    const { container, unmount } = page("/", null);
+    await settle();
+    askFromTheFrontDoor(container);
+    await settle();
+    const field = () => container.querySelector<HTMLTextAreaElement>("#question");
+    act(() => {
+      field()?.focus();
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+      setter?.call(field(), "e la biblioteca?");
+      field()?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    act(() => {
+      for (const name of ["animationend", "webkitAnimationEnd"]) {
+        const done = Object.assign(new Event(name, { bubbles: true }), { animationName: "recede" });
+        container.querySelector(".recede")?.dispatchEvent(done);
+      }
+    });
+    const after = {
+      entry: container.querySelector("[data-living-mascot]") !== null,
+      typed: field()?.value,
+      focused: document.activeElement === field(),
+    };
+    unmount();
+
+    expect(after).toEqual({ entry: false, typed: "e la biblioteca?", focused: true });
   });
 
   it("shows the thread at once with reduced motion", async () => {

@@ -23,7 +23,7 @@
  * ChatPage needs a router and a session to render and this needs neither.
  */
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { LivingMascot } from "@/components/LivingMascot";
@@ -63,11 +63,41 @@ export function EntryScreen({ onPick, visitor, hops = 0 }: EntryScreenProps) {
     document.getElementById("question")?.focus();
   };
 
+  // A keyboard reader resting on Skip when the intro ends by itself would be
+  // left on the page's body as the button goes; the question box takes the
+  // focus instead. Cleared only when the focus moves to another element: a
+  // removed button may or may not report its blur.
+  const onSkip = useRef(false);
+  useEffect(() => {
+    if (intro.playing || !onSkip.current) return;
+    onSkip.current = false;
+    document.getElementById("question")?.focus();
+  }, [intro.playing]);
+
   return (
     // `max-w-4xl` is the composer's own width (Composer.tsx). Without it the
     // heading centres on the screen while the chips stretch the whole column,
     // and the three things a reader looks at first sit on three different axes.
     <div className="flex w-full max-w-4xl flex-col items-center gap-room text-center">
+      {/* First in the page's order, so the keyboard reaches it before the
+          intro is over; fixed in the corner, so the eye finds it there. */}
+      {intro.playing && (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={skip}
+          onFocus={() => {
+            onSkip.current = true;
+          }}
+          onBlur={(event) => {
+            if (event.relatedTarget !== null) onSkip.current = false;
+          }}
+          className="hover-sketch fixed right-gutter bottom-gutter rounded-full text-ink"
+        >
+          {t("entry.skip")}
+        </Button>
+      )}
+
       <div className="flex flex-col items-center gap-tight">
         <LivingMascot
           restOn="question"
@@ -91,17 +121,6 @@ export function EntryScreen({ onPick, visitor, hops = 0 }: EntryScreenProps) {
           return <Suggestion key={chip} suggestion={question} onClick={onPick} />;
         })}
       </Suggestions>
-
-      {intro.playing && (
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={skip}
-          className="hover-sketch fixed right-gutter bottom-gutter rounded-full text-ink"
-        >
-          {t("entry.skip")}
-        </Button>
-      )}
     </div>
   );
 }

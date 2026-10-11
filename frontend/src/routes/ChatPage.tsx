@@ -130,8 +130,10 @@ export default function ChatPage() {
   // The first question leaves the entry (#173): it is sent at once, and the
   // entry stays a moment longer, while the cat hops and the entry recedes
   // (`recede`, index.css), before the thread takes its place. With reduced
-  // motion the thread is there at once.
+  // motion the thread is there at once. While it recedes its chips can still
+  // be pressed, and a second question would abort the first; it is ignored.
   const onSubmit = (question: string) => {
+    if (leaving) return;
     if (empty && !reduced) {
       setLeaving(true);
       setHops((count) => count + 1);
@@ -151,8 +153,7 @@ export default function ChatPage() {
 
   // Before the first question the page is a front door: heading, suggestions
   // and the composer together in the middle of the screen. After it, the
-  // composer parks at the foot and the thread owns the space. The composer is
-  // the same component in both — it moves, it is not duplicated.
+  // composer parks at the foot and the thread owns the space.
   const empty = turns.length === 0 && !unreadable;
   const entry = empty || leaving;
 
@@ -165,59 +166,66 @@ export default function ChatPage() {
     />
   );
 
+  // One tree for the entry and the thread, so the main landmark and the
+  // composer stay the same elements across the switch, and what a reader
+  // typed while the entry receded stays with the focus in the composer. On
+  // the entry the wrapper is the centred column holding both; on the thread
+  // it is `contents`, with no box of its own, and the two sit in the page's
+  // column as siblings.
   return (
-    <>
-      {entry ? (
-        <main
-          className={cn(
-            "flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room",
-            leaving && "recede",
-          )}
-          onAnimationEnd={(event) => {
-            if (event.animationName === "recede") setLeaving(false);
-          }}
-        >
-          <EntryScreen onPick={onSubmit} visitor={visitor} hops={hops} />
-          {composer}
-        </main>
-      ) : (
-        <>
-          <main className="arrive min-h-0 flex-1 overflow-y-auto px-gutter py-room">
-            <div className="mx-auto flex max-w-4xl flex-col gap-room">
-              {visitor && (
-                <Button type="button" variant="ghost" className="self-start" onClick={reset}>
-                  <MessageSquarePlus aria-hidden className="size-icon" />
-                  {t("sidebar.new")}
-                </Button>
-              )}
-              {unreadable && <p className="text-body text-muted">{t("sidebar.unreadable")}</p>}
-              {turns.map((turn, position) => {
-                // Only the last turn can be the one being answered; every
-                // earlier one is settled, whether it settled a second ago or
-                // last week.
-                const current = position === turns.length - 1;
-                return (
-                  <TurnView
-                    key={turn.key}
-                    turn={turn}
-                    live={current && waiting.phase === "streaming"}
-                    thinking={
-                      current && (waiting.phase === "queued" || waiting.phase === "retrying")
-                    }
-                    highlighted={highlighted}
-                    onHighlight={setHighlighted}
-                    visitor={visitor}
-                  />
-                );
-              })}
-              <div ref={bottom} />
-            </div>
-          </main>
-          {/* No composer under "not available": a question here would start a
-              conversation the URL does not name. The sidebar offers a new one. */}
-          {!unreadable && composer}
-        </>
+    <div
+      className={cn(
+        entry
+          ? "flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room"
+          : "contents",
+        leaving && "recede",
       )}
-    </>
+      onAnimationEnd={(event) => {
+        if (event.animationName === "recede") setLeaving(false);
+      }}
+    >
+      <main
+        className={
+          entry
+            ? "flex w-full justify-center"
+            : "arrive min-h-0 flex-1 overflow-y-auto px-gutter py-room"
+        }
+      >
+        {entry ? (
+          <EntryScreen onPick={onSubmit} visitor={visitor} hops={hops} />
+        ) : (
+          <div className="mx-auto flex max-w-4xl flex-col gap-room">
+            {visitor && (
+              <Button type="button" variant="ghost" className="self-start" onClick={reset}>
+                <MessageSquarePlus aria-hidden className="size-icon" />
+                {t("sidebar.new")}
+              </Button>
+            )}
+            {unreadable && <p className="text-body text-muted">{t("sidebar.unreadable")}</p>}
+            {turns.map((turn, position) => {
+              // Only the last turn can be the one being answered; every
+              // earlier one is settled, whether it settled a second ago or
+              // last week.
+              const current = position === turns.length - 1;
+              return (
+                <TurnView
+                  key={turn.key}
+                  turn={turn}
+                  live={current && waiting.phase === "streaming"}
+                  thinking={current && (waiting.phase === "queued" || waiting.phase === "retrying")}
+                  highlighted={highlighted}
+                  onHighlight={setHighlighted}
+                  visitor={visitor}
+                />
+              );
+            })}
+            <div ref={bottom} />
+          </div>
+        )}
+      </main>
+      {/* No composer under "not available": a question here would start a
+          conversation the URL does not name. The sidebar offers a new one. */}
+      {!unreadable && composer}
+    </div>
   );
 }

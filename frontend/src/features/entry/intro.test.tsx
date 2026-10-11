@@ -90,6 +90,45 @@ describe("the entry's intro", () => {
     expect(after).toEqual({ skip: false, focused: true });
   });
 
+  it("stops drawing the cat in when skipped", () => {
+    systemReducesMotion(false);
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn((callback: FrameRequestCallback) => frames.push(callback)),
+    );
+    const page = entry();
+    const outline = () =>
+      page.container.querySelector<SVGPathElement>('[data-part="outline"]')?.style.strokeDasharray;
+    act(() => {
+      for (const frame of frames.splice(0)) frame(1000);
+    });
+    const drawing = outline();
+    act(() => page.skip()?.click());
+    act(() => {
+      for (const frame of frames.splice(0)) frame(1100);
+    });
+    const skipped = outline();
+    page.unmount();
+
+    expect({ drawing, skipped }).toEqual({ drawing: "1 1", skipped: "" });
+  });
+
+  it("hands the focus from Skip to the question box when the intro ends by itself", () => {
+    systemReducesMotion(false);
+    const question = document.createElement("textarea");
+    question.id = "question";
+    document.body.append(question);
+    const page = entry();
+    act(() => page.skip()?.focus());
+    act(() => vi.advanceTimersByTime(INTRO.length * 1000 + 10));
+    const focused = document.activeElement === question;
+    page.unmount();
+    question.remove();
+
+    expect(focused).toBe(true);
+  });
+
   it("plays once: a second visit opens on the caption at rest", () => {
     systemReducesMotion(false);
     localStorage.setItem("mca.intro", "seen");
