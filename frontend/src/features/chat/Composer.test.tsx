@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
 
 /**
- * What the composer's one button offers in each state.
+ * What the composer's one button offers in each state, and when its box
+ * travels.
  *
  * A send button rendered disabled on the accent fill is a defect no gate
  * catches: `disabled:opacity-50` makes a faded slab, the loudest thing on an
  * otherwise empty screen, and the first thing a reader sees. Every gate stays
  * green, because it is a claim about what is on the page in a given state, and
- * only a document can answer that.
+ * only a document can answer that. How far the box travels needs a layout,
+ * which a document has not got; the browser test in `e2e/demo.spec.ts` reads
+ * that, and these read only whether it travels at all.
  */
 
-import { act } from "react";
+import { act, useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { Composer } from "@/features/chat/Composer";
@@ -99,5 +102,35 @@ describe("the composer", () => {
     unmount();
 
     expect(travelling).toBe(false);
+  });
+
+  it("travels from a start it is given, and lets go of a travel cut short", () => {
+    // The page's part, as ChatPage plays it when the entry has gone: a start
+    // handed to a composer that is already there.
+    function Page() {
+      const [from, setFrom] = useState<{ top: number } | null>(null);
+      return (
+        <>
+          <button type="button" data-start onClick={() => setFrom({ top: 100 })} />
+          <Composer
+            waiting={{ phase: "idle" }}
+            onSubmit={() => {}}
+            onStop={() => {}}
+            travelFrom={from}
+          />
+        </>
+      );
+    }
+    const { container, unmount } = mount(<Page />);
+
+    act(() => container.querySelector<HTMLButtonElement>("[data-start]")?.click());
+    const box = container.querySelector(".travel");
+    act(() => {
+      box?.dispatchEvent(Object.assign(new Event("animationcancel"), { animationName: "travel" }));
+    });
+    const seen = { started: box !== null, after: container.querySelector(".travel") !== null };
+    unmount();
+
+    expect(seen).toEqual({ started: true, after: false });
   });
 });

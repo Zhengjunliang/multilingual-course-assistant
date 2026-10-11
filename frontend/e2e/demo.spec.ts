@@ -78,10 +78,10 @@ test("a visitor without an account asks about the campus and gets an answer", as
 });
 
 /**
- * The question box on one frame: its top, its width, whether its field has
- * the focus, and whether anything is typed in it.
+ * The question box on one frame: its top, its width, whether it wears the
+ * travel, whether its field has the focus, and whether anything is typed in it.
  */
-type Frame = { top: number; width: number; focused: boolean; typed: boolean };
+type Frame = { top: number; width: number; travel: boolean; focused: boolean; typed: boolean };
 
 test.describe("the first question, sent from the entry", () => {
   test.beforeEach(({ api }) => api.signIn(STUDENT));
@@ -111,11 +111,13 @@ test.describe("the first question, sent from the entry", () => {
             started = true;
             const sample = () => {
               const field = document.getElementById("question");
-              const box = field?.closest(".bg-pill")?.getBoundingClientRect();
+              const box = field?.closest(".bg-pill");
               if (field instanceof HTMLTextAreaElement && box) {
+                const { top, width } = box.getBoundingClientRect();
                 frames.push({
-                  top: box.top,
-                  width: box.width,
+                  top,
+                  width,
+                  travel: getComputedStyle(box).animationName === "travel",
                   focused: document.activeElement === field,
                   typed: field.value !== "",
                 });
@@ -152,11 +154,13 @@ test.describe("the first question, sent from the entry", () => {
         "frames with the box between its two places",
       ).toBeGreaterThanOrEqual(6);
       // A box that jumped part of the way and slid the rest would pass the
-      // count above; the travel starts where the box stood.
+      // count above; the travel starts where the box stood. Read on the first
+      // frame that wears it, when it has not run yet, so a slow frame on a
+      // busy machine cannot make the start look like a jump.
       expect(
-        (tops.find((top) => top > from + 0.5) ?? to) - from,
-        "the first step of the travel",
-      ).toBeLessThan((to - from) / 3);
+        Math.abs((frames.find((frame) => frame.travel)?.top ?? to) - from),
+        "where the travel starts, from where the box stood",
+      ).toBeLessThanOrEqual(1);
       expect({
         upward: steps.filter((step) => step < -0.5).length,
         widths: [...new Set(frames.map((frame) => Math.round(frame.width)))].length,
