@@ -156,7 +156,7 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
                   role="columnheader"
                   colSpan={5}
                   scope="colgroup"
-                  className="sticky top-0 z-lifted border-line border-b bg-canvas px-tight py-tight text-left font-semibold text-body text-ink max-sm:block"
+                  className="sticky top-0 z-lifted border-line border-b bg-ground px-tight py-tight text-left font-semibold text-body text-ink max-sm:block"
                 >
                   {t("staff.plan.year", { year: group.year })}{" "}
                   <span className="font-normal text-muted">

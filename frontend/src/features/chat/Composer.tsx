@@ -86,7 +86,7 @@ export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: Comp
     <form
       className={cn(
         "w-full px-gutter",
-        placement === "foot" ? "border-line border-t bg-canvas py-gutter" : "py-0",
+        placement === "foot" ? "border-line border-t bg-ground py-gutter" : "py-0",
       )}
       onSubmit={onFormSubmit}
     >
