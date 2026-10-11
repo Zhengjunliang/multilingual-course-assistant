@@ -63,6 +63,7 @@
     "cancel": "Ferma"
   },
   "entry": {
+    "skip": "Salta",
     "caption": "Chiedi in qualsiasi lingua.",
     "chip": {
       "enrolment": "Quali sono le scadenze per l'iscrizione?",

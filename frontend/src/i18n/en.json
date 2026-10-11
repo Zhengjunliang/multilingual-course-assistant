@@ -63,6 +63,7 @@
     "cancel": "Stop"
   },
   "entry": {
+    "skip": "Skip",
     "caption": "Ask in any language.",
     "chip": {
       "enrolment": "What are the enrolment deadlines?",

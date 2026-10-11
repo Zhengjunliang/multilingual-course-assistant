@@ -120,6 +120,20 @@ for (const screen of SCREENS) {
   });
 }
 
+test("a visitor's first visit: the intro does not play", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: it.entry.caption, exact: true })).toBeVisible();
+  const cats = await catDrawings(page);
+  await page.waitForTimeout(250);
+
+  expect({
+    skip: await page.getByRole("button", { name: it.entry.skip }).count(),
+    caption: await page.getByRole("heading", { name: it.entry.caption }).textContent(),
+    moved: await moved(page),
+    still: (await catDrawings(page)).join() === cats.join(),
+  }).toEqual({ skip: 0, caption: it.entry.caption, moved: [], still: true });
+});
+
 test.describe("the chat mid-answer", () => {
   test.beforeEach(({ api }) => api.signIn(STUDENT));
 

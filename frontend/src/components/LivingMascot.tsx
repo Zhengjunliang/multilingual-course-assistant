@@ -26,32 +26,18 @@
  */
 
 import { Pause, Play } from "lucide-react";
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { DETAIL_STROKE, HEAD, LIVING, outline, STROKE } from "@/brand/fumetto";
 import { Button } from "@/components/ui/button";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 import { cn } from "@/lib/utils";
 import { born, hop, type Life, live, type Pose, poke, STILL, TIMING } from "./mascotLife";
 
 const STORAGE_KEY = "mca.mascot";
-const REDUCE = "(prefers-reduced-motion: reduce)";
 const NO_HOVER = "(hover: none)";
 const LINE = { strokeLinecap: "round", strokeLinejoin: "round" } as const;
-
-/**
- * The system's reduced-motion setting, read where React reads external state,
- * so the first frame already knows it and a change while the page is open is
- * followed. Rendered without a browser, as the styleguide's test does, the
- * cat stands still.
- */
-function onReduceChange(onChange: () => void): () => void {
-  const query = window.matchMedia(REDUCE);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-const readsReduced = () => window.matchMedia(REDUCE).matches;
 
 function storedPaused(): boolean {
   try {
@@ -71,6 +57,7 @@ const parts = [
   "asleep",
   "pupil-left",
   "pupil-right",
+  "face",
   "mouth",
   "yawn",
   "whiskers",
@@ -142,20 +129,52 @@ function draw(p: Parts, pose: Pose, now: number | null): void {
   });
 }
 
+/** The intro's first moments, in seconds: the outline drawn, then the face. */
+const SKETCH = { line: 1.1, faceFrom: 0.95, face: 0.3 } as const;
+
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+const easeInOut = (x: number) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2);
+
+/**
+ * The outline drawn in one stroke, `since` seconds into it, then the face and
+ * the stars fading in; `null` is the cat whole.
+ */
+function sketch(p: Parts, since: number | null): void {
+  const line = p.outline.style;
+  if (since === null) {
+    line.strokeDasharray = "";
+    line.strokeDashoffset = "";
+    p.face.style.opacity = "";
+    p.stars.style.opacity = "";
+    return;
+  }
+  line.strokeDasharray = "1 1";
+  line.strokeDashoffset = fixed(1 - easeInOut(clamp01(since / SKETCH.line)), 4);
+  const face = fixed(clamp01((since - SKETCH.faceFrom) / SKETCH.face), 3);
+  p.face.style.opacity = face;
+  p.stars.style.opacity = face;
+}
+
 interface LivingMascotProps {
   className?: string;
   /** The id of the field the eyes rest on when nobody moves: the question box. */
   restOn?: string;
   /** Changes each time a question is sent, and the cat hops. */
   hops?: number;
+  /**
+   * The intro (features/entry/): the cat arrives drawn in one stroke. Read
+   * when the cat appears; never under reduced motion, which skips the intro.
+   */
+  drawIn?: boolean;
 }
 
-export function LivingMascot({ className, restOn, hops = 0 }: LivingMascotProps) {
+export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: LivingMascotProps) {
   const { t } = useTranslation();
   const svg = useRef<SVGSVGElement>(null);
   const life = useRef<Life | null>(null);
   const [paused, setPaused] = useState(storedPaused);
-  const reduced = useSyncExternalStore(onReduceChange, readsReduced, () => true);
+  const reduced = useReducedMotion();
+  const sketching = useRef(drawIn);
   const mask = `fumetto-${useId().replace(/[^\w-]/g, "")}`;
 
   useEffect(() => {
@@ -163,6 +182,8 @@ export function LivingMascot({ className, restOn, hops = 0 }: LivingMascotProps)
     if (element === null) return;
     const p = find(element);
     if (reduced || paused) {
+      sketching.current = false;
+      sketch(p, null);
       draw(p, STILL, null);
       return;
     }
@@ -174,6 +195,7 @@ export function LivingMascot({ className, restOn, hops = 0 }: LivingMascotProps)
     const pointer = { x: 0, y: 0, at: Number.NEGATIVE_INFINITY };
     let frame = 0;
     let last = 0;
+    let sketchFrom: number | null = null;
 
     // Read where everything is before anything is written, so the frame
     // costs no layout of its own.
@@ -206,6 +228,13 @@ export function LivingMascot({ className, restOn, hops = 0 }: LivingMascotProps)
       const now = ms / 1000;
       const dt = last === 0 ? 0 : Math.min(0.05, now - last);
       last = now;
+      if (sketching.current) {
+        sketchFrom ??= now;
+        const since = now - sketchFrom;
+        const done = since > SKETCH.faceFrom + SKETCH.face;
+        sketch(p, done ? null : since);
+        if (done) sketching.current = false;
+      }
       draw(p, live(cat, { now, dt, random: Math.random, ...senses(now) }), now);
       frame = requestAnimationFrame(render);
     };
@@ -279,36 +308,49 @@ export function LivingMascot({ className, restOn, hops = 0 }: LivingMascotProps)
           </mask>
         </defs>
         <g data-part="body" fill="none" stroke="currentColor" {...LINE}>
-          <path data-part="outline" d={HEAD} strokeWidth={STROKE} />
-          <g data-part="look">
-            <g data-part="blink">
-              <g
-                data-part="open"
-                mask={`url(#${mask})`}
-                fill="currentColor"
-                strokeWidth={1}
-                strokeLinejoin="round"
-              >
-                {LIVING.eyes.map((d) => (
+          <path
+            data-part="outline"
+            d={HEAD}
+            strokeWidth={STROKE}
+            pathLength={1}
+            style={drawIn ? { strokeDasharray: "1 1", strokeDashoffset: 1 } : undefined}
+          />
+          <g data-part="face" style={drawIn ? { opacity: 0 } : undefined}>
+            <g data-part="look">
+              <g data-part="blink">
+                <g
+                  data-part="open"
+                  mask={`url(#${mask})`}
+                  fill="currentColor"
+                  strokeWidth={1}
+                  strokeLinejoin="round"
+                >
+                  {LIVING.eyes.map((d) => (
+                    <path key={d} d={d} />
+                  ))}
+                </g>
+              </g>
+              <g data-part="happy" strokeWidth={DETAIL_STROKE} display="none">
+                {LIVING.happyEyes.map((d) => (
+                  <path key={d} d={d} />
+                ))}
+              </g>
+              <g data-part="asleep" strokeWidth={DETAIL_STROKE} display="none">
+                {LIVING.sleepingEyes.map((d) => (
                   <path key={d} d={d} />
                 ))}
               </g>
             </g>
-            <g data-part="happy" strokeWidth={DETAIL_STROKE} display="none">
-              {LIVING.happyEyes.map((d) => (
-                <path key={d} d={d} />
-              ))}
-            </g>
-            <g data-part="asleep" strokeWidth={DETAIL_STROKE} display="none">
-              {LIVING.sleepingEyes.map((d) => (
-                <path key={d} d={d} />
-              ))}
-            </g>
+            <path data-part="mouth" d={LIVING.mouth} strokeWidth={DETAIL_STROKE} />
+            <path data-part="yawn" d={LIVING.yawn} strokeWidth={DETAIL_STROKE} display="none" />
+            <path data-part="whiskers" d={LIVING.whiskers} strokeWidth={DETAIL_STROKE} />
           </g>
-          <path data-part="mouth" d={LIVING.mouth} strokeWidth={DETAIL_STROKE} />
-          <path data-part="yawn" d={LIVING.yawn} strokeWidth={DETAIL_STROKE} display="none" />
-          <path data-part="whiskers" d={LIVING.whiskers} strokeWidth={DETAIL_STROKE} />
-          <g data-part="stars" fill="currentColor" stroke="none">
+          <g
+            data-part="stars"
+            fill="currentColor"
+            stroke="none"
+            style={drawIn ? { opacity: 0 } : undefined}
+          >
             {LIVING.stars.map((d) => (
               <path key={d} d={d} style={{ transformBox: "fill-box", transformOrigin: "center" }} />
             ))}

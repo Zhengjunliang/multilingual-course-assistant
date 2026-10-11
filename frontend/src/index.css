@@ -422,6 +422,29 @@
   }
 }
 
+/*
+ * A grapheme of the intro's caption arriving (features/entry/Caption.tsx):
+ * out of a blur and a few pixels low, each half a stagger after the one
+ * before, since a line has 560 ms on screen. Reduced motion gets no intro;
+ * the rule stops the letters too, in case.
+ */
+@keyframes blur-in {
+  from {
+    filter: blur(8px);
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@utility blur-in {
+  animation: blur-in var(--transition-duration-reveal) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger) / 2);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 html,
 body,
 #root {
