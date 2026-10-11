@@ -9,15 +9,14 @@
  * One `requestAnimationFrame` loop changes the drawing's attributes in place,
  * so React renders the cat once and never per frame. The drawing at first
  * paint is the cat at rest, which is also all it ever shows to a reader whose
- * system asks for reduced motion, and what it shows while paused: the loop
- * does not run at all then. It stops while the tab is hidden, and a device
- * that cannot hover gets no pointer to follow.
+ * system asks for reduced motion: the loop does not run at all then. It stops
+ * while the tab is hidden, and a device that cannot hover gets no pointer to
+ * follow.
  *
- * The cat moves by itself for longer than five seconds, so WCAG 2.2.2 asks for
- * a way to stop it: the button just outside its lower right corner, clear of
- * the drawing. A toggle (`aria-pressed`) whose name stays the same, as the
- * WAI-ARIA toggle button does; the choice is remembered in this browser, like
- * the sidebar's.
+ * Nothing on the page stops it. The cat moves by itself for longer than five
+ * seconds, which WCAG 2.2.2 answers with a stop control; the entry goes
+ * without one by the author's choice, and the system's reduced motion is the
+ * only way to still it.
  *
  * The send button is marked `data-mascot-cheer` (features/chat/Composer.tsx)
  * rather than handed in, and the cat asks each frame whether the pointer is on
@@ -25,27 +24,15 @@
  * under the pointer leaves no smile behind.
  */
 
-import { Pause, Play } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useEffect, useId, useRef } from "react";
 
 import { DETAIL_STROKE, HEAD, LIVING, outline, STROKE } from "@/brand/fumetto";
-import { Button } from "@/components/ui/button";
 import { useReducedMotion } from "@/lib/useReducedMotion";
 import { cn } from "@/lib/utils";
 import { born, hop, type Life, live, type Pose, poke, STILL, TIMING } from "./mascotLife";
 
-const STORAGE_KEY = "mca.mascot";
 const NO_HOVER = "(hover: none)";
 const LINE = { strokeLinecap: "round", strokeLinejoin: "round" } as const;
-
-function storedPaused(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === "paused";
-  } catch {
-    return false;
-  }
-}
 
 const parts = [
   "body",
@@ -169,10 +156,8 @@ interface LivingMascotProps {
 }
 
 export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: LivingMascotProps) {
-  const { t } = useTranslation();
   const svg = useRef<SVGSVGElement>(null);
   const life = useRef<Life | null>(null);
-  const [paused, setPaused] = useState(storedPaused);
   const reduced = useReducedMotion();
   const sketching = useRef(drawIn);
   const mask = `fumetto-${useId().replace(/[^\w-]/g, "")}`;
@@ -181,7 +166,7 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
     const element = svg.current;
     if (element === null) return;
     const p = find(element);
-    if (reduced || paused) {
+    if (reduced) {
       sketching.current = false;
       sketch(p, null);
       draw(p, STILL, null);
@@ -273,7 +258,7 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
       window.removeEventListener("wheel", onInput);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [reduced, paused, restOn]);
+  }, [reduced, restOn]);
 
   // Only a change counts: a cat that appears after a question went, as the
   // entry does again for a new conversation, has nothing to hop for.
@@ -291,19 +276,9 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
     if (svg.current !== null) sketch(find(svg.current), null);
   }, [drawIn]);
 
-  const togglePaused = () => {
-    const next = !paused;
-    setPaused(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, next ? "paused" : "playing");
-    } catch {
-      // The choice still holds on this page; it just will not outlive it.
-    }
-  };
-
   const [left, right] = LIVING.pupils;
   return (
-    <div className={cn("relative aspect-mascot", className)}>
+    <div className={cn("aspect-mascot", className)}>
       <svg
         ref={svg}
         viewBox="-6 -18 76 86"
@@ -381,23 +356,6 @@ export function LivingMascot({ className, restOn, hops = 0, drawIn = false }: Li
           ))}
         </g>
       </svg>
-      {!reduced && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-pressed={paused}
-          aria-label={t("mascot.pause")}
-          onClick={togglePaused}
-          className="absolute bottom-0 left-full text-muted"
-        >
-          {paused ? (
-            <Play aria-hidden className="size-icon" />
-          ) : (
-            <Pause aria-hidden className="size-icon" />
-          )}
-        </Button>
-      )}
     </div>
   );
 }
