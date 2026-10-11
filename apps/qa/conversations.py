@@ -91,9 +91,10 @@ def record_exchange(conversation: Conversation, start: StartEvent) -> int:
     of seconds, and a model instance held across it would be a snapshot going
     steadily more stale — `settle` writes by primary key for that reason.
 
-    `citations` and `route` are stored now rather than at the end because now is
-    when they exist: they arrive in the `start` event, which is not repeated.
-    Reopening this conversation later replays it from these columns.
+    `citations`, `route` and `search_ms` are stored now rather than at the end
+    because now is when they exist: they arrive in the `start` event, which is
+    not repeated. Reopening this conversation later replays it from these
+    columns.
 
     The question may have waited up to the queue timeout for the engine, and
     the student may have deleted the conversation meanwhile — after Stop, or
@@ -121,6 +122,7 @@ def record_exchange(conversation: Conversation, start: StartEvent) -> int:
             complete=False,
             citations=[citation.model_dump(mode="json") for citation in start.citations],
             route=start.route.model_dump(mode="json"),
+            search_ms=start.search_ms,
         )
     return answer.pk
 

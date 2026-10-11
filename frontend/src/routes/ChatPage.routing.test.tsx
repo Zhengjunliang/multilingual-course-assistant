@@ -37,6 +37,7 @@ const STORED: ConversationDetail = {
       complete: true,
       citations: [],
       route: null,
+      search_ms: null,
     },
     {
       id: 2,
@@ -46,6 +47,7 @@ const STORED: ConversationDetail = {
       complete: true,
       citations: [],
       route: null,
+      search_ms: null,
     },
   ],
 };

@@ -100,7 +100,14 @@ function stream(
   return [
     {
       name: "start",
-      data: { question, conversation_id: conversation, locale: "it", route, citations: [citation] },
+      data: {
+        question,
+        conversation_id: conversation,
+        locale: "it",
+        route,
+        citations: [citation],
+        search_ms: 2400,
+      },
     },
     { name: "token", data: { text: answer.slice(0, half) } },
     { name: "token", data: { text: `${answer.slice(half)} ${citation.marker}` } },
@@ -129,6 +136,7 @@ export const CONVERSATION: ConversationDetail = {
       complete: true,
       citations: [],
       route: null,
+      search_ms: null,
     },
     {
       id: 2,
@@ -138,6 +146,7 @@ export const CONVERSATION: ConversationDetail = {
       complete: true,
       citations: [WEB_CITATION],
       route: CAMPUS_ROUTE,
+      search_ms: 2400,
     },
   ],
 };

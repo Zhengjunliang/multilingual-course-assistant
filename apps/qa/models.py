@@ -115,6 +115,12 @@ class Message(models.Model):
     # mutable default — a bare `[]` would be one list shared by every row.
     citations = models.JSONField(default=list, verbose_name=_("citations"))
     route = models.JSONField(null=True, blank=True, verbose_name=_("routing decision"))
+    # `StartEvent.search_ms`, kept so a reopened conversation shows the seconds
+    # it showed live. Empty on a student's turn and on answers written before
+    # the column existed.
+    search_ms = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name=_("search time (ms)")
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("created at"))
 
     class Meta:

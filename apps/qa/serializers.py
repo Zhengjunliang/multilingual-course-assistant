@@ -160,7 +160,17 @@ class MessageSerializer(serializers.ModelSerializer[Message]):
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Message
-        fields = ("id", "role", "text", "locale", "complete", "citations", "route", "created_at")
+        fields = (
+            "id",
+            "role",
+            "text",
+            "locale",
+            "complete",
+            "citations",
+            "route",
+            "search_ms",
+            "created_at",
+        )
 
 
 class ConversationSerializer(serializers.ModelSerializer[Conversation]):

@@ -59,6 +59,8 @@ export interface StartEvent {
   locale: string;
   route: RouteDecision;
   citations: Citation[];
+  /** Routing and retrieval, in milliseconds; the wait for the engine is not in it. */
+  search_ms: number;
 }
 
 /** One piece of the answer, exactly as the model produced it. */

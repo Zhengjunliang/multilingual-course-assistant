@@ -19,6 +19,7 @@ import threading
 import time
 from collections.abc import Iterator, Sequence
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -73,6 +74,7 @@ class CountingEngine:
             locale=locale or "en",
             route=RouteDecision.model_validate_json(SLIDES_ROUTE),
             citations=[],
+            search_ms=0,
         )
         yield EndEvent()
 
@@ -117,6 +119,32 @@ def test_the_engine_answers_without_touching_the_database(tmp_path: Path) -> Non
 
     assert [type(event).NAME for event in events] == ["start", "token", "end"]
     assert cast("StartEvent", events[0]).conversation_id == CONVERSATION_ID
+
+
+def test_the_search_time_spans_routing_and_retrieval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`search_ms` is read before the router is asked and again when `start`
+    goes out. The clock is the engine module's own, so the stub moves no other
+    code's time."""
+    readings = iter([10.0, 11.4996])
+    monkeypatch.setattr(engine_module, "time", SimpleNamespace(monotonic=lambda: next(readings)))
+    qdrant = open_client(tmp_path / "qdrant")
+    ensure_collection(qdrant, StubDense().dimension())
+    index_chunks(qdrant, [make_chunk(0, ORM_TEXT)], StubDense(), StubSparse())
+    engine = Engine(
+        client=qdrant,
+        dense=StubDense(),
+        sparse=StubSparse(),
+        reranker=None,
+        completer=ScriptedCompleter([SLIDES_ROUTE]),
+        streamer=ScriptedStreamer(["An answer."]),
+    )
+
+    start = next(iter(engine.stream("What is an ORM?", CONVERSATION_ID, scope=None)))
+    qdrant.close()
+
+    assert cast("StartEvent", start).search_ms == 1500
 
 
 def test_a_stream_nobody_reads_takes_no_lock() -> None:
