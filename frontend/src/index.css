@@ -449,23 +449,16 @@
 /*
  * The entry receding into the conversation (E10 of #135, after Linear's board
  * fading behind its thread; routes/ChatPage.tsx): once the cat has hopped,
- * 420 ms as mascotLife.ts's `TIMING.hop`, the whole entry fades, rises and
- * loses its top and bottom edges under a mask. The mask's edge is a
- * registered property so that it can be animated. The conversation then
- * arrives from a little lower. Neither moves under reduced motion, where the
- * page does not wait for the first and the second stands still.
+ * 420 ms as mascotLife.ts's `TIMING.hop`, the cat and its caption fade and
+ * rise, and the question box stays where it is. The conversation then
+ * arrives from a little lower, as the box travels to its foot (`travel`
+ * below). None of the three moves under reduced motion, where the page does
+ * not wait for the first and the other two stand still.
  */
-@property --recede-edge {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-
 @keyframes recede {
   to {
     opacity: 0;
     transform: translateY(-1.5rem);
-    --recede-edge: 6rem;
   }
 }
 
@@ -477,18 +470,36 @@
 }
 
 @utility recede {
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    black var(--recede-edge),
-    black calc(100% - var(--recede-edge)),
-    transparent
-  );
   animation: recede var(--transition-duration-reveal) var(--ease-strong) 420ms both;
 }
 
 @utility arrive {
   animation: arrive var(--transition-duration-reveal) var(--ease-emphasized) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/*
+ * The question box travelling from under the entry to the foot of the
+ * conversation (#177; features/chat/Composer.tsx), as the conversation
+ * arrives: the box is what the reader was looking at when they pressed
+ * Enter, so it is the one thing that must not jump. After Gemini's, read on
+ * 11 October 2026: its box slides from the middle of the screen to the foot
+ * in 250 ms on cubic-bezier(0.2, 0, 0, 1), `base` and `emphasized` here,
+ * while the question rises in 500 ms; ChatGPT's jumps in one frame, and
+ * Perplexity's is taken away and drawn anew at the foot. `--travel-from` is
+ * where the box stood, measured from where it lands.
+ */
+@keyframes travel {
+  from {
+    translate: 0 var(--travel-from);
+  }
+}
+
+@utility travel {
+  animation: travel var(--transition-duration-base) var(--ease-emphasized) both;
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;

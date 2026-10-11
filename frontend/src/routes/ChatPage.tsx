@@ -53,6 +53,7 @@ export default function ChatPage() {
   const [unreadable, setUnreadable] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [hops, setHops] = useState(0);
+  const [travelFrom, setTravelFrom] = useState<{ top: number } | null>(null);
   const reduced = useReducedMotion();
 
   const visitor = account === null;
@@ -129,8 +130,9 @@ export default function ChatPage() {
   //
   // The first question leaves the entry (#173): it is sent at once, and the
   // entry stays a moment longer, while the cat hops and the entry recedes
-  // (`recede`, index.css), before the thread takes its place. With reduced
-  // motion the thread is there at once.
+  // (`recede`, index.css), before the thread takes its place and the
+  // composer travels to its foot (#177). With reduced motion the thread is
+  // there at once.
   const onSubmit = (question: string) => {
     if (empty && !reduced) {
       setLeaving(true);
@@ -161,6 +163,7 @@ export default function ChatPage() {
       onSubmit={onSubmit}
       onStop={stop}
       placement={entry ? "hero" : "foot"}
+      travelFrom={travelFrom}
     />
   );
 
@@ -169,25 +172,30 @@ export default function ChatPage() {
   // typed while the entry receded stays with the focus in the composer. On
   // the entry the wrapper is the centred column holding both; on the thread
   // it is `contents`, with no box of its own, and the two sit in the page's
-  // column as siblings.
+  // column as siblings. Only the entry recedes: the composer stays in view,
+  // and where its field stood as the entry went is where its travel to the
+  // foot starts.
   return (
     <div
-      className={cn(
+      className={
         entry
           ? "flex min-h-0 flex-1 flex-col items-center justify-center gap-room overflow-y-auto px-gutter py-room"
-          : "contents",
-        leaving && "recede",
-      )}
+          : "contents"
+      }
       onAnimationEnd={(event) => {
-        if (event.animationName === "recede") setLeaving(false);
+        if (event.animationName !== "recede") return;
+        const field = document.getElementById("question");
+        if (field !== null) setTravelFrom({ top: field.getBoundingClientRect().top });
+        setLeaving(false);
       }}
     >
       <main
-        className={
+        className={cn(
           entry
             ? "flex w-full justify-center"
-            : "arrive min-h-0 flex-1 overflow-y-auto px-gutter py-room"
-        }
+            : "arrive min-h-0 flex-1 overflow-y-auto px-gutter py-room",
+          leaving && "recede",
+        )}
       >
         {entry ? (
           <EntryScreen visitor={visitor} hops={hops} />

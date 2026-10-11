@@ -76,3 +76,91 @@ test("a visitor without an account asks about the campus and gets an answer", as
   // server reads the request as a signed-in one whose session ended (403).
   expect(api.asked).toEqual([expect.objectContaining({ question: CAMPUS_QUESTION, history: [] })]);
 });
+
+/** The question box on one frame: its top, its width, and whether its field has the focus. */
+type Frame = { top: number; width: number; focused: boolean };
+
+test.describe("the first question, sent from the entry", () => {
+  test.beforeEach(({ api }) => api.signIn(STUDENT));
+
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 375, height: 812 },
+  ]) {
+    test(`at ${viewport.width} px the question box travels to the foot and keeps what is typed on the way`, async ({
+      page,
+      api,
+    }) => {
+      // Every frame from the moment Enter goes down to the first one after the
+      // box has landed, however long a busy machine takes to get there.
+      await page.addInitScript(() => {
+        const frames: Frame[] = [];
+        Object.assign(window, { __frames: frames, __sampled: false });
+        let started = false;
+        let landed = false;
+        document.addEventListener("animationend", (event) => {
+          if (event.animationName === "travel") landed = true;
+        });
+        document.addEventListener(
+          "keydown",
+          (event) => {
+            if (event.key !== "Enter" || started) return;
+            started = true;
+            const sample = () => {
+              const field = document.getElementById("question");
+              const box = field?.closest(".bg-pill")?.getBoundingClientRect();
+              if (field && box) {
+                frames.push({
+                  top: box.top,
+                  width: box.width,
+                  focused: document.activeElement === field,
+                });
+              }
+              if (landed) Object.assign(window, { __sampled: true });
+              else requestAnimationFrame(sample);
+            };
+            requestAnimationFrame(sample);
+          },
+          true,
+        );
+      });
+      await page.setViewportSize(viewport);
+      api.answer(campusStream(7));
+      await page.goto("/");
+      const field = page.getByLabel(it.ask.label);
+      await field.fill(CAMPUS_QUESTION);
+      await field.press("Enter");
+
+      await page.waitForFunction(() =>
+        document
+          .getAnimations()
+          .some(
+            (animation) =>
+              animation instanceof CSSAnimation && animation.animationName === "travel",
+          ),
+      );
+      await page.keyboard.type("e poi");
+      await page.waitForFunction(() => (window as unknown as { __sampled: boolean }).__sampled);
+
+      const frames = await page.evaluate(
+        () => (window as unknown as { __frames: Frame[] }).__frames,
+      );
+      const tops = frames.map((frame) => frame.top);
+      const from = tops[0] ?? 0;
+      const to = tops.at(-1) ?? 0;
+      const steps = tops.slice(1).map((top, n) => top - (tops[n] ?? top));
+      expect(to, "the box ends lower than it began").toBeGreaterThan(from);
+      expect(
+        tops.filter((top) => top > from + 0.5 && top < to - 0.5).length,
+        "frames with the box between its two places",
+      ).toBeGreaterThanOrEqual(6);
+      expect({
+        upward: steps.filter((step) => step < -0.5).length,
+        widths: [...new Set(frames.map((frame) => Math.round(frame.width)))].length,
+        unfocused: frames.filter((frame) => !frame.focused).length,
+      }).toEqual({ upward: 0, widths: 1, unfocused: 0 });
+      await expect(field).toHaveValue("e poi");
+      await expect(field).toBeFocused();
+    });
+  }
+});
