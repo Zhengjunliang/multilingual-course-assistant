@@ -37,6 +37,9 @@
     "cancel": "Cancel",
     "deleteFailed": "The conversation could not be deleted."
   },
+  "mascot": {
+    "pause": "Stop the cat's animation"
+  },
   "account": {
     "title": "Account",
     "menu": "Open the account menu",

@@ -118,8 +118,10 @@ export function Composer({ waiting, onSubmit, onStop, placement = "foot" }: Comp
               its lettering at half strength — unreadable, and the loudest thing
               on an otherwise empty screen. Enter still sends, and the button
               appears with the first character. */}
+          {/* `data-mascot-cheer`: the living cat smiles while the pointer is
+              on it (components/LivingMascot.tsx). */}
           {ready && (
-            <Button type="submit" size="sm">
+            <Button type="submit" size="sm" data-mascot-cheer>
               {t("ask.submit")}
             </Button>
           )}

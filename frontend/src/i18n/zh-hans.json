@@ -37,6 +37,9 @@
     "cancel": "取消",
     "deleteFailed": "无法删除这个会话。"
   },
+  "mascot": {
+    "pause": "停止小猫的动画"
+  },
   "account": {
     "title": "账号",
     "menu": "打开账号菜单",
