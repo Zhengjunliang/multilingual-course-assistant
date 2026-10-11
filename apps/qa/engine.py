@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -168,6 +169,7 @@ class Engine:
         from qdrant_client.http.exceptions import ResponseHandlingException
 
         answer_locale = locale or detect_locale(question)
+        started = time.monotonic()
 
         try:
             # An unusable router *reply* is already a routing decision — `route`
@@ -236,6 +238,7 @@ class Engine:
             locale=answer_locale,
             route=decision,
             citations=[Citation.of(hit) for hit in hits],
+            search_ms=round((time.monotonic() - started) * 1000),
         )
 
         try:

@@ -972,6 +972,10 @@ def test_reopening_a_conversation_returns_what_the_stream_delivered(
     assert answer_message["text"] == f"An ORM {SLIDES_MARKER}"
     assert answer_message["citations"] == start_of(stream)["citations"]
     assert answer_message["route"] == start_of(stream)["route"]
+    assert answer_message["search_ms"] == start_of(stream)["search_ms"]
+    # The student's half has no search of its own: the column is empty there,
+    # as on every answer stored before it existed.
+    assert body["messages"][0]["search_ms"] is None
 
 
 @pytest.mark.parametrize("method", ["get", "delete"], ids=["read", "delete"])

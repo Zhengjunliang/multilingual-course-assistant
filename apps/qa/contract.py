@@ -147,6 +147,13 @@ class StartEvent(Event):
     value it sends back to make the next question a follow-up. None for an
     anonymous question, which is filed nowhere: its client keeps the thread and
     sends it back as `history` (apps/qa/serializers.py).
+
+    `search_ms` is how long routing and retrieval took, in milliseconds: from
+    the engine taking up the question to this event. The wait for the engine
+    itself is not in it — a question queued behind another one has not started
+    being searched. The interface shows it as the process line's seconds, and
+    it is stored with the answer so a reopened conversation shows the same
+    number rather than none.
     """
 
     NAME = "start"
@@ -156,6 +163,7 @@ class StartEvent(Event):
     locale: str
     route: RouteDecision
     citations: list[Citation]
+    search_ms: int
 
 
 class TokenEvent(Event):
