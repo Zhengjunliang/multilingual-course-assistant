@@ -1,7 +1,7 @@
 ---
 version: 'alpha'
 name: 'UniGuide AI'
-description: 'A university lab tool in the university''s blue on greys tinted toward it, with a serif for reading. Generated from frontend/src/index.css by frontend/scripts/design-md.mjs.'
+description: 'A university lab tool in the university''s blue on greys tinted toward it, with a serif for headings. Generated from frontend/src/index.css by frontend/scripts/design-md.mjs.'
 colors:
   primary: '{colors.accent}'
   canvas: '#FAFCFE'
@@ -48,7 +48,7 @@ typography:
     fontSize: '1.875rem'
     lineHeight: '2.25rem'
   reading:
-    fontFamily: 'Fraunces'
+    fontFamily: 'Figtree'
     fontSize: '1rem'
     lineHeight: '1.625rem'
   reading-zh:
@@ -186,7 +186,7 @@ The rules for how the interface looks, for whoever writes a screen, person or ag
 A university lab tool that answers questions about a course and the campus, in the university's blue on greys tinted toward it, laid out and furnished like the AI products it measures itself against rather than like the university's website. Three rules hold it together:
 
 - **The blue is for acting and for being somewhere**: a primary button, the focus ring, a link, the open conversation, the current page, the mark. The reading never wears it.
-- **A serif for reading, a sans for working**: the answer and the headings in Fraunces, every control in Figtree.
+- **A serif for headings, one sans for the rest**: the headings in Fraunces; the answer and every control in Figtree, so the face does not change between the question box and the last line of the answer.
 - **One cat**: Fumetto, the mark and the mascot, appears where a screen greets, waits, apologises or is lost, beside the words that say so, and nowhere for decoration alone.
 
 ## Colors
@@ -205,8 +205,8 @@ A citation and its source card are linked by fill, never by colour: the pill and
 
 Two families, self-hosted under the SIL Open Font License, each followed by the system's Chinese faces:
 
-- **Fraunces** (`font-serif`) for the answer at `text-reading` and for every heading at `text-title` or `text-display`. A screen's heading is never left in the controls' face; `src/theme/tokens.test.ts` fails on one.
-- **Figtree** (`font-sans`, the page's default) for controls, labels and the rest of the interface, at `text-body` and `text-caption`.
+- **Fraunces** (`font-serif`) for every heading at `text-title` or `text-display`. A screen's heading is never left in the controls' face; `src/theme/tokens.test.ts` fails on one.
+- **Figtree** (`font-sans`, the page's default) for the answer at `text-reading`, in a column no wider than `max-w-reading` (720 px), and for controls, labels and the rest of the interface, at `text-body` and `text-caption`.
 
 Five sizes carry the interface, and a sixth needs a reason: `caption`, `body`, `reading`, `title`, `display`. Chinese is not packaged: the system draws it, PingFang, Source Han or Microsoft YaHei. Wherever text says it is Chinese, `:lang(zh)` rules in `index.css` give it its own stack, `font-sans-zh`, headings and answers included, and give reading text the looser leading `reading-zh`. That stack starts with Figtree for Latin letters and digits alone and goes straight to the Chinese faces, so quotes, the ellipsis and the dash in Chinese are drawn by the Chinese face, the quotes full width, and its Latin letters match the interface instead of mixing Fraunces into the line; every family between Figtree and the generic fallback is a Chinese face that draws the quotes full width, since Segoe UI draws that punctuation narrow and so does Microsoft YaHei UI. Text in another language keeps its own stack inside the Chinese interface, and Chinese text gets the Chinese stack inside any other: the family follows `lang`, from the page's root down, and no element below the root declares one for itself. An answer therefore carries `lang` with the language it was written in, which is not always the interface's.
 

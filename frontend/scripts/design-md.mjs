@@ -31,8 +31,8 @@ import { declarations, hex, PAIRS, parseOklch, STYLESHEET, THEMES } from "./pale
 
 const DESIGN_MD = fileURLToPath(new URL("../../DESIGN.md", import.meta.url));
 
-/** The sizes set in the serif: the reading and the headings. The rest is the controls' sans. */
-const SERIF = new Set(["reading", "title", "display"]);
+/** The sizes set in the serif: the headings. The rest, the answer included, is the sans. */
+const SERIF = new Set(["title", "display"]);
 
 const suffix = (theme) => (theme.name === "light" ? "" : `-${theme.name}`);
 const quote = (value) => `'${String(value).replaceAll("'", "''")}'`;
@@ -43,7 +43,7 @@ function tokens() {
   const lines = [
     "version: 'alpha'",
     `name: ${quote(APP_NAME)}`,
-    `description: ${quote("A university lab tool in the university's blue on greys tinted toward it, with a serif for reading. Generated from frontend/src/index.css by frontend/scripts/design-md.mjs.")}`,
+    `description: ${quote("A university lab tool in the university's blue on greys tinted toward it, with a serif for headings. Generated from frontend/src/index.css by frontend/scripts/design-md.mjs.")}`,
     "colors:",
     `  primary: ${quote("{colors.accent}")}`,
   ];

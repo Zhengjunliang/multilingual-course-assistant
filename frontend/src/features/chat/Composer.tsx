@@ -153,7 +153,7 @@ export function Composer({
       <div
         ref={box}
         className={cn(
-          "mx-auto flex max-w-4xl flex-col gap-tight rounded-bubble border bg-pill p-snug transition-colors",
+          "mx-auto flex max-w-3xl flex-col gap-tight rounded-bubble border bg-pill p-snug transition-colors",
           ready ? "border-accent" : "border-transparent",
           travelling && "travel",
         )}

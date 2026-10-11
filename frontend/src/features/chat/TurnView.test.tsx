@@ -178,7 +178,10 @@ describe("the answer's language", () => {
     unmount();
 
     expect(text).toContain("学费九月三十日截止");
-    expect(classes).toEqual(expect.arrayContaining(["font-serif", "text-reading"]));
+    // The page's sans, which `lang` turns into the Chinese stack: no family of
+    // its own on the prose (DESIGN.md, Typography).
+    expect(classes).toContain("text-reading");
+    expect(classes.some((name) => name.startsWith("font-serif"))).toBe(false);
     // The route line and the sources are the interface's and the excerpts' own
     // languages; only the question and the answer say "zh". Citation cards
     // carry their own.

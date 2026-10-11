@@ -199,7 +199,7 @@ export default function ChatPage() {
         {entry ? (
           <EntryScreen visitor={visitor} hops={hops} />
         ) : (
-          <div className="mx-auto flex max-w-4xl flex-col gap-room">
+          <div className="mx-auto flex max-w-3xl flex-col gap-room">
             {unreadable && <p className="text-body text-muted">{t("sidebar.unreadable")}</p>}
             {turns.map((turn, position) => {
               // Only the last turn can be the one being answered; every

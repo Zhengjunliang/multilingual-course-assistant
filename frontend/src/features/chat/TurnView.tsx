@@ -100,7 +100,7 @@ export const TurnView = memo(function TurnView({
 
       <div className="flex min-w-0 gap-snug">
         <Mascot pose={poseOf(turn, waiting)} className="size-avatar" />
-        <div className="flex min-w-0 flex-1 flex-col gap-snug">
+        <div className="flex min-w-0 max-w-reading flex-1 flex-col gap-snug">
           {turn.route !== null && (
             <div className="flex min-w-0 flex-col gap-hair">
               {/* Body size, not the smallest type on the page. This line is the
