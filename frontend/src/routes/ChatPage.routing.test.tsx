@@ -323,7 +323,7 @@ describe("a visitor's addresses", () => {
     vi.unstubAllGlobals();
   });
 
-  it("is the chat on /, with no list of conversations and the ways to an account", async () => {
+  it("is the chat on /, with no list of conversations and the way to an account", async () => {
     const { container, unmount, path } = page("/", null);
     await settle();
     askFromTheFrontDoor(container);
@@ -336,7 +336,7 @@ describe("a visitor's addresses", () => {
     // Asked, answered, and still on /: a visitor's question names no conversation.
     expect(landed).toBe("/");
     expect(sidebar).toBeNull();
-    expect(links).toEqual(["/login", "/register"]);
+    expect(links).toEqual(["/login"]);
     expect(requested).toEqual(["POST /api/ask"]);
     // Signed in from another tab meanwhile, the next question would be refused.
     expect(rechecked).toBe(1);

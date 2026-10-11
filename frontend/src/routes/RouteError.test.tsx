@@ -170,7 +170,7 @@ describe("a page that throws", () => {
     expect(seen).toEqual({ panel: null, chat: true });
   });
 
-  it("on a visitor's / gives way to the panel, with the ways to an account still there", async () => {
+  it("on a visitor's / gives way to the panel, with the way to an account still there", async () => {
     breaks.chat = true;
     const { container, unmount } = at("/", null);
     await settle();
@@ -180,7 +180,7 @@ describe("a page that throws", () => {
     };
     unmount();
 
-    expect(seen).toEqual({ panel: PANEL, links: ["/login", "/register"] });
+    expect(seen).toEqual({ panel: PANEL, links: ["/login"] });
   });
 });
 
