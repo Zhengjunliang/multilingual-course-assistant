@@ -40,6 +40,12 @@ interface TurnViewProps {
    */
   thinking: boolean;
   /**
+   * The server refused the question as busy and it will be asked again. The
+   * cat keeps thinking, but nothing is being searched: the process line waits,
+   * and counts afresh from the next request, as the server's seconds do.
+   */
+  retrying: boolean;
+  /**
    * Nobody is signed in. A question routed to the slides then finds nothing,
    * because the slides are for an account, and the answer says only that no
    * course material was found; the line under it says why.
@@ -56,7 +62,13 @@ function poseOf(turn: Turn, waiting: boolean) {
   return waiting ? "thinking" : "avatar";
 }
 
-export const TurnView = memo(function TurnView({ turn, live, thinking, visitor }: TurnViewProps) {
+export const TurnView = memo(function TurnView({
+  turn,
+  live,
+  thinking,
+  retrying,
+  visitor,
+}: TurnViewProps) {
   const { t } = useTranslation();
   // Kept by identity: the answer's badges hang off this array, and a new one on
   // every render would redraw them.
@@ -85,7 +97,7 @@ export const TurnView = memo(function TurnView({ turn, live, thinking, visitor }
         <Mascot pose={poseOf(turn, waiting)} className="size-avatar" />
         <div className="flex min-w-0 max-w-reading flex-1 flex-col gap-snug">
           <ProcessLine
-            running={working}
+            running={working && !retrying}
             route={turn.route}
             searchMs={turn.searchMs}
             citations={turn.citations}

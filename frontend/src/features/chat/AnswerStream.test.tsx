@@ -114,7 +114,7 @@ describe("an answer", () => {
 
   it.each([
     ["in a sentence", `Le tasse scadono il 30 settembre ${SLIDES}.`, "settembre <a"],
-    ["that is a web marker", `Vedi il calendario ${WEB}.`, 'whitespace-nowrap">unifi.it</span>'],
+    ["that is a web marker", `Vedi il calendario ${WEB}.`, 'aria-label="unifi.it, fonte"'],
     [
       "right after a URL",
       `Vedi https://www.unifi.it/p602.html${SLIDES} per le date.`,

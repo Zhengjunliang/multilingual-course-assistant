@@ -66,11 +66,11 @@ function turn(overrides: Partial<Turn> = {}): Turn {
   };
 }
 
-function view(t: Turn, live = false, thinking = false, visitor = false): string {
+function view(t: Turn, live = false, thinking = false, visitor = false, retrying = false): string {
   // A router because a visitor's turn may link to the login page.
   return render(
     <MemoryRouter>
-      <TurnView turn={t} live={live} thinking={thinking} visitor={visitor} />
+      <TurnView turn={t} live={live} thinking={thinking} retrying={retrying} visitor={visitor} />
     </MemoryRouter>,
   );
 }
@@ -106,7 +106,7 @@ describe("the process line", () => {
     // thing in the quietest voice available. Guarding the negative keeps a
     // later tidy-up from putting it back.
     const { container, unmount } = mount(
-      <TurnView turn={turn()} live={false} thinking={false} visitor={false} />,
+      <TurnView turn={turn()} live={false} thinking={false} retrying={false} visitor={false} />,
     );
     const line = container.querySelector("summary")?.closest(TYPE_SIZES);
     if (line == null) throw new Error("no type size is set around the process line");
@@ -151,6 +151,7 @@ describe("the answer's language", () => {
         })}
         live={false}
         thinking={false}
+        retrying={false}
         visitor={false}
       />,
     );
@@ -182,6 +183,19 @@ describe("the cat beside the answer", () => {
     expect(poseIn(view(turn({ answer: "", complete: false }), false, true))).toBe("thinking");
   });
 
+  it("keeps thinking while a busy refusal is waited out, when no search is counted", () => {
+    const html = view(
+      turn({ route: null, searchMs: null, citations: [], answer: "", complete: false }),
+      false,
+      true,
+      false,
+      true,
+    );
+
+    expect(poseIn(html)).toBe("thinking");
+    expect(html).not.toContain("Ricerca in corso");
+  });
+
   it("is just there once the answer is", () => {
     expect(poseIn(view(turn()))).toBe("avatar");
   });
@@ -194,7 +208,9 @@ describe("the cat beside the answer", () => {
 });
 
 function mounted(of: Turn) {
-  return mount(<TurnView turn={of} live={false} thinking={false} visitor={false} />);
+  return mount(
+    <TurnView turn={of} live={false} thinking={false} retrying={false} visitor={false} />,
+  );
 }
 
 describe("a pill in the answer", () => {
@@ -213,7 +229,7 @@ describe("a pill in the answer", () => {
       text: "Slide p. 3",
       href: `/api/sources/${"ab".repeat(32)}#page=3`,
       target: "_blank",
-      label: null,
+      label: "Slide p. 3, fonte",
     });
   });
 
@@ -222,10 +238,15 @@ describe("a pill in the answer", () => {
     const { container, unmount } = mounted(
       turn({ answer: "La scadenza è il 30 settembre. [Excerpt 1] [Excerpt 2]" }),
     );
-    const pills = [...container.querySelectorAll("a[data-pill]")].map((pill) => pill.textContent);
+    const pills = [...container.querySelectorAll("a[data-pill]")].map((pill) => ({
+      text: pill.textContent,
+      label: pill.getAttribute("aria-label"),
+    }));
     unmount();
 
-    expect(pills).toEqual(["Slide p. 3 +1 fonti: Slide p. 3, Slide p. 4"]);
+    expect(pills).toEqual([
+      { text: "Slide p. 3 +1", label: "Slide p. 3 +1, fonti: Slide p. 3, Slide p. 4" },
+    ]);
   });
 });
 

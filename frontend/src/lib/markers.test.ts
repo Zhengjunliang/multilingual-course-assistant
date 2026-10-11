@@ -69,13 +69,21 @@ describe("resolveExcerptRefs", () => {
         "b [Excerpt 1, Excerpt 2, Excerpt 3].",
         "c (Excerpt 2 and 3)",
         "d [Excerpt 1、Excerpt 2]",
+        "e （Excerpt 1，Excerpt 3）",
       ].map((answer) => resolveExcerptRefs(answer, citations)),
     ).toEqual([
       "a [PPM 1] [WEB 9].",
       "b [PPM 1] [PPM 2] [WEB 9].",
       "c [PPM 2] [WEB 9]",
       "d [PPM 1] [PPM 2]",
+      "e [PPM 1] [WEB 9]",
     ]);
+  });
+
+  it("does not read a range as a list", () => {
+    // "to" is not one of the conjunctions: each reference resolves alone, and
+    // the range stays prose rather than dropping the excerpts inside it.
+    expect(resolveExcerptRefs("(Excerpt 1 to 3)", citations)).toBe("([PPM 1] to 3)");
   });
 
   it("leaves a number with no citation behind it as prose", () => {

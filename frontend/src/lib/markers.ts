@@ -34,7 +34,7 @@ export function badgesOf(citations: readonly Citation[]): Badge[] {
 
 /** Two or more excerpt references in one pair of brackets (`resolveExcerptRefs`). */
 const EXCERPT_LIST =
-  /[[(]\s*Excerpt\s+\d+(?:(?:\s*[,;&、]\s*|\s+\p{L}{1,3}\s+|\s*[和与及]\s*)(?:Excerpt\s+)?\d+)+\s*[\])]/gu;
+  /[[(（【]\s*Excerpt\s+\d+(?:(?:\s*[,;&、，；]\s*|\s+(?:e|ed|and|et|y|und|o|or)\s+|\s*[和与及或]\s*)(?:Excerpt\s+)?\d+)+\s*[\])）】]/gu;
 
 /**
  * The system prompt forbids writing "Excerpt N" and the small quantized model
@@ -49,8 +49,10 @@ const EXCERPT_LIST =
  * 2)", becomes its markers side by side, which the pills then draw as one
  * («name +1»); resolved one by one, the brackets and the "e" would be left
  * standing between two pills. Between two references of a list may stand a
- * comma, a semicolon, an ampersand, a word of up to three letters (e, and, et,
- * y, und) or a Chinese conjunction.
+ * comma or a semicolon, half or full width, an ampersand, a conjunction (e,
+ * and, et, y, und, o, or) or a Chinese one; brackets may be full width.
+ * Nothing else: "Excerpt 2 to 5" is a range, and reading it as two references
+ * would drop the three between them.
  *
  * A number with no citation behind it is left as prose: inventing a pill for
  * it would send the reader to a source the answer never drew on.
