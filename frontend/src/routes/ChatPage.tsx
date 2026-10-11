@@ -205,15 +205,13 @@ export default function ChatPage() {
               // earlier one is settled, whether it settled a second ago or
               // last week.
               const current = position === turns.length - 1;
-              // Not while a busy refusal is waited out: the question box says
-              // when it will ask again, and the process line counts afresh
-              // from that request, as the server's seconds do.
               return (
                 <TurnView
                   key={turn.key}
                   turn={turn}
                   live={current && waiting.phase === "streaming"}
-                  thinking={current && waiting.phase === "queued"}
+                  thinking={current && (waiting.phase === "queued" || waiting.phase === "retrying")}
+                  retrying={current && waiting.phase === "retrying"}
                   visitor={visitor}
                 />
               );

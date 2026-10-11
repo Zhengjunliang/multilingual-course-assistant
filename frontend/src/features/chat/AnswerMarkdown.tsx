@@ -85,20 +85,17 @@ function CitationPill({ numbers }: { numbers?: string }) {
   if (first === undefined) return <>{numbers}</>;
 
   const href = sourceLink(first);
+  const shown = `${shortName(first, t)}${sources.length > 1 ? ` +${sources.length - 1}` : ""}`;
   // The name a screen reader and voice control use starts with what the pill
-  // shows (WCAG 2.5.3, label in name); a merged pill then names every source
-  // its «+N» stands for.
-  const pill = (
-    <span className="whitespace-nowrap">
-      {shortName(first, t)}
-      {sources.length > 1 && ` +${sources.length - 1}`}
-      {sources.length > 1 && (
-        <span className="sr-only">
-          {` ${t("sources.pill", { names: sources.map((source) => shortName(source, t)).join(", ") })}`}
-        </span>
-      )}
-    </span>
-  );
+  // shows (WCAG 2.5.3, label in name), then says it is a source and, for a
+  // merged pill, every source its «+N» stands for. An attribute rather than
+  // hidden text, which a reader's own copy and find-in-page would pick up.
+  const label = t("sources.pill", {
+    count: sources.length,
+    shown,
+    names: sources.map((source) => shortName(source, t)).join(", "),
+  });
+  const pill = <span className="whitespace-nowrap">{shown}</span>;
   const look =
     "mx-0.5 inline-flex items-center rounded-full bg-mark px-tight align-baseline font-medium text-caption text-muted no-underline transition-colors hover:bg-ink hover:text-canvas data-[state=open]:bg-ink data-[state=open]:text-canvas";
 
@@ -127,14 +124,22 @@ function CitationPill({ numbers }: { numbers?: string }) {
       })}
     >
       {href === null ? (
-        // A slide stored before its key existed has nowhere to go: a plain
-        // pill, which still previews under the pointer; its source is in the
-        // sources panel for everyone else.
+        // A slide stored before its key existed, or a source whose address is
+        // not a web URL, has nowhere to go: a plain pill, which still previews
+        // under the pointer; its source is in the sources panel for everyone
+        // else.
         <span data-pill className={look}>
           {pill}
         </span>
       ) : (
-        <a href={href} target="_blank" rel="noopener noreferrer" data-pill className={look}>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={label}
+          data-pill
+          className={look}
+        >
           {pill}
         </a>
       )}

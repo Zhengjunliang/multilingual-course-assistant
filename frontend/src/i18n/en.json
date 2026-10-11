@@ -91,7 +91,8 @@
     "filePage": "{{file}} · p. {{page}}",
     "openPage": "Open the page",
     "openSlide": "Open the slide at page {{page}}",
-    "pill": "sources: {{names}}"
+    "pill_one": "{{shown}}, source",
+    "pill_other": "{{shown}}, sources: {{names}}"
   },
   "answer": {
     "copy": "Copy the answer",

@@ -91,7 +91,8 @@
     "filePage": "{{file}} · 第 {{page}} 页",
     "openPage": "打开网页",
     "openSlide": "打开幻灯片第 {{page}} 页",
-    "pill": "来源：{{names}}"
+    "pill_one": "{{shown}}，来源",
+    "pill_other": "{{shown}}，来源：{{names}}"
   },
   "answer": {
     "copy": "复制回答",
