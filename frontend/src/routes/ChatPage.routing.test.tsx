@@ -76,6 +76,7 @@ function answerStream(conversationId: number | null, question: string): Response
     locale: "it",
     route: { target: "unifi_web", query: question, fresh: false, reason: "campus question" },
     citations: [],
+    search_ms: 1200,
   };
   const body = `event: start\ndata: ${JSON.stringify(start)}\n\nevent: end\ndata: {}\n\n`;
   return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
@@ -169,6 +170,20 @@ function askFromTheFrontDoor(container: HTMLElement) {
     field?.dispatchEvent(new Event("input", { bubbles: true }));
   });
   act(() => container.querySelector<HTMLButtonElement>("button[type='submit']")?.click());
+}
+
+/**
+ * Ends the entry's `recede`. A browser sends `animationend`; jsdom has no
+ * `AnimationEvent`, and React then listens for the prefixed name instead, so
+ * both are sent and React hears one of them.
+ */
+function finishReceding(container: HTMLElement) {
+  act(() => {
+    for (const name of ["animationend", "webkitAnimationEnd"]) {
+      const done = Object.assign(new Event(name, { bubbles: true }), { animationName: "recede" });
+      container.querySelector(".recede")?.dispatchEvent(done);
+    }
+  });
 }
 
 /** Deletes a conversation from its sidebar row, through the confirmation alert dialog. */
@@ -317,7 +332,6 @@ describe("a visitor's addresses", () => {
     conversations = [];
     requested = [];
     rechecked = 0;
-    sessionStorage.clear();
     vi.stubGlobal("fetch", fakeApi);
   });
 
@@ -403,6 +417,20 @@ describe("a visitor's addresses", () => {
     expect(after).toEqual({ entry: false, typed: "e la biblioteca?", focused: true });
   });
 
+  it("has no new conversation in its thread: a reload is the way to one", async () => {
+    const { container, unmount } = page("/", null);
+    await settle();
+    askFromTheFrontDoor(container);
+    await settle();
+    finishReceding(container);
+    const thread = container.querySelector("main")?.textContent ?? "";
+    const buttons = [...container.querySelectorAll("main button")].map((b) => b.textContent);
+    unmount();
+
+    expect(thread).toContain("Quali sono le scadenze per l'iscrizione?");
+    expect(buttons).not.toContain(i18n.t("sidebar.new"));
+  });
+
   it("shows the thread at once with reduced motion", async () => {
     vi.spyOn(window, "matchMedia").mockImplementation(
       (query) =>
@@ -482,8 +510,14 @@ const ACTIONS = {
   recheck: async () => {},
 };
 
-function SwitchingSession({ children }: { children: ReactNode }) {
-  const [account, setAccount] = useState<Account | null>(STUDENT);
+function SwitchingSession({
+  children,
+  initial = STUDENT,
+}: {
+  children: ReactNode;
+  initial?: Account | null;
+}) {
+  const [account, setAccount] = useState<Account | null>(initial);
   switchAccount = setAccount;
   return <SessionContext value={{ account, ...ACTIONS }}>{children}</SessionContext>;
 }
@@ -518,5 +552,38 @@ describe("another account signed in under the page", () => {
 
     // Once for each account: the second list is the second account's.
     expect([first, second]).toEqual([1, 2]);
+  });
+
+  it("takes a visitor's thread away when an account signs in, and does not bring it back", async () => {
+    const { container, unmount } = mount(
+      <ThemeProvider>
+        <SwitchingSession initial={null}>
+          <RouterProvider router={createMemoryRouter(routes)} />
+        </SwitchingSession>
+      </ThemeProvider>,
+    );
+    await settle();
+    askFromTheFrontDoor(container);
+    await settle();
+    finishReceding(container);
+    const question = "Quali sono le scadenze per l'iscrizione?";
+    const asked = container.querySelector("main")?.textContent?.includes(question);
+
+    act(() => switchAccount(STUDENT));
+    await settle();
+    const signedIn = container.querySelector("main")?.textContent?.includes(question);
+    act(() => switchAccount(null));
+    await settle();
+    const signedOut = container.querySelector("main")?.textContent?.includes(question);
+    unmount();
+
+    // The layout the chat sits in is swapped, so the page holding the thread
+    // is unmounted: nothing of a visitor's questions is filed under an account,
+    // or left for whoever signs out on a shared computer.
+    expect({ asked, signedIn, signedOut }).toEqual({
+      asked: true,
+      signedIn: false,
+      signedOut: false,
+    });
   });
 });

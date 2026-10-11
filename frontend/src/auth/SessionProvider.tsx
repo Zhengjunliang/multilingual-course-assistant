@@ -12,20 +12,12 @@
  * remembered on this screen (i18n/index.ts). `User.locale` is the single
  * source for a signed-in reader; the switch in the header writes to the
  * account and the account writes back here.
- *
- * Signing in, signing up and signing out also empty the visitor's thread
- * (features/chat/visitorThread.ts), here or in another tab (`recheck`). It is
- * not carried into the account, and a reader who signs out of a shared
- * computer leaves no thread for the next one. Only these: the first
- * `readSession` answering "nobody" is a reload, and a visitor's thread is
- * meant to survive one.
  */
 
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { Account } from "@/api/account";
 import { logIn, logOut, readSession, register, setAccountLocale } from "@/api/account";
-import { clearVisitorThread } from "@/features/chat/visitorThread";
 import { chooseUiLocale, type UiLocale } from "@/i18n";
 
 interface SessionValue {
@@ -94,17 +86,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       account,
       logIn: async (username, password) => {
         const session = await logIn(username, password);
-        clearVisitorThread();
         adopt(session.user);
       },
       register: async (username, password, locale) => {
         const session = await register(username, password, locale);
-        clearVisitorThread();
         adopt(session.user);
       },
       logOut: async () => {
         await logOut();
-        clearVisitorThread();
         forget();
       },
       chooseLocale: async (locale) => {
@@ -119,7 +108,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         try {
           const { user } = await readSession();
           if ((user?.id ?? null) === (account?.id ?? null)) return;
-          clearVisitorThread();
           adopt(user);
         } catch {
           // A server that cannot say who is signed in has nothing to follow;

@@ -21,11 +21,11 @@
  * frame then leaves it for `/` and the page resets.
  *
  * A visitor, on `/` only (auth/RequireSession.tsx), gets the same page with no
- * stored conversation behind it: the thread is the tab's, and with no sidebar
- * the way to a new one is a button at the top of the thread.
+ * stored conversation behind it: the thread lives in this page's memory, and a
+ * reload is the way to a new one, as ChatGPT and Gemini have it for a reader
+ * who is not signed in (features/chat/useAsk.ts).
  */
 
-import { MessageSquarePlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -33,7 +33,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { isRefusal } from "@/api/client";
 import { readConversation } from "@/api/conversations";
 import { useSession } from "@/auth/useSession";
-import { Button } from "@/components/ui/button";
 import { Composer } from "@/features/chat/Composer";
 import { TurnView } from "@/features/chat/TurnView";
 import { useAsk } from "@/features/chat/useAsk";
@@ -201,12 +200,6 @@ export default function ChatPage() {
           <EntryScreen visitor={visitor} hops={hops} />
         ) : (
           <div className="mx-auto flex max-w-4xl flex-col gap-room">
-            {visitor && (
-              <Button type="button" variant="ghost" className="self-start" onClick={reset}>
-                <MessageSquarePlus aria-hidden className="size-icon" />
-                {t("sidebar.new")}
-              </Button>
-            )}
             {unreadable && <p className="text-body text-muted">{t("sidebar.unreadable")}</p>}
             {turns.map((turn, position) => {
               // Only the last turn can be the one being answered; every
