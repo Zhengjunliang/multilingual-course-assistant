@@ -201,7 +201,10 @@ export type Pose = keyof typeof POSES;
  * The living cat's own shapes (#173), drawn with the poses' and moved by
  * components/LivingMascot.tsx: it is awake with the avatar's eyes and mouth,
  * happy with the welcome pose's closed smiling eyes and stars, and asleep with
- * the eyes closed the other way up, a yawn and a rising "z".
+ * the eyes closed the other way up, a yawn and a rising "z". On a sign-in
+ * form (#183) it shuts its eyes the sleeping way while a password is typed,
+ * and a refused one leaves it with the error pose's drooping lids and the
+ * thinking pose's flat mouth. Each pair of eyes is left, then right.
  */
 export const LIVING = {
   eyes: LIDDED,
@@ -211,6 +214,8 @@ export const LIVING = {
   happyEyes: POSES.welcome.strokes.slice(0, 2),
   stars: POSES.welcome.fills,
   sleepingEyes: ["M19.8 38.4Q24.6 42.8 29.4 38.4", "M35.2 38.4Q40 42.8 44.8 38.4"],
+  droopingEyes: DROOPING,
+  flatMouth: POSES.thinking.strokes[0],
   yawn: "M30 47Q32.4 45.2 34.8 47Q35.2 52 32.4 52.4Q29.6 52 30 47Z",
   /** One "z", centred on the origin; the cat lets three of them rise. */
   z: "M-2.5 -2.8H2.5L-2.5 2.8H2.5",
