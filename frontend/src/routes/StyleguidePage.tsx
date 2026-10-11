@@ -29,7 +29,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { HoverCard } from "@/components/ui/hover-card";
@@ -132,21 +132,21 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
       <Specimen
         name="Type"
-        note="Fraunces for headings and the answer, at the reading size; Figtree for every control. Chinese is set in the system's Chinese faces, its punctuation full width, with Figtree for its Latin letters; text in another language keeps its own quotes, whichever language the page is in."
+        note="Fraunces for headings; Figtree for the answer, at the reading size, and for every control, its emphasis a true italic. Chinese is set in the system's Chinese faces, its punctuation full width, with Figtree for its Latin letters; text in another language keeps its own quotes, whichever language the page is in."
       >
         <div className="flex max-w-prose flex-col gap-tight">
           <p className="font-semibold font-serif text-ink text-title">
             Il passo lungo il gradiente
           </p>
-          <p lang="en" className="font-serif text-ink text-reading">
+          <p lang="en" className="text-ink text-reading">
             The learning rate sets the size of each step along the negative gradient; a value too
             large makes the loss <em>oscillate</em>.
           </p>
-          <p lang="it" className="font-serif text-ink text-reading">
+          <p lang="it" className="text-ink text-reading">
             Il tasso di apprendimento fissa l'ampiezza di ogni passo; un valore troppo alto fa{" "}
             <em>oscillare</em> la perdita.
           </p>
-          <p lang="zh-hans" className="font-serif text-ink text-reading">
+          <p lang="zh-hans" className="text-ink text-reading">
             学习率决定了沿负梯度方向每一步的大小；学习率过大会导致损失震荡。
           </p>
           <p lang="zh-hans" className="text-body text-ink">
@@ -180,12 +180,9 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
       </Specimen>
 
       <Specimen name="Card" note="Surface, hairline border, raised a step off the page.">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle>CardTitle</CardTitle>
-            <p className="text-caption text-muted">CardHeader holds the title and its caption.</p>
-          </CardHeader>
-          <CardContent>CardContent carries the body at eighty percent ink.</CardContent>
+        <Card className="flex w-full max-w-sm flex-col gap-hair p-gutter">
+          <p className="font-medium text-body text-ink">A card</p>
+          <p className="text-caption text-muted">Its content and padding are the page's own.</p>
         </Card>
       </Specimen>
 

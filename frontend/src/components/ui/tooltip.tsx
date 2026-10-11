@@ -16,7 +16,7 @@
  * carries its own provider, as upstream now does, so a tooltip renders
  * wherever it is used, in a test or on /styleguide, with nothing above it.
  * The delays are Radix's own: a hint opens for a pointer that stops on it,
- * not one passing over a row of badges, and focus opens it at once.
+ * not one passing over a row of buttons, and focus opens it at once.
  */
 
 import * as RadixTooltip from "@radix-ui/react-tooltip";

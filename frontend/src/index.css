@@ -14,12 +14,13 @@
  * Not a CDN. The demo has to work on a machine with no network, and a webfont
  * fetched from a third party also tells that third party who opened the page —
  * a poor trade for a university tool. Each file is one variable face, every
- * weight in one request: Fraunces 67,304 bytes, its italic 81,520, Figtree
- * 20,156. They are Google Fonts' latin subset, which holds English and
+ * weight in one request: Fraunces 67,304 bytes, Figtree 20,156, its italic
+ * 20,928. They are Google Fonts' latin subset, which holds English and
  * Italian; `unicode-range` repeats it, so a character outside the subset never
  * makes the browser download a face that cannot draw it. The italic is a file
- * of its own because Fraunces draws a true italic rather than a slanted roman,
- * and the browser fetches it only when a page shows one.
+ * of its own because Figtree draws a true italic rather than a slanted roman,
+ * for the emphasis in an answer, and the browser fetches it only when a page
+ * shows one. The headings never lean, so Fraunces has no italic here.
  *
  * The leading slash is load-bearing. Vite only recognises a `url()` as a public
  * file when it starts with `/`; without it the build emits a warning rather
@@ -49,10 +50,10 @@
 }
 
 @font-face {
-  font-family: "Fraunces";
-  src: url("/fonts/Fraunces-Italic-Variable.woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: italic;
+  font-family: "Figtree";
+  src: url("/fonts/Figtree-Variable.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
   font-display: swap;
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
@@ -61,9 +62,9 @@
 
 @font-face {
   font-family: "Figtree";
-  src: url("/fonts/Figtree-Variable.woff2") format("woff2");
+  src: url("/fonts/Figtree-Italic-Variable.woff2") format("woff2");
   font-weight: 300 900;
-  font-style: normal;
+  font-style: italic;
   font-display: swap;
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,

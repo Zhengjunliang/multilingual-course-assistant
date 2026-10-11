@@ -70,7 +70,7 @@ describe("the screens", () => {
   });
 
   it("set every title and display heading in the serif", () => {
-    // Fraunces for the headings and the answer, Figtree for the controls: a
+    // Fraunces for the headings, Figtree for the answer and the controls: a
     // class list at title or display size without `font-serif` is a heading
     // left in the controls' face.
     const sansHeadings = found(COMPONENTS, /"[^"]*\btext-(?:title|display)\b[^"]*"/g).filter(
