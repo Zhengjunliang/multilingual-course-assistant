@@ -44,48 +44,51 @@ import remarkMath from "remark-math";
 
 import type { Citation } from "@/api/contract";
 import { HoverCard } from "@/components/ui/hover-card";
-import { type Badge, remarkPills, withoutPills } from "@/lib/markers";
+import { remarkPills, withoutPills } from "@/lib/markers";
 import { cn } from "@/lib/utils";
 import { SourceSummary } from "./SourcesPanel";
-import { shortName, sourceLink } from "./sourceLabel";
+import { shortName, sourceLink, sourcesOf } from "./sourceLabel";
 
-interface Pills {
-  badges: readonly Badge[];
-  citations: readonly Citation[];
-}
-
-const PillContext = createContext<Pills | null>(null);
+/** The answer's citations, which a pill's excerpt numbers index from one. */
+const PillContext = createContext<readonly Citation[]>([]);
 
 /**
  * One pill, drawn where `remarkPills` left a `citation-pill` element: the
- * name of its first source, «+N» for the rest of a run of them, as ChatGPT and
- * Open WebUI write a citation into an answer (read 11 October 2026).
+ * name of its first source, «+N» for the other pages of a run of them, as
+ * ChatGPT and Open WebUI write a citation into an answer (read 11 October
+ * 2026).
  *
- * The pill is a link to that first source, and a click follows it: a web page
- * in a new tab at its passage, a slide at its page. Resting on it or focusing
- * it opens a card listing every source of the run, each with its own link
- * (components/ui/hover-card.tsx). The fill is what says "clickable", not a
- * colour or a border: a blue word inside an answer would read as an ordinary
- * link (index.css), and `--mark` against `--canvas` is a gated pair so the
- * pill cannot dissolve into the paragraph. Under the pointer, and while its
- * card is open, it turns to ink.
+ * The pill is a link to its first excerpt, and a click follows it: a web page
+ * in a new tab at that excerpt's passage, a slide at its page. Resting on it
+ * or focusing it opens a card listing every excerpt of the run, each with its
+ * own link (components/ui/hover-card.tsx): two excerpts of one page are two
+ * passages, and the card shows the one the answer named (#182). The fill is
+ * what says "clickable", not a colour or a border: a blue word inside an
+ * answer would read as an ordinary link (index.css), and `--mark` against
+ * `--canvas` is a gated pair so the pill cannot dissolve into the paragraph.
+ * Under the pointer, and while its card is open, it turns to ink.
  *
- * Numbers with no badge are drawn as the numbers: the plugin only emits known
- * ones, and this never throws on the rest either.
+ * Numbers with no excerpt are drawn as the numbers: the plugin only emits
+ * known ones, and this never throws on the rest either.
  */
 function CitationPill({ numbers }: { numbers?: string }) {
   const { t } = useTranslation();
-  const pills = useContext(PillContext);
-  const sources = (numbers ?? "")
+  const citations = useContext(PillContext);
+  const excerpts = (numbers ?? "")
     .split(",")
-    .map((number) => pills?.badges.find((badge) => String(badge.number) === number))
-    .map((badge) => pills?.citations.find((citation) => citation.marker === badge?.marker))
-    .filter((citation) => citation !== undefined);
-  const [first] = sources;
+    .map((number) => ({ number, citation: citations[Number(number) - 1] }))
+    .filter(
+      (excerpt): excerpt is { number: string; citation: Citation } =>
+        excerpt.citation !== undefined,
+    );
+  const [first] = excerpts;
   if (first === undefined) return <>{numbers}</>;
+  // «+N» and the name a screen reader hears count pages, as the sources
+  // panel does: two excerpts of one page are one source.
+  const sources = sourcesOf(excerpts.map((excerpt) => excerpt.citation));
 
-  const href = sourceLink(first);
-  const shown = `${shortName(first, t)}${sources.length > 1 ? ` +${sources.length - 1}` : ""}`;
+  const href = sourceLink(first.citation);
+  const shown = `${shortName(first.citation, t)}${sources.length > 1 ? ` +${sources.length - 1}` : ""}`;
   // The name a screen reader and voice control use starts with what the pill
   // shows (WCAG 2.5.3, label in name), then says it is a source and, for a
   // merged pill, every source its «+N» stands for. An attribute rather than
@@ -101,10 +104,10 @@ function CitationPill({ numbers }: { numbers?: string }) {
 
   return (
     <HoverCard
-      content={sources.map((source) => {
+      content={excerpts.map(({ number, citation: source }) => {
         const to = sourceLink(source);
         return (
-          <div key={source.marker} className="flex flex-col gap-hair">
+          <div key={number} className="flex flex-col gap-hair">
             <SourceSummary citation={source} />
             {to !== null && (
               <a
@@ -317,8 +320,10 @@ export interface AnswerMarkdownProps {
   text: string;
   /** The answer's language: a Chinese answer sets at Chinese leading (index.css). */
   lang?: string;
-  badges: readonly Badge[];
-  /** The answer's citations, which a pill names and links to. */
+  /**
+   * The answer's citations, which a pill names and links to; none while the
+   * answer streams, so that no sentinel a model wrote can draw a pill.
+   */
   citations: readonly Citation[];
   rehypePlugins?: Options["rehypePlugins"];
   /** Tokens are still arriving: the caret follows the last word (index.css, `caret-after`). */
@@ -328,7 +333,6 @@ export interface AnswerMarkdownProps {
 export function AnswerMarkdown({
   text,
   lang,
-  badges,
   citations,
   rehypePlugins,
   streaming = false,
@@ -343,11 +347,10 @@ export function AnswerMarkdown({
       remarkGfm,
       remarkCjkFriendly,
       [remarkMath, { singleDollarTextMath: false }],
-      [remarkPills, badges],
+      [remarkPills, citations],
     ],
-    [badges],
+    [citations],
   );
-  const pills = useMemo(() => ({ badges, citations }), [badges, citations]);
 
   // Called as a function, not rendered as an element, so that a throw lands
   // here. Parsing and tree building recurse, and an answer nested a few
@@ -364,11 +367,11 @@ export function AnswerMarkdown({
       components: COMPONENTS,
     });
   } catch {
-    body = <p className="whitespace-pre-wrap">{withoutPills(text, badges)}</p>;
+    body = <p className="whitespace-pre-wrap">{withoutPills(text, citations)}</p>;
   }
 
   return (
-    <PillContext value={pills}>
+    <PillContext value={citations}>
       <div
         lang={lang}
         className={cn(

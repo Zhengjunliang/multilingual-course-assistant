@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Citation } from "@/api/contract";
 import {
-  badgesOf,
+  citedMarkers,
   type MdNode,
   remarkPills,
-  resolveExcerptRefs,
   segmentAnswer,
   withoutMarkers,
   withPills,
@@ -35,32 +34,25 @@ function cite(marker: string): Citation {
   };
 }
 
-/** A badge as `badgesOf` would have built it, for the segmentation tests. */
-function badge(marker: string, number: number) {
-  return { marker, number };
+/**
+ * The answer as `segmentAnswer` cuts it, each reference written as the excerpt
+ * numbers it names: "a {1,3}." for a list of the first and third.
+ */
+function cut(answer: string, citations: readonly Citation[]): string {
+  return segmentAnswer(answer, citations)
+    .map((segment) => (segment.kind === "text" ? segment.text : `{${segment.excerpts.join(",")}}`))
+    .join("");
 }
 
-describe("badgesOf", () => {
-  it("numbers distinct markers from one, in retrieval order", () => {
-    expect(badgesOf([cite("[PPM 7]"), cite("[WEB 1]"), cite("[PPM 7]"), cite("[PPM 2]")])).toEqual([
-      badge("[PPM 7]", 1),
-      badge("[WEB 1]", 2),
-      badge("[PPM 2]", 3),
-    ]);
-  });
-});
-
-describe("resolveExcerptRefs", () => {
+describe("segmentAnswer, on excerpt numbers", () => {
   const citations = [cite("[PPM 1]"), cite("[PPM 2]"), cite("[WEB 9]")];
 
-  it("rewrites every shape the model writes", () => {
+  it("reads every shape the model writes", () => {
     // Bracketed, parenthesised and bare are the three the docstring names.
-    expect(resolveExcerptRefs("a [Excerpt 1] b (Excerpt 2) c Excerpt 3 d", citations)).toBe(
-      "a [PPM 1] b [PPM 2] c [WEB 9] d",
-    );
+    expect(cut("a [Excerpt 1] b (Excerpt 2) c Excerpt 3 d", citations)).toBe("a {1} b {2} c {3} d");
   });
 
-  it("rewrites a list in one pair of brackets into markers side by side", () => {
+  it("reads a list in one pair of brackets as one reference", () => {
     // As the model wrote them on 11 October 2026, in Italian, and the other
     // separators the docstring names.
     expect(
@@ -70,26 +62,20 @@ describe("resolveExcerptRefs", () => {
         "c (Excerpt 2 and 3)",
         "d [Excerpt 1、Excerpt 2]",
         "e （Excerpt 1，Excerpt 3）",
-      ].map((answer) => resolveExcerptRefs(answer, citations)),
-    ).toEqual([
-      "a [PPM 1] [WEB 9].",
-      "b [PPM 1] [PPM 2] [WEB 9].",
-      "c [PPM 2] [WEB 9]",
-      "d [PPM 1] [PPM 2]",
-      "e [PPM 1] [WEB 9]",
-    ]);
+      ].map((answer) => cut(answer, citations)),
+    ).toEqual(["a {1,3}.", "b {1,2,3}.", "c {2,3}", "d {1,2}", "e {1,3}"]);
   });
 
   it("does not read a range as a list", () => {
     // "to" is not one of the conjunctions: each reference resolves alone, and
     // the range stays prose rather than dropping the excerpts inside it.
-    expect(resolveExcerptRefs("(Excerpt 1 to 3)", citations)).toBe("([PPM 1] to 3)");
+    expect(cut("(Excerpt 1 to 3)", citations)).toBe("({1} to 3)");
   });
 
   it("leaves a number with no citation behind it as prose", () => {
-    expect(resolveExcerptRefs("see Excerpt 9", citations)).toBe("see Excerpt 9");
-    // In a list, the references it can resolve still become markers.
-    expect(resolveExcerptRefs("[Excerpt 1, Excerpt 9]", citations)).toBe("[[PPM 1], Excerpt 9]");
+    expect(cut("see Excerpt 9", citations)).toBe("see Excerpt 9");
+    // In a list, the references it can resolve are still taken.
+    expect(cut("[Excerpt 1, Excerpt 9]", citations)).toBe("[{1}, Excerpt 9]");
   });
 
   it("leaves Excerpt 0 as prose", () => {
@@ -97,104 +83,130 @@ describe("resolveExcerptRefs", () => {
     // `Excerpt 0` resolves to a real citation and this goes red — as does the
     // three-shape test above, which is the honest way to put it: this case is
     // not the only guard on the offset, it is the one that names its floor.
-    expect(resolveExcerptRefs("see Excerpt 0", citations)).toBe("see Excerpt 0");
+    expect(cut("see Excerpt 0", citations)).toBe("see Excerpt 0");
+  });
+
+  it("names the excerpt it was given, not its page's first", () => {
+    // #182: four excerpts of one page, and the answer cites the winter
+    // sessions of two years as excerpts 3 and 4. A marker the model wrote
+    // itself still names the page, at its best-ranked excerpt.
+    const page = Array.from({ length: 4 }, () => cite("[WEB p537]"));
+    expect(cut("2025-26: Excerpt 3. 2026-27: [Excerpt 4]. [WEB p537]", page)).toBe(
+      "2025-26: {3}. 2026-27: {4}. {1}",
+    );
+  });
+
+  it("leaves a marker whole when its own text holds an excerpt reference", () => {
+    // The reference inside starts later than the marker that holds it.
+    expect(cut("See [Notes Excerpt 1].", [cite("[PPM 1]"), cite("[Notes Excerpt 1]")])).toBe(
+      "See {2}.",
+    );
   });
 });
 
-describe("segmentAnswer", () => {
+describe("segmentAnswer, on markers", () => {
   it("does not let a marker shadow the longer one it is a prefix of", () => {
     // The markers are constructed, not taken from a real citation, and that is
     // worth saying rather than hiding. `rag.answer.source_marker` closes every
     // marker with "]", so "[PPM 1]" cannot be a prefix of "[PPM 10]" — the "]"
     // and the "0" would have to be the same character. The docstring's own
     // example of the hazard therefore cannot arise from today's grammar, and a
-    // test built on it would pass with the longest-first sort deleted.
+    // test built on it would pass with the tie-break deleted.
     //
-    // What the sort promises is still a promise about any badge list, so it is
-    // tested with a pair that does nest. Remove the sort at markers.ts:80 and
-    // this goes red: "[A]" is taken first and "[B]" is left stranded in prose.
-    const badges = [badge("[A]", 1), badge("[A][B]", 2)];
-    expect(segmentAnswer("See [A][B] now.", badges)).toEqual([
+    // What the tie-break promises is still a promise about any citation list,
+    // so it is tested with a pair that does nest. Drop `b.end - a.end` from
+    // `segmentAnswer`'s sort and this goes red: "[A]" is taken first and "[B]"
+    // is left stranded in prose.
+    expect(segmentAnswer("See [A][B] now.", [cite("[A]"), cite("[A][B]")])).toEqual([
       { kind: "text", at: 0, text: "See " },
-      { kind: "badge", at: 4, badge: badge("[A][B]", 2) },
+      { kind: "reference", at: 4, excerpts: [2] },
       { kind: "text", at: 10, text: " now." },
     ]);
   });
 
   it("gives each occurrence of one marker its own offset", () => {
-    // `at` is what React keys on, so two badges for the same marker must not
-    // collide.
-    expect(segmentAnswer("x [A] y [A] z", [badge("[A]", 1)])).toEqual([
+    // `withPills` reads the character before each reference off its `at`.
+    expect(segmentAnswer("x [A] y [A] z", [cite("[A]")])).toEqual([
       { kind: "text", at: 0, text: "x " },
-      { kind: "badge", at: 2, badge: badge("[A]", 1) },
+      { kind: "reference", at: 2, excerpts: [1] },
       { kind: "text", at: 5, text: " y " },
-      { kind: "badge", at: 8, badge: badge("[A]", 1) },
+      { kind: "reference", at: 8, excerpts: [1] },
       { kind: "text", at: 11, text: " z" },
     ]);
   });
 
   it("reassembles into the answer it was given", () => {
     // Loses nothing and repeats nothing, spelled out segment by segment: a
-    // rebuilt string would stay equal with a wrong offset or a wrong badge, and
-    // a failure here names the segment that broke.
-    const badges = [badge("[PPM 1]", 1), badge("[WEB 2]", 2)];
-    expect(segmentAnswer("Before [PPM 1] middle [WEB 2] after.", badges)).toEqual([
+    // rebuilt string would stay equal with a wrong offset or a wrong excerpt,
+    // and a failure here names the segment that broke.
+    const citations = [cite("[PPM 1]"), cite("[WEB 2]")];
+    expect(segmentAnswer("Before [PPM 1] middle [WEB 2] after.", citations)).toEqual([
       { kind: "text", at: 0, text: "Before " },
-      { kind: "badge", at: 7, badge: badge("[PPM 1]", 1) },
+      { kind: "reference", at: 7, excerpts: [1] },
       { kind: "text", at: 14, text: " middle " },
-      { kind: "badge", at: 22, badge: badge("[WEB 2]", 2) },
+      { kind: "reference", at: 22, excerpts: [2] },
       { kind: "text", at: 29, text: " after." },
     ]);
   });
 
   it("returns the whole answer as one segment when no marker turns up", () => {
-    expect(segmentAnswer("nothing cited here", [badge("[PPM 4]", 1)])).toEqual([
+    expect(segmentAnswer("nothing cited here", [cite("[PPM 4]")])).toEqual([
       { kind: "text", at: 0, text: "nothing cited here" },
     ]);
   });
 });
 
-describe("withoutMarkers", () => {
-  it("drops each marker with the spaces that led up to it", () => {
-    const badges = [badge("[PPM 1]", 1), badge("[WEB 2]", 2)];
+describe("citedMarkers", () => {
+  it("counts a page cited by its marker or by one of its excerpts", () => {
+    const citations = [cite("[A]"), cite("[A]"), cite("[B]"), cite("[C]")];
+    expect(citedMarkers("Vedi Excerpt 2 e [B].", citations)).toEqual(new Set(["[A]", "[B]"]));
+  });
+});
 
+describe("withoutMarkers", () => {
+  const citations = [cite("[PPM 1]"), cite("[WEB 2]")];
+
+  it("drops each reference with the spaces that led up to it", () => {
     expect(
       withoutMarkers(
-        "Le tasse scadono il 30 settembre [PPM 1] [WEB 2].\n- Prima rata [PPM 1]",
-        badges,
+        "Le tasse scadono il 30 settembre [PPM 1] [WEB 2].\n- Prima rata [PPM 1] (Excerpt 2)",
+        citations,
       ),
     ).toBe("Le tasse scadono il 30 settembre.\n- Prima rata");
   });
 
   it("takes the space after a marker that opened a line, and ends where the text does", () => {
-    const badges = [badge("[PPM 1]", 1), badge("[WEB 2]", 2)];
-
     expect(
-      withoutMarkers("[PPM 1] e [WEB 2] non lo dicono.\n[WEB 2] Le tasse.  \n\n", badges),
+      withoutMarkers("[PPM 1] e [WEB 2] non lo dicono.\n[WEB 2] Le tasse.  \n\n", citations),
     ).toBe("e non lo dicono.\nLe tasse.");
   });
 });
 
 describe("remarkPills", () => {
   /** The pills a paragraph of `answer` comes out with, as their `numbers`. */
-  function pills(answer: string, badges: ReturnType<typeof badge>[]): (string | undefined)[] {
+  function pills(answer: string, citations: readonly Citation[]): (string | undefined)[] {
     const paragraph: MdNode = {
       type: "paragraph",
-      children: [{ type: "text", value: withPills(answer, badges) }],
+      children: [{ type: "text", value: withPills(answer, citations) }],
     };
-    remarkPills(badges)({ type: "root", children: [paragraph] });
+    remarkPills(citations)({ type: "root", children: [paragraph] });
     return (paragraph.children ?? [])
       .filter((node) => node.type === "citationPill")
       .map((node) => node.data?.hProperties?.numbers);
   }
 
-  const badges = [badge("[PPM 1]", 1), badge("[WEB 2]", 2), badge("[PPM 3]", 3)];
+  const citations = [cite("[PPM 1]"), cite("[WEB 2]"), cite("[PPM 3]")];
 
-  it("draws pills side by side as one, each source once", () => {
-    expect(pills("Scadono il 30 settembre [PPM 1] [WEB 2][PPM 1].", badges)).toEqual(["1,2"]);
+  it("draws pills side by side as one, each excerpt once", () => {
+    expect(pills("Scadono il 30 settembre [PPM 1] [WEB 2][PPM 1].", citations)).toEqual(["1,2"]);
   });
 
   it("keeps pills apart where words stand between them", () => {
-    expect(pills("Prima [PPM 1], poi [PPM 3].", badges)).toEqual(["1", "3"]);
+    expect(pills("Prima [PPM 1], poi [PPM 3].", citations)).toEqual(["1", "3"]);
+  });
+
+  it("draws a list as one pill, and two excerpts of one page as two of its numbers", () => {
+    expect(pills("Vedi [Excerpt 1 e Excerpt 3].", citations)).toEqual(["1,3"]);
+    expect(pills("Vedi Excerpt 1 Excerpt 2.", [cite("[A]"), cite("[A]")])).toEqual(["1,2"]);
   });
 });

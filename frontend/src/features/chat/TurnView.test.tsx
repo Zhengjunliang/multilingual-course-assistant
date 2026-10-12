@@ -15,7 +15,7 @@
 
 import { act } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Citation, RouteDecision } from "@/api/contract";
 import { mount } from "@/test/mount";
@@ -213,7 +213,54 @@ function mounted(of: Turn) {
   );
 }
 
+const CALENDAR_URL = "https://ingegneria.unifi.it/p537.html";
+const CALENDAR_MARKER = `[${CALENDAR_URL} · 2026-09-20]`;
+const CALENDAR_TEXTS = [
+  "Pausa pasquale dal 2 al 7 aprile 2026.",
+  "Lezioni del secondo periodo dal 2 marzo 2026.",
+  "Sessione invernale 2025-26 dal 19 gennaio al 28 febbraio 2026.",
+  "Sessione invernale 2026-27 dal 18 gennaio al 27 febbraio 2027.",
+];
+
+/** Four excerpts of one page, as #182 found them: they share its marker. */
+const CALENDAR = CALENDAR_TEXTS.map(
+  (text): Citation => ({
+    ...citation(CALENDAR_MARKER, 1),
+    kind: "web",
+    text,
+    heading_path: ["Calendario didattico"],
+    source_file: "",
+    source_sha256: null,
+    url: CALENDAR_URL,
+    fetch_date: "2026-09-20",
+  }),
+);
+
+/**
+ * Where a pill opens the page, and which of the page's excerpts its card
+ * shows once focus has rested on it for the card's delay
+ * (components/ui/hover-card.tsx). Needs fake timers.
+ */
+function opened(pill: HTMLAnchorElement) {
+  const href = pill.getAttribute("href") ?? "";
+  act(() => pill.focus());
+  act(() => vi.advanceTimersByTime(200));
+  const card =
+    document.body.querySelector("[data-radix-popper-content-wrapper]")?.textContent ?? "";
+  act(() => pill.blur());
+  act(() => vi.advanceTimersByTime(150));
+  return {
+    // The passage the page opens at: its text fragment, decoded.
+    at: decodeURIComponent(href.split("#:~:text=")[1] ?? ""),
+    shows: CALENDAR_TEXTS.filter((text) => card.includes(text)),
+  };
+}
+
 describe("a pill in the answer", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("names its source, and a click opens the source in a new tab", () => {
     const { container, unmount } = mounted(turn());
     const pill = container.querySelector<HTMLAnchorElement>("a[data-pill]");
@@ -246,6 +293,39 @@ describe("a pill in the answer", () => {
 
     expect(pills).toEqual([
       { text: "Slide p. 3 +1", label: "Slide p. 3 +1, fonti: Slide p. 3, Slide p. 4" },
+    ]);
+  });
+
+  it("cited by excerpt number, previews and opens that excerpt, not its page's first", () => {
+    // #182: asked when the winter exam session is, the answer cited two
+    // excerpts of one page by number, and both pills showed the first.
+    vi.useFakeTimers();
+    const { container, unmount } = mounted(
+      turn({
+        answer:
+          "La sessione 2025-26 inizia il 19 gennaio [Excerpt 3], quella 2026-27 il 18 gennaio [Excerpt 4].",
+        citations: CALENDAR,
+      }),
+    );
+    const pills = [...container.querySelectorAll<HTMLAnchorElement>("a[data-pill]")].map(opened);
+    unmount();
+
+    expect(pills).toEqual([
+      { at: expect.stringContaining("Sessione invernale 2025-26"), shows: [CALENDAR_TEXTS[2]] },
+      { at: expect.stringContaining("Sessione invernale 2026-27"), shows: [CALENDAR_TEXTS[3]] },
+    ]);
+  });
+
+  it("cited by the page's marker, previews and opens the page's first excerpt", () => {
+    vi.useFakeTimers();
+    const { container, unmount } = mounted(
+      turn({ answer: `Le date sono nel calendario ${CALENDAR_MARKER}.`, citations: CALENDAR }),
+    );
+    const pills = [...container.querySelectorAll<HTMLAnchorElement>("a[data-pill]")].map(opened);
+    unmount();
+
+    expect(pills).toEqual([
+      { at: expect.stringContaining("Pausa pasquale"), shows: [CALENDAR_TEXTS[0]] },
     ]);
   });
 });

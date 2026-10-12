@@ -17,10 +17,6 @@ import { AnswerStream } from "./AnswerStream";
 
 const SLIDES = "[PPM 3]";
 const WEB = "[https://www.unifi.it/p602.html · 2026-09-20]";
-const BADGES = [
-  { marker: SLIDES, number: 1 },
-  { marker: WEB, number: 2 },
-];
 
 const SLIDE: Citation = {
   marker: SLIDES,
@@ -60,13 +56,7 @@ const PILL = /<a[^>]*data-pill[^>]*>(.*?)<\/a>/;
 
 function answer(text: string, complete = true): string {
   return render(
-    <AnswerStream
-      text={text}
-      badges={BADGES}
-      complete={complete}
-      live={false}
-      citations={CITATIONS}
-    />,
+    <AnswerStream text={text} complete={complete} live={false} citations={CITATIONS} />,
   );
 }
 
@@ -157,15 +147,7 @@ describe("an answer", () => {
 
   it("draws the caret after the last word only while words arrive", () => {
     const streaming = (text: string, live: boolean) =>
-      render(
-        <AnswerStream
-          text={text}
-          badges={BADGES}
-          complete={false}
-          live={live}
-          citations={CITATIONS}
-        />,
-      );
+      render(<AnswerStream text={text} complete={false} live={live} citations={CITATIONS} />);
 
     // The caret is the prose's own `::after` (index.css, `caret-after`), so
     // it follows the last word wherever the last block ends.
