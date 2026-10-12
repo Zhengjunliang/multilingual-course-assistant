@@ -95,10 +95,19 @@ interface ChatShellProps {
   onNewConversation: () => void;
   /** Beside the drawer's button: where the page sits, such as a staff page's breadcrumb. */
   leading?: ReactNode;
+  /** Whether the reader has staff pages, whose keys the list of shortcuts then names. */
+  staff?: boolean;
   children: ReactNode;
 }
 
-export function ChatShell({ sidebar, rail, onNewConversation, leading, children }: ChatShellProps) {
+export function ChatShell({
+  sidebar,
+  rail,
+  onNewConversation,
+  leading,
+  staff = false,
+  children,
+}: ChatShellProps) {
   const { t } = useTranslation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(storedCollapsed);
@@ -255,6 +264,7 @@ export function ChatShell({ sidebar, rail, onNewConversation, leading, children 
         open={dialog === "help"}
         onOpenChange={closeDialog}
         onCloseAutoFocus={giveFocusBack}
+        staff={staff}
       />
     </div>
   );

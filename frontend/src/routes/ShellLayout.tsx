@@ -214,6 +214,7 @@ export default function ShellLayout() {
         sidebar={sidebar}
         rail={rail}
         onNewConversation={() => void navigate("/")}
+        staff={items.length > 0}
         leading={
           trail.crumbs.length > 0 ? (
             <Breadcrumb

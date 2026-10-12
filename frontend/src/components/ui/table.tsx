@@ -109,7 +109,7 @@ export function TableRow({
       className={cn(
         "h-table-row border-hairline border-b transition-colors hover:bg-hover max-sm:h-auto",
         SELECTED,
-        "max-sm:flex max-sm:flex-col max-sm:gap-hair max-sm:rounded-card max-sm:border max-sm:bg-surface max-sm:p-snug max-sm:shadow-raised",
+        "max-sm:flex max-sm:flex-col max-sm:gap-hair max-sm:rounded-card max-sm:border max-sm:border-line max-sm:bg-surface max-sm:p-snug max-sm:shadow-raised",
         className,
       )}
       {...props}

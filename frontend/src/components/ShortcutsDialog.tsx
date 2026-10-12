@@ -21,9 +21,16 @@ interface ShortcutsDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Where the focus goes back to: the dialog is opened from state, so Radix has no trigger to return it to. */
   onCloseAutoFocus?: (event: Event) => void;
+  /** Whether the reader has staff pages, where the study plan's `/` works. */
+  staff?: boolean;
 }
 
-export function ShortcutsDialog({ open, onOpenChange, onCloseAutoFocus }: ShortcutsDialogProps) {
+export function ShortcutsDialog({
+  open,
+  onOpenChange,
+  onCloseAutoFocus,
+  staff = false,
+}: ShortcutsDialogProps) {
   const { t } = useTranslation();
   const keys = shortcuts();
   const rows: [string, string][] = [
@@ -31,7 +38,8 @@ export function ShortcutsDialog({ open, onOpenChange, onCloseAutoFocus }: Shortc
     [t("shortcuts.search"), keys.search.label],
     [t("shortcuts.settings"), keys.settings.label],
     [t("shortcuts.help"), keys.help.label],
-    [t("shortcuts.filter"), FILTER.label],
+    // The study plan's filter, on a staff page only staff open.
+    ...(staff ? [[t("shortcuts.filter"), FILTER.label] as [string, string]] : []),
     [t("shortcuts.send"), t("keys.enter")],
     [t("shortcuts.newLine"), `${t("keys.shift")} ${t("keys.enter")}`],
     [t("shortcuts.close"), t("keys.escape")],
