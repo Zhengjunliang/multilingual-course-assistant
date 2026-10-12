@@ -34,6 +34,7 @@ from rag.index import (
     build_sparse_encoder,
     open_client,
 )
+from rag.passages import collapse
 from rag.probe import configure_cli_logging
 
 if TYPE_CHECKING:
@@ -275,14 +276,15 @@ def hybrid_search(
     ]
 
 
-def rerank_hits(query: str, hits: Sequence[Hit], reranker: Reranker, limit: int) -> list[Hit]:
-    """Replace fusion scores with reranker scores and keep the best `limit`.
+def rerank_hits(query: str, hits: Sequence[Hit], reranker: Reranker) -> list[Hit]:
+    """Replace fusion scores with reranker scores and sort by them, the whole
+    pool: `search()` cuts it once the copies of a passage have collapsed.
     The reranker reads raw `text` — the same thing the user will be shown."""
     if not hits:
         return []
     scores = reranker.rerank(query, [hit.chunk.text for hit in hits])
     rescored = [Hit(chunk=hit.chunk, score=score) for hit, score in zip(hits, scores, strict=True)]
-    return sorted(rescored, key=lambda hit: hit.score, reverse=True)[:limit]
+    return sorted(rescored, key=lambda hit: hit.score, reverse=True)
 
 
 def round_robin(pools: Sequence[Sequence[Hit]], limit: int) -> list[Hit]:
@@ -314,9 +316,11 @@ def search(
     ingest_run_id: str | None = None,
 ) -> list[Hit]:
     """The full retrieval pipeline: with a reranker, per-collection fusion
-    pools merge into one candidate pool and the reranker picks the final
-    `limit`; without one, fusion order interleaves round-robin (the M3
-    no-rerank baseline). The web-source conditions apply only to the
+    pools merge into one candidate pool that the reranker orders; without one,
+    fusion order interleaves round-robin (the M3 no-rerank baseline). Either
+    way the copies of a passage collapse before the cut to `limit`
+    (`rag.passages`), so a copy never takes the place of another passage.
+    The web-source conditions apply only to the
     `unifi_web` branch (the eval-isolation rule, docs/architecture.md): slides prefetches never
     carry them, so slides retrieval semantics cannot drift with web features.
     `scope` applies only to the slides branch, the other way round: in
@@ -331,7 +335,7 @@ def search(
                 dense,
                 sparse,
                 scope=None if is_web else scope,
-                limit=PREFETCH_LIMIT if reranker else limit,
+                limit=PREFETCH_LIMIT,
                 locale=locale,
                 collection=collection,
                 ingest_source=ingest_source if is_web else None,
@@ -339,9 +343,9 @@ def search(
             )
         )
     if reranker is None:
-        return round_robin(pools, limit)
+        return round_robin([collapse(pool) for pool in pools], limit)
     merged = [hit for pool in pools for hit in pool]
-    return rerank_hits(query, merged, reranker, limit)
+    return collapse(rerank_hits(query, merged, reranker))[:limit]
 
 
 def main(argv: list[str] | None = None) -> None:

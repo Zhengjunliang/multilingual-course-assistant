@@ -132,10 +132,12 @@ class StartEvent(Event):
     field is added to it.
 
     `citations` is the grounding set the answer is being generated from — every
-    retrieved hit, in retrieval order, one entry each, no deduplication. Two
-    chunks of one page share a marker but carry different text and different
-    scores, so merging them here would drop an excerpt the reader was answered
-    from; a client that wants them merged can group on `marker`. They travel
+    retrieved hit, in retrieval order, one entry each. Retrieval has already
+    collapsed the copies of one passage into one hit (`rag.passages`); two
+    chunks of one page are two passages, sharing a marker but carrying
+    different text and different scores, so merging them here would drop an
+    excerpt the reader was answered from; a client that wants them merged can
+    group on `marker`. They travel
     first, ahead of the prose, because sources and answer appearing together is
     the claim this system is making.
 

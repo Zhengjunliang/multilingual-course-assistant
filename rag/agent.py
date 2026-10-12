@@ -63,6 +63,7 @@ from rag.llm import (
     inert_url,
     quote,
 )
+from rag.passages import collapse
 from rag.probe import configure_cli_logging
 from rag.search import DEFAULT_RERANK_MODEL, Hit, build_reranker, search
 
@@ -720,7 +721,9 @@ def deepen(
         # was actually stored and citing what it replaced.
         hits = retrieve(decision.query)
 
-    return DeepenResult(hits=[*hits, *ephemeral], decisions=decisions)
+    # A page fetched live may repeat a passage retrieval already holds, under
+    # another address or as its newer version: the answer gets each passage once.
+    return DeepenResult(hits=collapse([*hits, *ephemeral]), decisions=decisions)
 
 
 def append_decisions(path: Path, decisions: Sequence[Decision]) -> None:

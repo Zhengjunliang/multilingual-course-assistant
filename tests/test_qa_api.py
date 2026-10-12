@@ -711,9 +711,9 @@ def test_a_client_that_never_reads_a_byte_releases_the_lock(index: QdrantClient)
 
 
 def test_two_chunks_of_one_page_stay_two_citations(tmp_path: Path) -> None:
-    """The contract says the grounding set is not deduplicated. Two chunks of
-    one page share a marker but carry different text, and merging them would
-    drop an excerpt the reader was answered from."""
+    """The contract merges copies of one passage, never two passages of one
+    page: two chunks of one page share a marker but carry different text, and
+    merging them would drop an excerpt the reader was answered from."""
     qdrant = open_client(tmp_path / "one-page")
     ensure_collection(qdrant, StubDense().dimension())
     first = make_chunk(0, ORM_TEXT)
