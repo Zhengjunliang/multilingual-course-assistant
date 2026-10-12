@@ -213,24 +213,31 @@ def test_two_paragraphs_of_one_page_stay_two_hits_however_alike() -> None:
     assert len(collapse(hits_of(first, second))) == 2
 
 
+@pytest.mark.parametrize(
+    "copy_text",
+    [ANALYSIS, ANALYSIS.replace("lunedi", "lune-\ndi")],
+    ids=["equal", "hyphenated"],
+)
 @pytest.mark.parametrize("copy_fetched", ["2026-08-22", "2026-10-01"], ids=["crawled", "later"])
 @pytest.mark.parametrize("order", list(permutations(range(3))))
 def test_a_copy_at_another_address_does_not_join_two_paragraphs_of_one_page(
-    order: tuple[int, ...], copy_fetched: str
+    order: tuple[int, ...], copy_fetched: str, copy_text: str
 ) -> None:
-    """The copy of the first paragraph is a near-duplicate of the second. In
-    any rank order, and whichever copy is newer, both paragraphs stay."""
+    """The copy of the first paragraph is a near-duplicate of the second too.
+    In any rank order, whichever copy is newer, and whether the copy is the
+    same text or a reflowed one, both paragraphs stay."""
     url = "https://ingegneria.unifi.it/p536.html"
     first = web_chunk(0, ANALYSIS, url, content_hash="cc" * 32)
     copy = web_chunk(
-        1, ANALYSIS, "https://ingegneria.unifi.it/vp-536-corsi.html", fetch_date=copy_fetched
+        1, copy_text, "https://ingegneria.unifi.it/vp-536-corsi.html", fetch_date=copy_fetched
     )
     second = web_chunk(2, PHYSICS, url, content_hash="cc" * 32)
     chunks = (first, copy, second)
 
     collapsed = collapse(hits_of(*(chunks[at] for at in order)))
 
-    assert sorted(hit.chunk.text for hit in collapsed) == sorted([ANALYSIS, PHYSICS])
+    shown = sorted(hit.chunk.text for hit in collapsed)
+    assert shown in (sorted([ANALYSIS, PHYSICS]), sorted([copy_text, PHYSICS]))
 
 
 def test_one_slides_text_in_two_editions_stays_two_hits() -> None:

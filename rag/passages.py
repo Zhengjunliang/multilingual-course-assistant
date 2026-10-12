@@ -24,6 +24,7 @@ import argparse
 import json
 import re
 from functools import lru_cache
+from itertools import combinations
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
@@ -64,26 +65,35 @@ def _features(text: str) -> tuple[frozenset[tuple[str, ...]], frozenset[str]]:
     return shingles, frozenset(_NUMBER.findall(joined))
 
 
-def near_duplicate(a: str, b: str) -> bool:
+def _resemblance(a: str, b: str) -> float:
+    """The 3-shingle Jaccard of two near-duplicates, 0 for two texts that are not."""
     shingles_a, numbers_a = _features(a)
     shingles_b, numbers_b = _features(b)
     if not shingles_a or not shingles_b:
-        return False
+        return 0.0
     shared = len(shingles_a & shingles_b)
-    if shared / (len(shingles_a) + len(shingles_b) - shared) < NEAR_DUPLICATE_JACCARD:
-        return False
+    jaccard = shared / (len(shingles_a) + len(shingles_b) - shared)
     fewer, more = sorted((numbers_a, numbers_b), key=len)
-    return fewer <= more
+    return jaccard if jaccard >= NEAR_DUPLICATE_JACCARD and fewer <= more else 0.0
+
+
+def near_duplicate(a: str, b: str) -> bool:
+    return _resemblance(a, b) > 0.0
+
+
+def _link(a: Chunk, b: Chunk) -> float:
+    """How alike two hits are as one passage, 0 when they are two."""
+    if a.kind != "web" or b.kind != "web":
+        return 0.0
+    if a.text == b.text:
+        return 1.0
+    if a.url == b.url and a.content_hash == b.content_hash:
+        return 0.0  # two chunks of one version of one page are two paragraphs
+    return _resemblance(a.text, b.text)
 
 
 def same_passage(a: Chunk, b: Chunk) -> bool:
-    if a.kind != "web" or b.kind != "web":
-        return False
-    if a.text == b.text:
-        return True
-    if a.url == b.url and a.content_hash == b.content_hash:
-        return False  # two chunks of one version of one page are two paragraphs
-    return near_duplicate(a.text, b.text)
+    return _link(a, b) > 0.0
 
 
 def edition_year(url: str) -> int | None:
@@ -123,51 +133,39 @@ def _paragraphs_of_one_page(a: Chunk, b: Chunk) -> bool:
 def collapse(hits: Sequence[Hit]) -> list[Hit]:
     """Each passage once, in the order of its best-ranked copy.
 
-    Web hits of equal text are one passage first, whatever else holds. Each
-    such set then joins every group holding a near-duplicate of one of its
-    hits, and the groups it joins become one, so a chain of editions each
-    close to the next is one passage whatever order the ranking brings them
-    in, though the first and the last are far apart. A group never takes two
-    paragraphs of one page version: a copy of one of them at another address
-    may be a near-duplicate of the other, and since the copy is grouped with
-    its own paragraph before any near-duplicate is, the other paragraph is
-    refused in every rank order. The group keeps its best score and shows its
-    newest copy, so a citation's URL is always the page its text came from."""
-    equal: dict[str, list[int]] = {}
-    units: list[list[int]] = []
-    for index, hit in enumerate(hits):
-        if hit.chunk.kind != "web":
-            units.append([index])
-        elif hit.chunk.text in equal:
-            equal[hit.chunk.text].append(index)
-        else:
-            equal[hit.chunk.text] = [index]
-            units.append(equal[hit.chunk.text])
-
-    groups: list[list[int]] = []
-    for unit in units:
-        home: list[int] | None = None
-        for group in [*groups]:
-            if not any(same_passage(hits[a].chunk, hits[b].chunk) for a in unit for b in group):
-                continue
-            members = home or unit
-            if any(
-                _paragraphs_of_one_page(hits[a].chunk, hits[b].chunk)
-                for a in members
-                for b in group
-            ):
-                continue
-            if home is None:
-                group.extend(unit)
-                home = group
-            else:
-                home.extend(group)
-                groups.remove(group)
-        if home is None:
-            groups.append(list(unit))
+    Pairs of hits that are one passage join their groups pair by pair, the
+    most alike first, equal texts before near-duplicates: single-linkage
+    clustering in Kruskal's order. Every such pair ends in one group, so a
+    chain of editions each close to the next is one passage, though the first
+    and the last are far apart, whatever order the ranking brings them in. A
+    join that would put two paragraphs of one page version into one group is
+    refused, a cannot-link constraint (Wagstaff et al., ICML 2001); a copy of
+    one of them at another address may be a near-duplicate of both, and
+    joins the one it is closer to first, which keeps the other out. Equally
+    alike pairs join in rank order. The group keeps its best score and shows
+    its newest copy, so a citation's URL is always the page its text came
+    from."""
+    pairs = sorted(
+        (-link, first, second)
+        for first, second in combinations(range(len(hits)), 2)
+        if (link := _link(hits[first].chunk, hits[second].chunk)) > 0.0
+    )
+    group_of = list(range(len(hits)))
+    members = {index: [index] for index in range(len(hits))}
+    for _, first, second in pairs:
+        joined, other = sorted((group_of[first], group_of[second]))
+        if joined == other or any(
+            _paragraphs_of_one_page(hits[a].chunk, hits[b].chunk)
+            for a in members[joined]
+            for b in members[other]
+        ):
+            continue
+        for member in members[other]:
+            group_of[member] = joined
+        members[joined].extend(members.pop(other))
     collapsed: list[Hit] = []
-    for group in groups:
-        copies = [hits[member] for member in sorted(group)]
+    for key in sorted(members):
+        copies = [hits[member] for member in sorted(members[key])]
         best = max(hit.score for hit in copies)
         collapsed.append(_survivor(copies).model_copy(update={"score": best}))
     return collapsed
