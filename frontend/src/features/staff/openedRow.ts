@@ -14,8 +14,9 @@
  * by its address too. A click that opens the row in another tab or
  * window, with a modifier or another button, leaves this page where it is,
  * and notes nothing, by the rule React Router's own links follow. It is
- * kept in `sessionStorage`, so a reload in between keeps it; storage may be
- * refused, and the table is then simply unmarked.
+ * kept in `sessionStorage`, so a reload in between keeps it, except for the
+ * first entry of a load, which a reload turns into another load; storage
+ * may be refused, and the table is then simply unmarked.
  * Noting it is a write before the link's own navigation rather than a second
  * navigation that replaces the entry's state, which the router's next
  * navigation would interrupt.

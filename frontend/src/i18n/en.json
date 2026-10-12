@@ -201,7 +201,8 @@
       "integrated": "integrated course: code from the Cineca catalogue",
       "alsoIn": "also in the study plan of {{list}}",
       "noMatch": "No course matches the search.",
-      "noCurriculum": "No course in this curriculum."
+      "noCurriculum": "No course in this curriculum.",
+      "none": "This study plan lists no courses."
     },
     "secretariat": {
       "title": "Teaching secretariat",

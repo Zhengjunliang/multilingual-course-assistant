@@ -214,7 +214,8 @@ export default function ShellLayout() {
         sidebar={sidebar}
         rail={rail}
         onNewConversation={() => void navigate("/")}
-        staff={items.length > 0}
+        // A study plan hangs under a programme; a teacher alone views none.
+        plan={items.some((item) => item.key !== "mine")}
         leading={
           trail.crumbs.length > 0 ? (
             <Breadcrumb

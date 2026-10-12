@@ -201,7 +201,8 @@
       "integrated": "corso integrato: codice dal catalogo Cineca",
       "alsoIn": "anche nel piano di studi di {{list}}",
       "noMatch": "Nessun insegnamento corrisponde alla ricerca.",
-      "noCurriculum": "Nessun insegnamento in questo curriculum."
+      "noCurriculum": "Nessun insegnamento in questo curriculum.",
+      "none": "Questo piano di studi non elenca insegnamenti."
     },
     "secretariat": {
       "title": "Segreteria didattica",
