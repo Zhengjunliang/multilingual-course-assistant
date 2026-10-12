@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, memo, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Citation } from "@/api/contract";
@@ -56,8 +56,18 @@ interface AnswerStreamProps {
  * until `end` turns the marker into a pill. Math is typeset only then too, so
  * a formula is not re-laid out on every token; until KaTeX arrives it shows as
  * its LaTeX source.
+ *
+ * `memo`, so a settled answer is not parsed again when its turn redraws for
+ * something around it, such as a source pointed at in the sources panel;
+ * its pills follow that through a context of their own (CitationPill.tsx).
  */
-export function AnswerStream({ text, lang, complete, live, citations }: AnswerStreamProps) {
+export const AnswerStream = memo(function AnswerStream({
+  text,
+  lang,
+  complete,
+  live,
+  citations,
+}: AnswerStreamProps) {
   const { t } = useTranslation();
 
   if (!complete) {
@@ -78,4 +88,4 @@ export function AnswerStream({ text, lang, complete, live, citations }: AnswerSt
       <MathMarkdown text={withPills(text, citations)} lang={lang} citations={citations} />
     </Suspense>
   );
-}
+});

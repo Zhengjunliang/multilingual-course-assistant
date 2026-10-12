@@ -81,7 +81,8 @@ describe("the process line", () => {
 
     expect(html).toContain("<details");
     expect(html).toContain("Ricerca completata · 3 s");
-    expect(html).toContain("Cercato in entrambe le fonti");
+    // Where it searched is a chip inside the sentence.
+    expect(html).toMatch(/Cercato in <span[^>]*>entrambe le fonti<\/span>/);
     // The count is the start event's citations: RouteDecision has no field
     // for it, and none had to be added.
     expect(html).toContain("Letti 3 estratti");
@@ -229,6 +230,11 @@ describe("the cat beside the answer", () => {
     expect(poseIn(view(failed))).toBe("error");
   });
 });
+
+/** The button under the answer that opens its sources, named with how many there are. */
+function sourcesButton(container: HTMLElement) {
+  return container.querySelector<HTMLButtonElement>('button[aria-label^="Fonti ("]');
+}
 
 function mounted(of: Turn) {
   return mount(
@@ -452,8 +458,8 @@ describe("the row under the answer", () => {
       value: { writeText: async (text: string) => void written.push(text) },
     });
     const { container, unmount } = mounted(turn());
-    const copy = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Copia la risposta"]',
+    const copy = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Copia la risposta",
     );
 
     await act(async () => copy?.click());
@@ -462,11 +468,12 @@ describe("the row under the answer", () => {
 
     expect(written).toEqual(["La scadenza è il 30 settembre."]);
     expect(said).toBe("Risposta copiata");
+    expect(copy?.textContent).toBe("Risposta copiata");
   });
 
   it("opens the sources, the cited one first and the rest after it, none marked unused", () => {
     const { container, unmount } = mounted(turn());
-    const open = [...container.querySelectorAll("button")].find((b) => b.textContent === "Fonti");
+    const open = sourcesButton(container);
 
     act(() => open?.click());
     const panel = document.body.querySelector('[role="dialog"]');
@@ -484,7 +491,7 @@ describe("the row under the answer", () => {
 
   it("lists every source as one when the answer cited none of them", () => {
     const { container, unmount } = mounted(turn({ answer: "La scadenza è il 30 settembre." }));
-    const open = [...container.querySelectorAll("button")].find((b) => b.textContent === "Fonti");
+    const open = sourcesButton(container);
 
     act(() => open?.click());
     const panel = document.body.querySelector('[role="dialog"]');
@@ -498,9 +505,94 @@ describe("the row under the answer", () => {
     expect(text).not.toContain("Altre consultate"); // spellchecker:disable-line
   });
 
+  it("shows an Italian question's language on its bubble and an English slide's on its row", () => {
+    const english: Citation = { ...citation("[Excerpt 1]", 31), locale: "en" };
+    const { container, unmount } = mounted(turn({ citations: [english] }));
+    const bubble = container.querySelector("article > div [aria-hidden]")?.textContent;
+
+    act(() => sourcesButton(container)?.click());
+    const row = document.body.querySelector('[role="dialog"] li');
+    const chip = row?.querySelector("[aria-hidden]:not(svg)")?.textContent;
+    const said = row?.querySelector(".sr-only")?.textContent;
+    unmount();
+
+    expect({ bubble, chip, said }).toEqual({ bubble: "IT", chip: "EN", said: "inglese" });
+  });
+
+  it("narrows to one kind of source, and its groups and their counts follow", () => {
+    const others = "Altre consultate"; // spellchecker:disable-line
+    const web: Citation = {
+      ...CALENDAR[0],
+      marker: "[https://www.unifi.it/tasse · 2026-09-20]",
+      url: "https://www.unifi.it/tasse",
+    } as Citation;
+    const { container, unmount } = mounted(
+      turn({ citations: [citation("[Excerpt 1]", 3), citation("[Excerpt 2]", 4), web] }),
+    );
+    act(() => sourcesButton(container)?.click());
+    const panel = () => document.body.querySelector('[role="dialog"]');
+    const seen = () => ({
+      headings: [...(panel()?.querySelectorAll("h3") ?? [])].map((h) => h.textContent),
+      rows: panel()?.querySelectorAll("li").length,
+    });
+    const pick = (name: string) =>
+      act(() =>
+        [...(panel()?.querySelectorAll<HTMLButtonElement>('[role="radio"]') ?? [])]
+          .find((option) => option.textContent?.startsWith(name))
+          ?.click(),
+      );
+
+    const all = seen();
+    pick("Web");
+    const web_ = seen();
+    pick("Slide");
+    const slides = seen();
+    unmount();
+
+    expect(all).toEqual({ headings: ["Citate nella risposta1", `${others}2`], rows: 3 });
+    expect(web_).toEqual({ headings: [`${others}1`], rows: 1 });
+    expect(slides).toEqual({ headings: ["Citate nella risposta1", `${others}1`], rows: 2 });
+  });
+
+  it("lists every source as one, with no heading, under an answer that did not finish", () => {
+    const { container, unmount } = mounted(
+      turn({ complete: false, failure: { kind: "incomplete" } }),
+    );
+
+    act(() => sourcesButton(container)?.click());
+    const panel = document.body.querySelector('[role="dialog"]');
+    const seen = {
+      headings: panel?.querySelectorAll("h3").length,
+      rows: panel?.querySelectorAll("li").length,
+    };
+    unmount();
+
+    expect(seen).toEqual({ headings: 0, rows: 3 });
+  });
+
+  it("marks a row's pills while the row has the focus, and lets go when the panel closes", () => {
+    const { container, unmount } = mounted(turn());
+    const pill = () => container.querySelector("a[data-pill]");
+    act(() => sourcesButton(container)?.click());
+    const link = document.body.querySelector<HTMLAnchorElement>('[role="dialog"] li a');
+
+    act(() => link?.focus());
+    const marked = pill()?.hasAttribute("data-highlighted");
+    act(() => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    const closed = document.body.querySelector('[role="dialog"]') === null;
+    const left = pill()?.hasAttribute("data-highlighted");
+    unmount();
+
+    expect({ marked, closed, left }).toEqual({ marked: true, closed: true, left: false });
+  });
+
   it("gives focus back to the sources button when the panel closes", async () => {
     const { container, unmount } = mounted(turn());
-    const open = [...container.querySelectorAll("button")].find((b) => b.textContent === "Fonti");
+    const open = sourcesButton(container);
 
     act(() => {
       open?.focus();

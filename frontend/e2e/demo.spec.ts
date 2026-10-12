@@ -39,6 +39,13 @@ test.describe("a signed-in student", () => {
     // One folded line above the answer: the fixture's search took 2400 ms,
     // which the line shows as 3 s, up to the next whole second as it counts.
     await expect(page.getByText(it.process.done.replace("{{seconds}}", "3"))).toBeVisible();
+    // The line opens onto its steps and folds again from the keyboard.
+    const steps = page.locator("details > ol");
+    await page.locator("summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(steps).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(steps).toBeHidden();
     // In the answer, a pill naming the site, which opens the page at its passage.
     const pill = page.locator("a[data-pill]");
     await expect(pill).toHaveText("unifi.it");
@@ -60,11 +67,13 @@ test.describe("a signed-in student", () => {
     await expect(pill).toHaveText("Slide p. 12");
     await expect(pill).toHaveAttribute("href", slide);
 
-    // The sources panel names the file, the page and the edition.
+    // The sources panel names the page, the file and the edition; the row's
+    // title is its link.
     await page.getByRole("button", { name: it.sources.title }).click();
-    const row = page.getByRole("dialog", { name: it.sources.title }).getByRole("link");
-    await expect(row).toHaveAttribute("href", slide);
-    await expect(row).toContainText("basi-di-dati-05.pdf · p. 12");
+    const row = page.getByRole("dialog", { name: it.sources.title }).getByRole("listitem");
+    await expect(row.getByRole("link")).toHaveAttribute("href", slide);
+    await expect(row).toContainText("Slide p. 12");
+    await expect(row).toContainText("basi-di-dati-05.pdf");
     await expect(row).toContainText("B003 · 2025-2026");
   });
 });

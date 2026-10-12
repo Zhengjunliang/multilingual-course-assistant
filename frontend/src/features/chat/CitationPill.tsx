@@ -14,6 +14,14 @@ import { distinctions, excerptAround, hostOf, shortName, sourceLink, titleOf } f
 export const PillContext = createContext<readonly Citation[]>([]);
 
 /**
+ * The marker of the source under the pointer or the focus in the sources
+ * panel, whose pills take their hover look until it is left (TurnView.tsx);
+ * `null` when none is. A context of its own, so a change redraws the pills
+ * and not the Markdown around them.
+ */
+export const HighlightContext = createContext<string | null>(null);
+
+/**
  * What a source is, on its card's tinted head: the site and what sets the page
  * apart from another of the run that reads the same, or the course's code and
  * edition, then a slide's page and the language. The course's code rather
@@ -62,7 +70,9 @@ function SourceBody({ citation }: { citation: Citation }) {
       <p lang={citation.locale} className="text-muted">
         {before}
         {passage !== "" && (
-          <mark className="rounded-chip bg-accent-soft px-hair text-ink">{passage}</mark>
+          <mark className="box-decoration-clone rounded-chip bg-accent-soft px-hair text-ink">
+            {passage}
+          </mark>
         )}
         {after}
       </p>
@@ -108,8 +118,9 @@ function SourceActions({ citation }: { citation: Citation }) {
  * copy it (components/ui/hover-card.tsx). The fill is what says "clickable",
  * not a colour: a blue word inside an answer would read as an ordinary link
  * (index.css), and `--mark` against `--canvas` is a gated pair so the pill
- * cannot dissolve into the paragraph. A hairline edges it; under the pointer
- * the edge turns to ink, and while its card is open the whole pill does.
+ * cannot dissolve into the paragraph. A hairline edges it; under the pointer,
+ * and while one of its sources is pointed at in the sources panel, the edge
+ * turns to ink, and while its card is open the whole pill does.
  *
  * Numbers with no excerpt are drawn as the numbers: the plugin only emits
  * known ones, and this never throws on the rest either.
@@ -117,6 +128,7 @@ function SourceActions({ citation }: { citation: Citation }) {
 export function CitationPill({ numbers }: { numbers?: string }) {
   const { t } = useTranslation();
   const citations = useContext(PillContext);
+  const highlighted = useContext(HighlightContext);
   // One per page: «+N», the card and the name a screen reader hears count
   // pages, as the sources panel does.
   const sources = pillSources((numbers ?? "").split(",").map(Number), citations);
@@ -142,7 +154,8 @@ export function CitationPill({ numbers }: { numbers?: string }) {
   );
   const told = distinctions(sources);
   const look =
-    "group mx-0.5 inline-flex items-center gap-hair rounded-full border border-line bg-mark px-tight align-baseline font-medium text-caption text-ink no-underline transition-colors hover:border-ink data-[state=open]:border-ink data-[state=open]:bg-ink data-[state=open]:text-canvas";
+    "group mx-0.5 inline-flex items-center gap-hair rounded-full border border-line bg-mark px-tight align-baseline font-medium text-caption text-ink no-underline transition-colors hover:border-ink data-highlighted:border-ink data-[state=open]:border-ink data-[state=open]:bg-ink data-[state=open]:text-canvas";
+  const pointed = sources.some((source) => source.marker === highlighted) || undefined;
 
   return (
     <HoverCard
@@ -158,7 +171,7 @@ export function CitationPill({ numbers }: { numbers?: string }) {
         // not a web URL, has nowhere to go: a plain pill, which still previews
         // under the pointer; its source is in the sources panel for everyone
         // else.
-        <span data-pill className={look}>
+        <span data-pill data-highlighted={pointed} className={look}>
           {pill}
         </span>
       ) : (
@@ -168,6 +181,7 @@ export function CitationPill({ numbers }: { numbers?: string }) {
           rel="noopener noreferrer"
           aria-label={label}
           data-pill
+          data-highlighted={pointed}
           className={look}
         >
           {pill}
