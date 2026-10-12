@@ -76,7 +76,7 @@ export default function EditionPage() {
   return (
     <>
       <PageHead
-        eyebrow={
+        chips={
           <>
             <Code>{`${course.code} · ${year}`}</Code>
             {data.is_current && <Badge>{t("staff.current")}</Badge>}

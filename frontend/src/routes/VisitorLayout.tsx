@@ -39,7 +39,7 @@ export default function VisitorLayout() {
       landing: null,
       root: null,
       back: { to: "/", label: homeLabel },
-      setCrumbs: nothing,
+      setTrail: nothing,
       refreshConversations: nothing,
       setBusy: nothing,
     }),

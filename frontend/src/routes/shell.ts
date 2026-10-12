@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 
 import type { Programme } from "@/api/catalog";
 import type { Crumb } from "@/components/ui/breadcrumb";
-import { crumbs, type StaffPage } from "@/features/staff/crumbs";
+import { area, crumbs, type StaffPage } from "@/features/staff/crumbs";
 import type { ManagementKey } from "@/features/staff/landing";
 import type { Back } from "@/features/staff/Refusal";
 
@@ -30,11 +30,19 @@ export interface Shell {
   root: ManagementKey | null;
   /** Where a "not found" page sends the reader: their own start. */
   back: Back;
-  setCrumbs: (crumbs: readonly Crumb[]) => void;
+  setTrail: (trail: Trail) => void;
   refreshConversations: () => void;
   /** The conversation being answered, or `null`; the chat clears it when it unmounts. */
   setBusy: (id: number | null) => void;
 }
+
+/** The breadcrumb a staff page puts in the header, and the area whose icon leads it. */
+export interface Trail {
+  area: ManagementKey | null;
+  crumbs: readonly Crumb[];
+}
+
+export const NO_TRAIL: Trail = { area: null, crumbs: [] };
 
 export const ShellContext = createContext<Shell | null>(null);
 
@@ -46,13 +54,15 @@ export function useShell(): Shell {
 
 /** Puts `page`'s breadcrumb in the header while the page is shown; `null` shows none yet. */
 export function useCrumbs(page: StaffPage | null): void {
-  const { root, setCrumbs } = useShell();
+  const { root, setTrail } = useShell();
   const { t } = useTranslation();
-  // The crumbs travel as text so the effect runs when they change, not on
-  // every render that builds an equal list.
-  const text = JSON.stringify(page === null ? [] : crumbs(page, root, t));
+  // The trail travels as text so the effect runs when it changes, not on
+  // every render that builds an equal one.
+  const text = JSON.stringify(
+    page === null ? NO_TRAIL : { area: area(page, root), crumbs: crumbs(page, root, t) },
+  );
   useEffect(() => {
-    setCrumbs(JSON.parse(text) as Crumb[]);
-    return () => setCrumbs([]);
-  }, [text, setCrumbs]);
+    setTrail(JSON.parse(text) as Trail);
+    return () => setTrail(NO_TRAIL);
+  }, [text, setTrail]);
 }

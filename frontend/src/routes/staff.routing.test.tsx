@@ -170,6 +170,8 @@ let failures = 0;
 let switchable = true;
 /** Holds every read of one edition until it settles, as a slow server would. */
 let held: Promise<void> | null = null;
+/** Whether edition 5 has left the reader's scope since the page read it: every request about it is a 404. */
+let lost = false;
 
 /** An edition as the server would answer it now. */
 function served(e: Edition): Edition {
@@ -254,6 +256,9 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   if (method === "DELETE" && path.startsWith("/api/catalog/editions/")) {
     revoked.add(path.slice(path.lastIndexOf("/") + 1));
     return new Response(null, { status: 204 });
+  }
+  if (lost && path.startsWith("/api/catalog/editions/5")) {
+    return json({ detail: { message: "Not found.", code: "not_found" } }, 404);
   }
   const one = EDITIONS.find((e) => path === `/api/catalog/editions/${e.id}`);
   if (one !== undefined) {
@@ -365,6 +370,7 @@ beforeEach(() => {
   failures = 0;
   switchable = true;
   held = null;
+  lost = false;
   vi.stubGlobal("fetch", fakeApi);
 });
 
@@ -748,6 +754,8 @@ describe("a read that fails", () => {
     const { container, unmount } = page("/staff/programmes");
     await settle();
     const said = text(container.querySelector('main [role="alert"]'));
+    // The chip after the disc.
+    const code = text(container.querySelector("main [data-status-panel] > span + span"));
     // A failed read is not a page that does not exist.
     const trail = crumbs(container);
     const retry = [...container.querySelectorAll<HTMLButtonElement>("main button")].find(
@@ -758,8 +766,9 @@ describe("a read that fails", () => {
     const title = text(container.querySelector("main h1"));
     unmount();
 
-    expect([said, trail, title]).toEqual([
-      `${i18n.t("staff.loadFailed")}Riprova`,
+    expect([said, code, trail, title]).toEqual([
+      `${i18n.t("staff.failure.title")}${i18n.t("staff.failure.body")}`,
+      "500",
       ["Corsi di laurea (current)"],
       "Corsi di laurea",
     ]);
@@ -788,6 +797,26 @@ describe("a write from a page", () => {
     unmount();
 
     expect(seen).toEqual([null, true]);
+  });
+
+  it("hands focus to the not-found panel's heading when the edition left the reader's scope meanwhile", async () => {
+    reader = SECRETARIAT;
+    const { container, unmount } = page("/staff/editions/5?programme=B047");
+    await settle();
+    lost = true;
+    act(() => container.querySelector<HTMLButtonElement>("main [data-assign]")?.click());
+    const input = document.body.querySelector<HTMLInputElement>('[role="dialog"] input');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    act(() => {
+      setter?.call(input, "mrossi");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    act(() => input?.form?.requestSubmit());
+    await settle();
+    const seen = [document.body.querySelector('[role="dialog"]'), text(document.activeElement)];
+    unmount();
+
+    expect(seen).toEqual([null, "Non trovato"]);
   });
 
   it.each([

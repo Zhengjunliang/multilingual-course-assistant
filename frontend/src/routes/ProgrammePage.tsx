@@ -58,7 +58,7 @@ export default function ProgrammePage() {
   return (
     <>
       <PageHead
-        eyebrow={<Code>{programme.code}</Code>}
+        chips={<Code>{programme.code}</Code>}
         heading={programme.name}
         caps
         sub={

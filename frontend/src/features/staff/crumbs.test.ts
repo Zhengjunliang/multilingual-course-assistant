@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { CurriculumEntry } from "@/api/catalog";
 import type { Crumb } from "@/components/ui/breadcrumb";
 import i18n from "@/i18n";
-import { contextProgramme, crumbs, programmeLine, type StaffPage } from "./crumbs";
+import { area, contextProgramme, crumbs, programmeLine, type StaffPage } from "./crumbs";
 import type { ManagementKey } from "./landing";
 
 const B047 = { code: "B047", name: "INGEGNERIA INFORMATICA", locale: "it" };
@@ -74,6 +74,35 @@ describe("a staff page's breadcrumb", () => {
     ],
   ])("of %s", (_, page, root, expected) => {
     expect(crumbs(page, root, t)).toEqual(expected);
+  });
+});
+
+describe("the area whose icon leads the breadcrumb", () => {
+  it.each<[string, StaffPage, ManagementKey | null, ManagementKey]>([
+    ["the list of programmes", { kind: "programmes" }, "programmes", "programmes"],
+    [
+      "the one programme of its secretariat",
+      { kind: "programme", programme: B047 },
+      "programme",
+      "programme",
+    ],
+    [
+      "an edition through a programme, for a reader who also teaches",
+      { kind: "edition", course: PPM, year: "2025-2026", programme: B047 },
+      "mine",
+      "programmes",
+    ],
+    [
+      "an edition under the teacher's own courses",
+      { kind: "edition", course: PPM, year: "2025-2026", programme: null },
+      "mine",
+      "mine",
+    ],
+    ["a teacher's own courses", { kind: "mine" }, "mine", "mine"],
+    ["a page not there, for a teacher", { kind: "notFound" }, "mine", "mine"],
+    ["a page not there, for secretariat staff", { kind: "notFound" }, "programme", "programme"],
+  ])("of %s", (_, page, root, expected) => {
+    expect(area(page, root)).toBe(expected);
   });
 });
 

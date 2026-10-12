@@ -26,15 +26,15 @@ import { deleteConversation, listConversations, pinConversation } from "@/api/co
 import { ApiError } from "@/api/http";
 import { isStaff } from "@/auth/staff";
 import { useSession } from "@/auth/useSession";
-import { Breadcrumb, type Crumb } from "@/components/ui/breadcrumb";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Toaster } from "@/components/ui/sonner";
 import { ChatShell, type SidebarControls } from "@/features/chat/ChatShell";
 import { ConversationSidebar } from "@/features/chat/ConversationSidebar";
 import { SidebarRail } from "@/features/chat/SidebarRail";
 import { isSessionLost } from "@/features/staff/errors";
 import { managementItems } from "@/features/staff/landing";
-import { ManagementNav } from "@/features/staff/ManagementNav";
-import { type Shell, ShellContext } from "./shell";
+import { ICON, ManagementNav } from "@/features/staff/ManagementNav";
+import { NO_TRAIL, type Shell, ShellContext, type Trail } from "./shell";
 
 export default function ShellLayout() {
   const { t } = useTranslation();
@@ -46,7 +46,7 @@ export default function ShellLayout() {
   // way rather than telling a reader with conversations that they have none.
   const [conversations, setConversations] = useState<ConversationSummary[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
-  const [crumbs, setCrumbs] = useState<readonly Crumb[]>([]);
+  const [trail, setTrail] = useState<Trail>(NO_TRAIL);
   const [programmes, setProgrammes] = useState<{ data: Programme[] | null; error: unknown }>({
     data: null,
     error: null,
@@ -185,7 +185,7 @@ export default function ShellLayout() {
       landing: items[0]?.to ?? null,
       root: items[0]?.key ?? null,
       back: { to: items[0]?.to ?? "/", label: homeLabel },
-      setCrumbs,
+      setTrail,
       refreshConversations,
       setBusy,
     }),
@@ -215,7 +215,13 @@ export default function ShellLayout() {
         rail={rail}
         onNewConversation={() => void navigate("/")}
         leading={
-          crumbs.length > 0 ? <Breadcrumb label={t("staff.breadcrumb")} crumbs={crumbs} /> : null
+          trail.crumbs.length > 0 ? (
+            <Breadcrumb
+              label={t("staff.breadcrumb")}
+              crumbs={trail.crumbs}
+              icon={trail.area === null ? undefined : ICON[trail.area]}
+            />
+          ) : null
         }
       >
         <Outlet />
