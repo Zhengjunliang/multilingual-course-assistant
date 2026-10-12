@@ -1,7 +1,7 @@
 ---
 version: 'alpha'
 name: 'UniGuide AI'
-description: 'A university lab tool in the university''s blue on greys tinted toward it, with a serif for headings. Generated from frontend/src/index.css by frontend/scripts/design-md.mjs.'
+description: 'A university lab tool in the university''s blue on greys tinted toward it, in one sans from headings to answers. Generated from frontend/src/index.css by frontend/scripts/design-md.mjs.'
 colors:
   primary: '{colors.accent}'
   canvas: '#FAFCFE'
@@ -14,6 +14,8 @@ colors:
   accent-ink: '#FFFFFF'
   accent-soft: '#DEEDFB'
   mark: '#E8ECEF'
+  hairline: '#E5E8EC'
+  tint: '#F6F9FB'
   warn: '#FFEDEB'
   warn-line: '#E54B50'
   warn-ink: '#A2031F'
@@ -27,6 +29,8 @@ colors:
   accent-ink-dark: '#040A11'
   accent-soft-dark: '#152D43'
   mark-dark: '#1D2227'
+  hairline-dark: '#1C2024'
+  tint-dark: '#0A0E11'
   warn-dark: '#271514'
   warn-line-dark: '#FF5B5B'
   warn-ink-dark: '#FFB7B2'
@@ -40,13 +44,14 @@ typography:
     fontSize: '0.875rem'
     lineHeight: '1.25rem'
   title:
-    fontFamily: 'Fraunces'
+    fontFamily: 'Figtree'
     fontSize: '1.125rem'
     lineHeight: '1.75rem'
   display:
-    fontFamily: 'Fraunces'
+    fontFamily: 'Figtree'
     fontSize: '1.875rem'
     lineHeight: '2.25rem'
+    letterSpacing: '-0.02em'
   reading:
     fontFamily: 'Figtree'
     fontSize: '1rem'
@@ -66,12 +71,14 @@ spacing:
   snug: '0.75rem'
   gutter: '1rem'
   room: '1.5rem'
+  control-xs: '1.75rem'
   control-sm: '2rem'
   control-icon: '2.25rem'
   control: '2.5rem'
   field: '5rem'
   icon: '1rem'
   icon-lg: '1.25rem'
+  avatar-sm: '1.5rem'
   avatar: '1.75rem'
   mascot: '6rem'
   entry-cat-sm: '9.75rem'
@@ -127,6 +134,10 @@ components:
     textColor: '{colors.accent-ink}'
   line-fill:
     backgroundColor: '{colors.line}'
+  hairline-fill:
+    backgroundColor: '{colors.hairline}'
+  tint-fill:
+    backgroundColor: '{colors.tint}'
   warn-line-fill:
     backgroundColor: '{colors.warn-line}'
   ink-on-canvas-dark:
@@ -179,6 +190,10 @@ components:
     textColor: '{colors.accent-ink-dark}'
   line-fill-dark:
     backgroundColor: '{colors.line-dark}'
+  hairline-fill-dark:
+    backgroundColor: '{colors.hairline-dark}'
+  tint-fill-dark:
+    backgroundColor: '{colors.tint-dark}'
   warn-line-fill-dark:
     backgroundColor: '{colors.warn-line-dark}'
 ---
@@ -192,29 +207,31 @@ The rules for how the interface looks, for whoever writes a screen, person or ag
 A university lab tool that answers questions about a course and the campus, in the university's blue on greys tinted toward it, laid out and furnished like the AI products it measures itself against rather than like the university's website. Three rules hold it together:
 
 - **The blue is for acting and for being somewhere**: a primary button, the focus ring, a link, the open conversation, the current page, the mark. The reading never wears it.
-- **A serif for headings, one sans for the rest**: the headings in Fraunces; the answer and every control in Figtree, so the face does not change between the question box and the last line of the answer.
+- **One family, from the headings to the answer**: Figtree, so the face does not change between a page's title, the question box and the last line of the answer; a heading is told by its weight and its size.
 - **One cat**: Fumetto, the mark and the mascot, appears where a screen greets, waits, apologises or is lost, beside the words that say so, and nowhere for decoration alone.
 
 ## Colors
 
 Every colour is a token with a job, named in `index.css` and used through its utility (`bg-surface`, `text-muted`), never as a raw value or a Tailwind palette step. The dark theme swaps the same names, so no component carries a second set of classes.
 
-- **Grounds**: `canvas` is the page, under the grain: a fine noise in the accent's hue that never moves, at most 7 % over the light ground and 5.6 % over the dark one, painted with the ground by `bg-ground`. `surface` is a card or a field on it, `sidebar` the conversation column, and neither carries the grain. `mark` is the quiet fill of something under the pointer, a citation pill at rest and a source row under the pointer.
+- **Grounds**: `canvas` is the page, under the grain: a fine noise in the accent's hue that never moves, at most 7 % over the light ground and 5.6 % over the dark one, painted with the ground by `bg-ground`. `surface` is a card or a field on it, `sidebar` the conversation column, and neither carries the grain. `tint`, two points off `surface`, is the ground of a panel's head or foot: a card's, a dialog's, a table's head. `mark` is the quiet fill of a citation pill at rest, a count, a neutral chip and a skeleton.
 - **Text**: `ink` for everything read, `muted` for what supports it (a subtitle, an excerpt, an idle row). There is no third grey.
-- **Lines**: `line` separates, and only that; a card is told apart by its outline, not by a step of fill.
-- **The accent**: `accent` is the university website's blue, `accent-ink` the text that sits on it, `accent-soft` the tint behind where the reader is (the open conversation, the current management page, a state badge).
+- **Lines**: `line` separates panels, and only that; `hairline`, a step lighter, separates what is inside one panel, its rows and its foot. A card is told apart by its outline, not by a step of fill.
+- **The accent**: `accent` is the university website's blue, `accent-ink` the text that sits on it, `accent-soft` the tint of a chip in the accent and of a soft button, edged by `accent-line`.
+- **Interaction**, in the accent: `hover`, the accent at 6 % (9 % in the dark theme), fills whatever is under the pointer, a row, a menu item, a ghost or outlined button; `selected`, at 11 % (17 %), marks where the reader is, with a 3 px bar in the accent at its leading edge, and rings a field that has the focus. Both are the accent laid over whatever ground is behind them, translucent so the grain shows through. 🔜 (M4, #191) The sidebar's open conversation and current management page take `selected`; they wear `accent-soft` until then.
 - **The warning**: `warn`, `warn-line` and `warn-ink` are the one other hue, for a failure and for confirming that something will be destroyed. Nothing else is red.
 
-A citation pill says it can be clicked by its fill, never by colour: `mark` at rest, `ink` with canvas lettering under the pointer and while its card is open. Blue inside the prose would read as an ordinary link. Every pair of colours the interface puts together is listed in [frontend/scripts/palette.mjs](frontend/scripts/palette.mjs) and held to 4.5:1 in both themes by `npm run check:contrast`; a new pair is added there before it ships. Contrast is measured on the bare ground: on the grain's strongest pixel muted text, the faintest, keeps 6.2:1 in light and 7.9:1 in dark. axe cannot measure text over a background image, so `frontend/e2e/a11y.spec.ts` hides the grain before it runs and fails on any contrast axe leaves unmeasured.
+A citation pill says it can be clicked by its fill, never by colour: `mark` at rest, `ink` with canvas lettering under the pointer and while its card is open. Blue inside the prose would read as an ordinary link. Every pair of colours the interface puts together is listed in [frontend/scripts/palette.mjs](frontend/scripts/palette.mjs) and held to 4.5:1 in both themes by `npm run check:contrast`, a translucent one laid over each ground it sits on first; a new pair is added there before it ships. Contrast is measured on the bare ground: on the grain's strongest pixel muted text, the faintest, keeps 6.2:1 in light and 7.9:1 in dark. axe cannot measure text over a background image, so `frontend/e2e/a11y.spec.ts` hides the grain before it runs and fails on any contrast axe leaves unmeasured.
 
 ## Typography
 
-Two families, self-hosted under the SIL Open Font License, each followed by the system's Chinese faces:
+One family, Figtree (`font-sans`, the page's default), self-hosted under the SIL Open Font License and followed by the system's Chinese faces:
 
-- **Fraunces** (`font-serif`) for every heading at `text-title` or `text-display`. A screen's heading is never left in the controls' face; `src/theme/tokens.test.ts` fails on one.
-- **Figtree** (`font-sans`, the page's default) for the answer at `text-reading`, in a column no wider than `max-w-reading` (720 px), and for controls, labels and the rest of the interface, at `text-body` and `text-caption`.
+- **Headings** at `text-title` or `text-display`, at 600 (`font-semibold`) or 700, the display size closed by a fiftieth of an em, which its token carries. A heading without its weight, or in a second family, fails `src/theme/tokens.test.ts`.
+- **The answer** at `text-reading`, in a column no wider than `max-w-reading` (720 px).
+- **Controls, labels and the rest** of the interface at `text-body` and `text-caption`.
 
-Five sizes carry the interface, and a sixth needs a reason: `caption`, `body`, `reading`, `title`, `display`. Chinese is not packaged: the system draws it, PingFang, Source Han or Microsoft YaHei. Wherever text says it is Chinese, `:lang(zh)` rules in `index.css` give it its own stack, `font-sans-zh`, headings and answers included, and give reading text the looser leading `reading-zh`. That stack starts with Figtree for Latin letters and digits alone and goes straight to the Chinese faces, so quotes, the ellipsis and the dash in Chinese are drawn by the Chinese face, the quotes full width, and its Latin letters match the interface instead of mixing Fraunces into the line; every family between Figtree and the generic fallback is a Chinese face that draws the quotes full width, since Segoe UI draws that punctuation narrow and so does Microsoft YaHei UI. Text in another language keeps its own stack inside the Chinese interface, and Chinese text gets the Chinese stack inside any other: the family follows `lang`, from the page's root down, and no element below the root declares one for itself. An answer therefore carries `lang` with the language it was written in, which is not always the interface's.
+Five sizes carry the interface, and a sixth needs a reason: `caption`, `body`, `reading`, `title`, `display`. Chinese is not packaged: the system draws it, PingFang, Source Han or Microsoft YaHei. Wherever text says it is Chinese, `:lang(zh)` rules in `index.css` give it its own stack, `font-sans-zh`, headings and answers included, and give reading text the looser leading `reading-zh`. That stack starts with Figtree for Latin letters and digits alone and goes straight to the Chinese faces, so quotes, the ellipsis and the dash in Chinese are drawn by the Chinese face, the quotes full width, and its Latin letters match the interface's; every family between Figtree and the generic fallback is a Chinese face that draws the quotes full width, since Segoe UI draws that punctuation narrow and so does Microsoft YaHei UI. Text in another language keeps its own stack inside the Chinese interface, and Chinese text gets the Chinese stack inside any other: the family follows `lang`, from the page's root down, and no element below the root declares one for itself. An answer therefore carries `lang` with the language it was written in, which is not always the interface's.
 
 ## Layout
 
@@ -281,7 +298,7 @@ A screen with nothing of its own to show is one panel, `components/StatusPanel.t
 - Do spend colour, distance, corners, shadows and layers through their tokens; don't write a raw value or a Tailwind step where a token exists.
 - Do keep an answer's text in `ink`; don't colour anything inside the reading blue unless it is a link.
 - Do put an answer's sources after it, behind its pills and its sources button; don't put a strip of sources, a route or a reason above it.
-- Do give `accent-soft` to where the reader is; don't give the accent to a setting that is merely true, such as the chosen language.
+- Do give `selected` to where the reader is; don't give the accent to a setting that is merely true, such as the chosen language or theme.
 - Do keep the warning hue for failure and destruction; don't use it for emphasis.
 - Do add a colour pair to `palette.mjs` before a screen composes it.
 - Do show the ground with `bg-ground`; don't paint `bg-canvas`, which leaves a flat patch in the grain.

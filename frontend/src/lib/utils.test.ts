@@ -21,6 +21,9 @@ describe("cn", () => {
     ["two paddings", ["px-snug py-tight", "px-hair"], "py-tight px-hair"],
     ["two corners", ["rounded-control", "rounded-full"], "rounded-full"],
     ["two shadows", ["shadow-raised", "shadow-none"], "shadow-none"],
+    ["two grounds, one a tint", ["bg-surface", "bg-tint"], "bg-tint"],
+    ["two hovers", ["hover:bg-mark", "hover:bg-hover"], "hover:bg-hover"],
+    ["two control heights", ["h-control-sm", "h-control-xs"], "h-control-xs"],
   ])("merges %s", (_, inputs, merged) => {
     expect(cn(...inputs)).toBe(merged);
   });

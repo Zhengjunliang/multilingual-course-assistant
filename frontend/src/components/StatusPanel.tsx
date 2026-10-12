@@ -33,7 +33,7 @@ export function StatusPanel({ pose, heading, body, alert = false, children }: St
     <div data-status-panel className="flex flex-col items-center gap-room text-center">
       <Mascot pose={pose} className="size-mascot" />
       <div role={alert ? "alert" : undefined} className="flex max-w-sm flex-col gap-hair">
-        <h1 className="font-semibold font-serif text-display text-ink">{heading}</h1>
+        <h1 className="font-semibold text-display text-ink">{heading}</h1>
         <p className="text-body text-muted">{body}</p>
       </div>
       <div className="flex flex-wrap justify-center gap-tight">{children}</div>

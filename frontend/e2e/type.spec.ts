@@ -1,7 +1,8 @@
 /**
  * Chinese takes its punctuation from a Chinese face, and no other language
  * does: what a browser computes from the language rules of src/index.css,
- * which src/index.css.test.ts reads as text.
+ * which src/index.css.test.ts reads as text. A heading is set in the face of
+ * everything else, Figtree.
  *
  * Each element's first family is compared whole, since "Figtree Latin" also
  * starts with "Figtree". The elements are added to the page as a reader's text
@@ -42,6 +43,23 @@ test.describe("the Chinese interface", () => {
       plain: "Figtree Latin",
       foreign: "Figtree",
     });
+  });
+});
+
+test.describe("a heading", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("is set in Figtree, the face of everything else", async ({ page }) => {
+    await page.goto("/login");
+    const heading = page.getByRole("heading", { level: 1 });
+    await expect(heading).toBeVisible();
+
+    expect(
+      await heading.evaluate(
+        (element) =>
+          getComputedStyle(element).fontFamily.split(",")[0]?.trim().replace(/^"|"$/g, "") ?? "",
+      ),
+    ).toBe("Figtree");
   });
 });
 

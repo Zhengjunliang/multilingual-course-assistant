@@ -113,7 +113,7 @@ export function EntryScreen({ visitor, hops = 0, landed = false }: EntryScreenPr
         caption={caption}
         writing={writing}
         holds={holds}
-        className={cn("font-semibold font-serif text-display text-ink", landed && "rise [--i:0]")}
+        className={cn("font-semibold text-display text-ink", landed && "rise [--i:0]")}
       />
       <p className={cn("text-body text-muted", landed && "rise [--i:1]")}>{t("app.subtitle")}</p>
     </div>

@@ -27,12 +27,20 @@ import { fileURLToPath } from "node:url";
 import { lint } from "@google/design.md/linter";
 
 import { APP_NAME } from "../src/brand/fumetto.ts";
-import { declarations, hex, PAIRS, parseOklch, STYLESHEET, THEMES } from "./palette.mjs";
+import {
+  declarations,
+  hex,
+  hexOf,
+  over,
+  PAIRS,
+  parseOklch,
+  STYLESHEET,
+  THEMES,
+  TINTS,
+  translucents,
+} from "./palette.mjs";
 
 const DESIGN_MD = fileURLToPath(new URL("../../DESIGN.md", import.meta.url));
-
-/** The sizes set in the serif: the headings. The rest, the answer included, is the sans. */
-const SERIF = new Set(["title", "display"]);
 
 const suffix = (theme) => (theme.name === "light" ? "" : `-${theme.name}`);
 const quote = (value) => `'${String(value).replaceAll("'", "''")}'`;
@@ -43,7 +51,7 @@ function tokens() {
   const lines = [
     "version: 'alpha'",
     `name: ${quote(APP_NAME)}`,
-    `description: ${quote("A university lab tool in the university's blue on greys tinted toward it, with a serif for headings. Generated from frontend/src/index.css by frontend/scripts/design-md.mjs.")}`,
+    `description: ${quote("A university lab tool in the university's blue on greys tinted toward it, in one sans from headings to answers. Generated from frontend/src/index.css by frontend/scripts/design-md.mjs.")}`,
     "colors:",
     `  primary: ${quote("{colors.accent}")}`,
   ];
@@ -63,6 +71,32 @@ function tokens() {
         `    textColor: ${quote(`{colors.${front}${suffix(each)}}`)}`,
       );
     }
+    // A tint is drawn as what it shows over its ground, a colour of its own
+    // (`hover-over-surface`), since the format has no alpha to compose.
+    const mixed = translucents(STYLESHEET, each.selector);
+    for (const { tint, ground, fronts } of TINTS) {
+      const mix = mixed.get(tint);
+      const shown = `${tint}-over-${ground}`;
+      lines.push(
+        `  ${shown}${suffix(each)}: ${quote(
+          hexOf(
+            over(
+              parseOklch(colours.get(mix.of), mix.of),
+              mix.alpha,
+              parseOklch(colours.get(ground), ground),
+            ),
+          ),
+        )}`,
+      );
+      for (const front of fronts) {
+        used.add(front).add(ground);
+        components.push(
+          `  ${front}-on-${shown}${suffix(each)}:`,
+          `    backgroundColor: ${quote(`{colors.${shown}${suffix(each)}}`)}`,
+          `    textColor: ${quote(`{colors.${front}${suffix(each)}}`)}`,
+        );
+      }
+    }
     for (const name of colours.keys()) {
       if (used.has(name)) continue;
       components.push(
@@ -79,10 +113,12 @@ function tokens() {
     const role = match[1];
     lines.push(
       `  ${role}:`,
-      `    fontFamily: ${quote(firstFamily(theme.get(SERIF.has(role) ? "font-serif" : "font-sans")))}`,
+      `    fontFamily: ${quote(firstFamily(theme.get("font-sans")))}`,
       `    fontSize: ${quote(size)}`,
       `    lineHeight: ${quote(theme.get(`text-${role}--line-height`))}`,
     );
+    const tracking = theme.get(`text-${role}--letter-spacing`);
+    if (tracking !== undefined) lines.push(`    letterSpacing: ${quote(tracking)}`);
   }
   lines.push(
     "  reading-zh:",

@@ -52,10 +52,8 @@ interface LineProps extends Written {
 
 /**
  * One line cut into its words and graphemes; `arrives` blurs each grapheme in
- * after the one before. The serif is named again here: an element with `lang`
- * takes its language's stack back (index.css), which is the sans unless it
- * says otherwise, and `font-serif` is what turns to the Chinese stack in
- * Chinese.
+ * after the one before. Its `lang` gives it its language's stack (index.css),
+ * the Chinese one for the Chinese line.
  */
 function Line({ lang, text, arrives, className }: LineProps) {
   const words = useMemo(() => graphemesByWord(lang, text), [lang, text]);
@@ -65,7 +63,7 @@ function Line({ lang, text, arrives, className }: LineProps) {
       aria-hidden
       lang={lang}
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className={cn("col-start-1 row-start-1 font-serif", className)}
+      className={cn("col-start-1 row-start-1", className)}
     >
       {words.map((graphemes, w) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: a line's words never reorder

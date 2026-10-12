@@ -1,6 +1,6 @@
 /**
  * Every screen spends corners, shadows, layers and motion through the names in
- * index.css, and sets its headings in the serif.
+ * index.css, and sets its headings in the one family.
  *
  * The whole of src, not the component layer alone: the layer was clean first,
  * and a page that writes `rounded-lg` beside a card that says `rounded-card`
@@ -69,14 +69,16 @@ describe("the screens", () => {
     expect(found(sources(/\.tsx?$/), RAW_MOTION)).toEqual([]);
   });
 
-  it("set every title and display heading in the serif", () => {
-    // Fraunces for the headings, Figtree for the answer and the controls: a
-    // class list at title or display size without `font-serif` is a heading
-    // left in the controls' face.
-    const sansHeadings = found(COMPONENTS, /"[^"]*\btext-(?:title|display)\b[^"]*"/g).filter(
-      (hit) => !/\bfont-serif\b/.test(hit),
+  it("set every heading in the one family, by its weight", () => {
+    // Figtree from the headings to the answer (DESIGN.md, Typography): no
+    // second family, which Tailwind's own `font-serif` would still bring, and
+    // a class list at title or display size carries 600 or 700, since the
+    // weight is what makes it a heading.
+    const serif = found(COMPONENTS, /\bfont-serif\b/g);
+    const light = found(COMPONENTS, /"[^"]*\btext-(?:title|display)\b[^"]*"/g).filter(
+      (hit) => !/\bfont-(?:semibold|bold)\b/.test(hit),
     );
 
-    expect(sansHeadings).toEqual([]);
+    expect({ serif, light }).toEqual({ serif: [], light: [] });
   });
 });

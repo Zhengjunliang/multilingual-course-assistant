@@ -94,7 +94,7 @@ export function ConversationSidebar({
           collapse button without being cut. */}
       <div className="flex items-center gap-tight">
         <MascotMark className="size-avatar" />
-        <p className="min-w-0 flex-1 truncate py-tight font-semibold font-serif text-body text-ink">
+        <p className="min-w-0 flex-1 truncate py-tight font-semibold text-body text-ink">
           {APP_NAME}
         </p>
         {/* Only from `lg` up: below that the sidebar is a drawer, and a drawer
