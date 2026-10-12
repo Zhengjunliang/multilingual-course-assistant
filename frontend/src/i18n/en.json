@@ -114,11 +114,17 @@
     "openPage": "Open the page",
     "openSlide": "Open the slide at page {{page}}",
     "pill_one": "{{shown}}, source",
-    "pill_other": "{{shown}}, sources: {{names}}"
+    "pill_other": "{{shown}}, sources: {{names}}",
+    "copyCitation": "Copy the citation",
+    "citationCopied": "Citation copied"
   },
   "answer": {
     "copy": "Copy the answer",
     "copied": "Answer copied"
+  },
+  "code": {
+    "copy": "Copy",
+    "copied": "Copied"
   },
   "error": {
     "incomplete": "The answer stopped before it was finished."

@@ -27,6 +27,7 @@ import { citedMarkers } from "@/lib/markers";
 import { AnswerActions } from "./AnswerActions";
 import { AnswerStream } from "./AnswerStream";
 import { ProcessLine } from "./ProcessLine";
+import { LanguageChip } from "./SourceParts";
 import type { Turn } from "./useAsk";
 
 interface TurnViewProps {
@@ -81,13 +82,18 @@ export const TurnView = memo(function TurnView({
       {/* In the language it was asked in, the one the answer is written in:
           the font follows `lang` (index.css), so an Italian question keeps
           its narrow quotes in the Chinese interface and a Chinese one gets
-          full-width ones in any other, and a screen reader its voice. */}
-      <p
-        lang={turn.locale ?? undefined}
-        className="ml-auto max-w-prose whitespace-pre-wrap rounded-bubble rounded-br-chip bg-mark px-gutter py-tight text-ink"
-      >
-        {turn.question}
-      </p>
+          full-width ones in any other, and a screen reader its voice. That
+          language is also on a chip under the bubble, per question, since a
+          conversation may change language; it is known from `start` on. */}
+      <div className="ml-auto flex max-w-prose flex-col items-end gap-hair">
+        <p
+          lang={turn.locale ?? undefined}
+          className="whitespace-pre-wrap rounded-bubble rounded-br-chip border border-line bg-surface px-gutter py-tight text-ink shadow-raised"
+        >
+          {turn.question}
+        </p>
+        {turn.locale !== null && <LanguageChip locale={turn.locale} />}
+      </div>
 
       <div className="flex min-w-0 gap-snug">
         <Mascot pose={poseOf(turn, waiting)} className="size-avatar" />

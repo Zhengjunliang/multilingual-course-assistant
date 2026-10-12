@@ -25,121 +25,21 @@
  * pill needs from its answer arrives through `PillContext` instead.
  */
 
-import { ExternalLink } from "lucide-react";
 import {
   Children,
   type ComponentProps,
-  createContext,
   isValidElement,
   type ReactElement,
   type ReactNode,
-  useContext,
   useMemo,
 } from "react";
-import { useTranslation } from "react-i18next";
 import Markdown, { type Components, type ExtraProps, type Options } from "react-markdown";
 
 import type { Citation } from "@/api/contract";
-import { HoverCard } from "@/components/ui/hover-card";
-import { ANSWER_SYNTAX, pillSources, remarkPills, withoutPills } from "@/lib/markers";
+import { ANSWER_SYNTAX, remarkPills, withoutPills } from "@/lib/markers";
 import { cn } from "@/lib/utils";
-import { SourceSummary } from "./SourcesPanel";
-import { distinctions, shortName, sourceLink } from "./sourceLabel";
-
-/** The answer's citations, which a pill's excerpt numbers index from one. */
-const PillContext = createContext<readonly Citation[]>([]);
-
-/**
- * One pill, drawn where `remarkPills` left a `citation-pill` element: the
- * name of its first source, «+N» for the other pages of a run of them, as
- * ChatGPT and Open WebUI write a citation into an answer (read 11 October
- * 2026).
- *
- * The pill is a link to its first excerpt, and a click follows it: a web page
- * in a new tab at that excerpt's passage, a slide at its page. Resting on it
- * or focusing it opens a card listing every source of the run, each at the
- * excerpt the answer named on it (`pillSources`, #182) and with its own link
- * (components/ui/hover-card.tsx). The fill is what says "clickable", not a
- * colour or a border: a blue word inside an answer would read as an ordinary
- * link (index.css), and `--mark` against `--canvas` is a gated pair so the
- * pill cannot dissolve into the paragraph. Under the pointer, and while its
- * card is open, it turns to ink.
- *
- * Numbers with no excerpt are drawn as the numbers: the plugin only emits
- * known ones, and this never throws on the rest either.
- */
-function CitationPill({ numbers }: { numbers?: string }) {
-  const { t } = useTranslation();
-  const citations = useContext(PillContext);
-  // One per page: «+N», the card and the name a screen reader hears count
-  // pages, as the sources panel does.
-  const sources = pillSources((numbers ?? "").split(",").map(Number), citations);
-  const [first] = sources;
-  if (first === undefined) return <>{numbers}</>;
-
-  const href = sourceLink(first);
-  const shown = `${shortName(first, t)}${sources.length > 1 ? ` +${sources.length - 1}` : ""}`;
-  // The name a screen reader and voice control use starts with what the pill
-  // shows (WCAG 2.5.3, label in name), then says it is a source and, for a
-  // merged pill, every source its «+N» stands for. An attribute rather than
-  // hidden text, which a reader's own copy and find-in-page would pick up.
-  const label = t("sources.pill", {
-    count: sources.length,
-    shown,
-    names: sources.map((source) => shortName(source, t)).join(", "),
-  });
-  const pill = <span className="whitespace-nowrap">{shown}</span>;
-  const told = distinctions(sources);
-  const look =
-    "mx-0.5 inline-flex items-center rounded-full bg-mark px-tight align-baseline font-medium text-caption text-muted no-underline transition-colors hover:bg-ink hover:text-canvas data-[state=open]:bg-ink data-[state=open]:text-canvas";
-
-  return (
-    <HoverCard
-      content={sources.map((source) => {
-        const to = sourceLink(source);
-        return (
-          <div key={source.marker} className="flex flex-col gap-hair">
-            <SourceSummary citation={source} distinction={told.get(source.marker)} />
-            {to !== null && (
-              <a
-                href={to}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-hair self-start text-caption text-accent underline underline-offset-2"
-              >
-                {source.kind === "web"
-                  ? t("sources.openPage")
-                  : t("sources.openSlide", { page: source.page })}
-                <ExternalLink aria-hidden className="size-icon" />
-              </a>
-            )}
-          </div>
-        );
-      })}
-    >
-      {href === null ? (
-        // A slide stored before its key existed, or a source whose address is
-        // not a web URL, has nowhere to go: a plain pill, which still previews
-        // under the pointer; its source is in the sources panel for everyone
-        // else.
-        <span data-pill className={look}>
-          {pill}
-        </span>
-      ) : (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={label}
-          data-pill
-          className={look}
-        >
-          {pill}
-        </a>
-      )}
-    </HoverCard>
-  );
-}
+import { CitationPill, PillContext } from "./CitationPill";
+import { CodeBlock } from "./CodeBlock";
 
 /**
  * The `urlTransform`: an absolute http(s) URL, or nothing.
@@ -267,7 +167,11 @@ function heading({ children, className }: { children?: ReactNode; className?: st
 
 const COMPONENTS = {
   p: Paragraph,
-  ul: ({ children }) => <ul className="flex list-disc flex-col gap-hair pl-gutter">{children}</ul>,
+  // The bullets in muted: nothing in the reading wears the accent but a link
+  // (DESIGN.md, Do's and Don'ts), and a bullet is no content of its own.
+  ul: ({ children }) => (
+    <ul className="flex list-disc flex-col gap-hair pl-gutter marker:text-muted">{children}</ul>
+  ),
   ol: ({ children }) => (
     <ol className="flex list-decimal flex-col gap-hair pl-gutter">{children}</ol>
   ),
@@ -280,18 +184,16 @@ const COMPONENTS = {
   h5: heading,
   h6: heading,
   blockquote: ({ children }) => (
-    <blockquote className="border-line border-l-2 pl-snug text-muted">{children}</blockquote>
+    <blockquote className="rounded-r-control border-muted border-l-2 bg-mark px-snug py-tight text-ink">
+      {children}
+    </blockquote>
   ),
   code: ({ children, className }) => (
     <code className={cn("rounded-chip bg-mark px-hair font-mono text-caption", className)}>
       {children}
     </code>
   ),
-  pre: ({ children }) => (
-    <pre className="overflow-x-auto rounded-control bg-mark p-snug font-mono text-caption [&>code]:bg-transparent [&>code]:p-0">
-      {children}
-    </pre>
-  ),
+  pre: CodeBlock,
   table: ({ children }) => (
     <div className="overflow-x-auto">
       <table className="border-collapse text-body">{children}</table>

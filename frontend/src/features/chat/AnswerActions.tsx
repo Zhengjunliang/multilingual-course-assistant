@@ -10,18 +10,17 @@
  */
 
 import { Check, Copy } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Citation } from "@/api/contract";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { withoutMarkers } from "@/lib/markers";
-import { SourceIcon, SourcesPanel } from "./SourcesPanel";
+import { SourceIcon } from "./SourceParts";
+import { SourcesPanel } from "./SourcesPanel";
 import { sourcesOf } from "./sourceLabel";
-
-/** How long the copy button shows its tick: long enough to see, gone before a second copy. */
-const COPIED_MS = 2000;
+import { useCopy } from "./useCopy";
 
 /** How many source marks the button stacks. */
 const STACKED = 3;
@@ -38,24 +37,8 @@ interface AnswerActionsProps {
 
 export function AnswerActions({ answer, citations, cited, complete }: AnswerActionsProps) {
   const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopy();
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), COPIED_MS);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(withoutMarkers(answer, citations));
-      setCopied(true);
-    } catch {
-      // The browser refused the clipboard (an insecure origin, a denied
-      // permission): the button stays as it was, which says it did not copy.
-    }
-  };
 
   const sources = sourcesOf(citations);
   const shown = sources.filter((source) => cited?.has(source.marker) ?? true);
@@ -72,7 +55,7 @@ export function AnswerActions({ answer, citations, cited, complete }: AnswerActi
             variant="ghost"
             size="icon"
             aria-label={t("answer.copy")}
-            onClick={copy}
+            onClick={() => copy(withoutMarkers(answer, citations))}
           >
             {copied ? (
               <Check aria-hidden className="size-icon" />
