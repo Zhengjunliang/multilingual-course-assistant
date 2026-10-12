@@ -20,9 +20,9 @@ The crawl's hard limits, all code constants in `rag/crawl.py`: robots.txt respec
 
 ✅ `search()` in `rag/search.py` takes `collections`; a gold question picks them by its `target`.
 
-- **With rerank**: each collection yields its own fusion pool (20 per pool, `PREFETCH_LIMIT`), the pools are merged, and one rerank takes the top k. Scores are comparable across collections because the reranker reads only the query and the text.
-- **With `--no-rerank`**: RRF scores are **not comparable across collections**, so the pools are not merged: each collection gives its top k, the lists are interleaved round-robin by rank and cut to k. This is a definition, not a fusion; the longer list fills the remaining slots.
-- The `ingest_source` and `ingest_run_id` condition goes into the `unifi_web` prefetch branches only: the eval-isolation rule of [architecture.md](architecture.md).
+- **With rerank**: each collection yields its own fusion pool (20 per pool, `PREFETCH_LIMIT`), the pools are merged, and one rerank orders them; the copies of one passage collapse, the hits the reranker scores below 0.5 are left out but the first, and the list is cut to k ([decisions.md](decisions.md), 2026-10-12). Scores are comparable across collections because the reranker reads only the query and the text.
+- **With `--no-rerank`**: RRF scores are **not comparable across collections**, so the pools are not merged: each collection's pool collapses the copies of a passage and gives its top k, the lists are interleaved round-robin by rank and cut to k. This is a definition, not a fusion; the longer list fills the remaining slots.
+- The `ingest_source` and `ingest_run_id` condition goes into the `unifi_web` branch queries only: the eval-isolation rule of [architecture.md](architecture.md).
 - Collections are merged only when the router says `both` (`collections_for()` in `rag/agent.py`); the two non-regression gates, slides and campus, each search one collection.
 
 ## Snapshot and registry layout

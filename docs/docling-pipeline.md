@@ -204,13 +204,15 @@ sequenceDiagram
     LLM-->>API: RouteDecision
     API->>E: encode the query
     E-->>API: query vector
-    API->>Q: hybrid query (dense + BM25, RRF fusion) per collection
-    Q-->>API: top-k candidates
+    API->>Q: a dense and a BM25 query per collection
+    Q-->>API: 20 candidates per branch
+    Note over API: RRF fusion on the client, equal scores by point id
     API->>R: score (question, candidate) pairs
-    R-->>API: top-n
+    R-->>API: P("yes") per candidate
+    Note over API: copies of one passage collapse; P("yes") at least 0.5, at most 5, at least 1
     Note over API: only rag.agent on the command line deepens here; /api/ask does not
     API-->>U: SSE start: locale, route, sources
-    API->>LLM: system + excerpts + question
+    API->>LLM: system + excerpts numbered [n] + question
     LLM-->>API: streamed tokens
     API-->>U: SSE tokens, then end
 ```
@@ -219,22 +221,24 @@ Four concepts to keep apart:
 
 - **Dense retrieval**: text → vector → cosine similarity. It matches **meaning**: `sorting algorithm` finds `algoritmi di ordinamento` — the source of the cross-language capability, with neither query nor material translated. Weak on exact names, abbreviations and code identifiers.
 - **Sparse / BM25**: term statistics, matching **literal words**. Its weakness is the mirror image: across languages it fails by construction.
-- **Hybrid + RRF**: both branches retrieve on their own, and Reciprocal Rank Fusion merges them by **rank** (their scores have different scales). Qdrant supports it natively.
+- **Hybrid + RRF**: both branches retrieve on their own, and Reciprocal Rank Fusion merges them by **rank** (their scores have different scales). Qdrant offers it natively; this project computes it on the client with Qdrant's formula, so that equal scores have a fixed order (section 4.1).
 - **Rerank**: retrieval is a bi-encoder (query and document encoded separately, precomputable — fast but coarse); a reranker is a cross-encoder (question and document read together — accurate but slow). Two stages: retrieval narrows to dozens, reranking picks a few. It is not an optional optimisation but one of the main sources of quality.
 
-**Choosing top-k**: too small and the answer is not recalled; too large and the context fills with noise ("lost in the middle"), with latency and memory rising. k is chosen by measurement, 🔜 M3 `#31`.
+**Choosing top-k**: too small and the answer is not recalled; too large and the context fills with noise ("lost in the middle"), with latency and memory rising. With the reranker, k is a cap of 5, and the reranker's score decides how many of the five reach the answer (section 4.1); the cap and the cut-off are chosen by measurement, 🔜 M3 `#31`.
 
 ### 4.1 Retrieval and generation rules
 
-Implemented in `rag/index.py`, `rag/search.py` and `rag/answer.py`:
+Implemented in `rag/index.py`, `rag/search.py`, `rag/passages.py` and `rag/answer.py`:
 
 - **Sparse side** ✅ `rag/index.py`: fastembed's `Qdrant/bm25` (term frequency on the document side, `modifier=IDF` on the collection), stemming with its default English scheme; `text` and `embed_text` are stored apart (section 3.6) so the two inputs do not contaminate each other. Why BM25 and not SPLADE: [decisions.md](decisions.md), 2026-08-04, *Sparse retrieval is fastembed BM25 with an IDF modifier; SPLADE is not pursued*.
-- **The fusion trap** ✅ `rag/search.py`: in Qdrant's embedded mode a fusion query **silently ignores a top-level `query_filter`** (measured), so `locale`, the edition scope and ingest filters go inside each `Prefetch` branch.
+- **The fusion on the client** ✅ `rag/search.py`: each branch is a query of its own carrying `locale`, the edition scope and the ingest filters, and ranks equal scores by point id, fetching past its cut while a tie runs on (`branch_search`); `fuse_rrf` merges the branches with Qdrant's formula and ranks equal fused scores by point id. A server returns equal scores in no fixed order, and one text under two addresses is two points with equal vectors ([decisions.md](decisions.md), 2026-10-12, *A result list holds each passage once, as many as the reranker judges relevant, and an answer cites them by number*, point 1).
+- **One passage once** ✅ `rag/passages.py`: two web hits with equal texts, or near-duplicates from two pages or two versions of a page, are one hit, the newest copy shown; slides never collapse. With the reranker the whole pool is reranked before the collapse and the cut; `rag.agent` collapses again after deepening (same entry, point 2).
+- **Relevance cut-off** ✅ `rag/search.py` (`RELEVANCE_CUTOFF`): a reranked hit below P("yes") 0.5 is left out, the first always stays, 5 is a cap; without a reranker nothing is cut (same entry, point 3).
 - **Loading the reranker** ✅ `rag/search.py`: `Qwen/Qwen3-Reranker-0.6B` is a causal LM, and the official recipe scores each (query, document) pair as P("yes") over the two tokens yes and no; wrapping it in a classification head such as CrossEncoder **silently attaches a randomly initialised head** that outputs noise.
 - **The answer follows the question's language** ✅ `rag/answer.py`: the language is detected from the question text by default, `--locale` overrides it, and the system prompt states it; checking it at scale is part of the M3 evaluation (🔜 M3 `#20`).
-- **Citation markers** ✅ `rag/answer.py` (`source_marker()`): `[source_file p.N]` for slides, `[url · fetch_date]` for web pages; each excerpt in the prompt carries its marker and the model is asked to reuse it. The sources shown to the student are rendered from retrieval metadata, not from the model's text ([decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*, point 6).
+- **Citations** ✅ `rag/answer.py`: each excerpt in the prompt is headed `[n]` beside its marker (`source_marker()`: `[source_file p.N]` for slides, `[url · fetch_date]` for web pages), and the model cites the number, `[2]` or `[1][3]` (same entry, point 4). The sources shown to the student are rendered from retrieval metadata, not from the model's text ([decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*, point 6).
 - **Refusal** ✅ `rag/answer.py`: with no candidate the LLM is not called, and the answer says the material has nothing — in Italian for an Italian question, in English otherwise; the prompt also asks the model to say so when the excerpts do not support an answer. Whether a refusal was right is a bucket of the error taxonomy (🔜 M3 `#23`).
-- **RRF parameters and dense/sparse weights**: Qdrant's RRF defaults and 20 candidates per prefetch branch (`PREFETCH_LIMIT`); choosing them by measurement is 🔜 M3 `#31`.
+- **RRF parameters and dense/sparse weights**: Qdrant's RRF constant (`RRF_K`), no weights, and 20 candidates per branch (`PREFETCH_LIMIT`); choosing them and the cut-off by measurement is 🔜 M3 `#31`.
 - **Heading-chain pollution**: section 3.7.
 
 ## 5. LangChain / LangGraph / LlamaIndex
