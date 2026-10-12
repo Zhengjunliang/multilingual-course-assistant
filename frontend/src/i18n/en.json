@@ -138,7 +138,6 @@
   "staff": {
     "cancel": "Cancel",
     "breadcrumb": "Breadcrumb",
-    "loadFailed": "This page could not be loaded.",
     "nav": {
       "programmes": "Degree programmes",
       "management": "Management",
@@ -269,7 +268,11 @@
       "done": "Role revoked",
       "gone": "{{username}} no longer held this role: it had been revoked elsewhere."
     },
-    "retry": "Try again"
+    "retry": "Try again",
+    "failure": {
+      "title": "This page could not be opened",
+      "body": "The server did not answer as it should. Try again in a moment; if it happens again, go back to where you started."
+    }
   },
   "shortcuts": {
     "newConversation": "New conversation",

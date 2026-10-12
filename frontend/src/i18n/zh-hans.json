@@ -138,7 +138,6 @@
   "staff": {
     "cancel": "取消",
     "breadcrumb": "路径",
-    "loadFailed": "页面加载失败。",
     "nav": {
       "programmes": "专业",
       "management": "管理",
@@ -269,7 +268,11 @@
       "done": "已撤销角色",
       "gone": "{{username}} 已不再拥有此角色：它已在别处被撤销。"
     },
-    "retry": "重试"
+    "retry": "重试",
+    "failure": {
+      "title": "无法打开此页面",
+      "body": "服务器没有正常响应。请稍后重试；如果仍然失败，请回到你的起始页。"
+    }
   },
   "shortcuts": {
     "newConversation": "新会话",

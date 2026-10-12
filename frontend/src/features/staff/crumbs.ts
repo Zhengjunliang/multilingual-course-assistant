@@ -12,6 +12,11 @@
  * and it lists the course, else the first such programme. With none — a
  * teacher, who views no programme — an edition sits under the teacher's own
  * courses.
+ *
+ * The trail also names its area, the Gestione item it starts from, whose icon
+ * leads the breadcrumb: "I miei insegnamenti" for a page reached through the
+ * teacher's own courses, the programmes otherwise. A key and not the icon, so
+ * the trail stays plain data (routes/shell.ts carries it as text).
  */
 
 import type { TFunction } from "i18next";
@@ -66,6 +71,15 @@ export function contextProgramme(
 export function coursePath(code: string, programme: ProgrammeName | null): string {
   const query = programme === null ? "" : `?${new URLSearchParams({ programme: programme.code })}`;
   return `/staff/courses/${encodeURIComponent(code)}${query}`;
+}
+
+export function area(page: StaffPage, root: ManagementKey | null): ManagementKey {
+  const mine =
+    page.kind === "mine" ||
+    (page.kind === "edition" && page.programme === null) ||
+    (page.kind === "notFound" && root === "mine");
+  if (mine) return "mine";
+  return root === "programme" ? "programme" : "programmes";
 }
 
 export function crumbs(page: StaffPage, root: ManagementKey | null, t: TFunction): Crumb[] {

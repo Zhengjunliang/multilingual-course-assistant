@@ -138,7 +138,6 @@
   "staff": {
     "cancel": "Annulla",
     "breadcrumb": "Percorso",
-    "loadFailed": "Impossibile caricare la pagina.",
     "nav": {
       "programmes": "Corsi di laurea",
       "management": "Gestione",
@@ -269,7 +268,11 @@
       "done": "Ruolo revocato",
       "gone": "{{username}} non aveva più questo ruolo: era già stato revocato altrove."
     },
-    "retry": "Riprova"
+    "retry": "Riprova",
+    "failure": {
+      "title": "Impossibile aprire questa pagina",
+      "body": "Il server non ha risposto come doveva. Riprova tra poco; se succede ancora, torna al tuo punto di partenza."
+    }
   },
   "shortcuts": {
     "newConversation": "Nuova conversazione",

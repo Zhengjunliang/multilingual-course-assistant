@@ -17,6 +17,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { type CurriculumEntry, listEditions, readCourse } from "@/api/catalog";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Chip } from "@/components/ui/chip";
 import {
   Table,
   TableBody,
@@ -103,10 +104,10 @@ export default function CoursePage() {
   return (
     <>
       <PageHead
-        eyebrow={
+        chips={
           <>
             <Code>{course.code}</Code>
-            {course.code_source === "cineca-only" && <span>{t("staff.plan.integrated")}</span>}
+            {course.code_source === "cineca-only" && <Chip>{t("staff.plan.integrated")}</Chip>}
           </>
         }
         heading={course.name}
