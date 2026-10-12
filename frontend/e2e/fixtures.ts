@@ -129,7 +129,8 @@ export const CONVERSATION: ConversationDetail = {
   last_message_at: "2026-10-08T10:00:02Z",
   title: CAMPUS_QUESTION,
   title_locale: "it",
-  pinned: false,
+  // Pinned, so that every floor judges the sidebar's «Fissate» group too.
+  pinned: true,
   last_source: { courses: [], web: true },
   messages: [
     {

@@ -60,6 +60,8 @@ interface ConversationSidebarProps {
    * conversation is its job, not this one's.
    */
   onDelete: (id: number) => Promise<boolean>;
+  /** Pins or unpins a conversation and resolves to whether the server did. */
+  onPin: (id: number, pinned: boolean) => Promise<boolean>;
   /** Which mount this is, and what the shell lets it do (ChatShell.tsx). */
   controls: SidebarControls;
   /**
@@ -73,6 +75,7 @@ export function ConversationSidebar({
   conversations,
   busy,
   onDelete,
+  onPin,
   controls,
   management,
 }: ConversationSidebarProps) {
@@ -145,6 +148,7 @@ export function ConversationSidebar({
           conversations={conversations}
           query={query}
           busy={busy}
+          onPin={onPin}
           onDelete={onDelete}
           onNavigate={onNavigate}
           focusAfterDelete={newConversation}

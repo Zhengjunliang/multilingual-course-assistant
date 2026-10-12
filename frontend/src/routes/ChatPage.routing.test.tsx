@@ -101,6 +101,20 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     conversations = conversations.filter((row) => row.id !== id);
     return new Response(null, { status: 204 });
   }
+  if (method === "PATCH" && path.startsWith("/api/conversations/")) {
+    const id = Number(path.slice("/api/conversations/".length));
+    const row = conversations.find((listed) => listed.id === id);
+    if (row === undefined) return json({ detail: "Not found." }, 404);
+    const { pinned } = JSON.parse(String(init.body)) as { pinned: boolean };
+    // In the server's order: pinned rows first, each group by its last message.
+    conversations = conversations
+      .map((listed) => (listed.id === id ? { ...listed, pinned } : listed))
+      .sort(
+        (a, b) =>
+          Number(b.pinned) - Number(a.pinned) || b.last_message_at.localeCompare(a.last_message_at),
+      );
+    return json({ ...row, pinned });
+  }
   if (method === "POST" && path === "/api/ask") {
     const { question, history } = JSON.parse(String(init.body)) as {
       question: string;
@@ -326,6 +340,57 @@ describe("the chat page's address", () => {
     // ever does.
     expect(saidFailed).toBe(failing === true);
     expect(unwanted).toBe(false);
+  });
+});
+
+describe("pinning from the sidebar", () => {
+  beforeEach(() => {
+    conversations = [STORED_ROW, OTHER];
+    requested = [];
+    vi.stubGlobal("fetch", fakeApi);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const button = (container: HTMLElement, label: string) =>
+    [...container.querySelectorAll<HTMLButtonElement>("aside button")].find(
+      (candidate) => candidate.getAttribute("aria-label") === label,
+    );
+  const group = (container: HTMLElement, label: string) =>
+    [...container.querySelectorAll(`aside nav[aria-label="${label}"] a`)].map((row) =>
+      row.getAttribute("href"),
+    );
+
+  it("moves a row to «Fissate» once the server has pinned it, and back, the focus with it", async () => {
+    const title = "Quando scadono le tasse?";
+    const { container, unmount } = page("/");
+    await settle();
+
+    const pin = button(container, i18n.t("sidebar.pin", { title }));
+    act(() => {
+      pin?.focus();
+      pin?.click();
+    });
+    await settle();
+    const pinned = group(container, "Fissate");
+    const focusedOnUnpin = document.activeElement?.getAttribute("aria-label");
+
+    act(() => button(container, i18n.t("sidebar.unpin", { title }))?.click());
+    await settle();
+    const recent = group(container, "Recenti");
+    const fixed = container.querySelector('aside nav[aria-label="Fissate"]');
+    unmount();
+
+    expect(requested.filter((line) => line.startsWith("PATCH"))).toEqual([
+      "PATCH /api/conversations/8",
+      "PATCH /api/conversations/8",
+    ]);
+    expect(pinned).toEqual(["/c/8"]);
+    expect(focusedOnUnpin).toBe(i18n.t("sidebar.unpin", { title }));
+    expect(recent).toEqual(["/c/7", "/c/8"]);
+    expect(fixed).toBeNull();
   });
 });
 
