@@ -33,6 +33,8 @@ interface Occurrence {
   at: number;
   end: number;
   excerpts: number[];
+  /** The marker the model wrote, for a reference that is one. */
+  marker?: string;
 }
 
 /**
@@ -77,7 +79,8 @@ function excerptRefs(answer: string, citations: readonly Citation[]): Occurrence
 
 /**
  * Where the answer writes a marker, as the prompt asks it to. A marker names a
- * page, and stands for that page's first excerpt, its best-ranked.
+ * page, and stands for that page's first excerpt, its best-ranked, unless an
+ * excerpt reference beside it says which (`besideExcerpts`).
  */
 function markerRefs(answer: string, citations: readonly Citation[]): Occurrence[] {
   const first = new Map<string, number>();
@@ -88,11 +91,45 @@ function markerRefs(answer: string, citations: readonly Citation[]): Occurrence[
   for (const [marker, excerpt] of first) {
     let at = answer.indexOf(marker);
     while (at !== -1) {
-      found.push({ at, end: at + marker.length, excerpts: [excerpt] });
+      found.push({ at, end: at + marker.length, excerpts: [excerpt], marker });
       at = answer.indexOf(marker, at + marker.length);
     }
   }
   return found;
+}
+
+/** Only spaces or tabs: two references on one line, written side by side. */
+const SIDE_BY_SIDE = /^[ \t]*$/;
+
+/**
+ * A marker written right beside an excerpt reference of its own page, as the
+ * prompt's header reads ("Excerpt 3 [m]:", rag/answer.py) and the model copies
+ * it, stands for that excerpt rather than the page's first: the pair is one
+ * citation. The reference before the marker is looked at first, as the header
+ * puts it there.
+ */
+function besideExcerpts(
+  taken: readonly Occurrence[],
+  answer: string,
+  citations: readonly Citation[],
+): void {
+  taken.forEach((reference, index) => {
+    if (reference.marker === undefined) return;
+    for (const other of [taken[index - 1], taken[index + 1]]) {
+      if (other === undefined || other.marker !== undefined) continue;
+      const between =
+        other.end <= reference.at
+          ? answer.slice(other.end, reference.at)
+          : answer.slice(reference.end, other.at);
+      const same = other.excerpts.filter(
+        (number) => citationOf(citations, number)?.marker === reference.marker,
+      );
+      if (SIDE_BY_SIDE.test(between) && same.length > 0) {
+        reference.excerpts = same;
+        return;
+      }
+    }
+  });
 }
 
 /**
@@ -115,11 +152,16 @@ export function segmentAnswer(answer: string, citations: readonly Citation[]): S
   const found = [...excerptRefs(answer, citations), ...markerRefs(answer, citations)].sort(
     (a, b) => a.at - b.at || b.end - a.end,
   );
+  const taken: Occurrence[] = [];
+  for (const occurrence of found) {
+    // One that overlaps something already taken is dropped.
+    if (occurrence.at >= (taken.at(-1)?.end ?? 0)) taken.push(occurrence);
+  }
+  besideExcerpts(taken, answer, citations);
 
   const segments: Segment[] = [];
   let cursor = 0;
-  for (const { at, end, excerpts } of found) {
-    if (at < cursor) continue; // overlaps something already taken
+  for (const { at, end, excerpts } of taken) {
     if (at > cursor) segments.push({ kind: "text", at: cursor, text: answer.slice(cursor, at) });
     segments.push({ kind: "reference", at, excerpts });
     cursor = end;
@@ -237,7 +279,9 @@ function needsBreak(text: string, at: number): boolean {
 
 /**
  * A complete answer with each reference replaced by the sentinels of its
- * excerpts, side by side, ready to parse.
+ * excerpts, a space between them, ready to parse: `remarkPills` draws them as
+ * one pill, and where a pill cannot sit they are written back as the markers
+ * they stand for, a space between them, as the model would have written them.
  *
  * Any sentinel character already in the answer goes first, spelled out or as a
  * character reference: the characters are this format's, and a stray one would
@@ -250,7 +294,7 @@ export function withPills(answer: string, citations: readonly Citation[]): strin
     .map((segment) => {
       if (segment.kind === "text") return segment.text;
       const pills = segment.excerpts.map((number) => `${PILL_OPEN}${number}${PILL_CLOSE}`);
-      return (needsBreak(clean, segment.at) ? PILL_BREAK : "") + pills.join("");
+      return (needsBreak(clean, segment.at) ? PILL_BREAK : "") + pills.join(" ");
     })
     .join("");
 }
