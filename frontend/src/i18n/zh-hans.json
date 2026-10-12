@@ -179,16 +179,14 @@
     "source": "学习计划取自 Cineca 课程目录。",
     "you": "你",
     "plan": {
-      "title": "课程",
-      "sub_one": "学习计划，按年级排列：{{count}} 门课程。",
-      "sub_other": "学习计划，按年级排列：{{count}} 门课程。",
+      "title": "培养方案",
       "curricula": "方向：{{list}}",
       "search": "按名称或代码搜索",
       "searchLabel": "搜索课程",
       "filter": "方向",
+      "yearFilter": "年级",
       "all": "全部",
       "course": "课程",
-      "entries": "学习计划条目",
       "current": "当前版本",
       "teachers": "教师",
       "noTeacher": "未指派教师",
@@ -208,8 +206,7 @@
     "secretariat": {
       "title": "教学秘书处",
       "sub": "管理本学习计划中各课程的版本。",
-      "empty": "教学秘书处没有成员。",
-      "onlyAdmin": "只有管理员能指派教学秘书。"
+      "empty": "教学秘书处没有成员。"
     },
     "refusal": {
       "notFound": "未找到",
@@ -279,6 +276,7 @@
     "search": "搜索会话",
     "settings": "打开设置",
     "help": "显示快捷键",
+    "filter": "筛选培养方案里的课程",
     "send": "发送问题",
     "newLine": "在问题里换行",
     "close": "关闭菜单或窗口"

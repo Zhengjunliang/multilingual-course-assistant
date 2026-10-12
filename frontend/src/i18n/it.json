@@ -179,16 +179,14 @@
     "source": "Piano di studi dal catalogo dei corsi Cineca.",
     "you": "tu",
     "plan": {
-      "title": "Insegnamenti",
-      "sub_one": "Il piano di studi, per anno di corso: {{count}} insegnamento.",
-      "sub_other": "Il piano di studi, per anno di corso: {{count}} insegnamenti.",
+      "title": "Piano di studi",
       "curricula": "Curriculum: {{list}}",
       "search": "Cerca per nome o codice",
       "searchLabel": "Cerca un insegnamento",
       "filter": "Curriculum",
+      "yearFilter": "Anno di corso",
       "all": "Tutti",
       "course": "Insegnamento",
-      "entries": "Voci del piano di studi",
       "current": "Edizione corrente",
       "teachers": "Docenti",
       "noTeacher": "Nessun docente assegnato",
@@ -208,8 +206,7 @@
     "secretariat": {
       "title": "Segreteria didattica",
       "sub": "Gestisce le edizioni degli insegnamenti di questo piano di studi.",
-      "empty": "Nessun membro della segreteria didattica.",
-      "onlyAdmin": "Solo l'amministratore assegna la segreteria didattica."
+      "empty": "Nessun membro della segreteria didattica."
     },
     "refusal": {
       "notFound": "Non trovato",
@@ -279,6 +276,7 @@
     "search": "Cerca tra le conversazioni",
     "settings": "Apri le impostazioni",
     "help": "Mostra le scorciatoie",
+    "filter": "Filtra gli insegnamenti del piano di studi",
     "send": "Invia la domanda",
     "newLine": "Vai a capo nella domanda",
     "close": "Chiudi un menu o una finestra"

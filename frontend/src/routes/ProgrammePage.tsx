@@ -1,27 +1,33 @@
 /**
  * `/staff/programmes/:code`: one programme — its study plan, and its
- * secretariat.
+ * secretariat, each a tab with its count.
  *
  * The programme and its study plan are two reads made together; a programme
  * outside the caller's scope is a 404 on both, and the page says "not found".
  * Only the superuser assigns and revokes secretariat staff, which the
- * programme's `permissions` say; anyone else reads who they are and why they
- * cannot.
+ * programme's `permissions` say; anyone else reads who they are, and a
+ * banner where the button would be says why they cannot. The plan's count is
+ * the rows its tab shows before any filter: a course two years of study list
+ * is two rows (features/staff/studyPlan.ts).
  */
 
+import { Lock } from "lucide-react";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 
 import { listStudyPlan, readProgramme } from "@/api/catalog";
-import { Card } from "@/components/ui/card";
+import { Banner } from "@/components/ui/banner";
+import { Chip } from "@/components/ui/chip";
+import { Tabs } from "@/components/ui/tabs";
 import { useMembers } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { isNotFound } from "@/features/staff/errors";
-import { Code, Note, PageHead, Section } from "@/features/staff/page";
+import { Code, PageHead } from "@/features/staff/page";
 import { StaffList } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { StudyPlanTable } from "@/features/staff/StudyPlanTable";
+import { rowCount, studyPlan } from "@/features/staff/studyPlan";
 import { useCrumbs, useShell } from "./shell";
 
 export default function ProgrammePage() {
@@ -58,33 +64,55 @@ export default function ProgrammePage() {
   return (
     <>
       <PageHead
-        chips={<Code>{programme.code}</Code>}
         heading={programme.name}
         caps
-        sub={
-          programme.curricula.length > 0
-            ? t("staff.plan.curricula", { list: programme.curricula.join(" · ") })
-            : undefined
+        chips={
+          <>
+            <Code>{programme.code}</Code>
+            {programme.curricula.map((curriculum) => (
+              <Chip key={curriculum}>{curriculum}</Chip>
+            ))}
+            <Chip tone="accent">{t("staff.plan.count", { count: programme.course_count })}</Chip>
+          </>
         }
         source
       />
-      <Section heading={t("staff.plan.title")} sub={t("staff.plan.sub", { count: plan.length })}>
-        <StudyPlanTable rows={plan} programme={programme} />
-      </Section>
-      <Section
-        heading={t("staff.secretariat.title")}
-        sub={t("staff.secretariat.sub")}
-        right={members.assign}
-      >
-        <Card className="overflow-hidden">
-          <StaffList
-            people={programme.secretariat}
-            empty={t("staff.secretariat.empty")}
-            action={members.action}
-          />
-          {!assigns && <Note foot>{t("staff.secretariat.onlyAdmin")}</Note>}
-        </Card>
-      </Section>
+      <Tabs
+        label={programme.name}
+        defaultValue="plan"
+        tabs={[
+          {
+            value: "plan",
+            label: t("staff.plan.title"),
+            count: rowCount(studyPlan(plan, programme, null, "")),
+            content: <StudyPlanTable rows={plan} programme={programme} />,
+          },
+          {
+            value: "secretariat",
+            label: t("staff.secretariat.title"),
+            count: programme.secretariat.length,
+            content: (
+              <div className="flex flex-col gap-snug">
+                <div className="flex flex-wrap items-center gap-snug">
+                  <p className="min-w-0 flex-1 text-body text-muted">
+                    {t("staff.secretariat.sub")}
+                  </p>
+                  {members.assign}
+                </div>
+                {!assigns && (
+                  <Banner icon={Lock} heading={t("staff.refusal.cannot.assignSecretariat")} />
+                )}
+                <StaffList
+                  people={programme.secretariat}
+                  staffRole="secretariat"
+                  empty={t("staff.secretariat.empty")}
+                  action={members.action}
+                />
+              </div>
+            ),
+          },
+        ]}
+      />
       {members.dialogs}
     </>
   );
