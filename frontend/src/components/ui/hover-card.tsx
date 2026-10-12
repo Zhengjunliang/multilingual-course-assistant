@@ -19,24 +19,32 @@
  *
  * Its parts (#190): an optional head on `--tint` behind a hairline, for what
  * the source is (a course or a site, a page, a language); the body; and its
- * actions at the foot, as soft buttons.
+ * actions at the foot, as soft buttons. A link that stands for several
+ * sources, a pill merged over a run of them, previews each in a section of
+ * its own with the same three parts, a hairline between them (#193); a card
+ * taller than the room the window leaves scrolls.
  */
 
 import * as RadixHoverCard from "@radix-ui/react-hover-card";
 import type { ReactElement, ReactNode } from "react";
 
-interface HoverCardProps {
-  /** What the card holds. */
-  content: ReactNode;
-  /** Above the content, on the tint: what the link points at. */
+export interface HoverCardSection {
+  key: string;
+  /** Above the body, on the tint: what the link points at. */
   head?: ReactNode;
-  /** Under the content: soft buttons, such as opening the source. */
+  body: ReactNode;
+  /** Under the body: soft buttons, such as opening the source. */
   actions?: ReactNode;
+}
+
+interface HoverCardProps {
+  /** What the card holds, one section per thing the link stands for. */
+  sections: readonly HoverCardSection[];
   /** The link the card previews, rendered as the trigger itself: it must accept a ref and DOM props. */
   children: ReactElement;
 }
 
-export function HoverCard({ content, head, actions, children }: HoverCardProps) {
+export function HoverCard({ sections, children }: HoverCardProps) {
   return (
     <RadixHoverCard.Root openDelay={200} closeDelay={150}>
       <RadixHoverCard.Trigger asChild>{children}</RadixHoverCard.Trigger>
@@ -44,17 +52,21 @@ export function HoverCard({ content, head, actions, children }: HoverCardProps) 
         <RadixHoverCard.Content
           sideOffset={6}
           collisionPadding={16}
-          className="z-floating flex w-80 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card border border-line bg-surface text-body text-ink shadow-overlay"
+          className="z-floating flex max-h-(--radix-hover-card-content-available-height) w-80 max-w-[calc(100vw-2rem)] flex-col divide-y divide-hairline overflow-y-auto rounded-card border border-line bg-surface text-body text-ink shadow-overlay"
         >
-          {head !== undefined && (
-            <div className="flex items-center gap-tight border-hairline border-b bg-tint px-snug py-tight font-semibold text-caption">
-              {head}
-            </div>
-          )}
-          <div className="flex flex-col gap-snug p-snug">{content}</div>
-          {actions !== undefined && (
-            <div className="flex items-center gap-tight px-snug pb-snug">{actions}</div>
-          )}
+          {sections.map(({ key, head, body, actions }) => (
+            <section key={key} className="flex flex-col">
+              {head !== undefined && (
+                <div className="flex items-center gap-tight border-hairline border-b bg-tint px-snug py-tight font-semibold text-caption">
+                  {head}
+                </div>
+              )}
+              <div className="flex flex-col gap-snug p-snug">{body}</div>
+              {actions !== undefined && (
+                <div className="flex items-center gap-tight px-snug pb-snug">{actions}</div>
+              )}
+            </section>
+          ))}
         </RadixHoverCard.Content>
       </RadixHoverCard.Portal>
     </RadixHoverCard.Root>

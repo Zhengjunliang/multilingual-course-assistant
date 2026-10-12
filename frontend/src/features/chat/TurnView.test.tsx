@@ -161,7 +161,9 @@ describe("the answer's language", () => {
     );
     const classes = [...(prose?.classList ?? [])];
     const text = prose?.textContent;
-    const question = container.querySelector("article > p")?.getAttribute("lang");
+    const question = [...container.querySelectorAll("p[lang]")]
+      .find((element) => element.textContent === "学费什么时候截止？")
+      ?.getAttribute("lang");
     unmount();
 
     expect(text).toContain("学费九月三十日截止");
@@ -173,6 +175,27 @@ describe("the answer's language", () => {
     // only the question and the answer say "zh".
     expect(question).toBe("zh");
     expect(marked.filter((lang) => lang === "zh")).toHaveLength(2);
+  });
+
+  it("is on a chip under each question once the server has said it", () => {
+    // The code a reader sees, the name a screen reader hears; before `start`
+    // the language is not known, and nothing is guessed.
+    const chipOf = (of: Turn) => {
+      const { container, unmount } = mounted(of);
+      const bubble = container.querySelector("article > div");
+      const seen = {
+        code: bubble?.querySelector("[aria-hidden]")?.textContent ?? null,
+        name: bubble?.querySelector(".sr-only")?.textContent ?? null,
+      };
+      unmount();
+      return seen;
+    };
+
+    expect(chipOf(turn({ locale: "en" }))).toEqual({ code: "EN", name: "inglese" });
+    expect(chipOf(turn({ locale: null, route: null, answer: "", complete: false }))).toEqual({
+      code: null,
+      name: null,
+    });
   });
 });
 
@@ -329,6 +352,82 @@ describe("a pill in the answer", () => {
     expect(pills).toEqual([
       { at: expect.stringContaining("Sessione invernale 2026-27"), shows: [CALENDAR_TEXTS[3]] },
     ]);
+  });
+
+  it("shows its source's kind, and keeps its fill and stays out of the accent in every state", () => {
+    // DESIGN.md, Colors: the fill says "clickable", the pointer turns the edge
+    // to ink and an open card the whole pill; blue would read as a link.
+    const { container, unmount } = mounted(turn());
+    const pill = container.querySelector<HTMLAnchorElement>("a[data-pill]");
+    const seen = { icon: pill?.querySelector("svg") !== null, classes: pill?.className ?? "" };
+    unmount();
+
+    expect(seen.icon).toBe(true);
+    expect(seen.classes).toContain("bg-mark");
+    expect(seen.classes).toContain("hover:border-ink");
+    expect(seen.classes).toContain("data-[state=open]:bg-ink");
+    expect(seen.classes).not.toMatch(/hover:bg-|accent/);
+  });
+
+  it("previews its source with the passage its link quotes marked, for a page and a slide", () => {
+    vi.useFakeTimers();
+    const page: Citation = {
+      ...CALENDAR[0],
+      text: "## Calendario\nSessione invernale 2025-26 dal 19 gennaio al 28 febbraio 2026.\nInfo.",
+    } as Citation;
+    const slide: Citation = {
+      ...citation("[Excerpt 2]", 4),
+      text: "BCNF\nUna relazione è in BCNF se ogni dipendenza ha una superchiave a sinistra.",
+    };
+    const { container, unmount } = mounted(
+      turn({ answer: "Le date [Excerpt 1] e la forma [Excerpt 2].", citations: [page, slide] }),
+    );
+    const marked = [...container.querySelectorAll<HTMLAnchorElement>("a[data-pill]")].map(
+      (pill) => {
+        act(() => pill.focus());
+        act(() => vi.advanceTimersByTime(200));
+        const card = document.body.querySelector("[data-radix-popper-content-wrapper]");
+        const seen = {
+          mark: card?.querySelector("mark")?.textContent,
+          link: decodeURIComponent(pill.getAttribute("href") ?? ""),
+        };
+        act(() => pill.blur());
+        act(() => vi.advanceTimersByTime(150));
+        return seen;
+      },
+    );
+    unmount();
+
+    expect(marked).toEqual([
+      {
+        mark: "Sessione invernale 2025-26 dal 19 gennaio al 28 febbraio 2026.",
+        link: expect.stringContaining(":~:text=Sessione invernale 2025-26 dal"),
+      },
+      {
+        mark: "Una relazione è in BCNF se ogni dipendenza ha una superchiave a sinistra.",
+        link: expect.stringContaining("#page=4"),
+      },
+    ]);
+  });
+
+  it("closes its card on Escape", () => {
+    vi.useFakeTimers();
+    const { container, unmount } = mounted(turn());
+    const pill = container.querySelector<HTMLAnchorElement>("a[data-pill]");
+    const card = () => document.body.querySelector("[data-radix-popper-content-wrapper]");
+
+    act(() => pill?.focus());
+    act(() => vi.advanceTimersByTime(200));
+    const opened = card() !== null;
+    act(() => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    const closed = card() === null;
+    unmount();
+
+    expect({ opened, closed }).toEqual({ opened: true, closed: true });
   });
 
   it("cited by the page's marker, previews and opens the page's first excerpt", () => {

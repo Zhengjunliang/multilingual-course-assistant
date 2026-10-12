@@ -9,65 +9,16 @@
  * own, with no "not cited" mark, which none of those products shows either.
  *
  * Each row is a link to the source (`sourceLink`): a web page in a new tab at
- * its passage, a slide at its page. `SourceSummary` is the same source as the
- * hover card over a pill shows it (AnswerMarkdown.tsx), so the two never
- * describe one source two ways.
+ * its passage, a slide at its page.
  */
 
-import { FileText, Globe } from "lucide-react";
 import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Citation } from "@/api/contract";
 import { Sheet } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
-import { distinctions, excerptOf, hostOf, sourceLink, sourcesOf, titleOf } from "./sourceLabel";
-
-/** A web page's or a slide's mark, beside its name. */
-export function SourceIcon({ citation, className }: { citation: Citation; className?: string }) {
-  const Icon = citation.kind === "web" ? Globe : FileText;
-  return <Icon aria-hidden className={cn("size-icon shrink-0", className)} />;
-}
-
-/**
- * Where a source is, its title, and the start of the excerpt. A slide also
- * names its edition, as code and year, the way Open edX course runs and UniFi's
- * Moodle titles name one; a slide stored before the year existed shows none.
- * `distinction` is what sets the source apart from another of its list that
- * reads the same (`distinctions`), after where it is.
- */
-export function SourceSummary({
-  citation,
-  distinction,
-}: {
-  citation: Citation;
-  distinction?: string | undefined;
-}) {
-  const { t } = useTranslation();
-  const where =
-    citation.kind === "web" && citation.url !== null
-      ? hostOf(citation.url)
-      : t("sources.filePage", { file: citation.source_file, page: citation.page });
-  return (
-    <>
-      <span className="flex min-w-0 items-center gap-tight text-caption text-muted">
-        <SourceIcon citation={citation} />
-        <span className="truncate">{distinction ? `${where} · ${distinction}` : where}</span>
-      </span>
-      {citation.kind === "slides" && citation.academic_year != null && (
-        <span className="font-mono text-caption text-muted">
-          {citation.course} · {citation.academic_year}
-        </span>
-      )}
-      <span lang={citation.locale} className="font-medium text-ink">
-        {titleOf(citation)}
-      </span>
-      <span lang={citation.locale} className="text-muted">
-        {excerptOf(citation.text)}
-      </span>
-    </>
-  );
-}
+import { SourceSummary } from "./SourceParts";
+import { distinctions, sourceLink, sourcesOf } from "./sourceLabel";
 
 function Row({ citation, distinction }: { citation: Citation; distinction: string | undefined }) {
   const href = sourceLink(citation);

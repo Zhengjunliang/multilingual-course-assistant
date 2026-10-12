@@ -23,7 +23,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Citation, RouteDecision } from "@/api/contract";
-import { SourceIcon } from "./SourcesPanel";
+import { SourceIcon } from "./SourceParts";
 import { shortName, sourcesOf, titleOf } from "./sourceLabel";
 
 interface ProcessLineProps {

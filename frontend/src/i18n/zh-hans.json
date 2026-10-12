@@ -114,11 +114,17 @@
     "openPage": "打开网页",
     "openSlide": "打开幻灯片第 {{page}} 页",
     "pill_one": "{{shown}}，来源",
-    "pill_other": "{{shown}}，来源：{{names}}"
+    "pill_other": "{{shown}}，来源：{{names}}",
+    "copyCitation": "复制引用",
+    "citationCopied": "已复制引用"
   },
   "answer": {
     "copy": "复制回答",
     "copied": "已复制回答"
+  },
+  "code": {
+    "copy": "复制",
+    "copied": "已复制"
   },
   "error": {
     "incomplete": "回答在结束之前中断了。"

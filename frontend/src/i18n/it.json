@@ -114,11 +114,17 @@
     "openPage": "Apri la pagina",
     "openSlide": "Apri la slide a pagina {{page}}",
     "pill_one": "{{shown}}, fonte",
-    "pill_other": "{{shown}}, fonti: {{names}}"
+    "pill_other": "{{shown}}, fonti: {{names}}",
+    "copyCitation": "Copia la citazione",
+    "citationCopied": "Citazione copiata"
   },
   "answer": {
     "copy": "Copia la risposta",
     "copied": "Risposta copiata"
+  },
+  "code": {
+    "copy": "Copia",
+    "copied": "Copiato"
   },
   "error": {
     "incomplete": "La risposta si è interrotta prima della fine."

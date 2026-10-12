@@ -113,33 +113,37 @@ export function Overlays() {
         note="Previews where a link goes: it opens for a pointer resting on the link for 200 ms and for keyboard focus, and closes on Escape or when the pointer leaves. A tinted head says what the source is, the body what it says, soft buttons what to do with it. Radix keeps it out of the tab order, so what it holds is reachable elsewhere too, and a click follows the link."
       >
         <HoverCard
-          head={
-            <>
-              <BookOpen aria-hidden className="size-icon text-accent" />
-              <span className="flex-1">Basi di dati</span>
-              <Chip size="sm">IT</Chip>
-            </>
-          }
-          actions={
-            <>
-              <Button variant="soft" size="sm">
-                <ExternalLink aria-hidden className="size-icon" />
-                Apri la slide a pagina 12
-              </Button>
-              <Button variant="ghost" size="icon-sm" aria-label="Copia la citazione">
-                <Copy aria-hidden className="size-icon" />
-              </Button>
-            </>
-          }
-          content={
-            <>
-              <span className="text-caption text-muted">unifi.it</span>
-              <span className="font-medium">Iscrizioni</span>
-              <span className="line-clamp-2 text-muted">
-                Le iscrizioni al primo anno si chiudono il 30 settembre, salvo proroghe.
-              </span>
-            </>
-          }
+          sections={[
+            {
+              key: "slide",
+              head: (
+                <>
+                  <BookOpen aria-hidden className="size-icon text-accent" />
+                  <span className="flex-1">Basi di dati</span>
+                  <Chip size="sm">IT</Chip>
+                </>
+              ),
+              body: (
+                <>
+                  <span className="font-medium">Iscrizioni</span>
+                  <span className="line-clamp-2 text-muted">
+                    Le iscrizioni al primo anno si chiudono il 30 settembre, salvo proroghe.
+                  </span>
+                </>
+              ),
+              actions: (
+                <>
+                  <Button variant="soft" size="sm">
+                    <ExternalLink aria-hidden className="size-icon" />
+                    Apri la slide a pagina 12
+                  </Button>
+                  <Button variant="ghost" size="icon-sm" aria-label="Copia la citazione">
+                    <Copy aria-hidden className="size-icon" />
+                  </Button>
+                </>
+              ),
+            },
+          ]}
         >
           <a
             href="https://www.unifi.it/"
