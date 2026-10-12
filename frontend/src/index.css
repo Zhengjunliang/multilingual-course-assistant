@@ -517,8 +517,8 @@
 /*
  * A line drawing itself in, as the cat's outline does in the entry's intro: a
  * path whose `pathLength` is 1, its one dash slid along it. The check in the
- * sign-in button (routes/AuthLayout.tsx), and the room's lines below. Under
- * reduced motion the line is there whole from the start.
+ * sign-in button (routes/AuthLayout.tsx) too. Under reduced motion the line is
+ * there whole from the start.
  */
 @keyframes draw {
   from {
@@ -543,7 +543,9 @@
  * the one before, as the cat's outline does in the intro; under reduced motion
  * it is whole from the start.
  *
- * Each line's dash is its length on screen, `--len`, which Room.tsx measures.
+ * Each line's dash is its length on screen, `--len`, which Room.tsx measures,
+ * and the gap after it longer than any line, so a wing that grows while the
+ * drawing waits shows no part of a line before its turn.
  * While a visitor's first-visit intro plays (`data-intro` on its Skip button,
  * features/entry/EntryScreen.tsx) the drawing is held before its first line:
  * one thing moves at a time, and the Skip button stands where the desk will.
@@ -564,7 +566,7 @@
 
 @utility room-draw {
   & path {
-    stroke-dasharray: var(--len);
+    stroke-dasharray: var(--len) 100000px;
     animation: room-line var(--transition-duration-scene) var(--ease-out) both;
     animation-delay: calc(var(--i, 0) * var(--stagger));
   }

@@ -161,6 +161,12 @@ export function Room({ clear, leaving = false }: RoomProps) {
     drawn = true;
   }, []);
 
+  // Reduced motion turned on midway cancels the drawing rather than ending
+  // it, and the room stays whole from then on.
+  useEffect(() => {
+    if (reduced) setDrawing(false);
+  }, [reduced]);
+
   // Each line's length on screen, for its dash, before the first frame.
   useLayoutEffect(() => {
     const element = root.current;
