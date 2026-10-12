@@ -6,7 +6,8 @@ import { ApiError } from "@/api/http";
 import { useSession } from "@/auth/useSession";
 import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
-import { AuthButton, AuthFailure, AuthLayout } from "./AuthLayout";
+import { FieldError } from "@/components/ui/field";
+import { AuthButton, AuthLayout } from "./AuthLayout";
 import { useLanding } from "./landing";
 
 const FAILURE = "login-failure";
@@ -90,7 +91,7 @@ export default function LoginPage() {
           invalid={failure !== null}
           describedBy={failure !== null ? FAILURE : undefined}
         />
-        {failure !== null && <AuthFailure id={FAILURE}>{failure}</AuthFailure>}
+        {failure !== null && <FieldError id={FAILURE}>{failure}</FieldError>}
         <AuthButton phase={landing.phase}>{t("auth.logIn")}</AuthButton>
       </form>
     </AuthLayout>

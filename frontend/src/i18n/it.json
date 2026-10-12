@@ -10,6 +10,7 @@
     "password": "Password",
     "passwordHint": "Almeno 8 caratteri.",
     "showPassword": "Mostra la password",
+    "capsLock": "Bloc Maiusc attivo",
     "logIn": "Accedi",
     "register": "Registrati",
     "failed": "Accesso non riuscito.",

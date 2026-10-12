@@ -10,6 +10,7 @@
     "password": "Password",
     "passwordHint": "At least 8 characters.",
     "showPassword": "Show password",
+    "capsLock": "Caps Lock is on",
     "logIn": "Sign in",
     "register": "Register",
     "failed": "Sign-in failed.",

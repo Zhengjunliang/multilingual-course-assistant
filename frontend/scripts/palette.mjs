@@ -123,7 +123,14 @@ export const PAIRS = [
     front: "warn-ink",
     back: "surface",
     min: TEXT,
-    where: "AuthLayout.tsx a refusal on the sign-in card, LineField.tsx a refused field's line",
+    where:
+      "field.tsx FieldError on the sign-in card and in a dialog, LineField.tsx a refused field's line",
+  },
+  {
+    front: "warn-ink",
+    back: "canvas",
+    min: TEXT,
+    where: "routes/styleguide/fields.tsx FieldError on the page",
   },
 ];
 

@@ -6,8 +6,9 @@ import { ApiError } from "@/api/http";
 import { useSession } from "@/auth/useSession";
 import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
+import { FieldError } from "@/components/ui/field";
 import { DEFAULT_UI_LOCALE, isUiLocale, type UiLocale } from "@/i18n";
-import { AuthButton, AuthFailure, AuthLayout } from "./AuthLayout";
+import { AuthButton, AuthLayout } from "./AuthLayout";
 import { useLanding } from "./landing";
 
 /** The ids of the messages that describe each field. */
@@ -66,7 +67,7 @@ export default function RegisterPage() {
     refused(field) && (
       <div id={about(field)} className="flex flex-col gap-hair">
         {messagesFor(field).map((message) => (
-          <AuthFailure key={message}>{message}</AuthFailure>
+          <FieldError key={message}>{message}</FieldError>
         ))}
       </div>
     );
@@ -118,7 +119,7 @@ export default function RegisterPage() {
           {messages("password")}
         </div>
 
-        {failure !== null && <AuthFailure role="alert">{failure}</AuthFailure>}
+        {failure !== null && <FieldError role="alert">{failure}</FieldError>}
         <AuthButton phase={landing.phase}>{t("auth.register")}</AuthButton>
       </form>
     </AuthLayout>

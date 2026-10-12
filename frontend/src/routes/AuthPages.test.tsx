@@ -207,7 +207,7 @@ describe("a registration", () => {
     const state = {
       focused: document.activeElement?.id,
       invalid: container.querySelector("#password")?.getAttribute("aria-invalid") ?? null,
-      alert: container.querySelector("[role=alert]")?.textContent?.replace(/^!/, "") ?? null,
+      alert: container.querySelector("[role=alert]")?.textContent ?? null,
     };
     unmount();
 

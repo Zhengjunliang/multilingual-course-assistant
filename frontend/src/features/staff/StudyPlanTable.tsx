@@ -11,13 +11,13 @@
  * link, stretched over it.
  */
 
-import { ChevronRight, Search } from "lucide-react";
-import { useId, useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import type { Programme, StudyPlanCourse } from "@/api/catalog";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/field";
 import {
   Table,
   TableBody,
@@ -79,7 +79,6 @@ interface StudyPlanTableProps {
 
 export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
   const { t, i18n } = useTranslation();
-  const searchId = useId();
   const [curriculum, setCurriculum] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const groups = studyPlan(rows, programme, curriculum, query);
@@ -88,24 +87,14 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
   return (
     <div className="flex flex-col gap-snug">
       <div className="flex flex-wrap items-center gap-snug">
-        <div className="relative min-w-0 flex-1 basis-64">
-          <Search
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 left-snug size-icon -translate-y-1/2 text-muted"
-          />
-          <label htmlFor={searchId} className="sr-only">
-            {t("staff.plan.searchLabel")}
-          </label>
-          <Input
-            id={searchId}
-            type="search"
-            autoComplete="off"
-            placeholder={t("staff.plan.search")}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="pl-control-icon"
-          />
-        </div>
+        <SearchField
+          label={t("staff.plan.searchLabel")}
+          autoComplete="off"
+          placeholder={t("staff.plan.search")}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          className="min-w-0 flex-1 basis-64"
+        />
         {programme.curricula.length > 1 && (
           <fieldset className="flex flex-wrap gap-hair rounded-control border border-line p-hair">
             <legend className="sr-only">{t("staff.plan.filter")}</legend>

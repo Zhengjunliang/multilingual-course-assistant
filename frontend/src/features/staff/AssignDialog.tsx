@@ -13,7 +13,6 @@
  * "not found" if that is what it is now.
  */
 
-import { CircleAlert } from "lucide-react";
 import { type FormEvent, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -21,7 +20,7 @@ import { toast } from "sonner";
 import { addMember, type MemberScope } from "@/api/catalog";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
 import { useFailure } from "./context";
 import { fieldErrorKey, grantPermission, isForbidden, isNotFound } from "./errors";
 import { Forbidden } from "./Refusal";
@@ -96,8 +95,6 @@ export function AssignDialog({
     }
   };
 
-  const hintId = `${fieldId}-hint`;
-  const errorId = `${fieldId}-error`;
   return (
     <Dialog
       open={scope !== null}
@@ -110,42 +107,25 @@ export function AssignDialog({
       onCloseAutoFocus={onCloseAutoFocus}
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-room">
-        <div className="flex flex-col gap-hair">
-          <label htmlFor={fieldId} className="font-medium text-body text-ink">
-            {t("staff.assign.username")}
-          </label>
-          <Input
-            ref={input}
-            id={fieldId}
-            // Where a reader expects to type the moment the dialog opens.
-            autoFocus
-            value={username}
-            onChange={(event) => {
-              setUsername(event.target.value);
-              setFieldError(null);
-            }}
-            autoComplete="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            placeholder={t("staff.assign.placeholder")}
-            aria-invalid={fieldError === null ? undefined : true}
-            aria-describedby={fieldError === null ? hintId : `${errorId} ${hintId}`}
-            className="font-mono"
-          />
-          <p id={hintId} className="text-caption text-muted">
-            {t("staff.assign.hint")}
-          </p>
-          {fieldError !== null && (
-            <p
-              id={errorId}
-              role="alert"
-              className="flex items-center gap-tight text-caption text-warn-ink"
-            >
-              <CircleAlert aria-hidden className="size-icon shrink-0" />
-              {fieldError}
-            </p>
-          )}
-        </div>
+        <Field
+          ref={input}
+          id={fieldId}
+          label={t("staff.assign.username")}
+          hint={t("staff.assign.hint")}
+          error={fieldError ?? undefined}
+          // Where a reader expects to type the moment the dialog opens.
+          autoFocus
+          value={username}
+          onChange={(event) => {
+            setUsername(event.target.value);
+            setFieldError(null);
+          }}
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          placeholder={t("staff.assign.placeholder")}
+          className="font-mono"
+        />
         {forbidden && scope !== null && <Forbidden permission={grantPermission(scope)} />}
         {refusal !== null && (
           <p role="alert" className="text-body text-warn-ink">

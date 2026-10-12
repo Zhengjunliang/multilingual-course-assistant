@@ -11,7 +11,6 @@ import { useTranslation } from "react-i18next";
 
 import { MAX_QUESTION_CHARS } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { MAX_BUSY_RETRIES, type Waiting } from "./useAsk";
 
@@ -179,7 +178,7 @@ export function Composer({
             so one line of text and the arrow share a centre, and the button
             stays at the foot as the question grows, where the caret is. */}
         <div className="flex items-end gap-snug">
-          <Textarea
+          <textarea
             ref={field}
             id="question"
             rows={1}
@@ -188,7 +187,7 @@ export function Composer({
             placeholder={t("ask.placeholder")}
             onChange={(event) => setQuestion(event.target.value)}
             onKeyDown={onKeyDown}
-            className="field-sizing-content max-h-[40vh] min-h-control-icon min-w-0 flex-1 resize-none border-0 bg-transparent px-hair focus-visible:outline-none"
+            className="field-sizing-content max-h-[40vh] min-h-control-icon min-w-0 flex-1 resize-none bg-transparent px-hair py-tight text-body text-ink outline-none placeholder:text-muted"
           />
           {/* One round button, as ChatGPT, Claude and Gemini keep theirs: an
               arrow that sends, and a square that stops while an answer is
