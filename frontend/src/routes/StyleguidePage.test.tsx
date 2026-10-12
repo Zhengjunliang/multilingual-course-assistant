@@ -41,6 +41,18 @@ describe("the component catalogue", () => {
     expect(missing).toEqual([]);
   });
 
+  it("names the shared components outside the layer that pages compose like primitives", () => {
+    // `components/ui` is read off the disk; these live beside it, in
+    // `components/`, and #190 changed them with the rest, so they are named
+    // here by hand.
+    const html = page();
+    const missing = ["LineField", "PasswordField", "StatusPanel"].filter(
+      (name) => !html.includes(name),
+    );
+
+    expect(missing).toEqual([]);
+  });
+
   it("shows both themes at once", () => {
     // A toggle would show one theme at a time, which is how a component ends up
     // right in one and wrong in the other. Both panels are on the page together.

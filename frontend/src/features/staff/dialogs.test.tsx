@@ -243,7 +243,7 @@ describe("revoking a role", () => {
       />,
     );
     const confirm = button("Revoca");
-    const destructive = confirm?.className.includes("bg-warn-ink") ?? false;
+    const destructive = confirm?.classList.contains("text-warn-ink") ?? false;
     act(() => {
       confirm?.focus();
       confirm?.click();

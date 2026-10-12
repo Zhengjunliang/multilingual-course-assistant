@@ -59,7 +59,7 @@ export const PAIRS = [
     back: "surface",
     min: TEXT,
     where:
-      "SourcesPanel.tsx where a source is and its excerpt, LineField.tsx a field's underline and label",
+      "SourcesPanel.tsx where a source is and its excerpt, LineField.tsx a field's underline and label, kbd.tsx a key's cap",
   },
   { front: "ink", back: "sidebar", min: TEXT, where: "ConversationSidebar.tsx title and rows" },
   {
@@ -72,15 +72,21 @@ export const PAIRS = [
     front: "ink",
     back: "mark",
     min: TEXT,
-    where: "a ghost icon button under the pointer, SourcesPanel.tsx row title under the pointer",
+    where: "chip.tsx and avatar.tsx neutral tone, SourcesPanel.tsx row title under the pointer",
   },
   {
     front: "muted",
     back: "mark",
     min: TEXT,
-    where: "AnswerMarkdown.tsx citation pill at rest, SourcesPanel.tsx row under the pointer",
+    where:
+      "AnswerMarkdown.tsx citation pill at rest, SourcesPanel.tsx row under the pointer, count.tsx, avatar-stack.tsx the rest as +N",
   },
-  { front: "accent-ink", back: "accent", min: TEXT, where: "button.tsx default variant" },
+  {
+    front: "accent-ink",
+    back: "accent",
+    min: TEXT,
+    where: "button.tsx primary variant, count.tsx accent tone",
+  },
   {
     front: "accent",
     back: "canvas",
@@ -99,16 +105,26 @@ export const PAIRS = [
     back: "accent-soft",
     min: TEXT,
     where:
-      "badge.tsx state word, ConversationSidebar.tsx open conversation, ManagementNav.tsx current page",
+      "badge.tsx, chip.tsx and avatar.tsx accent tone, button.tsx soft variant, ConversationSidebar.tsx open conversation, ManagementNav.tsx current page",
   },
-  { front: "warn-ink", back: "warn", min: TEXT, where: "TurnView.tsx failure box" },
+  {
+    front: "warn-ink",
+    back: "warn",
+    min: TEXT,
+    where: "TurnView.tsx failure box, button.tsx warn variant, chip.tsx warn tone",
+  },
+  {
+    front: "ink",
+    back: "tint",
+    min: TEXT,
+    where: "routes/styleguide/basics.tsx the --tint swatch",
+  },
   {
     front: "warn-ink",
     back: "surface",
     min: TEXT,
     where: "AuthLayout.tsx a refusal on the sign-in card, LineField.tsx a refused field's line",
   },
-  { front: "accent-ink", back: "warn-ink", min: TEXT, where: "button.tsx destructive variant" },
 ];
 
 /**
@@ -119,7 +135,38 @@ export const PAIRS = [
  * apart from the ground (check-contrast.mjs, the ladder), since a row under
  * the pointer that cannot be told from its neighbours has not changed.
  */
-export const TINTS = [];
+export const TINTS = [
+  {
+    tint: "hover",
+    ground: "canvas",
+    fronts: ["ink"],
+    where: "button.tsx ghost and outline variants under the pointer, on the page",
+  },
+  {
+    tint: "hover",
+    ground: "surface",
+    fronts: ["ink"],
+    where: "button.tsx ghost and outline variants under the pointer, in a card or a dialog",
+  },
+  {
+    tint: "hover",
+    ground: "sidebar",
+    fronts: ["ink"],
+    where: "button.tsx ghost variant under the pointer, ConversationSidebar.tsx icon buttons",
+  },
+  {
+    tint: "selected",
+    ground: "canvas",
+    fronts: ["accent"],
+    where: "routes/styleguide/basics.tsx the --selected swatch",
+  },
+  {
+    tint: "selected",
+    ground: "surface",
+    fronts: ["accent"],
+    where: "button.tsx soft variant under the pointer",
+  },
+];
 
 /**
  * The cat's files are written in hex (src/brand/fumetto.ts), because an SVG or

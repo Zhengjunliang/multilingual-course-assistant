@@ -6,8 +6,10 @@
  * exists to sequence an image load against a fallback, and there is no image to
  * load. A dependency whose entire job is the case that cannot happen here.
  *
- * `--mark` rather than the accent. The accent is spent on what a reader is
- * about to do; an avatar is a label for who they already are.
+ * Two tones (#190): `accent`, the tint of a chip in the accent, edged by its
+ * hairline, and `neutral` on `--mark`, so a list can tell two kinds of people
+ * apart. Three sizes: `sm` inside a line of text or a stack, `md` and `lg` as
+ * tall as the control beside them.
  */
 
 import { cn } from "@/lib/utils";
@@ -15,12 +17,18 @@ import { cn } from "@/lib/utils";
 interface AvatarProps {
   /** Shown as its first letter, uppercased. An empty name renders no letter. */
   name: string;
-  /** `sm` sits inside a line of text, beside the name it stands for. */
-  size?: "default" | "sm";
+  size?: "sm" | "md" | "lg";
+  tone?: "accent" | "neutral";
   className?: string;
 }
 
-export function Avatar({ name, size = "default", className }: AvatarProps) {
+const SIZES = {
+  sm: "size-avatar-sm text-caption",
+  md: "size-control-sm text-caption",
+  lg: "size-control text-body",
+} as const;
+
+export function Avatar({ name, size = "md", tone = "accent", className }: AvatarProps) {
   // `[...name]` and not `name[0]`: the first *character* of "Émile" is one code
   // point but the first UTF-16 unit of an emoji or a rarer CJK glyph is half of
   // a surrogate pair, which renders as a replacement square.
@@ -30,8 +38,11 @@ export function Avatar({ name, size = "default", className }: AvatarProps) {
     <span
       aria-hidden
       className={cn(
-        "flex shrink-0 select-none items-center justify-center rounded-full bg-mark font-medium text-caption text-ink",
-        size === "sm" ? "size-icon-lg" : "size-control-icon",
+        "flex shrink-0 select-none items-center justify-center rounded-full font-semibold ring-1 ring-inset",
+        SIZES[size],
+        tone === "accent"
+          ? "bg-accent-soft text-accent ring-accent-line"
+          : "bg-mark text-ink ring-line",
         className,
       )}
     >

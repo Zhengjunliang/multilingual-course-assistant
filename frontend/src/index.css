@@ -801,6 +801,25 @@
   }
 }
 
+/*
+ * A spinner turning (components/ui/spinner.tsx), a little faster than a turn
+ * a second, beside words that say what is on its way. Under reduced motion it
+ * stands still, and the words still say it.
+ */
+@keyframes turn {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@utility spinner {
+  animation: turn 800ms linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 html,
 body,
 #root {

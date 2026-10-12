@@ -39,7 +39,7 @@ interface AlertDialogProps {
   confirmLabel: string;
   /** Does the thing; resolves to whether it was done, and the dialog closes only then. */
   onConfirm: () => Promise<boolean>;
-  /** The warning colour on the confirming button, for an action that destroys something. */
+  /** The warning's tint on the confirming button, for an action that destroys something. */
   destructive?: boolean;
   /** Keeps the confirming button off, after a refusal that asking again would only repeat. */
   confirmDisabled?: boolean;
@@ -112,8 +112,9 @@ export function AlertDialog({
             </RadixAlertDialog.Cancel>
             <Button
               type="button"
-              variant={destructive ? "destructive" : "default"}
-              disabled={running || confirmDisabled}
+              variant={destructive ? "warn" : "primary"}
+              pending={running}
+              disabled={confirmDisabled}
               onClick={() => void confirm()}
             >
               {confirmLabel}

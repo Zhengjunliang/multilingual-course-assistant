@@ -19,6 +19,11 @@ colors:
   warn: '#FFEDEB'
   warn-line: '#E54B50'
   warn-ink: '#A2031F'
+  hover-over-canvas: '#EBF1F6'
+  hover-over-surface: '#F0F4F7'
+  hover-over-sidebar: '#E4EBF1'
+  selected-over-canvas: '#DFE9F0'
+  selected-over-surface: '#E3EBF1'
   canvas-dark: '#07090C'
   surface-dark: '#0E1216'
   sidebar-dark: '#14191E'
@@ -34,6 +39,11 @@ colors:
   warn-dark: '#271514'
   warn-line-dark: '#FF5B5B'
   warn-ink-dark: '#FFB7B2'
+  hover-over-canvas-dark: '#0F171F'
+  hover-over-surface-dark: '#161F28'
+  hover-over-sidebar-dark: '#1B252F'
+  selected-over-canvas-dark: '#162430'
+  selected-over-surface-dark: '#1C2B38'
 typography:
   caption:
     fontFamily: 'Figtree'
@@ -126,18 +136,31 @@ components:
   warn-ink-on-warn:
     backgroundColor: '{colors.warn}'
     textColor: '{colors.warn-ink}'
+  ink-on-tint:
+    backgroundColor: '{colors.tint}'
+    textColor: '{colors.ink}'
   warn-ink-on-surface:
     backgroundColor: '{colors.surface}'
     textColor: '{colors.warn-ink}'
-  accent-ink-on-warn-ink:
-    backgroundColor: '{colors.warn-ink}'
-    textColor: '{colors.accent-ink}'
+  ink-on-hover-over-canvas:
+    backgroundColor: '{colors.hover-over-canvas}'
+    textColor: '{colors.ink}'
+  ink-on-hover-over-surface:
+    backgroundColor: '{colors.hover-over-surface}'
+    textColor: '{colors.ink}'
+  ink-on-hover-over-sidebar:
+    backgroundColor: '{colors.hover-over-sidebar}'
+    textColor: '{colors.ink}'
+  accent-on-selected-over-canvas:
+    backgroundColor: '{colors.selected-over-canvas}'
+    textColor: '{colors.accent}'
+  accent-on-selected-over-surface:
+    backgroundColor: '{colors.selected-over-surface}'
+    textColor: '{colors.accent}'
   line-fill:
     backgroundColor: '{colors.line}'
   hairline-fill:
     backgroundColor: '{colors.hairline}'
-  tint-fill:
-    backgroundColor: '{colors.tint}'
   warn-line-fill:
     backgroundColor: '{colors.warn-line}'
   ink-on-canvas-dark:
@@ -182,18 +205,31 @@ components:
   warn-ink-on-warn-dark:
     backgroundColor: '{colors.warn-dark}'
     textColor: '{colors.warn-ink-dark}'
+  ink-on-tint-dark:
+    backgroundColor: '{colors.tint-dark}'
+    textColor: '{colors.ink-dark}'
   warn-ink-on-surface-dark:
     backgroundColor: '{colors.surface-dark}'
     textColor: '{colors.warn-ink-dark}'
-  accent-ink-on-warn-ink-dark:
-    backgroundColor: '{colors.warn-ink-dark}'
-    textColor: '{colors.accent-ink-dark}'
+  ink-on-hover-over-canvas-dark:
+    backgroundColor: '{colors.hover-over-canvas-dark}'
+    textColor: '{colors.ink-dark}'
+  ink-on-hover-over-surface-dark:
+    backgroundColor: '{colors.hover-over-surface-dark}'
+    textColor: '{colors.ink-dark}'
+  ink-on-hover-over-sidebar-dark:
+    backgroundColor: '{colors.hover-over-sidebar-dark}'
+    textColor: '{colors.ink-dark}'
+  accent-on-selected-over-canvas-dark:
+    backgroundColor: '{colors.selected-over-canvas-dark}'
+    textColor: '{colors.accent-dark}'
+  accent-on-selected-over-surface-dark:
+    backgroundColor: '{colors.selected-over-surface-dark}'
+    textColor: '{colors.accent-dark}'
   line-fill-dark:
     backgroundColor: '{colors.line-dark}'
   hairline-fill-dark:
     backgroundColor: '{colors.hairline-dark}'
-  tint-fill-dark:
-    backgroundColor: '{colors.tint-dark}'
   warn-line-fill-dark:
     backgroundColor: '{colors.warn-line-dark}'
 ---
@@ -255,7 +291,7 @@ The pill (`bg-pill`) is the material of what floats in the page and takes input,
 
 Four corners, by what wears them: `rounded-chip` for a short word (a code, a segment, the corner a message bubble points from), `rounded-control` for a control and a notice, `rounded-card` for a card, a window and a menu, `rounded-bubble` for a message and the composer. `rounded-full` is kept for what is round by shape: an avatar, a pill, a dot. Softer than the university website's square frames, which the interface must not imitate.
 
-Icons come from Lucide, at `size-icon` beside text and `size-icon-lg` standing alone, and take the colour of the text beside them.
+Icons come from Lucide, at `size-icon` beside text and `size-icon-lg` standing alone, and take the colour of the text beside them. One exception: the icon of an action row, a row in a list that starts something rather than leading somewhere, such as the sidebar's new-conversation row, takes the accent, so the one action among places reads as one.
 
 ## Components
 
