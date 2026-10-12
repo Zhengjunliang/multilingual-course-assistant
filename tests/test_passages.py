@@ -53,6 +53,21 @@ APRIL = (
 
 TASSE = "Le tasse universitarie si pagano in due rate tramite il portale dei servizi online."
 
+# Three editions, each a near-duplicate of the next, the first and the last
+# too far apart to be one by themselves.
+EDITIONS = (
+    "The teaching centre holds the laboratories, the lecture rooms and the offices of the "
+    "School, and opens to students on every weekday from the early morning.",
+    "The teaching centre holds the laboratories, both lecture rooms and the offices of the "
+    "School, and opens to everyone on every weekday from the early morning.",
+    "The teaching centre holds the laboratories, both lecture rooms and the offices for the "
+    "School, and opens to everyone on every day from the early morning.",
+)
+
+# Two paragraphs of one page, alike enough to be one passage on two pages.
+ANALYSIS = "Il corso di Analisi si tiene il lunedi in aula 101 del plesso di Santa Marta."
+PHYSICS = ANALYSIS.replace("Analisi", "Fisica")
+
 
 def web_chunk(
     index: int,
@@ -175,15 +190,40 @@ def test_one_template_with_other_dates_stays_two_hits() -> None:
     assert len(collapse(hits_of(february, april))) == 2
 
 
+def test_a_chain_of_editions_is_one_hit_whatever_their_ranks() -> None:
+    """The middle edition ranked last still joins the first and the last."""
+    first, middle, last = (
+        web_chunk(index, text, url)
+        for index, (text, url) in enumerate(
+            zip(EDITIONS, (GUIDE_2015, GUIDE_2018, GUIDE_2020), strict=True)
+        )
+    )
+    assert not near_duplicate(EDITIONS[0], EDITIONS[2])
+
+    assert [hit.chunk.url for hit in collapse(hits_of(first, last, middle))] == [GUIDE_2020]
+
+
 def test_two_paragraphs_of_one_page_stay_two_hits_however_alike() -> None:
     url = "https://ingegneria.unifi.it/p536.html"
-    analysis = "Il corso di Analisi si tiene il lunedi in aula 101 del plesso di Santa Marta."
-    physics = analysis.replace("Analisi", "Fisica")
-    first = web_chunk(0, analysis, url, content_hash="cc" * 32)
-    second = web_chunk(1, physics, url, content_hash="cc" * 32)
+    first = web_chunk(0, ANALYSIS, url, content_hash="cc" * 32)
+    second = web_chunk(1, PHYSICS, url, content_hash="cc" * 32)
 
-    assert near_duplicate(analysis, physics)  # alike enough to merge across pages
+    assert near_duplicate(ANALYSIS, PHYSICS)  # alike enough to merge across pages
     assert len(collapse(hits_of(first, second))) == 2
+
+
+def test_a_copy_at_another_address_does_not_join_two_paragraphs_of_one_page() -> None:
+    """The copy of the first paragraph is a near-duplicate of the second, so a
+    group open to any member's copies would take all three."""
+    url = "https://ingegneria.unifi.it/p536.html"
+    first = web_chunk(0, ANALYSIS, url, content_hash="cc" * 32)
+    copy = web_chunk(1, ANALYSIS, "https://ingegneria.unifi.it/vp-536-corsi.html")
+    second = web_chunk(2, PHYSICS, url, content_hash="cc" * 32)
+
+    assert [hit.chunk.text for hit in collapse(hits_of(first, copy, second))] == [
+        ANALYSIS,
+        PHYSICS,
+    ]
 
 
 def test_one_slides_text_in_two_editions_stays_two_hits() -> None:
