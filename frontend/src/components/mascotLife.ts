@@ -259,9 +259,15 @@ export function live(life: Life, senses: Senses): Pose {
 
   const hopped = (now - life.hopAt) / TIMING.hop;
   const hopping = hopped >= 0 && hopped < 1;
-  const happy = cheer || hopping || now < life.happyUntil;
-  const frowned = now - life.frownAt;
-  const frowning = frowned >= 0 && frowned < TIMING.frown;
+  // A refusal heard after this frame began, the frame's time being when it
+  // began, counts from this frame.
+  const frowned = Math.max(0, now - life.frownAt);
+  const frowning = frowned < TIMING.frown;
+  // The pointer resting on the send button smiles only while nothing else is
+  // going on: a pointer that clicked a sign-in form's button stays there
+  // through the wait, the refusal and the password typed again.
+  const cheering = cheer && !frowning && !senses.busy && !senses.away;
+  const happy = cheering || hopping || now < life.happyUntil;
   // Not looking while a password is typed, unless something else holds its
   // face: a refusal, a smile, a form being sent, sleep.
   const away = senses.away && !frowning && !happy && !senses.busy && life.mode === "awake";
@@ -283,9 +289,7 @@ export function live(life: Life, senses: Senses): Pose {
 
   // A shake of the head that dies out, about five times a second.
   const shake =
-    frowned >= 0 && frowned < TIMING.shake
-      ? 0.13 * Math.sin(frowned * 30) * Math.exp(-frowned * 3.2)
-      : 0;
+    frowned < TIMING.shake ? 0.13 * Math.sin(frowned * 30) * Math.exp(-frowned * 3.2) : 0;
   const both = (eye: Eye) => ({ left: eye, right: eye });
   let eyes: Pose["eyes"] = both("open");
   if (asleep || (yawning && sinceYawn > 0.15)) eyes = both("shut");

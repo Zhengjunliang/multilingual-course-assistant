@@ -17,6 +17,11 @@
  * Chrome paints a filled field pale blue, which an inset `box-shadow` of the
  * card's own colour covers. The label floats and the line grows without a
  * transition under reduced motion: they change at once.
+ *
+ * The accent line is an element, as Material's line ripple is, and not the
+ * field's `::after`: axe gives up measuring the contrast of any text whose
+ * ancestor has a positioned, painted pseudo-element larger than a quarter of
+ * the text (axe-core's `pseudoContent`), and the line is wider than that.
  */
 
 import type { ComponentProps, ReactNode } from "react";
@@ -32,12 +37,7 @@ interface LineFieldProps extends Omit<ComponentProps<"input">, "placeholder"> {
 
 export function LineField({ id, label, trailing, className, ...input }: LineFieldProps) {
   return (
-    <div
-      className={cn(
-        "relative after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-left after:scale-x-0 after:bg-accent after:transition-transform after:duration-slow after:ease-emphasized focus-within:after:scale-x-100 has-[[aria-invalid=true]]:after:scale-x-100 has-[[aria-invalid=true]]:after:bg-warn-ink motion-reduce:after:transition-none",
-        className,
-      )}
-    >
+    <div className={cn("group relative", className)}>
       <input
         id={id}
         placeholder=" "
@@ -53,6 +53,10 @@ export function LineField({ id, label, trailing, className, ...input }: LineFiel
       >
         {label}
       </label>
+      <span
+        aria-hidden
+        className="absolute inset-x-0 bottom-0 h-0.5 origin-left scale-x-0 bg-accent transition-transform duration-slow ease-emphasized group-focus-within:scale-x-100 group-has-[[aria-invalid=true]]:scale-x-100 group-has-[[aria-invalid=true]]:bg-warn-ink motion-reduce:transition-none"
+      />
       {trailing}
     </div>
   );

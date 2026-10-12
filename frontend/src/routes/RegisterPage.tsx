@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate } from "react-router-dom";
 
@@ -10,10 +10,10 @@ import { DEFAULT_UI_LOCALE, isUiLocale, type UiLocale } from "@/i18n";
 import { AuthButton, AuthFailure, AuthLayout } from "./AuthLayout";
 import { useLanding } from "./landing";
 
-/** The ids of the messages that describe each field, and of the form's own. */
+/** The ids of the messages that describe each field. */
 const HINT = "password-hint";
 const about = (field: string) => `${field}-refused`;
-const FAILURE = "register-failure";
+const FIELDS = ["username", "password"];
 
 export default function RegisterPage() {
   const { t, i18n } = useTranslation();
@@ -23,6 +23,14 @@ export default function RegisterPage() {
   const [failure, setFailure] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string[]>>({});
   const landing = useLanding("/");
+
+  // A refusal that names fields puts the focus in the first of them, once
+  // its messages describe it, as the login page puts it in its password. A
+  // failure no field carries is an alert instead.
+  useEffect(() => {
+    const first = FIELDS.find((field) => (fields[field] ?? []).length > 0);
+    if (first !== undefined) document.getElementById(first)?.focus();
+  }, [fields]);
 
   if (account !== null && landing.phase === "idle") return <Navigate to="/" replace />;
 
@@ -67,7 +75,7 @@ export default function RegisterPage() {
     <AuthLayout
       heading={t("auth.registerTitle")}
       refusals={landing.refusals}
-      crouching={landing.phase === "crouching"}
+      phase={landing.phase}
       footer={
         <>
           {t("auth.haveAccount")}{" "}
@@ -110,7 +118,7 @@ export default function RegisterPage() {
           {messages("password")}
         </div>
 
-        {failure !== null && <AuthFailure id={FAILURE}>{failure}</AuthFailure>}
+        {failure !== null && <AuthFailure role="alert">{failure}</AuthFailure>}
         <AuthButton phase={landing.phase}>{t("auth.register")}</AuthButton>
       </form>
     </AuthLayout>
