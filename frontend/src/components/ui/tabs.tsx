@@ -8,6 +8,10 @@
  * tabs are underlined rather than boxed, as GitHub's UnderlineNav is: the
  * selected one in ink over a 2 px rule in the accent, since the tab shown is
  * where the reader is, and its count in the accent too (#190, rules 3 and 5).
+ *
+ * Every panel stays mounted and the ones not shown are hidden (`forceMount`),
+ * where Radix would unmount them: a filter typed into one tab is still there
+ * when the reader comes back to it from another.
  */
 
 import * as RadixTabs from "@radix-ui/react-tabs";
@@ -62,7 +66,8 @@ export function Tabs<T extends string>({ label, tabs, defaultValue, className }:
         <RadixTabs.Content
           key={tab.value}
           value={tab.value}
-          className="focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+          forceMount
+          className="focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 data-[state=inactive]:hidden"
         >
           {tab.content}
         </RadixTabs.Content>

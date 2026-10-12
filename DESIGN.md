@@ -86,8 +86,11 @@ spacing:
   sidebar: '16.5rem'
   rail: '3.75rem'
   bar: '0.1875rem'
+  table-head: '2.25rem'
+  table-row: '3.375rem'
   icon: '1rem'
   icon-lg: '1.25rem'
+  icon-xl: '2.25rem'
   avatar-sm: '1.5rem'
   avatar: '1.75rem'
   mascot: '6rem'
@@ -169,6 +172,9 @@ components:
   ink-on-hover-over-surface:
     backgroundColor: '{colors.hover-over-surface}'
     textColor: '{colors.ink}'
+  muted-on-hover-over-surface:
+    backgroundColor: '{colors.hover-over-surface}'
+    textColor: '{colors.muted}'
   ink-on-hover-over-tint:
     backgroundColor: '{colors.hover-over-tint}'
     textColor: '{colors.ink}'
@@ -178,6 +184,12 @@ components:
   accent-on-selected-over-surface:
     backgroundColor: '{colors.selected-over-surface}'
     textColor: '{colors.accent}'
+  ink-on-selected-over-surface:
+    backgroundColor: '{colors.selected-over-surface}'
+    textColor: '{colors.ink}'
+  muted-on-selected-over-surface:
+    backgroundColor: '{colors.selected-over-surface}'
+    textColor: '{colors.muted}'
   line-fill:
     backgroundColor: '{colors.line}'
   hairline-fill:
@@ -259,6 +271,9 @@ components:
   ink-on-hover-over-surface-dark:
     backgroundColor: '{colors.hover-over-surface-dark}'
     textColor: '{colors.ink-dark}'
+  muted-on-hover-over-surface-dark:
+    backgroundColor: '{colors.hover-over-surface-dark}'
+    textColor: '{colors.muted-dark}'
   ink-on-hover-over-tint-dark:
     backgroundColor: '{colors.hover-over-tint-dark}'
     textColor: '{colors.ink-dark}'
@@ -268,6 +283,12 @@ components:
   accent-on-selected-over-surface-dark:
     backgroundColor: '{colors.selected-over-surface-dark}'
     textColor: '{colors.accent-dark}'
+  ink-on-selected-over-surface-dark:
+    backgroundColor: '{colors.selected-over-surface-dark}'
+    textColor: '{colors.ink-dark}'
+  muted-on-selected-over-surface-dark:
+    backgroundColor: '{colors.selected-over-surface-dark}'
+    textColor: '{colors.muted-dark}'
   line-fill-dark:
     backgroundColor: '{colors.line-dark}'
   hairline-fill-dark:

@@ -6,7 +6,6 @@
 import { ArrowRight, BookOpen, GraduationCap, Info, Lock, MessageSquare } from "lucide-react";
 
 import { AvatarStack } from "@/components/ui/avatar-stack";
-import { Badge } from "@/components/ui/badge";
 import { Banner } from "@/components/ui/banner";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import { Chip } from "@/components/ui/chip";
 import { Count } from "@/components/ui/count";
 import { Empty } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusDot } from "@/components/ui/status-dot";
 import {
   Table,
   TableBody,
@@ -109,27 +109,39 @@ export function Surfaces() {
 
       <Specimen
         name="Table"
-        note="Native table markup: TableHeader, TableBody, TableRow, TableHead, TableCell. Below sm each row stacks into a card; a row under the pointer wears --hover."
+        note="Native table markup: TableHeader, TableBody, TableRow, TableHead, TableCell. A panel: the head on --tint, 36 px; rows of 54 px, a name over its code, a hairline between them; --hover under the pointer; selected, the row the reader opened and came back to, at --selected with its bar. Below sm each row stacks into a card."
       >
         <Table aria-label="Edizioni">
           <TableHeader>
             <TableRow>
-              <TableHead>Corso</TableHead>
-              <TableHead>Anno</TableHead>
+              <TableHead>Insegnamento</TableHead>
+              <TableHead>Anno accademico</TableHead>
               <TableHead>Stato</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow>
-              <TableCell>B028451 Progettazione e Produzione Multimediale</TableCell>
-              <TableCell>2025-2026</TableCell>
-              <TableCell />
-            </TableRow>
-            <TableRow>
-              <TableCell>B028451 Progettazione e Produzione Multimediale</TableCell>
-              <TableCell>2024-2025</TableCell>
               <TableCell>
-                <Badge>Corrente</Badge>
+                <span className="block font-semibold uppercase">
+                  Progettazione e Produzione Multimediale
+                </span>
+                <span className="block font-mono text-caption text-muted">B028451</span>
+              </TableCell>
+              <TableCell label="Anno accademico">2025-2026</TableCell>
+              <TableCell label="Stato">
+                <StatusDot on={false}>Non corrente</StatusDot>
+              </TableCell>
+            </TableRow>
+            <TableRow selected>
+              <TableCell>
+                <span className="block font-semibold uppercase">
+                  Progettazione e Produzione Multimediale
+                </span>
+                <span className="block font-mono text-caption text-muted">B028451</span>
+              </TableCell>
+              <TableCell label="Anno accademico">2024-2025</TableCell>
+              <TableCell label="Stato">
+                <StatusDot on>Corrente</StatusDot>
               </TableCell>
             </TableRow>
           </TableBody>
@@ -138,10 +150,11 @@ export function Surfaces() {
 
       <Specimen
         name="Breadcrumb"
-        note="The pages above this one, each a link, and this one marked as the current page."
+        note="The pages above this one, each a link, and this one marked as the current page, at 600; the area's icon may lead it in a tinted disc, left out on a phone."
       >
         <Breadcrumb
           label="Percorso"
+          icon={GraduationCap}
           crumbs={[
             { label: "Corsi di laurea", to: "/staff/programmes" },
             { label: "B047 · INGEGNERIA INFORMATICA" },

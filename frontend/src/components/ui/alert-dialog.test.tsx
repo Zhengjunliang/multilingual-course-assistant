@@ -5,6 +5,7 @@
  * where focus starts, and that it closes only once the action is done.
  */
 
+import { UserMinus } from "lucide-react";
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,6 +22,7 @@ function open(onConfirm: () => Promise<boolean>, onOpenChange = vi.fn()) {
       cancelLabel="Annulla"
       confirmLabel="Rimuovi"
       onConfirm={onConfirm}
+      icon={UserMinus}
       destructive
     >
       <p>refused</p>
@@ -29,7 +31,7 @@ function open(onConfirm: () => Promise<boolean>, onOpenChange = vi.fn()) {
   const dialog = document.body.querySelector<HTMLElement>('[role="alertdialog"]');
   const button = (name: string) =>
     [...(dialog?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find(
-      (b) => b.textContent === name,
+      (b) => b.textContent?.trim() === name,
     );
   return { ...mounted, dialog, button, onOpenChange };
 }
@@ -76,5 +78,19 @@ describe("the alert dialog", () => {
 
     expect(whileRunning).toEqual([]);
     expect(disabled).toEqual([true, true]);
+  });
+
+  it("repeats the disc's icon on its destructive button, giving it up to the spinner while it runs", async () => {
+    let finish: (done: boolean) => void = () => {};
+    const { button, unmount } = open(() => new Promise<boolean>((resolve) => (finish = resolve)));
+    const icon = () => button("Rimuovi")?.querySelector(".lucide-user-minus") ?? null;
+
+    const atRest = icon();
+    await act(async () => button("Rimuovi")?.click());
+    const whileRunning = icon();
+    await act(async () => finish(false));
+    unmount();
+
+    expect([atRest?.getAttribute("aria-hidden"), whileRunning]).toEqual(["true", null]);
   });
 });
