@@ -6,10 +6,10 @@
  * A layout route (React Router's own pattern) rather than a shell each page
  * renders for itself: the sidebar is wired once, so moving between the chat
  * and a staff page neither fetches the conversations again nor flashes an
- * empty list. The conversations, deleting one, and the conversation being
- * answered live here for that reason; the chat reports the last of these
- * (routes/shell.ts). Leaving the chat unmounts it, which stops an answer being
- * written (features/chat/useAsk.ts).
+ * empty list. The conversations, pinning and deleting one, and the
+ * conversation being answered live here for that reason; the chat reports the
+ * last of these (routes/shell.ts). Leaving the chat unmounts it, which stops
+ * an answer being written (features/chat/useAsk.ts).
  * The toasts the staff pages raise live here too, so one outlasts the page
  * that raised it.
  */
@@ -17,11 +17,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useMatch, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 import { listProgrammes, type Programme } from "@/api/catalog";
 import { isRefusal } from "@/api/client";
 import type { ConversationSummary } from "@/api/conversations";
-import { deleteConversation, listConversations } from "@/api/conversations";
+import { deleteConversation, listConversations, pinConversation } from "@/api/conversations";
 import { ApiError } from "@/api/http";
 import { isStaff } from "@/auth/staff";
 import { useSession } from "@/auth/useSession";
@@ -131,6 +132,29 @@ export default function ShellLayout() {
     [open, navigate, refreshConversations, refused],
   );
 
+  // Pinning moves a row only once the server has said so, through the list
+  // it asks for next (features/chat/ConversationList.tsx). A 404 is a
+  // conversation deleted from another tab, which that list leaves out; any
+  // other failure leaves the row where it was and says so in a toast.
+  const onPin = useCallback(
+    async (id: number, pinned: boolean) => {
+      try {
+        await pinConversation(id, pinned);
+      } catch (error) {
+        const gone = error instanceof ApiError && error.status === 404;
+        if (!gone) {
+          refused(error);
+          toast.error(t(pinned ? "sidebar.pinFailed" : "sidebar.unpinFailed"));
+        }
+        refreshConversations();
+        return false;
+      }
+      refreshConversations();
+      return true;
+    },
+    [refreshConversations, refused, t],
+  );
+
   const items = useMemo(
     () => (account === null ? [] : managementItems(account, programmes.data)),
     [account, programmes.data],
@@ -155,6 +179,7 @@ export default function ShellLayout() {
     <ConversationSidebar
       conversations={conversations}
       busy={busy}
+      onPin={onPin}
       onDelete={onDelete}
       controls={controls}
       management={

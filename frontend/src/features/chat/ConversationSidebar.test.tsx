@@ -21,10 +21,13 @@ import { summary } from "@/test/conversations";
 import { mount } from "@/test/mount";
 import { ConversationSidebar } from "./ConversationSidebar";
 
-const ROWS: ConversationSummary[] = [
-  summary({ id: 7, created_at: "2026-09-28T10:00:00Z", title: "Che cos'è un ORM?" }),
-  summary({ id: 8, created_at: "2026-09-27T10:00:00Z", title: "Quando scadono le tasse?" }),
-];
+const ORM = summary({ id: 7, created_at: "2026-09-28T10:00:00Z", title: "Che cos'è un ORM?" });
+const FEES = summary({
+  id: 8,
+  created_at: "2026-09-27T10:00:00Z",
+  title: "Quando scadono le tasse?",
+});
+const ROWS: ConversationSummary[] = [ORM, FEES];
 
 function sidebar(conversations: ConversationSummary[] | null) {
   return mount(
@@ -43,6 +46,7 @@ function sidebar(conversations: ConversationSummary[] | null) {
         <ConversationSidebar
           conversations={conversations}
           busy={null}
+          onPin={async () => true}
           onDelete={async () => true}
           controls={{
             placement: "column",
@@ -61,12 +65,13 @@ function sidebar(conversations: ConversationSummary[] | null) {
   );
 }
 
-function deleteButton(title: string) {
-  const label = i18n.t("sidebar.delete", { title });
+function labelled(label: string) {
   return [...document.body.querySelectorAll<HTMLButtonElement>("button")].find(
     (button) => button.getAttribute("aria-label") === label,
   );
 }
+
+const deleteButton = (title: string) => labelled(i18n.t("sidebar.delete", { title }));
 
 function search(container: HTMLElement, text: string) {
   const field = container.querySelector<HTMLInputElement>('input[type="search"]');
@@ -80,6 +85,15 @@ function search(container: HTMLElement, text: string) {
 
 const rowTitles = (container: HTMLElement) =>
   [...container.querySelectorAll('a[href^="/c/"]')].map((row) => row.firstChild?.textContent);
+
+const groupTitles = (container: HTMLElement, group: string) =>
+  [...container.querySelectorAll(`nav[aria-label="${group}"] a`)].map(
+    (row) => row.firstChild?.textContent,
+  );
+
+/** The row's second line: what its last answer drew on. */
+const sourceLine = (container: HTMLElement, id: number) =>
+  container.querySelector(`a[href="/c/${id}"]`)?.lastElementChild;
 
 describe("the conversation sidebar", () => {
   it("marks itself as the sidebar's panel, so the shell's keys work in the drawer", () => {
@@ -111,7 +125,7 @@ describe("the conversation sidebar", () => {
     expect(rows).toEqual([]);
   });
 
-  it("counts the conversations, each with when it started", () => {
+  it("counts the conversations, each with the time of its last message", () => {
     const { container, unmount } = sidebar(ROWS);
     const heading = container.querySelector('nav[aria-label="Recenti"] h2')?.textContent;
     const times = [...container.querySelectorAll("a time")].map((time) =>
@@ -120,7 +134,96 @@ describe("the conversation sidebar", () => {
     unmount();
 
     expect(heading).toBe("Recenti2");
-    expect(times).toEqual(ROWS.map((row) => row.created_at));
+    expect(times).toEqual(ROWS.map((row) => row.last_message_at));
+  });
+
+  it("puts the pinned conversations under «Fissate», counted, above the rest", () => {
+    const pinned = [{ ...FEES, pinned: true }, ORM];
+    const { container, unmount } = sidebar(pinned);
+    const headings = [...container.querySelectorAll("nav h2")].map((h2) => h2.textContent);
+    const fixed = groupTitles(container, "Fissate");
+    const recent = groupTitles(container, "Recenti");
+    unmount();
+    const { container: none, unmount: unmountNone } = sidebar(ROWS);
+    const noGroup = none.querySelector('nav[aria-label="Fissate"]');
+    unmountNone();
+
+    expect(headings).toEqual(["Fissate1", "Recenti1"]);
+    expect(fixed).toEqual(["Quando scadono le tasse?"]);
+    expect(recent).toEqual(["Che cos'è un ORM?"]);
+    expect(noGroup).toBeNull();
+  });
+
+  it("names what each last answer drew on: the first course and how many more, the university, or nothing", () => {
+    const course = (name: string) => ({ name, locale: "it" });
+    const { container, unmount } = sidebar([
+      summary({
+        id: 1,
+        title: "a",
+        last_source: {
+          courses: [course("BASI DI DATI"), course("RETI LOGICHE"), course("CALCOLATORI")],
+          web: true,
+        },
+      }),
+      summary({ id: 2, title: "b", last_source: { courses: [], web: true } }),
+      summary({ id: 3, title: "c", last_source: null }),
+    ]);
+    const both = sourceLine(container, 1);
+    const lines = [
+      both?.textContent,
+      both?.querySelector('[aria-hidden="true"]:not(svg)')?.textContent,
+      sourceLine(container, 2)?.textContent,
+      sourceLine(container, 3)?.textContent,
+    ];
+    unmount();
+
+    expect(lines).toEqual([
+      "BASI DI DATI+2 e altri 2 corsiAteneo",
+      "+2",
+      "Ateneo",
+      i18n.t("sidebar.noSource"),
+    ]);
+  });
+
+  it("gives a title its first question's language and a course name its own", () => {
+    const { container, unmount } = sidebar([
+      summary({
+        id: 1,
+        title: "考试报名截止日期",
+        title_locale: "zh",
+        last_source: { courses: [{ name: "PPM", locale: null }], web: false },
+      }),
+      summary({
+        id: 2,
+        title: "",
+        last_source: { courses: [{ name: "BASI DI DATI", locale: "it" }], web: false },
+      }),
+    ]);
+    const langs = [1, 2].map((id) => {
+      const row = container.querySelector(`a[href="/c/${id}"]`);
+      return [
+        row?.firstElementChild?.getAttribute("lang"),
+        row?.querySelector("[lang]:not(:first-child)")?.getAttribute("lang") ?? null,
+      ];
+    });
+    unmount();
+
+    // An untitled row says so in the interface's words, which carry no `lang`.
+    expect(langs).toEqual([
+      ["zh", null],
+      [null, "it"],
+    ]);
+  });
+
+  it("names the pin button by what it will do", () => {
+    const { unmount } = sidebar([{ ...ORM, pinned: true }, FEES]);
+    const names = [
+      i18n.t("sidebar.unpin", { title: "Che cos'è un ORM?" }),
+      i18n.t("sidebar.pin", { title: "Quando scadono le tasse?" }),
+    ].map((label) => labelled(label) !== undefined);
+    unmount();
+
+    expect(names).toEqual([true, true]);
   });
 
   it("filters the titles as the search is typed, and says when nothing matches", () => {
