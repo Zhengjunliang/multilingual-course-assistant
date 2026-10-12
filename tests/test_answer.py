@@ -38,7 +38,7 @@ class StubStreamer:
 
     def stream(self, messages: Sequence[Message]) -> Iterator[str]:
         self.messages = list(messages)
-        yield from ("An ORM ", "maps objects to tables ", "[deck.pdf p.1]")
+        yield from ("An ORM ", "maps objects to tables ", "[1]")
 
 
 def make_hits() -> list[Hit]:
@@ -49,8 +49,8 @@ def test_format_context_delimits_every_excerpt() -> None:
     hits = [*make_hits(), Hit(chunk=make_chunk(1, SORT_TEXT), score=0.8)]
 
     assert format_context(hits) == (
-        f"Excerpt 1 [deck.pdf p.1]:\n<quoted>\n{ORM_TEXT}\n</quoted>\n\n"
-        f"Excerpt 2 [deck.pdf p.2]:\n<quoted>\n{SORT_TEXT}\n</quoted>"
+        f"[1] [deck.pdf p.1]\n<quoted>\n{ORM_TEXT}\n</quoted>\n\n"
+        f"[2] [deck.pdf p.2]\n<quoted>\n{SORT_TEXT}\n</quoted>"
     )
 
 
@@ -99,10 +99,10 @@ def test_messages_carry_the_answer_language_and_the_question() -> None:
 # The generation prompt, pinned. Same reasoning as the router's pin in
 # tests/test_agent.py: the identity tests below compare new code against new
 # code, so without this a prompt edit retires recorded results while every test
-# stays green. This one carries the quoted-material rule of 2026-10-08; the
-# generation results docs/experiment-log.md records before that date were
-# produced with the prompt before it, and the M3 runs use this one.
-GENERATION_PROMPT_SHA256 = "4b9cd532b82a548a18c453b810f9c8fe10e15c3b3634b49b39123e533b082203"
+# stays green. This one asks for numbered citations, `[n]`, since 2026-10-12;
+# the generation results docs/experiment-log.md records before that date were
+# produced with earlier prompts, and the M3 runs use this one.
+GENERATION_PROMPT_SHA256 = "0ac7ab1b0fbb67a1e91947b1d91d3097ced740f2554ff81786e08ccd19b7a54c"
 
 
 def test_the_generation_prompt_is_the_one_the_recorded_answers_were_produced_with() -> None:
@@ -147,22 +147,24 @@ def test_history_comes_before_the_excerpts_and_the_question() -> None:
         [Turn(question="What is an ORM?", answer="It maps objects to tables.")],
     )[1]["content"]
 
-    assert content.index("What is an ORM?") < content.index("Excerpt 1")
+    assert content.index("What is an ORM?") < content.index("[1] [deck.pdf p.1]")
     assert content.endswith("Question: How does it differ?")
 
 
-def test_an_earlier_answer_arrives_without_its_citation_markers() -> None:
-    """A marker names an excerpt that is not in front of the model this turn.
-    Left in, it is a label to copy into a citation that resolves to nothing."""
+def test_an_earlier_answer_arrives_without_its_citations() -> None:
+    """An old `[1]` named that turn's first excerpt and would read as this
+    turn's; an old marker names an excerpt that is not in front of the model.
+    Left in, either is a label to copy into a citation that is wrong."""
     content = build_messages(
         "And the second one?",
         make_hits(),
         "en",
-        [Turn(question="What is an ORM?", answer="It maps objects [deck.pdf p.1] to tables.")],
+        [Turn(question="What is an ORM?", answer="It maps objects [1] to [deck.pdf p.1] tables.")],
     )[1]["content"]
 
     assert "It maps objects to tables." in content
-    # `Excerpt 1 [deck.pdf p.1]` is this turn's own, and must survive.
+    # `[1] [deck.pdf p.1]` is this turn's own, and must survive.
+    assert content.count("[1]") == 1
     assert content.count("[deck.pdf p.1]") == 1
 
 
@@ -177,7 +179,7 @@ def test_a_long_earlier_answer_is_truncated() -> None:
     )[1]["content"]
 
     assert "…" in content
-    assert content.index("Excerpt 1") < HISTORY_ANSWER_CHARS + 200
+    assert content.index("[1] [deck.pdf p.1]") < HISTORY_ANSWER_CHARS + 200
 
 
 def test_no_hits_refuses_in_the_question_language_without_calling_the_llm() -> None:
@@ -217,7 +219,7 @@ def test_cli_answers_end_to_end_with_sources(
     main(["django orm", "--qdrant", str(qdrant_path), "--no-rerank"])
     out = capsys.readouterr().out
     assert "An ORM maps objects to tables" in out
-    assert "Sources:\n  [deck.pdf p.1]" in out
+    assert "Sources:\n  [1] [deck.pdf p.1]" in out
 
 
 def test_source_marker_matches_the_prompt_citation_format() -> None:

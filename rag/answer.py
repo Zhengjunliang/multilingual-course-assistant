@@ -49,8 +49,8 @@ LOCALE_NAMES = {"en": "English", "it": "Italian", "zh": "Chinese"}
 # not crowd out the excerpts this turn is actually grounded on.
 HISTORY_ANSWER_CHARS = 400
 
-# Anything bracketed, not the two marker shapes specifically. Over-removal is
-# the safe direction: what is being prevented is the model copying a marker that
+# Anything bracketed, not the citation shapes specifically. Over-removal is the
+# safe direction: what is being prevented is the model copying a citation that
 # belonged to a previous turn's excerpts, which are not in front of it now, and
 # a bracketed aside lost from a truncated old answer costs nothing.
 _BRACKETED = re.compile(r"\[[^\]]*\]")
@@ -61,9 +61,11 @@ You are a course assistant answering questions about university course material.
 Rules:
 - Answer ONLY from the numbered excerpts provided by the user. Do not use outside knowledge.
 - {QUOTED_CLAUSE}
-- Cite every claim by copying the bracketed source marker of its excerpt EXACTLY, \
-character for character. Never shorten a marker, never invent one, and never \
-write "Excerpt N" — the marker is the [...] label shown next to the excerpt.
+- After every claim, write the number of the excerpt it comes from in square \
+brackets, like [2]; a claim drawn from several excerpts gets one bracket each, \
+side by side, like [1][3]. The bracketed number is the only way to refer to an \
+excerpt: never write a word for excerpt or source next to a number, in any \
+language.
 - If the excerpts do not contain the answer, say so plainly instead of guessing.
 - Answer in {{language}}.
 - Be concise: a student wants the concept, not an essay."""
@@ -99,12 +101,14 @@ def format_history_questions(turns: Sequence[Turn]) -> str:
 def format_history(turns: Sequence[Turn]) -> str:
     """What generation sees: whole exchanges, trimmed and stripped of markers.
 
-    Both edits are about the citation rule the system prompt states. A marker
-    left in an old answer is a label the model can copy while the excerpt behind
-    it is nowhere in this turn's context, which is a citation that resolves to
-    nothing; removing them leaves history as prose to refer back to and nothing
-    to cite from. Each exchange is quoted: an anonymous conversation's history
-    is whatever the browser sends back, answers included.
+    Both edits are about the citation rule the system prompt states. A `[2]`
+    left in an old answer named that turn's second excerpt and reads as this
+    turn's, a citation the model can copy onto a passage that never said it; a
+    marker an older answer copied names an excerpt that is nowhere in this
+    turn's context. Removing every bracket leaves history as prose to refer
+    back to and nothing to cite from. Each exchange is quoted: an anonymous
+    conversation's history is whatever the browser sends back, answers
+    included.
     """
     blocks = [
         quote(f"Student: {turn.question}\nAssistant: {_shorten(_BRACKETED.sub('', turn.answer))}")
@@ -136,12 +140,17 @@ def source_marker(hit: Hit) -> str:
 
 
 def format_context(hits: Sequence[Hit]) -> str:
-    """Number the excerpts and tag each with the citation marker the model is
-    told to reuse; raw `text` is what the user could be shown, so it is also
-    what claims are grounded on. The number and the marker are this project's,
-    outside the quoted text."""
+    """Number the excerpts in the shape the model is told to cite them, `[n]`,
+    each beside its source marker; raw `text` is what the user could be shown,
+    so it is also what claims are grounded on. The number and the marker are
+    this project's, outside the quoted text.
+
+    The number is the citation because it names one excerpt, where a marker
+    names a page and two chunks of one page share it, and because copying it
+    takes two characters where a marker's URL takes dozens a 4B model gets
+    wrong; an `[n]` is what Open WebUI, LlamaIndex and RAGFlow ask for too."""
     blocks = [
-        f"Excerpt {number} {source_marker(hit)}:\n{quote(hit.chunk.text)}"
+        f"[{number}] {source_marker(hit)}\n{quote(hit.chunk.text)}"
         for number, hit in enumerate(hits, start=1)
     ]
     return "\n\n".join(blocks)
@@ -190,15 +199,11 @@ def answer(
 
 def print_sources(hits: Sequence[Hit]) -> None:
     """The footer every CLI prints under an answer (callers skip it when there
-    is nothing to cite): each distinct marker once, in retrieval order, in the
-    exact shape the model was told to cite."""
+    is nothing to cite): every excerpt under the number the answer cites it by,
+    beside its marker, as the prompt listed them."""
     print("\nSources:")
-    seen: list[str] = []
-    for hit in hits:
-        marker = source_marker(hit)
-        if marker not in seen:
-            seen.append(marker)
-            print(f"  {marker}")
+    for number, hit in enumerate(hits, start=1):
+        print(f"  [{number}] {source_marker(hit)}")
 
 
 def main(argv: list[str] | None = None) -> None:
