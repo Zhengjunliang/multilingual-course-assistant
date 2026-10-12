@@ -69,6 +69,8 @@ export interface Programme {
 export interface StaffMember {
   id: number;
   username: string;
+  /** The account's full name; empty when it has none, and the username stands alone. */
+  name: string;
 }
 
 export interface Edition {

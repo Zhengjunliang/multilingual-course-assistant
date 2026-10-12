@@ -160,7 +160,7 @@ export const CONVERSATION: ConversationDetail = {
 
 // --- the catalogue the staff pages read ------------------------------------------
 
-const STAFF_MEMBER: StaffMember = { id: STAFF.id, username: STAFF.username };
+const STAFF_MEMBER: StaffMember = { id: STAFF.id, username: STAFF.username, name: "Giulia Neri" };
 
 export const COURSE: Course = {
   code: "B003",

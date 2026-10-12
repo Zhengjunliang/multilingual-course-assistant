@@ -90,9 +90,16 @@ DEMO: dict[str, Any] = {
     ],
     "accounts": [
         {"username": "demo-admin", "superuser": True},
-        {"username": "demo-secretariat", "roles": [{"role": "secretariat", "programme": "B047"}]},
+        {
+            "username": "demo-secretariat",
+            "first_name": "Giulia",
+            "last_name": "Neri",
+            "roles": [{"role": "secretariat", "programme": "B047"}],
+        },
         {
             "username": "demo-teacher",
+            "first_name": "Laura",
+            "last_name": "Conti",
             "roles": [{"role": "teacher", "edition": "B028451:2025-2026"}],
         },
         {"username": "demo-student"},
@@ -129,17 +136,17 @@ def snapshot() -> dict[str, list[Any]]:
             str(r) for r in RoleAssignment.objects.select_related("user", "programme", "edition")
         ),
         "accounts": sorted(
-            (u.username, u.is_superuser, u.is_staff, u.has_usable_password())
+            (u.username, u.get_full_name(), u.is_superuser, u.is_staff, u.has_usable_password())
             for u in User.objects.all()
         ),
     }
 
 
 DEMO_ACCOUNTS = [
-    ("demo-admin", True, True, False),
-    ("demo-secretariat", False, False, False),
-    ("demo-student", False, False, False),
-    ("demo-teacher", False, False, False),
+    ("demo-admin", "", True, True, False),
+    ("demo-secretariat", "Giulia Neri", False, False, False),
+    ("demo-student", "", False, False, False),
+    ("demo-teacher", "Laura Conti", False, False, False),
 ]
 DEMO_ROLES = [
     "demo-secretariat · secretariat · B047",
@@ -214,7 +221,11 @@ def test_rows_of_its_own_are_kept_and_demo_accounts_made_the_files(
     assert (seen["roles"], seen["accounts"]) == (
         [*DEMO_ROLES, "mrossi · secretariat · B047"],
         sorted(
-            [*DEMO_ACCOUNTS, ("demo-staff", False, False, False), ("mrossi", False, False, False)]
+            [
+                *DEMO_ACCOUNTS,
+                ("demo-staff", "", False, False, False),
+                ("mrossi", "", False, False, False),
+            ]
         ),
     )
     assert sorted(line for line in out.splitlines() if " role " in line) == [

@@ -31,7 +31,7 @@ const B047: Programme = {
   locale: "it",
   curricula: ["TECNICO APPLICATIVO", "TECNICO SCIENTIFICO"],
   course_count: 1,
-  secretariat: [{ id: 2, username: "demo-secretariat" }],
+  secretariat: [{ id: 2, username: "demo-secretariat", name: "Giulia Neri" }],
   permissions: ["programme.view"],
 };
 const B222: Programme = {
@@ -104,7 +104,7 @@ function edition(id: number, year: string, current: boolean, teachers: string[])
     course: PPM,
     academic_year: year,
     is_current: current,
-    teachers: teachers.map((username, index) => ({ id: index + 10, username })),
+    teachers: teachers.map((username, index) => ({ id: index + 10, username, name: "" })),
     permissions: ["edition.set_current", "edition.view"],
     can_set_current: true,
   };
