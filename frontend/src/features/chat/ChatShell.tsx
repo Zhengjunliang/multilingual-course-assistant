@@ -1,7 +1,7 @@
 /**
  * The frame of every signed-in page, the chat and the staff pages alike
  * (routes/ShellLayout.tsx renders it): the sidebar, its narrow-screen drawer,
- * and the row of controls above the page.
+ * the row above the page, and the two dialogs the account menu opens.
  *
  * Lifted out of `ChatPage` for two reasons, and the test harness is neither of
  * them. The first is that the button which opens the drawer and the state it
@@ -21,9 +21,11 @@
 
 import { Menu, PanelLeft } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SettingsDialog } from "@/components/SettingsDialog";
+import { ShortcutsDialog } from "@/components/ShortcutsDialog";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 
@@ -53,6 +55,9 @@ export interface SidebarControls {
   onNavigate: () => void;
   /** Closes the wide-screen column. */
   onCollapse: () => void;
+  /** The shell's two dialogs, which the account menu opens. */
+  onOpenSettings: () => void;
+  onOpenHelp: () => void;
 }
 
 interface ChatShellProps {
@@ -64,15 +69,27 @@ interface ChatShellProps {
   sidebar: (controls: SidebarControls) => ReactNode;
   /** Beside the sidebar button: where the page sits, such as a staff page's breadcrumb. */
   leading?: ReactNode;
-  /** Whatever belongs opposite the sidebar button: the account, the title. */
-  controls: ReactNode;
   children: ReactNode;
 }
 
-export function ChatShell({ sidebar, leading, controls, children }: ChatShellProps) {
+export function ChatShell({ sidebar, leading, children }: ChatShellProps) {
   const { t } = useTranslation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(storedCollapsed);
+  // The settings and the list of shortcuts, opened from the account menu in
+  // either mount of the sidebar; they live here, once, for that reason.
+  const [dialog, setDialog] = useState<"settings" | "help" | null>(null);
+  // Where the focus was when a dialog opened, to give it back on closing:
+  // Radix returns it only to a `Trigger` of the dialog's own, and these open
+  // from state. Read in a layout effect, which runs before the dialog's own
+  // effects move the focus inside it, and after the account menu has given
+  // the focus back to its row (AccountMenu.tsx says why it waits).
+  const returnTo = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (dialog === null) return;
+    returnTo.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }, [dialog]);
 
   const remember = (next: boolean) => {
     setCollapsed(next);
@@ -86,6 +103,15 @@ export function ChatShell({ sidebar, leading, controls, children }: ChatShellPro
   const slot: SidebarControls = {
     onNavigate: () => setDrawerOpen(false),
     onCollapse: () => remember(true),
+    onOpenSettings: () => setDialog("settings"),
+    onOpenHelp: () => setDialog("help"),
+  };
+  const closeDialog = (open: boolean) => {
+    if (!open) setDialog(null);
+  };
+  const giveFocusBack = (event: Event) => {
+    event.preventDefault();
+    if (returnTo.current?.isConnected) returnTo.current.focus();
   };
 
   return (
@@ -102,7 +128,7 @@ export function ChatShell({ sidebar, leading, controls, children }: ChatShellPro
           stays a drawer that knows nothing about what it is holding — it is
           also used in the styleguide with unrelated children. */}
       {!collapsed && (
-        <aside className="hidden w-64 shrink-0 border-line border-r lg:block">
+        <aside className="hidden w-sidebar shrink-0 border-line border-r lg:block">
           {sidebar(slot)}
         </aside>
       )}
@@ -112,10 +138,10 @@ export function ChatShell({ sidebar, leading, controls, children }: ChatShellPro
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* No rule under it and no fill of its own. The reference interfaces
-            have no header bar at all: a button on one side, an avatar on the
-            other, and the answer running to the top of the screen between them.
+            have no header bar at all: the account is at the sidebar's foot, and
+            the answer runs to the top of the screen beside where the reader is.
             `shrink-0` and a sibling of the scroller rather than inside it, so
-            neither control ever passes over a line of the answer. */}
+            no control ever passes over a line of the answer. */}
         <header className="flex shrink-0 items-center gap-snug px-gutter py-snug">
           {/* Two buttons, one per width, never both visible. On a phone the
               sidebar is a drawer and this opens it; from `lg` up the drawer
@@ -143,10 +169,19 @@ export function ChatShell({ sidebar, leading, controls, children }: ChatShellPro
             </Button>
           )}
           <div className="min-w-0 flex-1">{leading}</div>
-          <div className="shrink-0">{controls}</div>
         </header>
         {children}
       </div>
+      <SettingsDialog
+        open={dialog === "settings"}
+        onOpenChange={closeDialog}
+        onCloseAutoFocus={giveFocusBack}
+      />
+      <ShortcutsDialog
+        open={dialog === "help"}
+        onOpenChange={closeDialog}
+        onCloseAutoFocus={giveFocusBack}
+      />
     </div>
   );
 }

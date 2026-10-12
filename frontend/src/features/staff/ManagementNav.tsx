@@ -1,27 +1,39 @@
 /**
  * The chat sidebar's "Gestione" group: the staff pages an account may open,
- * between "Nuova conversazione" and the conversations (ConversationSidebar).
+ * between the search field and the conversations (ConversationSidebar).
  *
- * Its items are landing.ts's. Each link closes the narrow-screen drawer as a
- * conversation link does, through the same `onNavigate`, so both mounts of the
- * sidebar behave alike. The item the reader is inside — on its page or any
- * page below it — is marked as the current one: `aria-current="page"` on its
- * own page, `"true"` below it, where the breadcrumb names the page itself
- * (outside the repository: WAI-ARIA 1.2, `aria-current`).
+ * Its items are landing.ts's, each with the count of what its page lists.
+ * Each link closes the narrow-screen drawer as a conversation link does,
+ * through the same `onNavigate`, so both mounts of the sidebar behave alike.
+ * The item the reader is inside — on its page or any page below it — is drawn
+ * as the open conversation is (features/chat/rows.ts) and marked as the
+ * current one: `aria-current="page"` on its own page, `"true"` below it, where
+ * the breadcrumb names the page itself (outside the repository: WAI-ARIA 1.2,
+ * `aria-current`). `ICON` is exported for the folded rail, which shows the
+ * same items as icons.
  */
 
 import { BookOpen, GraduationCap, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 
+import { Count } from "@/components/ui/count";
+import { SIDEBAR_ROW, SIDEBAR_ROW_CURRENT } from "@/features/chat/rows";
 import { cn } from "@/lib/utils";
 import type { ManagementItem, ManagementKey } from "./landing";
 
-const ICON: Record<ManagementKey, LucideIcon> = {
+export const ICON: Record<ManagementKey, LucideIcon> = {
   programmes: GraduationCap,
   programme: GraduationCap,
   mine: BookOpen,
 };
+
+/** Where the reader stands relative to an item, as `aria-current` says it. */
+export function currentness(item: ManagementItem, pathname: string): "page" | "true" | undefined {
+  if (pathname === item.to) return "page";
+  const inside = item.within.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  return inside ? "true" : undefined;
+}
 
 interface ManagementNavProps {
   items: readonly ManagementItem[];
@@ -35,31 +47,30 @@ export function ManagementNav({ items, onNavigate }: ManagementNavProps) {
 
   return (
     <nav aria-label={label} className="flex flex-col gap-hair">
-      <p className="px-tight pt-tight font-medium text-caption text-muted">{label}</p>
-      {items.map((item) => {
-        const Icon = ICON[item.key];
-        const inside = item.within.some(
-          (path) => pathname === path || pathname.startsWith(`${path}/`),
-        );
-        return (
-          <Link
-            key={item.key}
-            to={item.to}
-            onClick={onNavigate}
-            aria-current={pathname === item.to ? "page" : inside ? "true" : undefined}
-            className={cn(
-              "flex items-center gap-tight rounded-control px-tight py-tight text-body transition-colors",
-              // Where the reader is, drawn as the open conversation is.
-              inside
-                ? "bg-accent-soft font-medium text-accent"
-                : "text-muted hover:bg-mark hover:text-ink",
-            )}
-          >
-            <Icon aria-hidden className="size-icon shrink-0" />
-            <span className="truncate">{t(`staff.nav.${item.key}`)}</span>
-          </Link>
-        );
-      })}
+      <h2 className="px-tight pt-hair font-semibold text-body text-ink">{label}</h2>
+      <ul className="flex flex-col gap-hair">
+        {items.map((item) => {
+          const Icon = ICON[item.key];
+          const current = currentness(item, pathname);
+          return (
+            <li key={item.key}>
+              <Link
+                to={item.to}
+                onClick={onNavigate}
+                aria-current={current}
+                className={cn(SIDEBAR_ROW, current && SIDEBAR_ROW_CURRENT)}
+              >
+                <Icon
+                  aria-hidden
+                  className={cn("size-icon shrink-0", current ? "text-accent" : "text-muted")}
+                />
+                <span className="min-w-0 flex-1 truncate">{t(`staff.nav.${item.key}`)}</span>
+                {item.count !== null && <Count value={item.count} />}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }

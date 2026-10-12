@@ -23,13 +23,21 @@
  * accent at 6 %. A choice, such as the language, is a submenu whose row shows
  * the current value; its options are radios with a check on the chosen one,
  * never the accent, since a setting that is true is not where the reader is.
+ *
+ * In a narrow drawer (`inline`, #191) a submenu would open past the screen's
+ * edge, so the choice's row opens its options in place instead, under it and
+ * indented, as the prototype's phone menu does; the row says so with
+ * `aria-expanded`. The menu opens on any side of its trigger (`side`,
+ * `align`): above the sidebar's account row, to the right of the rail's
+ * avatar.
  */
 
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
-import { Check, ChevronRight, type LucideIcon } from "lucide-react";
-import { Fragment, type ReactNode, useId } from "react";
+import { Check, ChevronDown, ChevronRight, type LucideIcon } from "lucide-react";
+import { Fragment, type ReactNode, useId, useRef, useState } from "react";
 
 import { Kbd, type Shortcut } from "@/components/ui/kbd";
+import { cn } from "@/lib/utils";
 
 interface MenuAction {
   /** Stable across renders and across languages, so not the label. */
@@ -58,10 +66,23 @@ interface MenuSection {
 }
 
 interface DropdownMenuProps {
-  /** Rendered as the trigger itself, so it must accept a ref and DOM props. */
+  /** Rendered inside the trigger, which is a button of the menu's own. */
   trigger: ReactNode;
-  /** Screen-reader name for the trigger. */
-  ariaLabel: string;
+  /**
+   * The trigger's classes, for a trigger that is a whole row rather than an
+   * avatar; a round focus ring otherwise.
+   */
+  triggerClassName?: string;
+  /**
+   * Screen-reader name for a trigger that shows no words, such as an avatar
+   * alone. Left out when the trigger's own text names it, which a label would
+   * otherwise override.
+   */
+  ariaLabel?: string;
+  side?: "top" | "right" | "bottom";
+  align?: "start" | "end";
+  /** Choices open in place under their row rather than in a submenu. */
+  inline?: boolean;
   /** Above the sections: who is signed in. */
   head?: ReactNode;
   sections: readonly MenuSection[];
@@ -81,57 +102,120 @@ const SURFACE =
   "z-floating flex min-w-56 flex-col rounded-card border border-line bg-surface p-hair shadow-overlay";
 const RULE = "-mx-hair my-hair h-px bg-line";
 
-function Choice({ item }: { item: MenuChoice }) {
+/** The choice's row: its icon, its label and the option chosen. */
+function ChoiceRow({ item, chevron }: { item: MenuChoice; chevron: LucideIcon }) {
   const current = item.options.find((option) => option.value === item.value);
+  const Chevron = chevron;
   return (
-    <RadixMenu.Sub>
-      <RadixMenu.SubTrigger className={`${ITEM} data-[state=open]:bg-hover`}>
-        <item.icon aria-hidden className="size-icon shrink-0 text-muted" />
-        <span className="flex-1">{item.label}</span>
-        <span lang={current?.lang} className="text-caption text-muted">
-          {current?.label}
-        </span>
-        <ChevronRight aria-hidden className="size-icon shrink-0 text-muted" />
+    <>
+      <item.icon aria-hidden className="size-icon shrink-0 text-muted" />
+      <span className="flex-1">{item.label}</span>
+      <span lang={current?.lang} className="text-caption text-muted">
+        {current?.label}
+      </span>
+      <Chevron aria-hidden className="size-icon shrink-0 text-muted" />
+    </>
+  );
+}
+
+function Options({ item, className }: { item: MenuChoice; className?: string }) {
+  return (
+    <RadixMenu.RadioGroup
+      value={item.value}
+      onValueChange={item.onValueChange}
+      className={className}
+    >
+      {item.options.map((option) => (
+        <RadixMenu.RadioItem key={option.value} value={option.value} className={ITEM}>
+          <span lang={option.lang} className="flex-1">
+            {option.label}
+          </span>
+          <RadixMenu.ItemIndicator>
+            <Check aria-hidden className="size-icon" />
+          </RadixMenu.ItemIndicator>
+        </RadixMenu.RadioItem>
+      ))}
+    </RadixMenu.RadioGroup>
+  );
+}
+
+function Choice({ item }: { item: MenuChoice }) {
+  const [open, setOpen] = useState(false);
+  const row = useRef<HTMLDivElement>(null);
+  return (
+    <RadixMenu.Sub open={open} onOpenChange={setOpen}>
+      <RadixMenu.SubTrigger ref={row} className={`${ITEM} data-[state=open]:bg-hover`}>
+        <ChoiceRow item={item} chevron={ChevronRight} />
       </RadixMenu.SubTrigger>
       <RadixMenu.Portal>
-        <RadixMenu.SubContent sideOffset={6} className={SURFACE}>
-          <RadixMenu.RadioGroup value={item.value} onValueChange={item.onValueChange}>
-            {item.options.map((option) => (
-              <RadixMenu.RadioItem key={option.value} value={option.value} className={ITEM}>
-                <span lang={option.lang} className="flex-1">
-                  {option.label}
-                </span>
-                <RadixMenu.ItemIndicator>
-                  <Check aria-hidden className="size-icon" />
-                </RadixMenu.ItemIndicator>
-              </RadixMenu.RadioItem>
-            ))}
-          </RadixMenu.RadioGroup>
+        <RadixMenu.SubContent
+          sideOffset={6}
+          // Escape closes the submenu alone and gives the focus back to its
+          // row, as the WAI-ARIA menu pattern has it (outside the repository:
+          // APG, "Menu and Menubar"); Radix would close the whole menu.
+          onEscapeKeyDown={(event) => {
+            event.preventDefault();
+            setOpen(false);
+            row.current?.focus();
+          }}
+          className={SURFACE}
+        >
+          <Options item={item} />
         </RadixMenu.SubContent>
       </RadixMenu.Portal>
     </RadixMenu.Sub>
   );
 }
 
+function InlineChoice({ item }: { item: MenuChoice }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <RadixMenu.Item
+        aria-expanded={open}
+        // Opening the options is not a choice made, so the menu stays open.
+        onSelect={(event) => {
+          event.preventDefault();
+          setOpen((now) => !now);
+        }}
+        className={cn(ITEM, open && "bg-hover")}
+      >
+        <ChoiceRow item={item} chevron={open ? ChevronDown : ChevronRight} />
+      </RadixMenu.Item>
+      {/* Indented by the row's icon and gap, so the options line up under its label. */}
+      {open && <Options item={item} className="ps-room" />}
+    </>
+  );
+}
+
 export function DropdownMenu({
   trigger,
+  triggerClassName,
   ariaLabel,
+  side = "bottom",
+  align = "end",
+  inline = false,
   head,
   sections,
   onCloseAutoFocus,
 }: DropdownMenuProps) {
   const id = useId();
+  const ChoiceItem = inline ? InlineChoice : Choice;
   return (
     <RadixMenu.Root>
       <RadixMenu.Trigger
         aria-label={ariaLabel}
-        className="rounded-full focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+        className={
+          triggerClassName ??
+          "rounded-full focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+        }
       >
         {trigger}
       </RadixMenu.Trigger>
       <RadixMenu.Portal>
         <RadixMenu.Content
-          align="end"
+          side={side}
+          align={align}
           sideOffset={8}
           onCloseAutoFocus={() => onCloseAutoFocus?.()}
           className={SURFACE}
@@ -158,7 +242,7 @@ export function DropdownMenu({
                 )}
                 {section.items.map((item) =>
                   "options" in item ? (
-                    <Choice key={item.key} item={item} />
+                    <ChoiceItem key={item.key} item={item} />
                   ) : (
                     <RadixMenu.Item
                       key={item.key}

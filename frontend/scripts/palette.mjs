@@ -34,7 +34,12 @@ export const STYLESHEET = readFileSync(
 export const TEXT = 4.5;
 
 export const PAIRS = [
-  { front: "ink", back: "canvas", min: TEXT, where: "index.css body rule" },
+  {
+    front: "ink",
+    back: "canvas",
+    min: TEXT,
+    where: "index.css body rule, ConversationSidebar.tsx brand and conversation titles",
+  },
   {
     front: "canvas",
     back: "ink",
@@ -53,7 +58,7 @@ export const PAIRS = [
     back: "canvas",
     min: TEXT,
     where:
-      "EntryScreen.tsx and StatusPanel.tsx subtitle, ChatShell.tsx icon-only buttons (button.tsx ghost)",
+      "EntryScreen.tsx and StatusPanel.tsx subtitle, ChatShell.tsx icon-only buttons (button.tsx ghost), ConversationList.tsx a row's time and group headings",
   },
   {
     front: "muted",
@@ -61,13 +66,6 @@ export const PAIRS = [
     min: TEXT,
     where:
       "SourcesPanel.tsx where a source is and its excerpt, LineField.tsx a field's underline and label, kbd.tsx a key's cap",
-  },
-  { front: "ink", back: "sidebar", min: TEXT, where: "ConversationSidebar.tsx title and rows" },
-  {
-    front: "muted",
-    back: "sidebar",
-    min: TEXT,
-    where: "ConversationSidebar.tsx idle row, collapse and delete icon buttons",
   },
   {
     front: "ink",
@@ -191,20 +189,15 @@ export const TINTS = [
   {
     tint: "hover",
     ground: "canvas",
-    fronts: ["ink"],
-    where: "button.tsx ghost and outline variants under the pointer, on the page",
+    fronts: ["ink", "muted"],
+    where:
+      "button.tsx ghost and outline variants under the pointer, on the page; ConversationList.tsx and ManagementNav.tsx a row under the pointer, its title and its icons",
   },
   {
     tint: "hover",
     ground: "surface",
     fronts: ["ink"],
     where: "button.tsx ghost and outline variants under the pointer, in a card or a dialog",
-  },
-  {
-    tint: "hover",
-    ground: "sidebar",
-    fronts: ["ink"],
-    where: "button.tsx ghost variant under the pointer, ConversationSidebar.tsx icon buttons",
   },
   {
     tint: "hover",
@@ -217,7 +210,8 @@ export const TINTS = [
     tint: "selected",
     ground: "canvas",
     fronts: ["accent"],
-    where: "routes/styleguide/basics.tsx the --selected swatch",
+    where:
+      "ConversationList.tsx the open conversation, ManagementNav.tsx the current page, routes/styleguide/basics.tsx the --selected swatch",
   },
   {
     tint: "selected",

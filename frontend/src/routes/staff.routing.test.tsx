@@ -336,10 +336,13 @@ function click(element: HTMLElement | null | undefined) {
   act(() => element?.click());
 }
 
-/** The links of the sidebar's Gestione group, as label → address. */
+/** The links of the sidebar's Gestione group, as label, count → address. */
 function gestione(root: ParentNode) {
   const nav = root.querySelector('nav[aria-label="Gestione"]');
-  return [...(nav?.querySelectorAll("a") ?? [])].map((a) => [text(a), a.getAttribute("href")]);
+  return [...(nav?.querySelectorAll("a") ?? [])].map((a) => {
+    const [label, count] = [...a.querySelectorAll("span")].map((span) => span.textContent);
+    return [label, count, a.getAttribute("href")];
+  });
 }
 
 function crumbs(container: HTMLElement) {
@@ -371,27 +374,29 @@ afterEach(() => {
 describe("the Gestione group and /staff", () => {
   it.each<[string, Account, string[][], string]>([
     ["a student", STUDENT, [], "/"],
-    ["a teacher", TEACHER, [["I miei insegnamenti", "/staff/mine"]], "/staff/mine"],
+    // Each item counts what its page lists: the editions taught, the one
+    // programme's courses, the programmes.
+    ["a teacher", TEACHER, [["I miei insegnamenti", "1", "/staff/mine"]], "/staff/mine"],
     [
       "one programme's secretariat",
       SECRETARIAT,
-      [["Corso di laurea", "/staff/programmes/B047"]],
+      [["Corso di laurea", "1", "/staff/programmes/B047"]],
       "/staff/programmes/B047",
     ],
     [
       "two programmes' secretariat",
       BOTH,
-      [["Corsi di laurea", "/staff/programmes"]],
+      [["Corsi di laurea", "2", "/staff/programmes"]],
       "/staff/programmes",
     ],
-    ["the superuser", ADMIN, [["Corsi di laurea", "/staff/programmes"]], "/staff/programmes"],
+    ["the superuser", ADMIN, [["Corsi di laurea", "2", "/staff/programmes"]], "/staff/programmes"],
     // The programme first, and `/staff` waits for the list to know it.
     [
       "secretariat staff who teach",
       DUAL,
       [
-        ["Corso di laurea", "/staff/programmes/B047"],
-        ["I miei insegnamenti", "/staff/mine"],
+        ["Corso di laurea", "1", "/staff/programmes/B047"],
+        ["I miei insegnamenti", "1", "/staff/mine"],
       ],
       "/staff/programmes/B047",
     ],
@@ -402,8 +407,6 @@ describe("the Gestione group and /staff", () => {
     const seen = {
       items: gestione(container),
       lands: path(),
-      // The heading over the conversations is there only when Gestione is.
-      heading: text(container.querySelector('nav[aria-label="Le tue conversazioni"] p')),
       programmesAsked: asked.includes("GET /api/catalog/programmes"),
     };
     unmount();
@@ -411,7 +414,6 @@ describe("the Gestione group and /staff", () => {
     expect(seen).toEqual({
       items,
       lands,
-      heading: items.length > 0 ? "Le tue conversazioni" : null,
       programmesAsked: who !== STUDENT,
     });
   });
@@ -424,7 +426,7 @@ describe("the Gestione group and /staff", () => {
     const order = [
       aside?.querySelector('a[href="/"]'),
       aside?.querySelector('nav[aria-label="Gestione"]'),
-      aside?.querySelector('nav[aria-label="Le tue conversazioni"]'),
+      aside?.querySelector('nav[aria-label="Recenti"]'),
     ];
     const following = order
       .slice(1)

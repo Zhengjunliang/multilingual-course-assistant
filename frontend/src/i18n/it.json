@@ -20,7 +20,6 @@
   "sidebar": {
     "title": "Le tue conversazioni",
     "new": "Nuova conversazione",
-    "empty": "Nessuna conversazione.",
     "untitled": "Senza titolo",
     "open": "Apri le conversazioni",
     "collapse": "Chiudi la barra laterale",
@@ -32,19 +31,33 @@
     "deleteBodyAnswering": "«{{title}}» e le sue risposte vengono eliminate definitivamente. La risposta in corso si interrompe.",
     "deleteConfirm": "Elimina",
     "cancel": "Annulla",
-    "deleteFailed": "Non è stato possibile eliminare la conversazione."
+    "deleteFailed": "Non è stato possibile eliminare la conversazione.",
+    "recent": "Recenti",
+    "search": "Cerca",
+    "noMatch": "Nessuna conversazione corrisponde.",
+    "loading": "Caricamento delle conversazioni",
+    "emptyTitle": "Ancora nessuna conversazione",
+    "emptyBody": "Le domande che fai restano qui, così puoi riprenderle."
   },
   "account": {
-    "title": "Account",
     "menu": "Apri il menu dell'account",
-    "profile": "Profilo",
     "theme": "Tema",
     "themeCaption": "Vale su questo dispositivo, non sull'account.",
     "language": "Lingua",
     "languageHint": "Le risposte seguono la lingua della domanda, non quella dell'interfaccia.",
     "logOut": "Esci",
     "close": "Chiudi",
-    "admin": "Amministrazione"
+    "admin": "Amministrazione",
+    "settings": "Impostazioni",
+    "settingsItem": "Impostazioni…",
+    "help": "Aiuto e scorciatoie",
+    "languageInMenu": "La lingua si cambia dal menu dell'account.",
+    "role": {
+      "admin": "Amministratore",
+      "secretariat": "Segreteria",
+      "teacher": "Docente",
+      "student": "Studente"
+    }
   },
   "theme": {
     "system": "Di sistema",
@@ -247,7 +260,18 @@
     },
     "retry": "Riprova"
   },
+  "shortcuts": {
+    "newConversation": "Nuova conversazione",
+    "search": "Cerca tra le conversazioni",
+    "settings": "Apri le impostazioni",
+    "help": "Mostra le scorciatoie",
+    "send": "Invia la domanda",
+    "newLine": "Vai a capo nella domanda",
+    "close": "Chiudi un menu o una finestra"
+  },
   "keys": {
-    "enter": "Invio"
+    "enter": "Invio",
+    "shift": "Maiusc",
+    "escape": "Esc"
   }
 }

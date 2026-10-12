@@ -33,9 +33,11 @@ interface TooltipProps {
   /** The element the hint is for, rendered as the trigger itself: it must accept a ref and DOM props. */
   children: ReactElement;
   shortcut?: Shortcut;
+  /** Where it opens: above by default, to the right beside the sidebar's rows and rail. */
+  side?: "top" | "right";
 }
 
-export function Tooltip({ content, children, shortcut }: TooltipProps) {
+export function Tooltip({ content, children, shortcut, side = "top" }: TooltipProps) {
   return (
     <RadixTooltip.Provider>
       <RadixTooltip.Root>
@@ -44,6 +46,7 @@ export function Tooltip({ content, children, shortcut }: TooltipProps) {
         </RadixTooltip.Trigger>
         <RadixTooltip.Portal>
           <RadixTooltip.Content
+            side={side}
             sideOffset={4}
             collisionPadding={8}
             className="z-floating flex max-w-xs items-center gap-tight rounded-chip bg-ink px-tight py-hair font-medium text-caption text-canvas wrap-anywhere shadow-overlay"

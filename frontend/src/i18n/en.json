@@ -20,7 +20,6 @@
   "sidebar": {
     "title": "Your conversations",
     "new": "New conversation",
-    "empty": "No conversations yet.",
     "untitled": "Untitled",
     "open": "Open conversations",
     "collapse": "Close the sidebar",
@@ -32,19 +31,33 @@
     "deleteBodyAnswering": "\"{{title}}\" and its answers are deleted for good. The answer being written stops.",
     "deleteConfirm": "Delete",
     "cancel": "Cancel",
-    "deleteFailed": "The conversation could not be deleted."
+    "deleteFailed": "The conversation could not be deleted.",
+    "recent": "Recent",
+    "search": "Search",
+    "noMatch": "No conversation matches.",
+    "loading": "Loading conversations",
+    "emptyTitle": "No conversations yet",
+    "emptyBody": "The questions you ask stay here, so you can come back to them."
   },
   "account": {
-    "title": "Account",
     "menu": "Open the account menu",
-    "profile": "Profile",
     "theme": "Theme",
     "themeCaption": "Applies to this device, not to your account.",
     "language": "Language",
     "languageHint": "Answers follow the language of the question, not the interface's.",
     "logOut": "Sign out",
     "close": "Close",
-    "admin": "Administration"
+    "admin": "Administration",
+    "settings": "Settings",
+    "settingsItem": "Settings…",
+    "help": "Help and shortcuts",
+    "languageInMenu": "The language is changed from the account menu.",
+    "role": {
+      "admin": "Administrator",
+      "secretariat": "Secretariat",
+      "teacher": "Teacher",
+      "student": "Student"
+    }
   },
   "theme": {
     "system": "System",
@@ -247,7 +260,18 @@
     },
     "retry": "Try again"
   },
+  "shortcuts": {
+    "newConversation": "New conversation",
+    "search": "Search the conversations",
+    "settings": "Open the settings",
+    "help": "Show the shortcuts",
+    "send": "Send the question",
+    "newLine": "Start a new line in the question",
+    "close": "Close a menu or a window"
+  },
   "keys": {
-    "enter": "Enter"
+    "enter": "Enter",
+    "shift": "Shift",
+    "escape": "Esc"
   }
 }

@@ -2,12 +2,12 @@
  * The language menu: a globe and the language in use, opening on the languages
  * the product speaks, each written in itself.
  *
- * It exists in three frames and must not exist three times in the source. The
- * signed-in header writes the choice to the account (`User.locale`); the
- * sign-in pages and the visitor's header remember it on this screen only
- * (i18n/index.ts), because before a session there is nothing to write to.
- * That difference is the `onChange` each passes — everything a reader sees is
- * the same, and keeping it the same is exactly what copies would stop doing.
+ * It exists in two frames and must not exist twice in the source: the sign-in
+ * pages and the visitor's header, which remember the choice on this screen
+ * only (i18n/index.ts), because before a session there is nothing to write to.
+ * Signed in, the language is the account menu's «Lingua» (AccountMenu.tsx),
+ * which writes it to the account (`User.locale`) and names each language the
+ * same way (`endonym`, i18n/index.ts).
  *
  * A globe and a menu rather than a row of codes, the way MDN and GitHub Docs
  * offer their languages: a row grows with every language, and `zh-hans` means
@@ -40,6 +40,7 @@ import { useId } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { endonym } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 interface LocaleSwitchProps<T extends string> {
@@ -51,12 +52,6 @@ interface LocaleSwitchProps<T extends string> {
   /** One line under the languages, on what the choice does not change. */
   hint?: string;
   className?: string;
-}
-
-/** A language's name in that language, capitalised as the start of an entry. */
-function endonym(locale: string): string {
-  const name = new Intl.DisplayNames([locale], { type: "language" }).of(locale) ?? locale;
-  return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1);
 }
 
 /** A language's name in the interface's language `ui`. */

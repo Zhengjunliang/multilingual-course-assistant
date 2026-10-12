@@ -29,6 +29,18 @@ export function isUiLocale(value: string | null): value is UiLocale {
 }
 
 /**
+ * A language's name in that language, capitalised as the start of an entry:
+ * "Italiano", "English", "简体中文", from `Intl.DisplayNames`, so a reader finds
+ * their own language whatever the page is in and no catalogue spells another
+ * language's name. Every list of languages names them so (the language menu,
+ * the account menu's «Lingua»).
+ */
+export function endonym(locale: string): string {
+  const name = new Intl.DisplayNames([locale], { type: "language" }).of(locale) ?? locale;
+  return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1);
+}
+
+/**
  * The interface language a browser language tag asks for, or `null` when it
  * asks for none of them.
  *
