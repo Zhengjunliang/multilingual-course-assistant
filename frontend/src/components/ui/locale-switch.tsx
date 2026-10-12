@@ -40,7 +40,7 @@ import { useId } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { endonym, languageCode } from "@/i18n";
+import { endonym, languageCode, languageName } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 interface LocaleSwitchProps<T extends string> {
@@ -52,11 +52,6 @@ interface LocaleSwitchProps<T extends string> {
   /** One line under the languages, on what the choice does not change. */
   hint?: string;
   className?: string;
-}
-
-/** A language's name in the interface's language `ui`. */
-function inLanguage(locale: string, ui: string): string {
-  return new Intl.DisplayNames([ui], { type: "language" }).of(locale) ?? locale;
 }
 
 export function LocaleSwitch<T extends string>({
@@ -110,10 +105,10 @@ export function LocaleSwitch<T extends string>({
                 </Chip>
                 <span lang={locale}>{endonym(locale)}</span>
                 <span className="flex-1 text-caption text-muted">
-                  {inLanguage(locale, value).toLocaleLowerCase(value) ===
+                  {languageName(locale, value).toLocaleLowerCase(value) ===
                   endonym(locale).toLocaleLowerCase(value)
                     ? ""
-                    : inLanguage(locale, value)}
+                    : languageName(locale, value)}
                 </span>
                 <span className="flex size-icon shrink-0">
                   <RadixMenu.ItemIndicator>

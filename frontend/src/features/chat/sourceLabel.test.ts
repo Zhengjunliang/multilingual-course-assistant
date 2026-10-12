@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { Citation } from "@/api/contract";
 import i18n from "@/i18n";
 import {
+  citationText,
   distinctions,
+  excerptAround,
   excerptOf,
   hostOf,
+  passageOf,
   shortName,
   sourceLink,
   sourcesOf,
@@ -214,5 +217,77 @@ describe("an excerpt as a card shows it", () => {
 
     expect(shown.endsWith("parola…")).toBe(true);
     expect(shown.length).toBeLessThanOrEqual(141);
+  });
+
+  it("reads its lines as the page shows them: no bullet, a link as its text", () => {
+    expect(excerptOf("1. Compila la [domanda online](https://www.unifi.it/x)\n- entro il 30")).toBe(
+      "Compila la domanda online entro il 30",
+    );
+  });
+});
+
+describe("the passage a source's link and card mark", () => {
+  it("is the longest line as the page shows it, for a page and a slide alike", () => {
+    const text =
+      "## Tasse\n- Prima rata: 30 settembre, [156 euro](https://www.unifi.it/tasse)\nRata, Scadenza = 30 settembre 2026 per tutti gli iscritti al primo anno";
+
+    expect(passageOf({ ...web("https://www.unifi.it/tasse"), text })).toBe(
+      "Prima rata: 30 settembre, 156 euro",
+    );
+    expect(passageOf({ ...slide(4), text })).toBe("Prima rata: 30 settembre, 156 euro");
+  });
+
+  it("is nothing when the excerpt holds only a table row", () => {
+    expect(passageOf({ ...slide(4), text: "Rata, Scadenza = 30 settembre" })).toBe("");
+  });
+});
+
+describe("an excerpt around its passage", () => {
+  it("keeps the end of what comes before the passage, and what follows it", () => {
+    const text = "## Iscrizioni\nLe iscrizioni al primo anno si chiudono il 30 settembre.\nInfo.";
+
+    expect(excerptAround(text)).toEqual({
+      before: "Iscrizioni ",
+      passage: "Le iscrizioni al primo anno si chiudono il 30 settembre.",
+      after: " Info.",
+    });
+  });
+
+  it("finds a passage far into the excerpt, with an ellipsis before it", () => {
+    const text = `${"Premessa breve.\n".repeat(10)}La seconda rata si paga entro il 31 marzo di ogni anno accademico.`;
+    const { before, passage } = excerptAround(text);
+
+    expect(passage).toBe("La seconda rata si paga entro il 31 marzo di ogni anno accademico.");
+    expect(before.startsWith("…")).toBe(true);
+    expect(before.endsWith("Premessa breve. ")).toBe(true);
+    expect(before.length).toBeLessThanOrEqual(50);
+  });
+
+  it("cuts a passage too long to show whole, and shows nothing after it", () => {
+    const text = `${"parola ".repeat(40)}fine\ncoda`;
+    const { passage, after } = excerptAround(text);
+
+    expect(passage.endsWith("parola…")).toBe(true);
+    expect(passage.length).toBeLessThanOrEqual(141);
+    expect(after).toBe("");
+  });
+
+  it("is the excerpt's start, with nothing marked, when no line is a passage", () => {
+    expect(excerptAround("Rata, Scadenza = 30 settembre")).toEqual({
+      before: "Rata, Scadenza = 30 settembre",
+      passage: "",
+      after: "",
+    });
+  });
+});
+
+describe("a source as text to paste", () => {
+  it("is a page's title and address, or a slide's title, file and page", () => {
+    expect(citationText(web("https://www.unifi.it/p602.html", ["Iscrizioni"]), t)).toBe(
+      "Iscrizioni — https://www.unifi.it/p602.html",
+    );
+    expect(citationText(slide(12, ["Forme normali"]), t)).toBe(
+      "Forme normali — PPM-03-immagini.pdf · p. 12",
+    );
   });
 });

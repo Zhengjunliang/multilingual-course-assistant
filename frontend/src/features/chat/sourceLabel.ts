@@ -110,7 +110,7 @@ export function distinctions(sources: readonly Citation[]): Map<string, string> 
   return told;
 }
 
-/** How many words of the excerpt each end of a text fragment quotes. */
+/** How many words of the passage each end of a text fragment quotes. */
 const FRAGMENT_WORDS = 4;
 
 /** Markdown's marks in an excerpt, which the page shows as layout, not as text. */
@@ -128,6 +128,54 @@ const LINK = /\[([^\]]*)\]\([^)]*\)/g;
  */
 const TABLE_ROW = / = /;
 
+/**
+ * An excerpt's lines as the page shows them: a list item without its bullet,
+ * a link as its text, Markdown's marks gone, whitespace collapsed, and no
+ * empty line.
+ */
+function shownLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(LIST_ITEM, "")
+        .replace(LINK, "$1")
+        .replace(MARKUP, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter(Boolean);
+}
+
+/** Which of `lines` is the passage: the one of most words, the first of equals, never a table row; -1 for none. */
+function passageAt(lines: readonly string[]): number {
+  let found = -1;
+  let most = 0;
+  lines.forEach((line, at) => {
+    const words = line.split(" ").length;
+    if (!TABLE_ROW.test(line) && words > most) {
+      found = at;
+      most = words;
+    }
+  });
+  return found;
+}
+
+/**
+ * The line of an excerpt that a link to it quotes, as the page shows it: the
+ * longest, in words. One line, because a heading and the paragraph under it
+ * are two blocks on the page, and a quote spanning both would not be found; a
+ * table row, which the page shows as cells and no run of its text reads like,
+ * is never chosen. A web link's text fragment quotes it (`sourceLink`), and a
+ * source's card highlights it (`excerptAround`), so the card marks what the
+ * browser will. A slide gets the same line, though its PDF viewer reads no
+ * fragment. Empty when no line qualifies.
+ */
+export function passageOf(citation: Citation): string {
+  const lines = shownLines(citation.text);
+  return lines[passageAt(lines)] ?? "";
+}
+
 /** A term of a text fragment, with the characters its syntax reserves escaped. */
 function fragmentTerm(words: readonly string[]): string {
   return encodeURIComponent(words.join(" ")).replace(/-/g, "%2D");
@@ -138,15 +186,12 @@ function fragmentTerm(words: readonly string[]): string {
  *
  * A slide opens at its page in the browser's PDF viewer (`sourceHref`). A web
  * page opens with a text fragment, `#:~:text=start,end` (WICG Text
- * Fragments), quoting the first and last words of the excerpt's longest line,
- * so the browser scrolls to the passage and highlights it, as Open WebUI does
- * (read 11 October 2026). One line, because a heading and the paragraph under
- * it are two blocks on the page, and a term spanning both would not be found.
- * The line is read as the page shows it: a list item without its bullet, a
- * link as its text, and a table row, which the page shows as cells, never
- * chosen. Where the page does not hold those words verbatim, or the
- * browser has no text fragments, the page opens at its top, as it did before;
- * a PDF on the web gets no fragment, since a PDF viewer reads none.
+ * Fragments), quoting the first and last words of the excerpt's passage
+ * (`passageOf`), so the browser scrolls to it and highlights it, as Open WebUI
+ * does (read 11 October 2026). Where the page does not hold those words
+ * verbatim, or the browser has no text fragments, the page opens at its top,
+ * as it did before; a PDF on the web gets no fragment, since a PDF viewer
+ * reads none.
  *
  * `null` for a slide stored before its key existed, and for a web address
  * that is not an http(s) URL: there is nothing a pill may open.
@@ -164,18 +209,7 @@ export function sourceLink(citation: Citation): string | null {
     return null;
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-  const words = citation.text
-    .split("\n")
-    .filter((line) => !TABLE_ROW.test(line))
-    .map((line) =>
-      line
-        .replace(LIST_ITEM, "")
-        .replace(LINK, "$1")
-        .replace(MARKUP, " ")
-        .split(/\s+/)
-        .filter(Boolean),
-    )
-    .reduce<string[]>((longest, line) => (line.length > longest.length ? line : longest), []);
+  const words = passageOf(citation).split(" ").filter(Boolean);
   if (parsed.pathname.toLowerCase().endsWith(".pdf") || words.length === 0) return citation.url;
   const quoted =
     words.length <= 2 * FRAGMENT_WORDS
@@ -187,17 +221,77 @@ export function sourceLink(citation: Citation): string | null {
 /** How much of an excerpt a card or a row shows, in characters. */
 const EXCERPT_CHARS = 140;
 
+/** How much of what comes before its passage a card shows, in characters. */
+const LEAD_CHARS = 48;
+
+/** The least room after a passage worth filling with words rather than an ellipsis. */
+const TAIL_CHARS = 24;
+
 /**
- * The start of an excerpt as prose: Markdown's marks gone, whitespace
- * collapsed, cut at a word with an ellipsis once it runs past
- * `EXCERPT_CHARS`. Cut here rather than clipped by CSS: clipped lines are
- * still text, laid out under whatever follows, and axe cannot then measure
- * the excerpt's contrast (frontend/e2e/a11y.spec.ts).
+ * Prose cut at a word, with an ellipsis, once it runs past `max` characters.
+ * Cut here rather than clipped by CSS: clipped lines are still text, laid out
+ * under whatever follows, and axe cannot then measure the excerpt's contrast
+ * (frontend/e2e/a11y.spec.ts).
  */
-export function excerptOf(text: string): string {
-  const prose = text.replace(MARKUP, " ").replace(/\s+/g, " ").trim();
-  if (prose.length <= EXCERPT_CHARS) return prose;
-  const cut = prose.slice(0, EXCERPT_CHARS);
+function cutEnd(prose: string, max: number): string {
+  if (prose.length <= max) return prose;
+  const cut = prose.slice(0, max);
   const space = cut.lastIndexOf(" ");
   return `${space > 0 ? cut.slice(0, space) : cut}…`;
+}
+
+/** The end of prose, cut at a word with an ellipsis before it, once it runs past `max`. */
+function cutStart(prose: string, max: number): string {
+  if (prose.length <= max) return prose;
+  const cut = prose.slice(-max);
+  const space = cut.indexOf(" ");
+  return `…${space === -1 ? cut : cut.slice(space + 1)}`;
+}
+
+/** The start of an excerpt as prose, its lines as the page shows them, cut past `EXCERPT_CHARS`. */
+export function excerptOf(text: string): string {
+  return cutEnd(shownLines(text).join(" "), EXCERPT_CHARS);
+}
+
+/** An excerpt around its passage, in the three parts a card sets apart. */
+export interface Excerpt {
+  before: string;
+  passage: string;
+  after: string;
+}
+
+/**
+ * An excerpt as a source's card shows it: the end of what comes before its
+ * passage, the passage (`passageOf`), and what follows it in the room the
+ * passage leaves of `EXCERPT_CHARS`. A passage that alone runs past that is
+ * cut too, and nothing follows it; an excerpt with no passage is its start,
+ * as `excerptOf` gives it.
+ */
+export function excerptAround(text: string): Excerpt {
+  const lines = shownLines(text);
+  const at = passageAt(lines);
+  if (at === -1) return { before: excerptOf(text), passage: "", after: "" };
+
+  const passage = cutEnd(lines[at] ?? "", EXCERPT_CHARS);
+  const before = at === 0 ? "" : `${cutStart(lines.slice(0, at).join(" "), LEAD_CHARS)} `;
+  const rest = lines.slice(at + 1).join(" ");
+  const room = EXCERPT_CHARS - passage.length;
+  let after = "";
+  if (rest !== "" && !passage.endsWith("…")) {
+    after = room < TAIL_CHARS ? " …" : ` ${cutEnd(rest, room)}`;
+  }
+  return { before, passage, after };
+}
+
+/**
+ * A source as one line of text to paste elsewhere: its title, then a web
+ * page's address, without the fragment a link adds, or a slide's file and
+ * page.
+ */
+export function citationText(citation: Citation, t: TFunction): string {
+  const where =
+    citation.kind === "web" && citation.url !== null
+      ? citation.url
+      : t("sources.filePage", { file: citation.source_file, page: citation.page });
+  return `${titleOf(citation)} — ${where}`;
 }
