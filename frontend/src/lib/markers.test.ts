@@ -191,6 +191,12 @@ describe("citedMarkers", () => {
     expect(citedMarkers("Vedi Excerpt 2 e [B].", citations)).toEqual(new Set(["[A]", "[B]"]));
     expect(citedMarkers("Vedi [2][4].", citations)).toEqual(new Set(["[A]", "[C]"]));
   });
+
+  it("counts no number written in code or math", () => {
+    const citations = [cite("[A]"), cite("[B]")];
+    const answer = "Una lista [2]:\n\n```py\nx = [1]\n```\n\nE `y[1]`, `[1]` e $$[1]$$.";
+    expect(citedMarkers(answer, citations)).toEqual(new Set(["[B]"]));
+  });
 });
 
 describe("withoutMarkers", () => {
@@ -209,6 +215,15 @@ describe("withoutMarkers", () => {
     expect(withoutMarkers("Le tasse scadono il 30 settembre [1][2].", citations)).toBe(
       "Le tasse scadono il 30 settembre.",
     );
+  });
+
+  it.each([
+    ["a fenced block", "Esempio [1]:\n\n```py\nx = [1]\n```", "Esempio:\n\n```py\nx = [1]\n```"],
+    ["a ~~~ fence", "~~~\nvoti = [2] [1]\n~~~", "~~~\nvoti = [2] [1]\n~~~"],
+    ["an indented block", "Esempio:\n\n    voto [1][2]\n", "Esempio:\n\n    voto [1][2]"],
+    ["inline code", "Scrivi `voto [1]` così [2].", "Scrivi `voto [1]` così."],
+  ])("copies the numbers in %s as the answer wrote them", (_, text, copied) => {
+    expect(withoutMarkers(text, citations)).toBe(copied);
   });
 
   it("takes the space after a marker that opened a line, and ends where the text does", () => {
