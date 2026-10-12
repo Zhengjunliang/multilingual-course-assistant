@@ -79,7 +79,10 @@
     "label": "La tua domanda",
     "placeholder": "Chiedi del corso o dell'ateneo…",
     "submit": "Chiedi",
-    "cancel": "Ferma"
+    "cancel": "Ferma",
+    "empty": "Scrivi prima la domanda.",
+    "toSend": "per chiedere",
+    "toBreak": "a capo"
   },
   "entry": {
     "skip": "Salta",
@@ -90,7 +93,8 @@
   },
   "status": {
     "streaming": "Sto scrivendo la risposta…",
-    "retrying": "C'è un'altra domanda in corso. Riprovo tra {{seconds}} secondi ({{attempt}} di {{total}})."
+    "retrying": "Riprovo tra {{seconds}} secondi ({{attempt}} di {{total}}).",
+    "busy": "C'è un'altra domanda in corso."
   },
   "route": {
     "slides": "materiale del corso",
@@ -132,7 +136,8 @@
     "copy": "Copia la risposta",
     "copied": "Risposta copiata",
     "searchTime": "Tempo di ricerca",
-    "seconds": "{{seconds}} s"
+    "seconds": "{{seconds}} s",
+    "kept": "Quello che vedi è stato salvato così com'è."
   },
   "code": {
     "copy": "Copia",

@@ -162,7 +162,8 @@ test.describe("the chat mid-answer", () => {
   test("while the words arrive: nothing moves", async ({ page, api }) => {
     api.holdAnswer(campusStream(7).slice(0, 2));
     await ask(page);
-    await expect(page.getByText(it.status.streaming)).toBeAttached();
+    // The answer's own words for a screen reader; the composer's foot says it too.
+    await expect(page.getByRole("article").getByText(it.status.streaming)).toBeAttached();
     expect(await moved(page)).toEqual([]);
   });
 });

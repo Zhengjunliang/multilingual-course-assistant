@@ -79,7 +79,10 @@
     "label": "Your question",
     "placeholder": "Ask about the course or the university…",
     "submit": "Ask",
-    "cancel": "Stop"
+    "cancel": "Stop",
+    "empty": "Write your question first.",
+    "toSend": "to ask",
+    "toBreak": "for a new line"
   },
   "entry": {
     "skip": "Skip",
@@ -90,7 +93,8 @@
   },
   "status": {
     "streaming": "Writing the answer…",
-    "retrying": "Another question is being answered. Retrying in {{seconds}} seconds ({{attempt}} of {{total}})."
+    "retrying": "Retrying in {{seconds}} seconds ({{attempt}} of {{total}}).",
+    "busy": "Another question is being answered."
   },
   "route": {
     "slides": "course material",
@@ -132,7 +136,8 @@
     "copy": "Copy the answer",
     "copied": "Answer copied",
     "searchTime": "Search time",
-    "seconds": "{{seconds}} s"
+    "seconds": "{{seconds}} s",
+    "kept": "What you see has been saved as it is."
   },
   "code": {
     "copy": "Copy",

@@ -1,16 +1,14 @@
 // @vitest-environment jsdom
 
 /**
- * What the composer's one button offers in each state, and when its box
- * travels.
+ * What the composer's one button offers in each state, what its foot says,
+ * and when its box travels.
  *
- * A send button rendered disabled on the accent fill is a defect no gate
- * catches: `disabled:opacity-50` makes a faded slab, the loudest thing on an
- * otherwise empty screen, and the first thing a reader sees. Every gate stays
- * green, because it is a claim about what is on the page in a given state, and
- * only a document can answer that. How far the box travels needs a layout,
- * which a document has not got; the browser test in `e2e/demo.spec.ts` reads
- * that, and these read only whether it travels at all.
+ * The send button is never turned off (DESIGN.md, Do's and Don'ts): with
+ * nothing to send it is outlined rather than filled, and a press says what is
+ * missing. How far the box travels needs a layout, which a document has not
+ * got; the browser test in `e2e/demo.spec.ts` reads that, and these read only
+ * whether it travels at all.
  */
 
 import { act, useState } from "react";
@@ -21,9 +19,19 @@ import type { Waiting } from "@/features/chat/useAsk";
 import i18n from "@/i18n";
 import { mount } from "@/test/mount";
 
-function composer(waiting: Waiting = { phase: "idle" }) {
+interface Handlers {
+  onSubmit?: (question: string) => void;
+  onStop?: () => void;
+}
+
+function composer(waiting: Waiting = { phase: "idle" }, handlers: Handlers = {}) {
   return mount(
-    <Composer waiting={waiting} onSubmit={() => {}} onStop={() => {}} placement="hero" />,
+    <Composer
+      waiting={waiting}
+      onSubmit={handlers.onSubmit ?? (() => {})}
+      onStop={handlers.onStop ?? (() => {})}
+      placement="hero"
+    />,
   );
 }
 
@@ -45,44 +53,80 @@ const send = (container: HTMLElement) =>
   container.querySelector<HTMLButtonElement>("button[type='submit']");
 
 describe("the composer", () => {
-  it("keeps the send button quiet while there is nothing to send", () => {
+  it("keeps the send button on and outlined while there is nothing to send", () => {
     const { container, unmount } = composer();
     const button = send(container);
-    const seen = { disabled: button?.disabled, faded: button?.className.includes("opacity-50") };
-    unmount();
-
-    expect(seen).toEqual({ disabled: true, faded: false });
-  });
-
-  it("enables the send button with the first character", () => {
-    const { container, unmount } = composer();
-
-    type(container, "Quando inizia la sessione?");
-    const disabled = send(container)?.disabled;
-    unmount();
-
-    expect(disabled).toBe(false);
-  });
-
-  it("does not count whitespace as something to send", () => {
-    const { container, unmount } = composer();
-
-    type(container, "   ");
-    const disabled = send(container)?.disabled;
-    unmount();
-
-    expect(disabled).toBe(true);
-  });
-
-  it("puts the stop button in its place while an answer is written", () => {
-    const { container, unmount } = composer({ phase: "streaming" });
     const seen = {
-      send: send(container) !== null,
-      stop: container.querySelector(`button[aria-label="${i18n.t("ask.cancel")}"]`) !== null,
+      text: button?.textContent,
+      disabled: button?.disabled,
+      outlined: button?.className.includes("border-line"),
     };
     unmount();
 
-    expect(seen).toEqual({ send: false, stop: true });
+    expect(seen).toEqual({ text: "Chiedi", disabled: false, outlined: true });
+  });
+
+  it("fills the send button with the first character", () => {
+    const { container, unmount } = composer();
+
+    type(container, "Quando inizia la sessione?");
+    const filled = send(container)?.className.includes("bg-accent");
+    unmount();
+
+    expect(filled).toBe(true);
+  });
+
+  it.each([
+    ["nothing", ""],
+    ["only whitespace", "   "],
+  ])(
+    "pressed on %s, sends nothing, puts the caret in the field and says what is missing",
+    (_, text) => {
+      const sent: string[] = [];
+      const { container, unmount } = composer({ phase: "idle" }, { onSubmit: (q) => sent.push(q) });
+
+      type(container, text);
+      act(() => send(container)?.click());
+      const seen = {
+        sent,
+        focused: document.activeElement === container.querySelector("textarea"),
+        said: container.querySelector('[role="status"]')?.textContent,
+      };
+      type(container, "Quando?");
+      const after = container.querySelector('[role="status"]')?.textContent;
+      unmount();
+
+      expect(seen).toEqual({ sent: [], focused: true, said: "Scrivi prima la domanda." });
+      expect(after).toBe("");
+    },
+  );
+
+  it("puts a stop button with its word in its place while an answer is written, and it stops", () => {
+    let stopped = 0;
+    const { container, unmount } = composer(
+      { phase: "streaming" },
+      { onStop: () => (stopped += 1) },
+    );
+    const stop = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === i18n.t("ask.cancel"),
+    );
+    act(() => stop?.click());
+    const seen = { send: send(container) !== null, stop: stop !== undefined, stopped };
+    unmount();
+
+    expect(seen).toEqual({ send: false, stop: true, stopped: 1 });
+  });
+
+  it("names the keys at its foot, and the answer being written while one is", () => {
+    const foot = (waiting: Waiting) => {
+      const { container, unmount } = composer(waiting);
+      const text = container.querySelector("form p")?.textContent;
+      unmount();
+      return text;
+    };
+
+    expect(foot({ phase: "idle" })).toBe("Invioper chiedere·Maiusc Invioa capo");
+    expect(foot({ phase: "streaming" })).toBe("Sto scrivendo la risposta…");
   });
 
   it("does not replay a travel it mounts with", () => {

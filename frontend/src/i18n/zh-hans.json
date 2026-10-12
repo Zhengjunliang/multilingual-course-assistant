@@ -79,7 +79,10 @@
     "label": "你的问题",
     "placeholder": "问课程材料或学校信息…",
     "submit": "提问",
-    "cancel": "停止"
+    "cancel": "停止",
+    "empty": "请先写下问题。",
+    "toSend": "发送",
+    "toBreak": "换行"
   },
   "entry": {
     "skip": "跳过",
@@ -90,7 +93,8 @@
   },
   "status": {
     "streaming": "正在写回答…",
-    "retrying": "前面还有人在问。{{seconds}} 秒后重试（第 {{attempt}} 次，共 {{total}} 次）。"
+    "retrying": "{{seconds}} 秒后重试（第 {{attempt}} 次，共 {{total}} 次）。",
+    "busy": "前面还有人在问。"
   },
   "route": {
     "slides": "课程材料",
@@ -132,7 +136,8 @@
     "copy": "复制回答",
     "copied": "已复制回答",
     "searchTime": "检索用时",
-    "seconds": "{{seconds}} 秒"
+    "seconds": "{{seconds}} 秒",
+    "kept": "你看到的部分已按原样保存。"
   },
   "code": {
     "copy": "复制",

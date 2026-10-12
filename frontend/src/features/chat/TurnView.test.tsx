@@ -66,11 +66,27 @@ function turn(overrides: Partial<Turn> = {}): Turn {
   };
 }
 
-function view(t: Turn, live = false, thinking = false, visitor = false, retrying = false): string {
+/** The wait a busy refusal sets before the question is asked again. */
+const RETRY = { seconds: 5, attempt: 1 };
+
+function view(
+  t: Turn,
+  live = false,
+  thinking = false,
+  visitor = false,
+  retry: typeof RETRY | null = null,
+): string {
   // A router because a visitor's turn may link to the login page.
   return render(
     <MemoryRouter>
-      <TurnView turn={t} live={live} thinking={thinking} retrying={retrying} visitor={visitor} />
+      <TurnView
+        turn={t}
+        live={live}
+        thinking={thinking}
+        retry={retry}
+        failedNow={false}
+        visitor={visitor}
+      />
     </MemoryRouter>,
   );
 }
@@ -107,7 +123,14 @@ describe("the process line", () => {
     // thing in the quietest voice available. Guarding the negative keeps a
     // later tidy-up from putting it back.
     const { container, unmount } = mount(
-      <TurnView turn={turn()} live={false} thinking={false} retrying={false} visitor={false} />,
+      <TurnView
+        turn={turn()}
+        live={false}
+        thinking={false}
+        retry={null}
+        failedNow={false}
+        visitor={false}
+      />,
     );
     const line = container.querySelector("summary")?.closest(TYPE_SIZES);
     if (line == null) throw new Error("no type size is set around the process line");
@@ -152,7 +175,8 @@ describe("the answer's language", () => {
         })}
         live={false}
         thinking={false}
-        retrying={false}
+        retry={null}
+        failedNow={false}
         visitor={false}
       />,
     );
@@ -213,7 +237,7 @@ describe("the cat beside the answer", () => {
       false,
       true,
       false,
-      true,
+      RETRY,
     );
 
     expect(poseIn(html)).toBe("thinking");
@@ -238,7 +262,14 @@ function sourcesButton(container: HTMLElement) {
 
 function mounted(of: Turn) {
   return mount(
-    <TurnView turn={of} live={false} thinking={false} retrying={false} visitor={false} />,
+    <TurnView
+      turn={of}
+      live={false}
+      thinking={false}
+      retry={null}
+      failedNow={false}
+      visitor={false}
+    />,
   );
 }
 
@@ -620,6 +651,61 @@ describe("the row under the answer", () => {
     unmount();
 
     expect({ focused, expanded }).toEqual({ focused: true, expanded: "false" });
+  });
+});
+
+describe("a turn that did not get all the way", () => {
+  const cut = turn({ answer: "La scadenza è", complete: false, failure: { kind: "incomplete" } });
+
+  function banner(of: Turn, { visitor = false, failedNow = true } = {}) {
+    const { container, unmount } = mount(
+      <MemoryRouter>
+        <TurnView
+          turn={of}
+          live={false}
+          thinking={false}
+          retry={null}
+          failedNow={failedNow}
+          visitor={visitor}
+        />
+      </MemoryRouter>,
+    );
+    const shown = container.querySelector(".bg-warn");
+    const seen = { role: shown?.getAttribute("role") ?? null, text: shown?.textContent ?? null };
+    unmount();
+    return seen;
+  }
+
+  it("says in a warning banner that the answer stopped, and that what was written is kept", () => {
+    expect(banner(cut)).toEqual({
+      role: "status",
+      text: "La risposta si è interrotta prima della fine.Quello che vedi è stato salvato così com'è.",
+    });
+  });
+
+  it("promises nothing kept when nothing was written, or for a visitor, whose turn is stored nowhere", () => {
+    const heading = "La risposta si è interrotta prima della fine.";
+
+    expect(banner({ ...cut, answer: "" }).text).toBe(heading);
+    expect(banner(cut, { visitor: true }).text).toBe(heading);
+  });
+
+  it("is announced only when it happened just now, not when a stored conversation is read back", () => {
+    expect(banner(cut, { failedNow: false }).role).toBeNull();
+  });
+
+  it("says, while a busy server is waited out, how long until the next try and which it is", () => {
+    const html = view(
+      turn({ route: null, searchMs: null, citations: [], answer: "", complete: false }),
+      false,
+      true,
+      false,
+      RETRY,
+    );
+
+    expect(html).toContain("C&#x27;è un&#x27;altra domanda in corso.");
+    expect(html).toContain("Riprovo tra 5 secondi (1 di 2).");
+    expect(html).toContain('role="status"');
   });
 });
 

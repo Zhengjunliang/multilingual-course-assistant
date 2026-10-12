@@ -119,12 +119,14 @@ export default function ChatPage() {
     refreshConversations();
   }, [ask.conversationId, conversationId, navigate, refreshConversations]);
 
-  // Follow the answer as it is written, but only while it is being written.
+  // Follow the answer as it is written, but only while it is being written,
+  // and bring a banner about it into view: the wait for a busy server, or the
+  // failure that ended it.
   // `turns` is the trigger rather than an input — the effect reads nothing out
   // of it, it just needs to run again each time a token lands.
   // biome-ignore lint/correctness/useExhaustiveDependencies: turns is the trigger
   useEffect(() => {
-    if (waiting.phase === "streaming" || waiting.phase === "queued") {
+    if (waiting.phase !== "idle") {
       bottom.current?.scrollIntoView({ behavior: scrollBehavior(), block: "end" });
     }
   }, [waiting.phase, turns]);
@@ -225,7 +227,8 @@ export default function ChatPage() {
                   turn={turn}
                   live={current && waiting.phase === "streaming"}
                   thinking={current && (waiting.phase === "queued" || waiting.phase === "retrying")}
-                  retrying={current && waiting.phase === "retrying"}
+                  retry={current && waiting.phase === "retrying" ? waiting : null}
+                  failedNow={current && waiting.phase === "stopped"}
                   visitor={visitor}
                 />
               );
