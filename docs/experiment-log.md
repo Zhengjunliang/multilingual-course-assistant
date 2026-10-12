@@ -1,6 +1,6 @@
 # Experiment log
 
-What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; every number is reproducible with the commands in its entry's *Reproducibility* section. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
+What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; each entry's *Reproducibility* section says how its numbers were produced, and what of that was not kept. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
 ## 2026-10-12 — Each passage once, sources by the reranker, citations by number: the gold sets hold, copies leave the top 5, no excerpt number in the prose
 
@@ -109,15 +109,15 @@ The three runs took place within an hour, on the same day's pages; why runs on d
 
 Eight questions, the first three of `gold/smoke.jsonl` and of `gold/campus.jsonl` plus *Quando scade la prima rata delle tasse universitarie?* and *如何申请DSU奖学金？*, each routed and answered from the top five reranked excerpts; one answer per question and prompt.
 
-| Prompt | Answers citing a real marker | Answers writing `[Excerpt N]` | Answers copying a tag |
-| --- | --- | --- | --- |
-| before the change | 1/8 | 3/8 | 0/8 |
-| tags inline | 1/8 | 5/8 | 1/8 |
-| tags inline, plus a rule never to write them | 0/8 | 2/8 | 4/8 |
-| each tag on a line of its own | 1/8 | 6/8 | 0/8 |
-| Qwen-Agent's code fence instead of tags | 2/8 | 5/8 | 0/8 |
+| Prompt | Answers copying a tag |
+| --- | --- |
+| before the change | 0/8 |
+| tags inline | 1/8 |
+| tags inline, plus a rule never to write them | 4/8 |
+| each tag on a line of its own | 0/8 |
+| Qwen-Agent's code fence instead of tags | 0/8 |
 
-With the tags inline, the English slides answer interleaved its sentences with `<quoted>` blocks of its own, which `react-markdown` would show as text; naming the tags in a rule made it worse. On their own lines the tags are not copied. Citation conformance is as poor before the change as after it, the problem of the entry of 2026-08-25, section 2; eight questions cannot tell one in eight from two in eight, so the fence's second citation is not a finding.
+With the tags inline, the English slides answer interleaved its sentences with `<quoted>` blocks of its own, which `react-markdown` would show as text; naming the tags in a rule made it worse. On their own lines the tags are not copied.
 
 ### 3. The deepening decisions
 
@@ -136,11 +136,7 @@ The generation and deepening probes called `route`, `search` (top 5, reranker on
 
 ### 1. What moved
 
-`rag/migrate.py` at `ec3cb1a` copies the embedded index at `data/qdrant/` to the Qdrant service of `docker-compose.yml` (server 1.19.1, client 1.19.0) with qdrant-client's `QdrantClient.migrate()`, then checks the copy; the decision and the three gates are [decisions.md](decisions.md), 2026-08-24, *Qdrant runs as a service*, and 2026-08-25, *Where measurements run*, point 3. Before the run the index was copied to `data/backup/33/qdrant`, and the copy was opened and compared with the source: the counts and the (`url`, `ingest_source`) pairs of both collections equal.
-
-The source held 1234 `slides` points and 29098 `unifi_web` points, every one from the crawl snapshot (26047 from `crawl-20260822-143647`, 3051 from `crawl-20260822-164843`) and none fetched live: at the time of the move no page existed only in the index. Opening the source took 5.8 s, `migrate()` moved both collections in 44.3 s, comparing every point took 34.7 s and the recall gate 20.3 s.
-
-`migrate()` creates each collection with the configuration the source reports, and local mode reports placeholders. Against a probe collection created by `ensure_collection` on the same server, both collections differed in two optimizer settings: `indexing_threshold` 20000 KB where the server gives 10000, and `max_optimization_threads` 1 where the server chooses automatically. With 29098 vectors of 1024 dimensions over 8 segments, about 14.2 MiB each, the copied threshold would have kept `unifi_web` from ever getting an HNSW index. Both settings were set to the probe's values; the collection parameters, the HNSW settings, quantization and the WAL (32 MB, no segment ahead) matched the probe as copied. The seven keyword payload indexes (`course`, `academic_year`, `source_file`, `url`, `ingest_source`, `ingest_run_id`, `locale`) were created on both collections, and a second call created none.
+`rag/migrate.py` at `ec3cb1a` copied the embedded index at `data/qdrant/` to the Qdrant service of `docker-compose.yml` (server 1.19.1, client 1.19.0) with qdrant-client's `QdrantClient.migrate()`, then checked the copy; the decision and its gates are [decisions.md](decisions.md), 2026-08-24, *Qdrant runs as a service*. The source held 1234 `slides` points and 29098 `unifi_web` points, every one from the crawl snapshot and none fetched live. `migrate()` creates each collection with the configuration local mode reports, which holds placeholders: its `indexing_threshold` of 20000 KB, against the server's 10000, would have kept `unifi_web`, 8 segments of about 14.2 MiB, from ever getting an HNSW index. The optimizer settings were set to those of a collection the server creates through `ensure_collection`, and the seven keyword payload indexes, which local mode does not keep, were created.
 
 Once the optimizer had finished, the server's telemetry (`GET /telemetry?details_level=4`, read per segment) showed:
 
@@ -153,12 +149,7 @@ These two columns are the reference for the M3 gold runs: automatic growth adds 
 
 ### 2. Every point, compared
 
-Every source point was read back from the server by id:
-
-- the counts are equal (1234 = 1234, 29098 = 29098), and so are the 941 (`url`, `ingest_source`) pairs, counted on both sides the way `count_web_versions` counts them;
-- 1234/1234 and 29098/29098 points are identical: the payload equal; the dense vector equal in direction, within 1e-5 per component once both sides are normalised (the server stores a Cosine vector normalised, local mode keeps it raw), with a largest difference of 1.42e-08; the sparse vector equal index for index, its values equal bit for bit on 841 of the 30332 points and within the script's relative tolerance of 1e-6 on the others, about eight times the relative precision of float32 (1.2e-7).
-
-The dense tolerance sits between two scales: float32 rounding is about 6e-8, while two distinct 1024-dimensional embeddings differ by at least about 1e-3 in some component.
+Every source point was read back from the server by id: the counts and the 941 (`url`, `ingest_source`) pairs are equal, and 1234/1234 and 29098/29098 points are identical — the payload equal, the dense vector equal in direction within 1e-5 per component (the server stores a Cosine vector normalised, local mode keeps it raw; the largest difference 1.42e-08, where two distinct embeddings differ by about 1e-3 in some component), the sparse vector equal index for index and within a relative 1e-6 in value.
 
 ### 3. Approximate search against exact search
 
@@ -182,7 +173,7 @@ Both gold sets ran on the embedded index, the source the move reads without chan
 | smoke | no rerank | 37/40, MISS `q015` `q035` `q036` | 37/40 | identical; `top:` column identical |
 | campus | no rerank | 22/32 | 21/32 | `c034` HIT on the embedded index, MISS on the server |
 
-The rerank rows repeat the first comparison, run at `ec3cb1a` before the change below: the same HIT or MISS on every question, and the same totals as the entry of 2026-09-28 and the campus baseline.
+The rerank rows repeat the first comparison, run at `ec3cb1a` before the change below: the same HIT or MISS on every question, and the same totals as the baselines of the entry of 2026-08-24.
 
 **The six `top:` differences of the rerank path are one page under two addresses.** In each (`c006`, `c008`, `c024`, `c026`, `c031`, `c032`) the two top URLs hold identical chunk text: the crawl stored the same page twice, such as `ingegneria.unifi.it/p365.html` and `vp-365-organi.html`, or an `unifi.it/en/node/…` path and its Italian alias. The reranker scores the two copies equally, and which leads depends on the fusion order.
 
@@ -193,11 +184,6 @@ The rerank rows repeat the first comparison, run at `ec3cb1a` before the change 
 ### Reproducibility
 
 ```bash
-# Git Bash; the backup, opened and compared before the run
-mkdir -p data/backup/33 && cp -r data/qdrant data/backup/33/qdrant
-# data/qdrant is deleted once #33 is merged: to rerun the embedded side, copy
-# data/backup/33/qdrant back to data/qdrant first
-
 # at ec3cb1a: dry run, then the move and gates 1 and 2 (server empty before it)
 .venv/Scripts/python.exe -m rag.migrate --from data/qdrant --dry-run
 .venv/Scripts/python.exe -m rag.migrate --from data/qdrant
@@ -213,93 +199,17 @@ col() { grep -E '^[qc][0-9]{3} (HIT |MISS)' "$1" | cut -c1-9; }
 diff <(col smoke-embedded.txt) <(col smoke-server.txt)
 ```
 
-The backup check opens the copy and the source and compares, per collection, the point count and the count of every (`url`, `ingest_source`) pair. The branch comparison of section 4 queries each branch alone on both backends: `query_points` with the question's dense or sparse vector, `using` that branch, `limit` 20 and the filter `rag.gold` applies. The repeat checks call `hybrid_search` on the server for every gold question, ten times each at `f274169`, and thirty times for `c035` at `ec3cb1a`.
+`data/qdrant` was deleted with `#33`; `data/backup/33/qdrant` is the embedded index as it was at the move, and rerunning the embedded side means copying it back to `data/qdrant`. The branch comparison of section 4 queries each branch alone on both backends: `query_points` with the question's dense or sparse vector, `using` that branch, `limit` 20 and the filter `rag.gold` applies. The repeat checks call `hybrid_search` on the server for every gold question, ten times each at `f274169`, and thirty times for `c035` at `ec3cb1a`.
 
-Rollback point: `data/backup/33/qdrant`, kept until the Qdrant volume has snapshots (`#122`). Run outputs: `data/migrate-33/` (`run.log` of the move, the gold outputs of both comparisons; `v3/` the branch comparison, the repeat check and the gold runs after the restart, with their scripts). `rag/migrate.py` at `ec3cb1a` is a one-off script, deleted in the commit that records this entry.
+Run outputs: `data/migrate-33/` (`run.log` of the move, the gold outputs of both comparisons; `v3/` the branch comparison, the repeat check and the gold runs after the restart, with their scripts). `rag/migrate.py` exists only at `ec3cb1a`.
 
-## 2026-09-28 — The slides points move to their edition key without re-embedding
+## 2026-09-14 — A pypdf upgrade changes the extracted text, and the relevance gate's number is not comparable
 
-### 1. What moved
+### 1. The extracted text, the routing and retrieval
 
-`rag/relabel.py` at `3ebc020` moves each slides point to its post-`#96` edition key without touching its vector: it scrolls the point's stored vector and payload, upserts them under the new id with the edition fields added, verifies the vector survived unchanged, then deletes the old id. `course` moves from `"PPM"` to `"B028451"`, `academic_year` from unset to `"2025-2026"`, and `chunk_id` is recomputed under the post-`#96` rule that folds both into the id.
+Upgrading `pypdf` from 6.16.1 to 6.18.1 left the page and image counts of all 31 documents unchanged and raised the characters per page of 12 of them, by 1.1% to 9.7%, lowering none. The adaptive routing of all 31 did not change, and neither did `gold/smoke.jsonl`: 38/40 before and after, missing `q018` and `q028`. The corpus figures of the entries of 2026-07-31 and 2026-08-02 were taken before `pypdf` was a locked dependency, its version unrecorded, and depend on it as generation results depend on the model revision; the parsing stack's version is on the reproducibility list of [architecture.md](architecture.md) for this reason.
 
-Before the run, the whole index was copied to `data/backup/96/` (the `qdrant` directory identical to the source, 413496400 bytes; 31 sidecars; 31 chunk files) as the rollback point.
-
-A dry run (`--dry-run`) reported it would move 1234 points across 31 source files and rewrite 31 sidecars and 31 chunk files (1234 lines); opening the embedded client took 27.50 s and peaked at 1627.7 MiB, because the same client also loads `unifi_web`'s 29098 points.
-
-The real run scanned 1234 points (31 source files); every id matched the pre-`#96` rule, and the 1234 old-id → new-id pairs were recorded to `data/relabel-96/ids-20260928T184623Z.json` before anything was written. It upserted the 1234 points under their new ids, in batches of 256 (3.49 s), then **reopened the client** (4.78 s) and compared vectors against what that fresh client read back: **1234/1234 identical**. Only then did it delete the 1234 old points (2.82 s) from the id list recorded at scan time, and rewrite the 31 sidecars and 31 chunk files (1234 lines, 0.12 s). The comparison runs on a reopened client because the embedded client normalises cosine vectors in memory as it works with them; only the persisted state on disk keeps the raw values it actually wrote, so comparing against the in-memory copy would not have caught a write that landed wrong.
-
-Final invariants held: 1234 slides points in the collection = 1234 chunk ids across the 31 chunk files, the two id sets equal, 0 points labelled `PPM`, and `unifi_web` unchanged at 29098 points both before and after (a fresh open reports 29098 too).
-
-### 2. The smoke gold before, between and after
-
-Three runs of `gold/smoke.jsonl` (40 questions, rerank path) isolate the relabel from the scope filter that `#96` also added:
-
-| Run | What it ran | What it isolates | hit@5 |
-| --- | --- | --- | --- |
-| before | branch code, `rag.gold.EVAL_SCOPE` forced to `None`, on the index before the relabel | the search as it ran before `#96`'s scope existed | 38/40 (95%) |
-| mid | the same forced-`None` run, on the relabelled index | the relabel alone (scope disabled in both) | 38/40 (95%) |
-| after | branch head, scope pinned to `B028451:2025-2026` | the scope filter alone (relabel applied in both) | 38/40 (95%) |
-
-`before` and `mid` were meant to compare the pre-scope commit against the relabelled index; forcing `EVAL_SCOPE` to `None` for one run reproduces that comparison without leaving the branch. The per-question HIT/MISS columns and the `top:` column are identical before→mid (the relabel changed nothing the ranking depends on) and mid→after (the scope filter changed nothing, because every point belongs to the one edition it names). The misses are `q018` and `q028` in all three runs (`q028`: `4.2 Docker.pdf` p.11 wanted, `4.1 Docker.pdf` p.58 returned), unrelated to `#96`.
-
-The scope filter was also checked directly on the relabelled index: `rag.search "Cosa sono le migrazioni?" --scope B028451:2025-2026 --no-rerank` returns slides (top: `2-orm_django_2025.pdf` p.24); the same question with `--scope B028451:2024-2025` — an edition the corpus does not hold — returns none.
-
-### Reproducibility
-
-```powershell
-# dry run, then the real run, both at 3ebc020
-.venv\Scripts\python.exe -m rag.relabel --from-course PPM --to B028451:2025-2026 --dry-run
-.venv\Scripts\python.exe -m rag.relabel --from-course PPM --to B028451:2025-2026
-
-# smoke gold: before/mid force the scope off, after pins it (branch head)
-.venv\Scripts\python.exe -c "import rag.gold as g; g.EVAL_SCOPE = None; g.main(['gold/smoke.jsonl'])"
-.venv\Scripts\python.exe -m rag.gold gold/smoke.jsonl
-
-# the scope filter alone
-.venv\Scripts\python.exe -m rag.search "Cosa sono le migrazioni?" --scope B028451:2025-2026 --no-rerank
-.venv\Scripts\python.exe -m rag.search "Cosa sono le migrazioni?" --scope B028451:2024-2025 --no-rerank
-```
-
-Rollback point: `data/backup/96/` (copied before the run). Id map: `data/relabel-96/ids-20260928T184623Z.json` (1234 pairs). `rag/relabel.py` at `3ebc020` is a one-off script, deleted in the commit that records this entry.
-
-## 2026-09-14 — A pypdf upgrade changes the extracted text without changing the routing
-
-### 1. The comparison
-
-The upgrade of `pypdf` from **6.16.1** to **6.18.1** (a Dependabot pull request) was accepted only after measuring `rag.probe` on the whole corpus before and after it, because CI runs no ingest and could say nothing about it.
-
-Page counts and image counts are **identical in all 31 documents**. Only the density of extracted text changes, and it **always changes in the same direction**: 12 documents out of 31 return more characters per page, none returns fewer.
-
-| Document | 6.16.1 | 6.18.1 | Δ |
-| --- | --- | --- | --- |
-| Progetti Esercitazione Back-end PPM 2026 | 3975 | **4362** | +9.7% |
-| javascript_info_set2 | 540 | **557** | +3.1% |
-| javascript_info_set1 | 461 | **474** | +2.8% |
-| jquery_basics | 465 | **478** | +2.8% |
-| javascript_browser_document_events_interfaces | 566 | **581** | +2.7% |
-| 1.1 Course intro 2025 (2) | 261 | **268** | +2.7% |
-| 2.3 IMAGES LOSSY COMPRESSION 2024 | 413 | **423** | +2.4% |
-| 3.2b VIDEO H261-H262 2024 | 410 | **418** | +2.0% |
-| 4.1 Docker | 350 | **357** | +2.0% |
-| 3.1b VIDEO GENERAL CONCEPTS 2024 | 537 | **547** | +1.9% |
-| 4.2 Docker | 342 | **348** | +1.8% |
-| 3.3b VIDEO H264-H265 2024 | 1009 | **1020** | +1.1% |
-| *(the other 19)* | — | *unchanged* | 0 |
-
-The cause was not investigated: accepting the upgrade only required knowing that the routing verdict did not change. That the sign is always positive suggests an upstream fix in text-layer extraction, not a regression.
-
-### 2. What did not change, which is why the upgrade was accepted
-
-Adaptive routing is **identical**: the same 4 documents need formula enrichment (`2.1 IMAGES GENERAL`, `2.3 IMAGES LOSSY`, `3.2b VIDEO H261-H262`, `3.3b VIDEO H264-H265`, all because of the maths font `SymbolMT`), the same single document needs OCR (`3.5-HTML5-Part-2`, 50% of pages without a text layer), and the other 26 stay `classic`. Zero false positives, as in the original measurement.
-
-Retrieval is unchanged as well: `gold/smoke.jsonl` returns **38/40 (95%)** before and after, with the same two misses (`q018`, `q028`). The measurement was also repeated after the upgrade of `qdrant-client` from 1.18.0 to 1.19.0, accepted in the same session.
-
-### 3. The consequence for reproducibility
-
-Two numbers recorded earlier in this log date from 2026-07-31, when `pypdf` was not a locked dependency and its version was not recorded: the corpus's **~650 000 characters** (entry of 2026-07-31) and the OCR gain on `3.5-HTML5` (**10001 → 20032 characters**, entry of 2026-08-02, section 2). This entry first said they were produced with 6.16.1, the version it upgraded from. They are not wrong, but they **depend on the version of the extraction library**, exactly as generation results depend on the model revision. The version of the parsing stack therefore joins the reproducibility list of [architecture.md](architecture.md).
-
-### 4. The relevance gate: 17/20 — and the finding that the number is not comparable
+### 2. The relevance gate: 17/20 — and the finding that the number is not comparable
 
 `rag/live.py` uses `pypdf` for a second purpose: reading a sample of the text layer of a PDF fetched from the web, to hand to the relevance gate. Since extraction returns more text, the sample changes, and the verdict could change with it. The measurement was therefore repeated: `uv run python -m rag.live --measure-gate` returns **17/20**, against the **18/20** recorded on 2026-08-24.
 
@@ -322,20 +232,16 @@ A methodological conclusion follows that reaches beyond this session. On twenty 
 ```bash
 uv run python -m rag.probe data/corpus/PPM      # routing over all 31 documents
 uv run python -m rag.gold gold/smoke.jsonl      # hit@5 on the smoke set
-uv run python -m rag.live --measure-gate        # 17/20 in section 4; needs Ollama
+uv run python -m rag.live --measure-gate        # 17/20 in section 2; needs Ollama
 ```
 
-Versions compared: `pypdf` 6.16.1 → 6.18.1, `qdrant-client` 1.18.0 → 1.19.0. Corpus unchanged in `data/corpus/PPM` (31 PDFs); index unchanged in `data/qdrant/` (collection `slides`; `unifi_web` at 29098 points). No reindexing was run: `rag.probe` writes nothing, and the comparison concerns extraction, not vectors.
+Versions compared: `pypdf` 6.16.1 → 6.18.1; the smoke set gave the same 38/40 again after `qdrant-client` 1.18.0 → 1.19.0. Corpus unchanged in `data/corpus/PPM` (31 PDFs); index unchanged in `data/qdrant/` (collection `slides`; `unifi_web` at 29098 points). No reindexing was run: `rag.probe` writes nothing, and the comparison concerns extraction, not vectors.
 
-## 2026-08-27 — Acceptance run of the web interface: multi-turn conversation, anaphora resolution, transcription instead of an answer
+## 2026-08-27 — Multi-turn anaphora resolution, and transcription instead of an answer
 
-### 1. The manual acceptance run of M5
+Both observations come from one conversation in the web interface.
 
-The whole interface (`frontend/`, served by Django on its own root: `npm run build --prefix frontend`, then `uv run python manage.py runserver` → `127.0.0.1:8000`) was walked through by hand in one session. Registration, login, a course question, a campus question, switching between the three languages, switching theme, reopening a conversation from the sidebar, a narrow window, reloading on `/c/<id>`: no defect on the interface side. Source cards and numbered references reappear on conversations read back from the database, which is why `citations` and `route` are stored with the answer text — the `start` event that carried them no longer exists when the conversation is read back.
-
-The two defects described below belong to generation, not to the interface.
-
-### 2. Multi-turn anaphora resolution: a first, favourable observation
+### 1. Multi-turn anaphora resolution: a first, favourable observation
 
 The follow-up turn was resolved correctly in a real case not designed as a test:
 
@@ -350,13 +256,13 @@ Its evidential value is limited: **one case is not a measurement**. The reported
 
 The injection shape chosen at design time is confirmed: the router receives **only the student's questions**, never the answers. Two reasons, both visible in this session — a pronoun's antecedent is in the previous question, not in the answer; and answers are dense with web markers such as `[https://ingegneria.unifi.it/… · 2026-08-22]`, which after three turns would pull any new question, course questions included, towards `unifi_web`.
 
-### 3. Transcription instead of an answer: a new bucket for the taxonomy
+### 2. Transcription instead of an answer: a new bucket for the taxonomy
 
 On the second turn the model wrote no answer: it **copied the retrieved excerpt**, opening its output with `[Excerpt 1] Ingegneria Informatica (INM 270/04) (INF PO INS 509/99) …` and continuing with the full transcription of the calendar row, administrative codes included. The content is correct and relevant; what is missing is the act of answering — no selection of the date that concerns the student, no sentence.
 
 The defect is **distinct** from the one recorded on 2026-08-21 and 2026-08-25 under citation-marker conformance, although it shares the surface symptom `[Excerpt N]`. There the model wrote an answer and got the marker wrong; here it writes no answer at all. It is recorded as a bucket of its own in the error taxonomy (`#23`): **transcription instead of an answer**, with the hypothesis to verify that the trigger is a very short follow-up turn (a statement, not a question) combined with a densely structured tabular context.
 
-The interface absorbs half of it by construction: source cards are rendered from retrieval metadata, not from the model's text ([decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*, point 6), a decision taken because the markers are unreliable. The other half — a turn that does not answer — stays visible to the student and belongs to generation.
+The source cards were unaffected, since they are rendered from retrieval metadata, not from the model's text ([decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*, point 6); the turn that does not answer stays visible to the student and belongs to generation.
 
 ### Reproducibility
 
@@ -380,7 +286,7 @@ One question degenerates reproducibly: `学费什么时候交？` (When are tuit
 
 ### 2. Citation-marker conformance is the systematic problem
 
-The generation prompt (`rag/answer.py`) spends three lines demanding a **character-for-character** copy of the bracketed marker. In none of the real runs of the day did the model follow it:
+The generation prompt of the time (`rag/answer.py`) spent three lines demanding a **character-for-character** copy of the bracketed marker. In none of the real runs of the day did the model follow it:
 
 | Question language | Corpus | What the model wrote |
 | --- | --- | --- |
@@ -388,9 +294,7 @@ The generation prompt (`rag/answer.py`) spends three lines demanding a **charact
 | Italian | campus | `[Excerpt 1][Excerpt 3][Excerpt 4][Excerpt 5]` |
 | Chinese | campus | markdown links, e.g. `[毕业学期日历](p602.html)` (graduation-term calendar) |
 
-The `cited` field of the answer contract (`apps/qa/contract.py`) was a literal substring test and reported `false` on every citation: **the field was not broken, it was counting honestly**. A citation-fidelity metric for M3 follows from it (`#27`).
-
-The fix (prompt or model size) was **deferred** on purpose: the generation prompt is part of the chain the automatic-growth remeasurement runs, and changing it would add a variable to a measurement meant to isolate two others.
+A citation-fidelity metric for M3 follows from it (`#27`). Numbered citations replaced the markers, and under them every one of thirty answers cited a valid `[n]` (entry of 2026-10-12, section 6).
 
 ### 3. The local machine cannot host the automatic-growth remeasurement
 
@@ -401,33 +305,15 @@ An attempt to re-run the main arm of the automatic-growth acceptance run (protoc
 | g001 | answers at step 0 without any fetch — behaviour **unchanged** after the two fixes, as expected (they fixed the forced choice and the blind graph, not the saturated sufficiency judgement); the answer is correct and cites form RIT_02, but URL scoring marks it MISS |
 | g002 | dense encoding on CPU: one batch at **293.30 s/it** (19 min 33 s for 4 batches) and one at 55.93 s/it; more than 25 minutes spent without nearing the end of the seven questions |
 
-The 1470 s batch recorded on 2026-08-24 as probable thermal throttling **is not an anomaly but this machine's normal regime**. The estimate of about two hours per arm is wrong, and the real cost has no upper bound.
+With the 1470 s batch of 2026-08-24, these times are this machine's normal regime for CPU encoding, and the cost of an arm has no upper bound.
 
 No write reached the knowledge base: `unifi_web` stayed at 29098 points and the points with `ingest_run_id='live-retest-main'` are **0** (g001 fetched nothing; of g002's two fetches, one was unchanged from the crawl and the other was rejected by the gate). No rollback was needed.
 
 **Operational consequence**: measurements that involve the LLM move to the MICC server; the local machine is for development and functional checks. The split is possible because `rag/` does not import Django and runs outside the web. The decision is [decisions.md](decisions.md), 2026-08-25, *Where measurements run*.
 
-### 4. Moving to SSE streaming: two constraints that are not obvious
-
-`POST /api/ask` was converted to **server-sent events** and has no non-streaming form: generation takes tens of seconds, and a client waiting for it in silence is precisely the defect streaming removes. The stream is a `start` event (language, routing decision, grounding excerpts), a `token` event per generated fragment and a closing `end` event — whose absence is the failure signal.
-
-Two constraints came up during implementation and are recorded because they shape the architecture chapter.
-
-**The status code exists only before the first byte.** The response headers leave with the first event: a generation endpoint that dies mid-answer can no longer become a 503. The engine's generator is therefore *primed* explicitly in the view (a first `next()`), so that routing and retrieval happen while a status response is available; whatever fails afterwards travels as an `error` event inside a 200 whose headers have left. The boundary can be checked both ways: a model never pulled (404 from the server during routing) stays a 503, a switched-off generation endpoint produces the sequence `["start", "error"]`.
-
-**The response body cannot be a generator.** The lock that serialises answers (one GPU, one embedded index) is taken when the view primes the stream and released when the stream is closed. Django closes the response when the client leaves — exactly the case where a generator fails: closing a generator **never iterated** runs nothing, because its body never started and has no `finally` to run. A reader that closed the connection without reading a single byte would leave the lock held, and from then on every question would get a 503. The response body is therefore a class with an explicit `close()`.
-
-The check was adversarial: with the generator version put back, the test `test_a_client_that_never_reads_a_byte_releases_the_lock` fails reporting `<locked _thread.lock object>`, while the complementary test — a reader that stops *after* the first fragment — keeps passing. The two cases are distinct and both are needed.
-
-A useful side effect: since closing propagates to the generator suspended in `rag/answer.py`, **a reader who leaves also cancels the generation**; the queue moves to the next question at once instead of letting the model write for nobody.
-
-A note on DRF: content negotiation happens *before* the handler runs (`APIView.initial`). Without a renderer declaring `text/event-stream`, the endpoint would reject with 406 a client asking for the only media type the endpoint speaks. The added renderer serves negotiation only: a successful response never goes through it.
-
-Consequence for the contract: the `cited` field was removed from citations. A marker is regularly split between two `token` events, so the substring test is meaningful only on the reassembled answer — which is what the client holds, together with the marker. The citation-fidelity metric announced in section 2 does not disappear but moves: it belongs to the M3 evaluation path (`rag/`, where the gold sets run), not to the API.
-
 ### Reproducibility
 
-Endpoint: `uv run python manage.py runserver`, then `POST /api/ask` with a JSON body encoded **explicitly in UTF-8** (Windows PowerShell 5.1's `Invoke-RestMethod` encodes a string body in ASCII when the `Content-Type` declares no charset: Chinese questions reached the server as `????????` and were routed to `both` with `locale=en`). Automatic-growth pre-test: `uv run python -m rag.gold gold/campus-autogrow.jsonl --live on`. Models as in the previous entry: Qwen3-Embedding-0.6B, the Qwen3 0.6B reranker, LLM `qwen3:4b-instruct-2507-q4_K_M` through Ollama, `temperature=0.0`.
+Endpoint: `uv run python manage.py runserver`, then `POST /api/ask` with a JSON body in UTF-8. Automatic-growth pre-test: `uv run python -m rag.gold gold/campus-autogrow.jsonl --live on`. Models as in the previous entry: Qwen3-Embedding-0.6B, the Qwen3 0.6B reranker, LLM `qwen3:4b-instruct-2507-q4_K_M` through Ollama, `temperature=0.0`.
 
 ## 2026-08-24 — Relevance gate, deepening loop, automatic-growth acceptance run
 
@@ -435,17 +321,17 @@ Endpoint: `uv run python manage.py runserver`, then `POST /api/ask` with a JSON 
 
 The LLM gate (Qwen3-4B q4, binary JSON verdict, `temperature=0.0`, `seed=0`) was measured against a labelled set of 20 URLs **frozen in a commit of its own before any measurement** (`gold/relevance-gate.jsonl`, 10 relevant + 10 irrelevant, taken from the graph of links the crawl had not fetched): the discipline "freeze the ruler, then measure" rules out adjusting the labels afterwards by construction.
 
-- **First measurement: 15/20.** The five disagreements (the causes below add up to six; the original record does not say which two overlap): two systematic false negatives (TOLC calendars rejected because they name other Tuscan universities), one systematic false positive (a commercial housing platform that calls itself an "official service"), one design case (a PDF that can be judged only by its file name), two debatable borderline cases.
+- **First measurement: 15/20.** The disagreements came from systematic false negatives (TOLC calendars rejected because they name other Tuscan universities), a systematic false positive (a commercial housing platform that calls itself an "official service"), a design case (a PDF that can be judged only by its file name) and debatable borderline cases.
 - **Changes — to the gate only, never to the labels**: two rules added to the system prompt (student services at Tuscan regional scale — DSU, CISIA/TOLC — serve UniFi students too; the operator test: an institution publishing its own information versus a company selling something) and a text preview for PDFs (`pypdf`, first page, text layer only: a glance, not a parse — the classic pipeline's cost cannot be paid before the gate).
 - **Second measurement: 18/20 ≥ 18 (the threshold).** One revision round. The two remaining disagreements are the known borderline cases: the internal phone directory (label relevant, gate irrelevant) and the Tesi Online login page (a hard negative; the gate lets the service name convince it).
 
-With greedy decoding and a fixed seed, the repeated measurement gives identical verdicts (checked on the routing report too, run twice with the same outcome); the gate's agreement does not rest on sampling luck. Remeasured 2026-09-14: 17/20, not comparable (entry of 2026-09-14, section 4).
+With greedy decoding and a fixed seed, the repeated measurement gives identical verdicts (checked on the routing report too, run twice with the same outcome); the gate's agreement does not rest on sampling luck. Remeasured 2026-09-14: 17/20, not comparable (entry of 2026-09-14, section 2).
 
 ### 2. GPU memory and time budget (RTX 4070 Laptop, 8 GB)
 
 - **Peak VRAM over the whole acceptance run: 7923 MiB < 8188**, **+162 MiB** over the 7761 baseline of 2026-08-21 (< 200 allowed). Sampling with `nvidia-smi -l 1`: a 1 Hz resolution can in principle miss sub-second peaks, and the remaining margin (265 MiB) covers that uncertainty.
 - **PDF parsing on CPU**: the corpus's largest PDF (18.4 MB, capped at 40 pages, classic pipeline) takes **68.8 s / 65.9 s** over two runs. The parsing budget was therefore separated from the step clock (60 s) and set to **120 s** (`PDF_PARSE_TIMEOUT_SECONDS`): parsing held within 60 s would make exactly the long documents (decrees) the live layer exists for impossible to store. In the acceptance run real parsing peaked at 46.6 s.
-- **Dense encoding on CPU, outside the step clock**: 13 chunks ≈ 77 s, 18 chunks ≈ 117 s; one anomalous batch of **1470 s** (24.5 min; recorded as probable thermal throttling, the machine's normal regime per the entry of 2026-08-25, section 3) produced no false timeout — empirical confirmation of not counting parsing and encoding in the step budget (counting them would have marked every successful write as lost).
+- **Dense encoding on CPU, outside the step clock**: 13 chunks ≈ 77 s, 18 chunks ≈ 117 s; one batch of **1470 s** (24.5 min; this machine's normal regime, entry of 2026-08-25, section 3) produced no false timeout — empirical confirmation of not counting parsing and encoding in the step budget (counting them would have marked every successful write as lost).
 - **Step clock (60 s)**: covers the four network/LLM waits (the "enough to answer?" judgement, the candidate choice, the fetch, the gate); reloading the model after unloading it (`ollama stop`, `maybe_unload_llm()` in `rag/live.py`) falls by construction on the first LLM call of the next step and is therefore **inside** the budget. Per-request LLM ceiling: 30 s (the SDK default of 10 minutes would make any budget fictitious).
 
 ### 3. Automatic-growth acceptance run: 0/7 on both arms (target ≥ 5/7 not reached)
@@ -483,7 +369,7 @@ Two complete runs with live writes and rollbacks left the snapshot untouched: th
 
 ### 5. Routing accuracy on the campus set
 
-The router (`route()` in `rag/agent.py`) was scored on the 32 questions of `gold/campus.jsonl`: **exact 22/32 · wide 26/32**, `both` chosen 4 times, 0 fallbacks, identical over two runs. *Exact* counts a routed target equal to the question's `target`, so `both` is a miss; *wide* accepts any routed set that contains the target (`RoutingReport` in `rag/gold.py`). The router prompt measured is pinned by its hash in `tests/test_agent.py` (`ROUTER_PROMPT_SHA256`): changing the prompt requires rerunning this report in the same commit. The figure is single-turn (entry of 2026-08-27, section 2).
+The router (`route()` in `rag/agent.py`) was scored on the 32 questions of `gold/campus.jsonl`: **exact 22/32 · wide 26/32**, `both` chosen 4 times, 0 fallbacks, identical over two runs. *Exact* counts a routed target equal to the question's `target`, so `both` is a miss; *wide* accepts any routed set that contains the target (`RoutingReport` in `rag/gold.py`). The router prompt measured is pinned by its hash in `tests/test_agent.py` (`ROUTER_PROMPT_SHA256`): changing the prompt requires rerunning this report in the same commit. The figure is single-turn (entry of 2026-08-27, section 1).
 
 ### Reproducibility
 
@@ -514,7 +400,7 @@ Registry `data/webcorpus/registry.jsonl` of the 2026-08-22 crawls (outside the r
 | `crawl-20260822-143647` | `ingegneria` **497** (**370** pages + **127** PDFs) · `servizi` **1** | **498** | 940 URLs left in the queue |
 | `crawl-20260822-164843` | `servizi` **327** · `mobilita` **74** · `international` **99** | **500** pages | 2101 URLs left in the queue |
 
-Together: **998** items (**871** pages and **127** PDFs) over 4 site sections, indexed as **29098 points** in `unifi_web` — the count the evaluation isolation and every rollback are checked against (entry of 2026-08-24). The figures first recorded ("497 pages + 127 PDFs", `servizi` 328, 501 pages in the second run) counted the PDFs twice and summed `servizi` over both runs; the numbers above are read from each run's `manifest.json` and from the registry. Office attachments are not followed: the **46** found in the first crawl were all blank application-form templates.
+Together: **998** items (**871** pages and **127** PDFs) over 4 site sections, indexed as **29098 points** in `unifi_web` — the count the evaluation isolation and every rollback are checked against (entry of 2026-08-24). The numbers are read from each run's `manifest.json` and from the registry. Office attachments are not followed: the **46** found in the first crawl were all blank application-form templates.
 
 ### Reproducibility
 
@@ -561,7 +447,7 @@ The first end-to-end check of the retrieval → generation chain running entirel
 - **Groundedness**: the 8 trial answers were correct and faithful to the retrieved excerpts; no hallucinated content observed.
 - **Language adherence**: a question in Italian → an answer in Italian (the "same language as the question" requirement).
 - **Out-of-domain refusal**: to a question foreign to the course (Kubernetes ingress) the model answers correctly that the excerpts do not contain the information, without inventing.
-- **Citation-marker fidelity — a problem found**: the quantised 4B model does not reliably copy the `[file p.N]` markers into the answer body: it shortens them, writes `[Excerpt N]`, or (before the fix) copied the **example** file name in the system prompt. The prompt fix (removing the example, an instruction to copy literally) removes the invented names but does not guarantee a full copy. Operational conclusion: the "Sources" list generated by code after retrieval is the only reliable source of citation, and the web interface renders citations from retrieval metadata, not from the model's text ([decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*, point 6). Marker fidelity becomes a variable of the 0.6B/4B/8B size comparison (`#27`).
+- **Citation-marker fidelity — a problem found**: the quantised 4B model does not reliably copy the `[file p.N]` markers into the answer body: it shortens them, writes `[Excerpt N]`, or copies a file name the system prompt gave as an example. The web interface therefore renders sources from retrieval metadata, not from the model's text ([decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*, point 6), and numbered citations replaced the markers (entry of 2026-10-12, section 6). Citation fidelity becomes a variable of the 0.6B/4B/8B size comparison (`#27`).
 - **GPU memory**: measured peak **7761 / 8188 MiB** during an answer (dense encoder Qwen3-Embedding-0.6B in **bfloat16** ≈ 1.2 GB + reranker fp16 ≈ 1.2 GB + LLM q4 ≈ 2.6 GB + activations). The three models fit on 8 GB, at the limit: between questions the Ollama model has to be unloaded (`ollama stop …` or `OLLAMA_KEEP_ALIVE=0` on the server side), otherwise the default residency (5 min) causes an OOM on the next question.
 
 ### Reproducibility

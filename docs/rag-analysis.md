@@ -61,7 +61,7 @@ This file analyses the route and does not repeat how the pipelines work: that is
 | Explainability in the thesis | high (every step is own code) | medium | medium-low |
 | Speed of starting | medium | high | high |
 
-The proposal taken to the meeting: a **lightweight self-built pipeline** (Docling → chunking → Qwen3-Embedding → rerank → Qwen3) as the main system, with BM25 as the experimental baseline; LlamaIndex only if a ready component were needed (it has a Docling reader). The decision and its state are in [architecture.md](architecture.md); this file is the analysis, not the owner of the decision. The one-off minimal experiment this analysis also proposed was not run ([decisions.md](decisions.md), 2026-07-31, *The retrieval pipeline replaces a throwaway experiment, and MICC replaces Colab*).
+The proposal taken to the meeting: a **lightweight self-built pipeline** (Docling → chunking → Qwen3-Embedding → rerank → Qwen3) as the main system, with BM25 as the experimental baseline; LlamaIndex only if a ready component were needed (it has a Docling reader). The decision and its state are in [architecture.md](architecture.md); this file is the analysis, not the owner of the decision. The one-off minimal experiment this analysis also proposed was not run: the real pipeline verified Docling's parsing and Qwen3's answers instead, with measurements the thesis can cite ([experiment-log.md](experiment-log.md)).
 
 ## Why not LangChain, LangGraph or LlamaIndex
 
