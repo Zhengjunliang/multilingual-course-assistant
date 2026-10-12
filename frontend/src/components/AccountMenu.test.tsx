@@ -100,7 +100,8 @@ describe("the account row and its menu", () => {
       language?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
     });
     const english = [...document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
-      (option) => option.textContent === "English",
+      // Its code on a chip, then its name.
+      (option) => option.textContent === "ENEnglish",
     );
     act(() => english?.click());
     unmount();

@@ -40,7 +40,7 @@ import { useId } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { endonym } from "@/i18n";
+import { endonym, languageCode } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 interface LocaleSwitchProps<T extends string> {
@@ -59,11 +59,6 @@ function inLanguage(locale: string, ui: string): string {
   return new Intl.DisplayNames([ui], { type: "language" }).of(locale) ?? locale;
 }
 
-/** The language's own code, as a chip shows it: "zh-hans" is ZH. */
-function code(locale: string): string {
-  return (locale.split("-")[0] ?? locale).toUpperCase();
-}
-
 export function LocaleSwitch<T extends string>({
   locales,
   value,
@@ -80,7 +75,7 @@ export function LocaleSwitch<T extends string>({
           <Globe aria-hidden className="size-icon" />
           <span className="sr-only">{label}</span>
           <Chip size="sm" aria-hidden>
-            {code(value)}
+            {languageCode(value)}
           </Chip>
           <span lang={value}>{endonym(value)}</span>
           <ChevronDown aria-hidden className="size-icon" />
@@ -110,7 +105,7 @@ export function LocaleSwitch<T extends string>({
                 className="flex h-control-sm cursor-default items-center gap-tight rounded-chip px-tight text-body text-ink outline-none data-highlighted:bg-hover"
               >
                 <Chip size="sm" aria-hidden>
-                  {code(locale)}
+                  {languageCode(locale)}
                 </Chip>
                 <span lang={locale}>{endonym(locale)}</span>
                 <span className="flex-1 text-caption text-muted">

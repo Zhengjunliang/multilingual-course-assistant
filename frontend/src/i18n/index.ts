@@ -40,6 +40,11 @@ export function endonym(locale: string): string {
   return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1);
 }
 
+/** The language's own code, as a chip beside its name shows it: "zh-hans" is ZH. */
+export function languageCode(locale: string): string {
+  return (locale.split("-")[0] ?? locale).toUpperCase();
+}
+
 /**
  * The interface language a browser language tag asks for, or `null` when it
  * asks for none of them.

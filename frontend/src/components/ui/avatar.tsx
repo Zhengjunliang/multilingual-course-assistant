@@ -15,7 +15,12 @@
 import { cn } from "@/lib/utils";
 
 interface AvatarProps {
-  /** Shown as its first letter, uppercased. An empty name renders no letter. */
+  /**
+   * Shown as the first letters of its first two words, uppercased: "Laura
+   * Conti" is LC, the username "demo-student" DS and "junliang" J. Words
+   * break at spaces, dots, hyphens and underscores, as usernames are written.
+   * An empty name renders no letter.
+   */
   name: string;
   size?: "sm" | "md" | "lg";
   tone?: "accent" | "neutral";
@@ -29,10 +34,15 @@ const SIZES = {
 } as const;
 
 export function Avatar({ name, size = "md", tone = "accent", className }: AvatarProps) {
-  // `[...name]` and not `name[0]`: the first *character* of "Émile" is one code
+  // `[...word]` and not `word[0]`: the first *character* of "Émile" is one code
   // point but the first UTF-16 unit of an emoji or a rarer CJK glyph is half of
   // a surrogate pair, which renders as a replacement square.
-  const initial = [...name.trim()][0]?.toUpperCase() ?? "";
+  const initials = name
+    .split(/[\s._-]+/)
+    .filter((word) => word !== "")
+    .slice(0, 2)
+    .map((word) => [...word][0]?.toUpperCase() ?? "")
+    .join("");
 
   return (
     <span
@@ -46,7 +56,7 @@ export function Avatar({ name, size = "md", tone = "accent", className }: Avatar
         className,
       )}
     >
-      {initial}
+      {initials}
     </span>
   );
 }
