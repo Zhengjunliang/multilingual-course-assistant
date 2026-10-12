@@ -38,7 +38,11 @@ const INPUT =
 
 interface FieldErrorProps {
   id?: string;
-  /** `alert` for a refusal no field's description carries, so it is heard. */
+  /**
+   * `alert` for a refusal that must be heard as it appears: one no field's
+   * description carries, or one shown while the focus stays in its field
+   * (`Field`'s `announce`).
+   */
   role?: "alert";
   children: ReactNode;
 }

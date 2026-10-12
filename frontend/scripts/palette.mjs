@@ -99,7 +99,7 @@ export const PAIRS = [
     back: "surface",
     min: TEXT,
     where:
-      "input.tsx focus outline and border, AnswerMarkdown.tsx a source's open link in its hover card",
+      "field.tsx a focused field's edge, AnswerMarkdown.tsx a source's open link in its hover card",
   },
   {
     front: "accent",

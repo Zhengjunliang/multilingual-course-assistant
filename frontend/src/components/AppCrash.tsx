@@ -27,12 +27,14 @@ interface AppCrashState {
 
 /**
  * The error as a reader can copy it into a report: its name and message, then
- * its stack, or what was thrown. Chrome's stack starts with "Name: message";
- * Firefox's and Safari's hold the frames alone, so the head is added there.
+ * its stack, or what was thrown. Chrome's stack starts with the error as
+ * `String` writes it ("Name: message", or the name alone when there is no
+ * message); Firefox's and Safari's hold the frames alone, so the head is
+ * added there.
  */
 function details(error: unknown): string {
   if (!(error instanceof Error)) return String(error);
-  const head = `${error.name}: ${error.message}`;
+  const head = String(error);
   const stack = error.stack ?? "";
   return stack.startsWith(head) ? stack : `${head}\n${stack}`.trimEnd();
 }

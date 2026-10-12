@@ -36,3 +36,23 @@ it("folds the error it caught under a summary, closed until asked for", () => {
 
   expect(seen).toEqual({ summary: i18n.t("crash.details"), open: false, names: true });
 });
+
+/** Thrown with a stack of frames alone, as Firefox and Safari write one, and no message. */
+function BrokenElsewhere(): never {
+  const error = new Error();
+  error.stack = "render@CoursePage.tsx:12:3";
+  throw error;
+}
+
+it("leads its details with what was thrown, where the stack does not say it", () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const { container, unmount } = mount(
+    <AppCrash>
+      <BrokenElsewhere />
+    </AppCrash>,
+  );
+  const text = container.querySelector("pre")?.textContent;
+  unmount();
+
+  expect(text).toBe("Error\nrender@CoursePage.tsx:12:3");
+});
