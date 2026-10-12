@@ -18,18 +18,21 @@
  * answered and keeps every other turn object as it was.
  */
 
+import { TriangleAlert } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { Mascot } from "@/components/Mascot";
+import { Banner } from "@/components/ui/banner";
+import { Spinner } from "@/components/ui/spinner";
 import { citedMarkers } from "@/lib/markers";
 import { AnswerActions } from "./AnswerActions";
 import { AnswerStream } from "./AnswerStream";
 import { HighlightContext } from "./CitationPill";
 import { ProcessLine } from "./ProcessLine";
 import { LanguageChip } from "./SourceParts";
-import type { Turn } from "./useAsk";
+import { MAX_BUSY_RETRIES, type Turn } from "./useAsk";
 
 interface TurnViewProps {
   turn: Turn;
@@ -42,11 +45,18 @@ interface TurnViewProps {
    */
   thinking: boolean;
   /**
-   * The server refused the question as busy and it will be asked again. The
-   * cat keeps thinking, but nothing is being searched: the process line waits,
-   * and counts afresh from the next request, as the server's seconds do.
+   * The server refused the question as busy and it will be asked again, in
+   * `seconds`, for the `attempt`th time; `null` otherwise. The cat keeps
+   * thinking, but nothing is being searched: the process line waits, and
+   * counts afresh from the next request, as the server's seconds do. A banner
+   * says what is happening instead.
    */
-  retrying: boolean;
+  retry: { seconds: number; attempt: number } | null;
+  /**
+   * The turn's failure happened just now, rather than being read back with a
+   * stored conversation: only then is its banner announced.
+   */
+  failedNow: boolean;
   /**
    * Nobody is signed in. A question routed to the slides then finds nothing,
    * because the slides are for an account, and the answer says only that no
@@ -68,7 +78,8 @@ export const TurnView = memo(function TurnView({
   turn,
   live,
   thinking,
-  retrying,
+  retry,
+  failedNow,
   visitor,
 }: TurnViewProps) {
   const { t } = useTranslation();
@@ -105,7 +116,7 @@ export const TurnView = memo(function TurnView({
         <Mascot pose={poseOf(turn, waiting)} className="size-avatar" />
         <div className="flex min-w-0 max-w-reading flex-1 flex-col gap-snug">
           <ProcessLine
-            running={working && !retrying}
+            running={working && retry === null}
             route={turn.route}
             searchMs={turn.searchMs}
             citations={turn.citations}
@@ -148,10 +159,35 @@ export const TurnView = memo(function TurnView({
             </p>
           )}
 
+          {retry !== null && (
+            <Banner role="status" icon={Spinner} heading={t("status.busy")}>
+              {t("status.retrying", { ...retry, total: MAX_BUSY_RETRIES })}
+              <span
+                aria-hidden
+                className="mt-hair block h-hair overflow-hidden rounded-full bg-accent-line"
+              >
+                <span
+                  className="block h-full bg-accent"
+                  style={{ width: `${(retry.attempt / MAX_BUSY_RETRIES) * 100}%` }}
+                />
+              </span>
+            </Banner>
+          )}
+
+          {/* An answer cut short keeps what it had written (docs/api.md): a
+              signed-in reader's is stored as far as it got, which the banner
+              says when there is something to keep. */}
           {turn.failure !== null && (
-            <p className="rounded-control border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink">
-              {turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete")}
-            </p>
+            <Banner
+              tone="warn"
+              role={failedNow ? "status" : undefined}
+              icon={TriangleAlert}
+              heading={
+                turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete")
+              }
+            >
+              {!visitor && turn.answer !== "" ? t("answer.kept") : undefined}
+            </Banner>
           )}
         </div>
       </div>

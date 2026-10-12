@@ -11,8 +11,10 @@ import { useTranslation } from "react-i18next";
 
 import { MAX_QUESTION_CHARS } from "@/api/client";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { MAX_BUSY_RETRIES, type Waiting } from "./useAsk";
+import type { Waiting } from "./useAsk";
 
 interface ComposerProps {
   waiting: Waiting;
@@ -35,39 +37,6 @@ interface ComposerProps {
   travelFrom?: { top: number } | null;
   /** The entry has just been landed on from a sign-in form: the box rises into place. */
   rise?: boolean;
-}
-
-/**
- * The two waits that need explaining, and only those.
- *
- * Ordinary work — routing, retrieval, generation — is reported in the thread
- * itself, next to the question it belongs to (`TurnView`). What is left here is
- * the queue behind somebody else's question and the stop after it, neither of
- * which is about this question at all.
- */
-function WaitingLine({ waiting }: { waiting: Waiting }) {
-  const { t } = useTranslation();
-
-  switch (waiting.phase) {
-    case "retrying":
-      return (
-        <span className="text-body text-muted">
-          {t("status.retrying", {
-            seconds: waiting.seconds,
-            attempt: waiting.attempt,
-            total: MAX_BUSY_RETRIES,
-          })}
-        </span>
-      );
-    case "stopped":
-      return (
-        <span className="text-body text-warn-ink">
-          {waiting.failure.kind === "reported" ? waiting.failure.detail : t("error.incomplete")}
-        </span>
-      );
-    default:
-      return null;
-  }
 }
 
 export function Composer({
@@ -116,6 +85,9 @@ export function Composer({
   const busy =
     waiting.phase === "queued" || waiting.phase === "streaming" || waiting.phase === "retrying";
   const ready = question.trim().length > 0 && !busy;
+  // The send button was pressed with nothing to send: the foot says so until
+  // the next keystroke.
+  const [missing, setMissing] = useState(false);
 
   const send = () => {
     if (!ready) return;
@@ -123,8 +95,17 @@ export function Composer({
     setQuestion("");
   };
 
+  // The button never turns off to say there is nothing to send (DESIGN.md,
+  // Do's and Don'ts): pressed on an empty field, it puts the caret there and
+  // says what is missing. Enter on an empty field does nothing, as in a
+  // message box.
   const onFormSubmit = (event: FormEvent) => {
     event.preventDefault();
+    if (!ready && !busy) {
+      setMissing(true);
+      field.current?.focus();
+      return;
+    }
     send();
   };
 
@@ -174,9 +155,8 @@ export function Composer({
             line tall until the question is longer, then growing with it
             (`field-sizing-content`) up to `max-h-[40vh]`, where it scrolls;
             a browser without `field-sizing` keeps the one line and scrolls
-            in it. The field is as tall as the button (`min-h-control-icon`),
-            so one line of text and the arrow share a centre, and the button
-            stays at the foot as the question grows, where the caret is. */}
+            in it. The button stays at the foot as the question grows, where
+            the caret is. */}
         <div className="flex items-end gap-snug">
           <textarea
             ref={field}
@@ -185,44 +165,61 @@ export function Composer({
             value={question}
             maxLength={MAX_QUESTION_CHARS}
             placeholder={t("ask.placeholder")}
-            onChange={(event) => setQuestion(event.target.value)}
+            onChange={(event) => {
+              setQuestion(event.target.value);
+              setMissing(false);
+            }}
             onKeyDown={onKeyDown}
             className="field-sizing-content max-h-[40vh] min-h-control-icon min-w-0 flex-1 resize-none bg-transparent px-hair py-tight text-body text-ink outline-none placeholder:text-muted"
           />
-          {/* One round button, as ChatGPT, Claude and Gemini keep theirs: an
-              arrow that sends, and a square that stops while an answer is
-              being written. With nothing to send the arrow
-              is quiet, the mark's grey with a muted glyph, rather than
-              `disabled:opacity-50`, which turns the accent fill into a faded
-              slab, the loudest thing on an otherwise empty screen. Enter
-              sends either way. `data-mascot-cheer`: the living cat smiles
-              while the pointer is on it (components/LivingMascot.tsx), and
-              a disabled button takes no pointer. */}
+          {/* One round button that says what it does, as the prototype of
+              #193 draws it: «Chiedi» and an arrow, and «Ferma» and a square
+              while an answer is on its way. With nothing to send it is
+              outlined rather than filled, the accent kept for the moment
+              there is a question. `data-mascot-cheer`: the living cat smiles
+              while the pointer is on it (components/LivingMascot.tsx). */}
           {busy ? (
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              className="rounded-full"
-              onClick={onStop}
-              aria-label={t("ask.cancel")}
-            >
-              <Square aria-hidden className="size-icon fill-current" />
+            <Button type="button" variant="outline" className="rounded-full" onClick={onStop}>
+              <Square aria-hidden className="size-3 fill-current" />
+              {t("ask.cancel")}
             </Button>
           ) : (
             <Button
               type="submit"
-              size="icon"
-              disabled={!ready}
-              className="rounded-full disabled:bg-mark disabled:text-muted disabled:opacity-100 disabled:shadow-none"
-              aria-label={t("ask.submit")}
+              variant={ready ? "primary" : "outline"}
+              className="rounded-full"
               data-mascot-cheer
             >
-              <ArrowUp aria-hidden className="size-icon-lg" />
+              {t("ask.submit")}
+              <ArrowUp aria-hidden className="size-icon" />
             </Button>
           )}
         </div>
-        <WaitingLine waiting={waiting} />
+        {/* The foot: what is missing after an empty press, the answer being
+            written, or else the keys, which a touch screen has not got. The
+            keys are a reminder for the eye: Enter and Shift+Enter are in the
+            list of keys (ShortcutsDialog.tsx), which a screen reader reaches,
+            so the caps are hidden from it here as everywhere (kbd.tsx). */}
+        <p className="flex min-h-icon-lg flex-wrap items-center gap-tight px-hair text-caption text-muted">
+          <span role="status" className={missing ? "" : "sr-only"}>
+            {missing ? t("ask.empty") : ""}
+          </span>
+          {!missing && waiting.phase === "streaming" && (
+            <>
+              <Spinner />
+              {t("status.streaming")}
+            </>
+          )}
+          {!missing && !busy && (
+            <span aria-hidden className="flex items-center gap-hair pointer-coarse:hidden">
+              <Kbd>{t("keys.enter")}</Kbd>
+              {t("ask.toSend")}
+              <span className="px-hair">·</span>
+              <Kbd>{`${t("keys.shift")} ${t("keys.enter")}`}</Kbd>
+              {t("ask.toBreak")}
+            </span>
+          )}
+        </p>
       </div>
     </form>
   );

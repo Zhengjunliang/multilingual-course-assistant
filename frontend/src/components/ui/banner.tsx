@@ -12,14 +12,14 @@
  * is read with the page and needs none.
  */
 
-import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
 interface BannerProps {
   tone?: "info" | "warn";
-  icon: LucideIcon;
+  /** A Lucide icon, or the `Spinner` for a notice about something on its way. */
+  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
   heading: string;
   children?: ReactNode;
   /** A button or a link at the end. */

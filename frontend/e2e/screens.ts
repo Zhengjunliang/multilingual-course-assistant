@@ -31,7 +31,7 @@ export const SCREENS: Screen[] = [
   {
     path: `/c/${CONVERSATION.id}`,
     as: "student",
-    mark: { role: "button", name: it.sources.title },
+    mark: { role: "button", name: it.answer.copy },
   },
   { path: "/staff/programmes", as: "staff", mark: heading(it.staff.programmes.title) },
   { path: `/staff/programmes/${PROGRAMME.code}`, as: "staff", mark: heading(PROGRAMME.name) },
