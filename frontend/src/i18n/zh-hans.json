@@ -201,7 +201,8 @@
       "integrated": "综合课程：代码取自 Cineca 目录",
       "alsoIn": "也在以下专业的学习计划中：{{list}}",
       "noMatch": "没有符合搜索的课程。",
-      "noCurriculum": "该方向没有课程。"
+      "noCurriculum": "该方向没有课程。",
+      "none": "此培养方案没有列出课程。"
     },
     "secretariat": {
       "title": "教学秘书处",

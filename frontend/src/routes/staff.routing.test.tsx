@@ -858,7 +858,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
     ]);
   });
 
-  it("marks nothing on a page loaded afresh, though the last one loaded afresh noted a row", async () => {
+  it("marks nothing on another page loaded afresh, though the last one loaded afresh noted a row", async () => {
     reader = TEACHER;
     const mine = page("/staff/mine");
     await settle();
@@ -873,6 +873,30 @@ describe("a course, an edition, and a teacher's own courses", () => {
     await settle();
     const marked = container.querySelectorAll("main tr[data-selected]").length;
     unmount();
+
+    expect(marked).toBe(0);
+  });
+
+  it("marks nothing on the same page loaded afresh again, a load of its own", async () => {
+    reader = SECRETARIAT;
+    const path = "/staff/courses/B028451?programme=B047";
+    const load = vi.spyOn(performance, "timeOrigin", "get").mockReturnValue(1000);
+    const first = page(path);
+    await settle();
+    act(() =>
+      first.container
+        .querySelector<HTMLAnchorElement>('main a[href^="/staff/editions/5"]')
+        ?.click(),
+    );
+    await settle();
+    first.unmount();
+    // The same address from a bookmark: its first entry is "default" again, in another load.
+    load.mockReturnValue(2000);
+    const { container, unmount } = page(path);
+    await settle();
+    const marked = container.querySelectorAll("main tr[data-selected]").length;
+    unmount();
+    load.mockRestore();
 
     expect(marked).toBe(0);
   });

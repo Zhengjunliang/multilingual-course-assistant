@@ -124,8 +124,13 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
       {shown.length === 0 ? (
         <p className="rounded-card border border-line bg-surface px-snug py-room text-center text-body text-muted">
           {/* With nothing searched, only the curriculum can leave a year empty:
-              every year the options offer has a course in some curriculum. */}
-          {query.trim() === "" ? t("staff.plan.noCurriculum") : t("staff.plan.noMatch")}
+              every year the options offer has a course in some curriculum.
+              A plan with no year lists no course at all. */}
+          {years.length === 0
+            ? t("staff.plan.none")
+            : query.trim() === ""
+              ? t("staff.plan.noCurriculum")
+              : t("staff.plan.noMatch")}
         </p>
       ) : (
         <Table frameClassName="lg:overflow-visible">

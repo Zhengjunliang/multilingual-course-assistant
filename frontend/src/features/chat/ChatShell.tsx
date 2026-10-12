@@ -95,8 +95,8 @@ interface ChatShellProps {
   onNewConversation: () => void;
   /** Beside the drawer's button: where the page sits, such as a staff page's breadcrumb. */
   leading?: ReactNode;
-  /** Whether the reader has staff pages, whose keys the list of shortcuts then names. */
-  staff?: boolean;
+  /** Whether the reader may open a study plan, whose `/` the list of shortcuts then names. */
+  plan?: boolean;
   children: ReactNode;
 }
 
@@ -105,7 +105,7 @@ export function ChatShell({
   rail,
   onNewConversation,
   leading,
-  staff = false,
+  plan = false,
   children,
 }: ChatShellProps) {
   const { t } = useTranslation();
@@ -264,7 +264,7 @@ export function ChatShell({
         open={dialog === "help"}
         onOpenChange={closeDialog}
         onCloseAutoFocus={giveFocusBack}
-        staff={staff}
+        plan={plan}
       />
     </div>
   );
