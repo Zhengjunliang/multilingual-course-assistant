@@ -20,7 +20,7 @@ on one holding rows of its own:
   file's first year through `set_current()`, the one way to change it
   (docs/data-model.md, invariant 2); a course with one keeps it.
 - Accounts: `demo-` ones only, and the file may name no other. A declared
-  account's superuser flag and role rows are made the file's, rows it does not
+  account's name, superuser flag and role rows are made the file's, rows it does not
   declare removed; a `demo-` account the file does not name keeps the account
   and loses its role rows, so the demo holds exactly the roles the file shows.
   An account switched off in the admin stays off: every demo account shares
@@ -169,6 +169,10 @@ class Command(BaseCommand):
                 "it over, or delete it"
             )
         user.is_superuser = user.is_staff = account.get("superuser", False)
+        # The name the staff pages show over the username; the file owns it as
+        # it owns the rest of a demo account.
+        user.first_name = account.get("first_name", "")
+        user.last_name = account.get("last_name", "")
         user.full_clean()
         user.save()
 

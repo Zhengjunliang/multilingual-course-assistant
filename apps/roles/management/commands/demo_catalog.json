@@ -1034,6 +1034,8 @@
     },
     {
       "username": "demo-secretariat",
+      "first_name": "Giulia",
+      "last_name": "Neri",
       "roles": [
         {
           "role": "secretariat",
@@ -1043,6 +1045,8 @@
     },
     {
       "username": "demo-secretariat-b222",
+      "first_name": "Marta",
+      "last_name": "Ricci",
       "roles": [
         {
           "role": "secretariat",
@@ -1052,6 +1056,8 @@
     },
     {
       "username": "demo-teacher",
+      "first_name": "Laura",
+      "last_name": "Conti",
       "roles": [
         {
           "role": "teacher",
@@ -1060,7 +1066,9 @@
       ]
     },
     {
-      "username": "demo-student"
+      "username": "demo-student",
+      "first_name": "Luca",
+      "last_name": "Verdi"
     }
   ]
 }

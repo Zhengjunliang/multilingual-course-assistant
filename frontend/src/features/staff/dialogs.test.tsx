@@ -149,7 +149,7 @@ describe("assigning a member", () => {
     refusal: (() => Response) | null,
     press: "button" | "enter" = "button",
   ) {
-    answer = refusal ?? (() => json({ id: 7, username: "mrossi" }, 201));
+    answer = refusal ?? (() => json({ id: 7, username: "mrossi", name: "" }, 201));
     const { unmount } = open(
       <AssignDialog
         scope={scope}

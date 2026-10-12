@@ -72,16 +72,16 @@ What staff see and change, each within the scopes their roles cover ([apps/roles
 
 | Method and path | Does |
 | --------------- | ---- |
-| `GET /api/catalog/programmes` | the programmes the caller may view: `code`, `name`, `locale`, `curricula` (names, sorted), `course_count` (each course once), `secretariat` (`[{"id", "username"}]` by username), `permissions`; a student gets `[]` |
+| `GET /api/catalog/programmes` | the programmes the caller may view: `code`, `name`, `locale`, `curricula` (names, sorted), `course_count` (each course once), `secretariat` (`[{"id", "username", "name"}]` by username, `name` the account's full name or `""` when it has none), `permissions`; a student gets `[]` |
 | `GET /api/catalog/programmes/<code>` | one programme, as the list shows it |
 | `GET /api/catalog/programmes/<code>/courses` | the programme's study plan, one row per course it lists, with or without an edition: `course`, and `current_edition` (`id`, `academic_year`, `teachers`) or `null` |
 | `GET /api/catalog/courses/<code>` | one course a programme the caller may view lists: `code`, `name`, `locale`, `code_source` (`moodle` or `cineca-only`), `entries` (`programme` as `code`, `name`, `locale`; `curriculum`, `year_of_study`, `ad_code`), in every programme that lists it; 404 for any other course, a teacher's included |
-| `GET /api/catalog/editions` | the editions the caller may view: `id`, `course` (as `courses/<code>` reads it), `academic_year`, `is_current`, `teachers` (`[{"id", "username"}]` by username), `permissions`, `can_set_current`; `?course=<code>` keeps one course's, and gives `[]` for a code the caller may not view |
+| `GET /api/catalog/editions` | the editions the caller may view: `id`, `course` (as `courses/<code>` reads it), `academic_year`, `is_current`, `teachers` (members shaped as a programme's `secretariat`), `permissions`, `can_set_current`; `?course=<code>` keeps one course's, and gives `[]` for a code the caller may not view |
 | `GET /api/catalog/editions/<id>` | one edition, as the list shows it |
 | `POST /api/catalog/editions/<id>/set-current` | makes the edition its course's current one and answers with it (200) |
-| `POST /api/catalog/editions/<id>/teachers` | `{"username": "..."}` makes that user a teacher of the edition (201); needs `edition.assign_teacher` |
+| `POST /api/catalog/editions/<id>/teachers` | `{"username": "..."}` makes that user a teacher of the edition (201, answering with the member as the lists show it); needs `edition.assign_teacher` |
 | `DELETE /api/catalog/editions/<id>/teachers/<username>` | revokes it (204) |
-| `POST /api/catalog/programmes/<code>/secretariat` | makes a user secretariat staff of the programme (201); needs `programme.assign_secretariat`, which only the superuser holds |
+| `POST /api/catalog/programmes/<code>/secretariat` | makes a user secretariat staff of the programme (201, the member likewise); needs `programme.assign_secretariat`, which only the superuser holds |
 | `DELETE /api/catalog/programmes/<code>/secretariat/<username>` | revokes it (204) |
 
 - Status codes: 403 not logged in · 404 outside the caller's scope, whether or not it exists · 403 inside it without the permission · then 400 for the body's fields · 405 for a method the route does not serve, `OPTIONS` included. Each refusal a view returns names itself with a code, in DRF's envelope with every message as `{"message", "code"}`: `{"detail": {"message": "...", "code": "not_found"}}`, or `{"username": [{"message": "...", "code": "no_such_user"}]}` for a field ([config/exceptions.py](../config/exceptions.py); this project's codes: [apps/catalog/errors.py](../apps/catalog/errors.py)); a path no route matches is Django's plain 404, with no code. The scope is looked up before the permission and the permission before the fields, so a refusal says nothing the caller may not see; only a body that is not JSON at all is refused first, since the CSRF check reads it.

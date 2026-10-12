@@ -118,14 +118,18 @@ class ProgrammeSerializer(serializers.ModelSerializer[DegreeProgramme]):
 
 
 class StaffMemberSerializer(serializers.Serializer):
-    """A member of a scope's staff: shown by id and username, and named by username to add one.
+    """A member of a scope's staff: shown by id, username and name, added by username.
 
     A plain serializer, not a `ModelSerializer[User]`: that would validate the
-    username as a new, unique one, and refuse every user who exists.
+    username as a new, unique one, and refuse every user who exists. The name
+    is the account's full name, empty where it has none, since nothing asks
+    for one at registration: a page shows it over the username, or the
+    username alone.
     """
 
     id = serializers.IntegerField(read_only=True)
     username = serializers.CharField(max_length=150)
+    name = serializers.CharField(source="get_full_name", read_only=True)
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         try:

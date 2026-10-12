@@ -250,7 +250,7 @@ def test_each_caller_reads_courses_and_study_plans() -> None:
             "current_edition": {
                 "id": w.ppm_old.pk,
                 "academic_year": "2024-2025",
-                "teachers": [{"id": w.continuing.pk, "username": "continuing"}],
+                "teachers": [{"id": w.continuing.pk, "username": "continuing", "name": ""}],
             },
         },
     ]
@@ -655,6 +655,28 @@ def test_staff_requests_that_change_nothing(
     }
     assert RoleAssignment.objects.count() == rows
     assert grant_lines(caplog) == []
+
+
+def test_staff_members_carry_their_full_name_or_an_empty_one() -> None:
+    w = world()
+    for user, first, last in ((w.continuing, "Laura", "Conti"), (w.student, "Luca", "Verdi")):
+        user.first_name, user.last_name = first, last
+        user.save()
+
+    edition = as_user(w.secretariat).get(f"{EDITIONS_URL}/{w.ppm_old.pk}").json()
+    programme = as_user(w.root).get(f"{PROGRAMMES_URL}/B047").json()
+    granted = as_user(w.secretariat).post(teachers(w.ppm_new), {"username": "student"})
+
+    assert edition["teachers"] == [
+        {"id": w.continuing.pk, "username": "continuing", "name": "Laura Conti"}
+    ]
+    assert {"id": w.secretariat.pk, "username": "secretariat", "name": ""} in programme[
+        "secretariat"
+    ]
+    assert (granted.status_code, granted.json()) == (
+        201,
+        {"id": w.student.pk, "username": "student", "name": "Luca Verdi"},
+    )
 
 
 def test_a_grant_is_logged_once_it_commits(
