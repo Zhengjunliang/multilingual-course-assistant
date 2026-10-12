@@ -109,12 +109,19 @@ export function ChatShell({ sidebar, rail, onNewConversation, leading, children 
   // Radix returns it only to a `Trigger` of the dialog's own, and these open
   // from state. Read in a layout effect, which runs before the dialog's own
   // effects move the focus inside it, and after the account menu has given
-  // the focus back to its row (AccountMenu.tsx says why it waits).
+  // the focus back to its row (AccountMenu.tsx says why it waits). A key
+  // pressed with a menu open leaves the focus on an item about to go with the
+  // menu, so the menu's own trigger is where the reader was.
   const returnTo = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
     if (dialog === null) return;
-    returnTo.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const active = document.activeElement;
+    const opener = active?.closest('[role="menu"]')
+      ? document.querySelector(
+          '[aria-haspopup="menu"][aria-expanded="true"]:not([role="menuitem"])',
+        )
+      : active;
+    returnTo.current = opener instanceof HTMLElement ? opener : null;
   }, [dialog]);
 
   // The search field of each mount, and which one was asked for. The column
@@ -145,6 +152,10 @@ export function ChatShell({ sidebar, rail, onNewConversation, leading, children 
     if (window.matchMedia(WIDE).matches) {
       if (collapsed) remember(false);
       searchWanted.current = "column";
+    } else if (drawerOpen) {
+      // Open already, so it will not focus anything again on its own.
+      drawerSearch.current?.focus();
+      return;
     } else {
       setDrawerOpen(true);
       searchWanted.current = "drawer";

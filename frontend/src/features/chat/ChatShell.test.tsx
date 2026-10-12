@@ -28,7 +28,8 @@ function shell(onNewConversation: () => void = () => {}) {
     <ThemeProvider>
       <ChatShell
         sidebar={({ placement, onNavigate, onCollapse, searchRef, onOpenSettings }) => (
-          <>
+          // Marked as the real panel is, so the keys know the drawer holds it.
+          <div data-sidebar-panel>
             <button type="button" onClick={onNavigate}>
               Che cos'è un ORM?
             </button>
@@ -39,7 +40,7 @@ function shell(onNewConversation: () => void = () => {}) {
               Impostazioni…
             </button>
             <input ref={searchRef} aria-label={`Cerca (${placement})`} />
-          </>
+          </div>
         )}
         rail={({ onExpand, onSearch }) => (
           <>
@@ -178,19 +179,35 @@ describe("the chat frame", () => {
     expect(back).toBe(true);
   });
 
-  it("starts a conversation, and opens the settings and the shortcuts, from the keys", () => {
+  it("starts a conversation, and opens the settings and the shortcuts, from the keys", async () => {
     const started = vi.fn();
     const { unmount } = shell(started);
+    const heading = () => document.body.querySelector('[role="dialog"] h2')?.textContent;
 
     press({ key: "O", ctrlKey: true, shiftKey: true });
     press({ key: ",", ctrlKey: true });
-    const settings = document.body.querySelector('[role="dialog"] h2')?.textContent;
+    await settle();
+    const settings = heading();
+    // Inside the settings the keys wait: nothing acts behind an open dialog.
     press({ key: "?" });
-    const help = document.body.querySelector('[role="dialog"] h2')?.textContent;
+    const stillSettings = heading();
+    press({ key: "Escape" });
+    act(() =>
+      document.body
+        .querySelector<HTMLButtonElement>('[role="dialog"] button[aria-label="Chiudi"]')
+        ?.click(),
+    );
+    await settle();
+    press({ key: "?" });
+    const help = heading();
     unmount();
 
     expect(started).toHaveBeenCalledOnce();
-    expect([settings, help]).toEqual(["Impostazioni", "Aiuto e scorciatoie"]);
+    expect([settings, stillSettings, help]).toEqual([
+      "Impostazioni",
+      "Impostazioni",
+      "Aiuto e scorciatoie",
+    ]);
   });
 
   it("unfolds the rail for Ctrl K on a wide screen, and puts the focus in the search", () => {
@@ -204,6 +221,21 @@ describe("the chat frame", () => {
     unmount();
 
     expect([unfolded, focused]).toEqual([1, "Cerca (column)"]);
+  });
+
+  it("puts the focus in the drawer's search for Ctrl K when the drawer is open already", async () => {
+    atWidth(false);
+    const { container, unmount } = shell();
+    act(() => container.querySelector<HTMLButtonElement>("header button")?.click());
+    await settle();
+    const before = document.activeElement?.getAttribute("aria-label");
+
+    press({ key: "k", ctrlKey: true });
+    const focused = document.activeElement?.getAttribute("aria-label");
+    unmount();
+
+    expect(before).not.toBe("Cerca (drawer)");
+    expect(focused).toBe("Cerca (drawer)");
   });
 
   it("opens the drawer for Ctrl K on a phone, the focus in its search", async () => {

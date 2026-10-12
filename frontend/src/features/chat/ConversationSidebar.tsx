@@ -83,7 +83,12 @@ export function ConversationSidebar({
   const keys = shortcuts();
 
   return (
-    <div className="group/sidebar flex h-full min-h-0 flex-col gap-snug bg-ground p-snug">
+    // `data-sidebar-panel` tells the shell's keys that a dialog holding it is
+    // the drawer, where they work (useShellShortcuts.ts).
+    <div
+      data-sidebar-panel
+      className="group/sidebar flex h-full min-h-0 flex-col gap-snug bg-ground p-snug"
+    >
       <div className="flex min-h-control items-center gap-tight">
         <MascotMark className="size-control-icon" />
         <p className="min-w-0 flex-1 truncate font-semibold text-ink text-title">{APP_NAME}</p>
