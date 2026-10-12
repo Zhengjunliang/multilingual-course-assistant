@@ -35,9 +35,12 @@ export const SCREENS: Screen[] = [
   },
   { path: "/staff/programmes", as: "staff", mark: heading(it.staff.programmes.title) },
   { path: `/staff/programmes/${PROGRAMME.code}`, as: "staff", mark: heading(PROGRAMME.name) },
-  // A course and its edition share the course's name as their title.
-  { path: `/staff/courses/${COURSE.code}`, as: "staff", mark: heading(it.staff.course.editions) },
+  // A course and its editions share the course's name as their title; an
+  // edition's own mark is its teachers' heading.
+  { path: `/staff/courses/${COURSE.code}`, as: "staff", mark: heading(COURSE.name) },
   { path: "/staff/editions/11", as: "staff", mark: heading(it.staff.edition.teachers) },
+  // The one the reader may not assign on, with the read-only banner.
+  { path: "/staff/editions/12", as: "staff", mark: heading(it.staff.edition.teachers) },
   { path: "/staff/mine", as: "staff", mark: heading(it.staff.mine.title) },
   { path: "/staff/nowhere", as: "staff", mark: heading(it.staff.refusal.notFound) },
   { path: "/nowhere", as: "visitor", mark: heading(it.notFound.title) },

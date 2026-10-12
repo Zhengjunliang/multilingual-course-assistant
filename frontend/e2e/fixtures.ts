@@ -197,6 +197,17 @@ export const EDITION: Edition = {
   can_set_current: true,
 };
 
+/** An edition the staff account teaches but may not assign on: the read-only banner's page. */
+export const EDITION_READ: Edition = {
+  id: 12,
+  course: COURSE,
+  academic_year: "2024-2025",
+  is_current: false,
+  teachers: [STAFF_MEMBER],
+  permissions: ["edition.view", "edition.set_current"],
+  can_set_current: true,
+};
+
 export const STUDY_PLAN: StudyPlanCourse[] = [
   {
     course: COURSE,
