@@ -22,6 +22,7 @@ colors:
   hover-over-canvas: '#EBF1F6'
   hover-over-surface: '#F0F4F7'
   hover-over-sidebar: '#E4EBF1'
+  hover-over-tint: '#E8EEF4'
   selected-over-canvas: '#DFE9F0'
   selected-over-surface: '#E3EBF1'
   canvas-dark: '#07090C'
@@ -42,6 +43,7 @@ colors:
   hover-over-canvas-dark: '#0F171F'
   hover-over-surface-dark: '#161F28'
   hover-over-sidebar-dark: '#1B252F'
+  hover-over-tint-dark: '#121B24'
   selected-over-canvas-dark: '#162430'
   selected-over-surface-dark: '#1C2B38'
 typography:
@@ -136,6 +138,21 @@ components:
   warn-ink-on-warn:
     backgroundColor: '{colors.warn}'
     textColor: '{colors.warn-ink}'
+  muted-on-tint:
+    backgroundColor: '{colors.tint}'
+    textColor: '{colors.muted}'
+  ink-on-accent-soft:
+    backgroundColor: '{colors.accent-soft}'
+    textColor: '{colors.ink}'
+  muted-on-accent-soft:
+    backgroundColor: '{colors.accent-soft}'
+    textColor: '{colors.muted}'
+  ink-on-warn:
+    backgroundColor: '{colors.warn}'
+    textColor: '{colors.ink}'
+  muted-on-warn:
+    backgroundColor: '{colors.warn}'
+    textColor: '{colors.muted}'
   ink-on-tint:
     backgroundColor: '{colors.tint}'
     textColor: '{colors.ink}'
@@ -153,6 +170,9 @@ components:
     textColor: '{colors.ink}'
   ink-on-hover-over-sidebar:
     backgroundColor: '{colors.hover-over-sidebar}'
+    textColor: '{colors.ink}'
+  ink-on-hover-over-tint:
+    backgroundColor: '{colors.hover-over-tint}'
     textColor: '{colors.ink}'
   accent-on-selected-over-canvas:
     backgroundColor: '{colors.selected-over-canvas}'
@@ -208,6 +228,21 @@ components:
   warn-ink-on-warn-dark:
     backgroundColor: '{colors.warn-dark}'
     textColor: '{colors.warn-ink-dark}'
+  muted-on-tint-dark:
+    backgroundColor: '{colors.tint-dark}'
+    textColor: '{colors.muted-dark}'
+  ink-on-accent-soft-dark:
+    backgroundColor: '{colors.accent-soft-dark}'
+    textColor: '{colors.ink-dark}'
+  muted-on-accent-soft-dark:
+    backgroundColor: '{colors.accent-soft-dark}'
+    textColor: '{colors.muted-dark}'
+  ink-on-warn-dark:
+    backgroundColor: '{colors.warn-dark}'
+    textColor: '{colors.ink-dark}'
+  muted-on-warn-dark:
+    backgroundColor: '{colors.warn-dark}'
+    textColor: '{colors.muted-dark}'
   ink-on-tint-dark:
     backgroundColor: '{colors.tint-dark}'
     textColor: '{colors.ink-dark}'
@@ -225,6 +260,9 @@ components:
     textColor: '{colors.ink-dark}'
   ink-on-hover-over-sidebar-dark:
     backgroundColor: '{colors.hover-over-sidebar-dark}'
+    textColor: '{colors.ink-dark}'
+  ink-on-hover-over-tint-dark:
+    backgroundColor: '{colors.hover-over-tint-dark}'
     textColor: '{colors.ink-dark}'
   accent-on-selected-over-canvas-dark:
     backgroundColor: '{colors.selected-over-canvas-dark}'

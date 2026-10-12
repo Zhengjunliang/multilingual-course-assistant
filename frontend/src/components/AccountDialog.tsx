@@ -23,6 +23,7 @@ import { useSession } from "@/auth/useSession";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import { UI_LOCALES, type UiLocale } from "@/i18n";
 import { THEMES, type Theme } from "@/theme/ThemeProvider";
 import { useTheme } from "@/theme/useTheme";
@@ -64,27 +65,17 @@ export function AccountDialog({ open, onOpenChange }: AccountDialogProps) {
 
       <Section heading={t("account.theme")}>
         <p className="text-caption text-muted">{t("account.themeCaption")}</p>
-        <div className="flex flex-wrap gap-tight">
-          {THEMES.map((option) => {
-            const Icon = THEME_ICONS[option];
-            // Outline for the one in use, ghost for the rest — never the
-            // accent-filled variant. The accent marks what a reader is about to
-            // do, not a setting that is already true. `LocaleSwitch` follows
-            // the same rule one section below.
-            return (
-              <Button
-                key={option}
-                type="button"
-                size="sm"
-                variant={theme === option ? "outline" : "ghost"}
-                onClick={() => setTheme(option)}
-              >
-                <Icon aria-hidden className="size-icon" />
-                {t(`theme.${option}`)}
-              </Button>
-            );
-          })}
-        </div>
+        <ToggleGroup
+          className="self-start"
+          label={t("account.theme")}
+          value={theme}
+          onValueChange={setTheme}
+          options={THEMES.map((option) => ({
+            value: option,
+            label: t(`theme.${option}`),
+            icon: THEME_ICONS[option],
+          }))}
+        />
       </Section>
 
       <Section heading={t("account.language")}>

@@ -3,14 +3,16 @@
  * and the underlined ones of the sign-in card.
  */
 
-import { UserRound } from "lucide-react";
+import { Monitor, Moon, Sun, UserRound } from "lucide-react";
 import { useState } from "react";
 
 import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
 import { Field, FieldError, SearchField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Tabs } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import { Specimen, type Theme } from "./Specimen";
 
 /** A password field holds its value, so its specimen does too. */
@@ -42,9 +44,77 @@ function CounterSpecimen({ id }: { id: string }) {
   );
 }
 
+/** A toggle group holds its choice, so its specimens do too. */
+function ToggleSpecimens() {
+  const [mode, setMode] = useState<"system" | "light" | "dark">("light");
+  const [year, setYear] = useState("all");
+  return (
+    <>
+      <ToggleGroup
+        label="Aspetto"
+        value={mode}
+        onValueChange={setMode}
+        options={[
+          { value: "system", label: "Di sistema", icon: Monitor },
+          { value: "light", label: "Chiaro", icon: Sun },
+          { value: "dark", label: "Scuro", icon: Moon },
+        ]}
+      />
+      <ToggleGroup
+        label="Anno"
+        value={year}
+        onValueChange={setYear}
+        options={[
+          { value: "all", label: "Tutti", count: 8 },
+          { value: "1", label: "1° anno", count: 3 },
+          { value: "2", label: "2° anno", count: 3 },
+          { value: "3", label: "3° anno", count: 2 },
+        ]}
+      />
+    </>
+  );
+}
+
 export function Fields({ theme }: { theme: Theme }) {
   return (
     <>
+      <Specimen
+        name="ToggleGroup"
+        note="One of a few options, chosen in place: one tab stop, the arrows between the options, each a radio. The chosen one is raised out of a tinted track in ink, never in the accent, since it is a setting that is true; an option may carry a count."
+      >
+        <ToggleSpecimens />
+      </Specimen>
+
+      <Specimen
+        name="Tabs"
+        note="Views of one page, one at a time, underlined: the shown tab in ink over a 2 px rule in the accent, its count in the accent. The arrows move between tabs; each tab is tied to its panel."
+      >
+        <Tabs
+          label="Corso di laurea"
+          defaultValue="plan"
+          className="w-full"
+          tabs={[
+            {
+              value: "plan",
+              label: "Insegnamenti",
+              count: 8,
+              content: <p className="text-body text-muted">Otto insegnamenti.</p>,
+            },
+            {
+              value: "office",
+              label: "Segreteria didattica",
+              count: 2,
+              content: <p className="text-body text-muted">Due persone.</p>,
+            },
+            {
+              value: "editions",
+              label: "Edizioni",
+              content: <p className="text-body text-muted">Nessuna edizione.</p>,
+            },
+          ]}
+        />
+      </Specimen>
+
       <Specimen
         name="Field"
         note="A form's field in a page or a dialog: its label, the box with an icon at its start, then its refusal, its hint and a count of what is left. The hint and the refusal describe the input; the focus is the box's accent edge and a 3 px ring of --selected."
