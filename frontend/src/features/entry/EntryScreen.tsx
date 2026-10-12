@@ -1,9 +1,10 @@
 /**
  * The entry (#173): what `/` shows before the first question, to a visitor
- * and to a signed-in reader with no conversation open. The living cat alone
- * on the grained ground, no scene behind it; the caption and a line on what
- * it answers from. The composer sits under it (routes/ChatPage.tsx), and the
- * cat's eyes rest on it when nobody moves.
+ * and to a signed-in reader with no conversation open. The living cat on the
+ * grained ground, the room (Room.tsx) behind it; the caption and a line on
+ * what it answers from. The composer sits under it and the room stands around
+ * both (routes/ChatPage.tsx), and the cat's eyes rest on the composer when
+ * nobody moves.
  *
  * No example questions under the caption: the line names both knowledge
  * bases, and a canned question picked for the reader is rarely the one they
@@ -79,11 +80,13 @@ export function EntryScreen({ visitor, hops = 0, landed = false }: EntryScreenPr
     <div className="flex w-full max-w-4xl flex-col items-center gap-tight text-center">
       {/* First in the page's order, so the keyboard reaches it before the
           intro is over; fixed in the corner, so the eye finds it there, and
-          lifted, so what comes after it in the page never paints over it. */}
+          lifted, so what comes after it in the page never paints over it.
+          `data-intro` holds the room's drawing in until it goes (index.css). */}
       {intro.playing && (
         <Button
           type="button"
           variant="ghost"
+          data-intro
           onClick={skip}
           onFocus={() => {
             onSkip.current = true;

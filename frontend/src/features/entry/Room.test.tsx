@@ -8,6 +8,7 @@
  * acceptance of #183.
  */
 
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { mount } from "@/test/mount";
@@ -41,6 +42,32 @@ describe("the room", () => {
     second.unmount();
 
     expect({ drawsFirst, drawsAgain }).toEqual({ drawsFirst: true, drawsAgain: false });
+  });
+
+  it("drops the dash once the last line is in, so a wing resized later stays whole", async () => {
+    system({ reduce: false, hover: true });
+    vi.resetModules();
+    const { Room: Fresh } = await import("./Room");
+    const { container, unmount } = mount(<Fresh clear="25rem" />);
+    const lines = container.querySelectorAll("path");
+    // jsdom has no `AnimationEvent`, and React then listens for the prefixed
+    // name instead, so both are sent (as ChatPage.routing.test.tsx does).
+    const end = (line: Element | undefined) =>
+      act(() => {
+        for (const name of ["animationend", "webkitAnimationEnd"]) {
+          const done = Object.assign(new Event(name, { bubbles: true }), {
+            animationName: "room-line",
+          });
+          line?.dispatchEvent(done);
+        }
+      });
+    end(lines[0]);
+    const afterFirst = container.querySelector(".room-draw") !== null;
+    end(lines[lines.length - 1]);
+    const afterLast = container.querySelector(".room-draw") !== null;
+    unmount();
+
+    expect({ afterFirst, afterLast }).toEqual({ afterFirst: true, afterLast: false });
   });
 
   it.each([

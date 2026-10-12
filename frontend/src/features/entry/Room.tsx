@@ -17,13 +17,21 @@
  * at most 10, after the Firewatch site's parallax. It never moves by itself,
  * so WCAG 2.2.2 asks it for no pause control. Under reduced motion it is drawn
  * whole from the first frame and never moves; a device that cannot hover gets
- * no parallax. The lines keep their width at any size (`non-scaling-stroke`).
+ * no parallax. While a visitor's first-visit intro plays, the drawing in
+ * waits for it (index.css). The lines keep their width at any size
+ * (`non-scaling-stroke`).
+ *
+ * Each line is drawn in by a dash as long as the line is on screen, measured
+ * before the first frame: `pathLength` cannot stand in for it, since with
+ * `non-scaling-stroke` Chrome lays the dash out in screen pixels and a wing
+ * drawn larger than its plan would keep only part of each line. The dash goes
+ * once the last line is in, so a wing resized later stays whole.
  *
  * It leaves with the entry: `leaving` fades it as the entry recedes into the
  * conversation, which keeps the grain alone.
  */
 
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useReducedMotion } from "@/lib/useReducedMotion";
 import { cn } from "@/lib/utils";
@@ -146,15 +154,29 @@ interface RoomProps {
 
 export function Room({ clear, leaving = false }: RoomProps) {
   const reduced = useReducedMotion();
-  const [drawing] = useState(() => !drawn);
+  const [drawing, setDrawing] = useState(() => !drawn);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     drawn = true;
   }, []);
 
+  // Each line's length on screen, for its dash, before the first frame.
+  useLayoutEffect(() => {
+    const element = root.current;
+    if (element === null || !drawing) return;
+    for (const svg of element.querySelectorAll("svg")) {
+      const scale = svg.getScreenCTM?.()?.a || 1;
+      for (const path of svg.querySelectorAll("path")) {
+        const length = path.getTotalLength?.() ?? 0;
+        path.style.setProperty("--len", `${Math.ceil(length * scale) + 1}px`);
+      }
+    }
+  }, [drawing]);
+
   // The pointer, read once a frame: each layer slides against it by its
-  // depth, in screen pixels, whatever size the wing is drawn at.
+  // depth, in screen pixels, whatever size the wing is drawn at; 4 parts
+  // across to 3 up and down, so a corner moves it by its depth and no more.
   useEffect(() => {
     const element = root.current;
     if (element === null || reduced || window.matchMedia("(hover: none)").matches) return;
@@ -169,7 +191,7 @@ export function Room({ clear, leaving = false }: RoomProps) {
         const scale = svg.getScreenCTM()?.a || 1;
         for (const layer of svg.querySelectorAll<SVGGElement>("g[data-depth]")) {
           const depth = Number(layer.dataset.depth);
-          layer.style.transform = `translate(${((-x * 2 * depth) / scale).toFixed(2)}px, ${((-y * depth) / scale).toFixed(2)}px)`;
+          layer.style.transform = `translate(${((-x * 1.6 * depth) / scale).toFixed(2)}px, ${((-y * 1.2 * depth) / scale).toFixed(2)}px)`;
         }
       }
     };
@@ -194,8 +216,14 @@ export function Room({ clear, leaving = false }: RoomProps) {
       className={cn(
         "pointer-events-none text-accent transition-opacity duration-reveal max-md:relative max-md:order-last max-md:h-48 max-md:w-full max-md:shrink-0 md:absolute md:inset-0",
         leaving && "opacity-0",
-        drawing && "room-draw",
+        drawing && !reduced && "room-draw",
       )}
+      onAnimationEnd={(event) => {
+        const lines = event.currentTarget.querySelectorAll("path");
+        if (event.animationName === "room-line" && event.target === lines[lines.length - 1]) {
+          setDrawing(false);
+        }
+      }}
     >
       {WINGS.map(({ side, viewBox, layers }) => (
         <svg
@@ -220,7 +248,6 @@ export function Room({ clear, leaving = false }: RoomProps) {
                 <path
                   key={d}
                   d={d}
-                  pathLength={1}
                   vectorEffect="non-scaling-stroke"
                   strokeWidth={thin === true ? 1.5 : 2}
                   style={{ "--i": order++ } as CSSProperties}

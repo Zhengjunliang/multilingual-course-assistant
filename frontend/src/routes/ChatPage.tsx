@@ -54,8 +54,10 @@ export default function ChatPage() {
   const [leaving, setLeaving] = useState(false);
   const [hops, setHops] = useState(0);
   const [travelFrom, setTravelFrom] = useState<{ top: number } | null>(null);
-  // Whether the cat has just jumped here from a sign-in form (#183).
-  const [landed] = useState(leapt);
+  // Whether the cat has just jumped here from a sign-in form (#183). Only for
+  // the entry it jumped to: the page stays mounted between `/` and a thread,
+  // and an entry opened again later lands nothing.
+  const [landed, setLanded] = useState(leapt);
   const reduced = useReducedMotion();
 
   const visitor = account === null;
@@ -158,6 +160,10 @@ export default function ChatPage() {
   // composer parks at the foot and the thread owns the space.
   const empty = turns.length === 0 && !unreadable;
   const entry = empty || leaving;
+
+  useEffect(() => {
+    if (!entry) setLanded(false);
+  }, [entry]);
 
   const composer = (
     <Composer

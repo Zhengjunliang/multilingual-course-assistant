@@ -542,6 +542,11 @@
  * what is in front of it. It draws itself in once, each line a stagger after
  * the one before, as the cat's outline does in the intro; under reduced motion
  * it is whole from the start.
+ *
+ * Each line's dash is its length on screen, `--len`, which Room.tsx measures.
+ * While a visitor's first-visit intro plays (`data-intro` on its Skip button,
+ * features/entry/EntryScreen.tsx) the drawing is held before its first line:
+ * one thing moves at a time, and the Skip button stands where the desk will.
  */
 @utility room-lines {
   fill: none;
@@ -551,15 +556,26 @@
   opacity: var(--room-strength);
 }
 
+@keyframes room-line {
+  from {
+    stroke-dashoffset: var(--len);
+  }
+}
+
 @utility room-draw {
   & path {
-    stroke-dasharray: 1;
-    animation: draw var(--transition-duration-scene) var(--ease-out) both;
+    stroke-dasharray: var(--len);
+    animation: room-line var(--transition-duration-scene) var(--ease-out) both;
     animation-delay: calc(var(--i, 0) * var(--stagger));
+  }
+
+  body:has([data-intro]) & path {
+    animation-play-state: paused;
   }
 
   @media (prefers-reduced-motion: reduce) {
     & path {
+      stroke-dasharray: none;
       animation: none;
     }
   }
@@ -590,9 +606,14 @@
   }
 }
 
+/*
+ * `leap` starts from no transform: the crouch is already in the group's own
+ * transform, which the browser takes from the cat as it stood when the page
+ * changed, and eases out of it on the way.
+ */
 @keyframes leap {
   from {
-    transform: translateY(5px) scale(1.07, 0.9);
+    transform: none;
     animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
   }
   45% {
