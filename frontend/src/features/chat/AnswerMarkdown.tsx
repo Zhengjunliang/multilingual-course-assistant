@@ -60,13 +60,16 @@ const PillContext = createContext<readonly Citation[]>([]);
  *
  * The pill is a link to its first excerpt, and a click follows it: a web page
  * in a new tab at that excerpt's passage, a slide at its page. Resting on it
- * or focusing it opens a card listing every excerpt of the run, each with its
- * own link (components/ui/hover-card.tsx): two excerpts of one page are two
- * passages, and the card shows the one the answer named (#182). The fill is
- * what says "clickable", not a colour or a border: a blue word inside an
- * answer would read as an ordinary link (index.css), and `--mark` against
- * `--canvas` is a gated pair so the pill cannot dissolve into the paragraph.
- * Under the pointer, and while its card is open, it turns to ink.
+ * or focusing it opens a card listing every source of the run, each at the
+ * first excerpt the run names on it and with its own link
+ * (components/ui/hover-card.tsx): two excerpts of one page are two passages,
+ * and the card shows the one the answer named (#182). One entry per page, not
+ * per excerpt, because a run of five excerpts of two pages made a card taller
+ * than the window. The fill is what says "clickable", not a colour or a
+ * border: a blue word inside an answer would read as an ordinary link
+ * (index.css), and `--mark` against `--canvas` is a gated pair so the pill
+ * cannot dissolve into the paragraph. Under the pointer, and while its card
+ * is open, it turns to ink.
  *
  * Numbers with no excerpt are drawn as the numbers: the plugin only emits
  * known ones, and this never throws on the rest either.
@@ -74,21 +77,20 @@ const PillContext = createContext<readonly Citation[]>([]);
 function CitationPill({ numbers }: { numbers?: string }) {
   const { t } = useTranslation();
   const citations = useContext(PillContext);
-  const excerpts = (numbers ?? "")
-    .split(",")
-    .map((number) => ({ number, citation: citations[Number(number) - 1] }))
-    .filter(
-      (excerpt): excerpt is { number: string; citation: Citation } =>
-        excerpt.citation !== undefined,
-    );
-  const [first] = excerpts;
+  // One per page, in the order the run names them, each at the first excerpt
+  // the run names on it: «+N», the card and the name a screen reader hears
+  // count pages, as the sources panel does.
+  const sources = sourcesOf(
+    (numbers ?? "")
+      .split(",")
+      .map((number) => citations[Number(number) - 1])
+      .filter((citation) => citation !== undefined),
+  );
+  const [first] = sources;
   if (first === undefined) return <>{numbers}</>;
-  // «+N» and the name a screen reader hears count pages, as the sources
-  // panel does: two excerpts of one page are one source.
-  const sources = sourcesOf(excerpts.map((excerpt) => excerpt.citation));
 
-  const href = sourceLink(first.citation);
-  const shown = `${shortName(first.citation, t)}${sources.length > 1 ? ` +${sources.length - 1}` : ""}`;
+  const href = sourceLink(first);
+  const shown = `${shortName(first, t)}${sources.length > 1 ? ` +${sources.length - 1}` : ""}`;
   // The name a screen reader and voice control use starts with what the pill
   // shows (WCAG 2.5.3, label in name), then says it is a source and, for a
   // merged pill, every source its «+N» stands for. An attribute rather than
@@ -104,10 +106,10 @@ function CitationPill({ numbers }: { numbers?: string }) {
 
   return (
     <HoverCard
-      content={excerpts.map(({ number, citation: source }) => {
+      content={sources.map((source) => {
         const to = sourceLink(source);
         return (
-          <div key={number} className="flex flex-col gap-hair">
+          <div key={source.marker} className="flex flex-col gap-hair">
             <SourceSummary citation={source} />
             {to !== null && (
               <a
