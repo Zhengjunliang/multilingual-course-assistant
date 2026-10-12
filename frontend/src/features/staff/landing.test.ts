@@ -74,3 +74,25 @@ describe("the Gestione group", () => {
     expect(landing(reader, programmes)).toBe(lands);
   });
 });
+
+describe("the Gestione counts", () => {
+  it("count the programmes, the one programme's courses and the editions taught", () => {
+    const twelve = { ...B047, course_count: 12 };
+    const teacher = { role: "teacher", edition: 3 } as const;
+    expect(
+      managementItems(account([SECRETARIAT, teacher, { role: "teacher", edition: 4 }]), [twelve]),
+    ).toMatchObject([
+      { key: "programme", count: 12 },
+      { key: "mine", count: 2 },
+    ]);
+    expect(managementItems(account([], true), [B047, B222])).toMatchObject([
+      { key: "programmes", count: 2 },
+    ]);
+  });
+
+  it("leave the superuser's count unknown until the list arrives", () => {
+    expect(managementItems(account([], true), null)).toMatchObject([
+      { key: "programmes", count: null },
+    ]);
+  });
+});

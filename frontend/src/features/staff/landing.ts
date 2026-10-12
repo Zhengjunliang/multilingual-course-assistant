@@ -29,6 +29,12 @@ export interface ManagementItem {
   to: string;
   /** The paths below which the reader is inside this item, for its highlight. */
   within: readonly string[];
+  /**
+   * What the item's page lists, as its `Count` shows it: the programmes, the
+   * one programme's courses, or the editions the account teaches. `null` while
+   * the superuser's list has not arrived.
+   */
+  count: number | null;
 }
 
 const LIST = "/staff/programmes";
@@ -45,14 +51,24 @@ export function managementItems(
   const items: ManagementItem[] = [];
   const only = programmes?.length === 1 ? programmes[0] : undefined;
   if (account.is_superuser || (programmes !== null && programmes.length > 1)) {
-    items.push({ key: "programmes", to: LIST, within: [LIST, ...below] });
+    items.push({
+      key: "programmes",
+      to: LIST,
+      within: [LIST, ...below],
+      count: programmes?.length ?? null,
+    });
   } else if (only !== undefined) {
     const to = `${LIST}/${encodeURIComponent(only.code)}`;
-    items.push({ key: "programme", to, within: [to, ...below] });
+    items.push({ key: "programme", to, within: [to, ...below], count: only.course_count });
   }
   if (teaches(account)) {
     const editions = items.length === 0 ? ["/staff/editions"] : [];
-    items.push({ key: "mine", to: MINE, within: [MINE, ...editions] });
+    // One role per edition, as the server sends them; a Set all the same, so
+    // the count is of editions and not of rows.
+    const taught = new Set(
+      account.roles.flatMap((scope) => (scope.role === "teacher" ? [scope.edition] : [])),
+    );
+    items.push({ key: "mine", to: MINE, within: [MINE, ...editions], count: taught.size });
   }
   return items;
 }
