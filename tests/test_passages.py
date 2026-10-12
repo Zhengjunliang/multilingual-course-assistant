@@ -5,6 +5,7 @@ The texts are made up with the shape of the indexed ones: web text stays out
 of git (gold/README.md)."""
 
 from collections.abc import Iterator, Sequence
+from itertools import permutations
 from pathlib import Path
 
 import pytest
@@ -212,18 +213,24 @@ def test_two_paragraphs_of_one_page_stay_two_hits_however_alike() -> None:
     assert len(collapse(hits_of(first, second))) == 2
 
 
-def test_a_copy_at_another_address_does_not_join_two_paragraphs_of_one_page() -> None:
-    """The copy of the first paragraph is a near-duplicate of the second, so a
-    group open to any member's copies would take all three."""
+@pytest.mark.parametrize("copy_fetched", ["2026-08-22", "2026-10-01"], ids=["crawled", "later"])
+@pytest.mark.parametrize("order", list(permutations(range(3))))
+def test_a_copy_at_another_address_does_not_join_two_paragraphs_of_one_page(
+    order: tuple[int, ...], copy_fetched: str
+) -> None:
+    """The copy of the first paragraph is a near-duplicate of the second. In
+    any rank order, and whichever copy is newer, both paragraphs stay."""
     url = "https://ingegneria.unifi.it/p536.html"
     first = web_chunk(0, ANALYSIS, url, content_hash="cc" * 32)
-    copy = web_chunk(1, ANALYSIS, "https://ingegneria.unifi.it/vp-536-corsi.html")
+    copy = web_chunk(
+        1, ANALYSIS, "https://ingegneria.unifi.it/vp-536-corsi.html", fetch_date=copy_fetched
+    )
     second = web_chunk(2, PHYSICS, url, content_hash="cc" * 32)
+    chunks = (first, copy, second)
 
-    assert [hit.chunk.text for hit in collapse(hits_of(first, copy, second))] == [
-        ANALYSIS,
-        PHYSICS,
-    ]
+    collapsed = collapse(hits_of(*(chunks[at] for at in order)))
+
+    assert sorted(hit.chunk.text for hit in collapsed) == sorted([ANALYSIS, PHYSICS])
 
 
 def test_one_slides_text_in_two_editions_stays_two_hits() -> None:

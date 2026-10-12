@@ -123,32 +123,48 @@ def _paragraphs_of_one_page(a: Chunk, b: Chunk) -> bool:
 def collapse(hits: Sequence[Hit]) -> list[Hit]:
     """Each passage once, in the order of its best-ranked copy.
 
-    A hit joins every group that holds a copy of it, and the groups it joins
-    become one, so a chain of editions each close to the next is one passage
-    whatever order the ranking brings them in, though the first and the last
-    are far apart. A group never takes two paragraphs of one page version: a
-    copy of one of them at another address may be a near-duplicate of the
-    other, and would otherwise carry both into one passage. The group keeps
-    its best score and shows its newest copy, so a citation's URL is always
-    the page its text came from."""
-    groups: list[list[int]] = []
+    Web hits of equal text are one passage first, whatever else holds. Each
+    such set then joins every group holding a near-duplicate of one of its
+    hits, and the groups it joins become one, so a chain of editions each
+    close to the next is one passage whatever order the ranking brings them
+    in, though the first and the last are far apart. A group never takes two
+    paragraphs of one page version: a copy of one of them at another address
+    may be a near-duplicate of the other, and since the copy is grouped with
+    its own paragraph before any near-duplicate is, the other paragraph is
+    refused in every rank order. The group keeps its best score and shows its
+    newest copy, so a citation's URL is always the page its text came from."""
+    equal: dict[str, list[int]] = {}
+    units: list[list[int]] = []
     for index, hit in enumerate(hits):
-        home = [index]
+        if hit.chunk.kind != "web":
+            units.append([index])
+        elif hit.chunk.text in equal:
+            equal[hit.chunk.text].append(index)
+        else:
+            equal[hit.chunk.text] = [index]
+            units.append(equal[hit.chunk.text])
+
+    groups: list[list[int]] = []
+    for unit in units:
+        home: list[int] | None = None
         for group in [*groups]:
-            if not any(same_passage(hit.chunk, hits[member].chunk) for member in group):
+            if not any(same_passage(hits[a].chunk, hits[b].chunk) for a in unit for b in group):
                 continue
+            members = home or unit
             if any(
-                _paragraphs_of_one_page(hits[a].chunk, hits[b].chunk) for a in home for b in group
+                _paragraphs_of_one_page(hits[a].chunk, hits[b].chunk)
+                for a in members
+                for b in group
             ):
                 continue
-            if home == [index]:
-                group.append(index)
+            if home is None:
+                group.extend(unit)
                 home = group
             else:
                 home.extend(group)
                 groups.remove(group)
-        if home == [index]:
-            groups.append(home)
+        if home is None:
+            groups.append(list(unit))
     collapsed: list[Hit] = []
     for group in groups:
         copies = [hits[member] for member in sorted(group)]
