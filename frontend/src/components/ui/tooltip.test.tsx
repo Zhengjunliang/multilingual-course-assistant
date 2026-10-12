@@ -42,4 +42,21 @@ describe("a tooltip", () => {
       after: null,
     });
   });
+
+  it("names its key on the trigger and shows it beside the hint", () => {
+    const { container, unmount } = mount(
+      <Tooltip content="Cerca" shortcut={{ keys: "Control+K", label: "Ctrl K" }}>
+        <button type="button">Cerca</button>
+      </Tooltip>,
+    );
+    const trigger = container.querySelector("button");
+    act(() => trigger?.focus());
+    const seen = {
+      keys: trigger?.getAttribute("aria-keyshortcuts"),
+      cap: document.body.querySelector("kbd")?.textContent,
+    };
+    unmount();
+
+    expect(seen).toEqual({ keys: "Control+K", cap: "Ctrl K" });
+  });
 });

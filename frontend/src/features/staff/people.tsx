@@ -13,21 +13,13 @@ import { useTranslation } from "react-i18next";
 import type { StaffMember } from "@/api/catalog";
 import { useSession } from "@/auth/useSession";
 import { Avatar } from "@/components/ui/avatar";
+import { AvatarStack } from "@/components/ui/avatar-stack";
 import { Badge } from "@/components/ui/badge";
 
 export function PeopleInline({ people }: { people: readonly StaffMember[] }) {
   return (
     <span className="flex min-w-0 items-center gap-tight">
-      <span className="flex shrink-0 -space-x-hair">
-        {people.map((person) => (
-          <Avatar
-            key={person.id}
-            name={person.username}
-            size="sm"
-            className="ring-2 ring-surface"
-          />
-        ))}
-      </span>
+      <AvatarStack names={people.map((person) => person.username)} max={people.length} />
       <span className="truncate font-mono text-body text-ink">
         {people.map((person) => person.username).join(", ")}
       </span>

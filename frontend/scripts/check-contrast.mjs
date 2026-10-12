@@ -84,7 +84,7 @@ const LADDER = [
   {
     a: "mark",
     b: "surface",
-    where: "button.tsx ghost hover, dropdown-menu.tsx item under the pointer",
+    where: "dropdown-menu.tsx item under the pointer, count.tsx on a card",
   },
   { a: "mark", b: "canvas", where: "AnswerMarkdown.tsx citation pill in the answer" },
 ];

@@ -5,6 +5,7 @@ import { APP_NAME } from "@/brand/fumetto";
 import { LivingMascot } from "@/components/LivingMascot";
 import { Button } from "@/components/ui/button";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
+import { Spinner } from "@/components/ui/spinner";
 import { Room } from "@/features/entry/Room";
 import { chooseUiLocale, UI_LOCALES, type UiLocale } from "@/i18n";
 import { useReducedMotion } from "@/lib/useReducedMotion";
@@ -127,6 +128,7 @@ export function AuthButton({ phase, children }: { phase: Phase; children: string
   return (
     <Button
       type="submit"
+      size="lg"
       aria-disabled={phase !== "idle"}
       aria-busy={phase === "busy"}
       data-mascot-cheer
@@ -140,12 +142,7 @@ export function AuthButton({ phase, children }: { phase: Phase; children: string
           className="h-icon w-0 -translate-x-tight opacity-0 transition-[width,margin,opacity,translate] duration-base ease-emphasized group-hover:ml-tight group-hover:w-icon group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:ml-tight group-focus-visible:w-icon group-focus-visible:translate-x-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
         />
       </span>
-      {turning && (
-        <span
-          aria-hidden
-          className="absolute inset-0 m-auto size-icon-lg animate-spin rounded-full border-2 border-current border-r-transparent"
-        />
-      )}
+      {turning && <Spinner className="absolute inset-0 m-auto size-icon-lg" />}
       {accepted && (
         <svg aria-hidden viewBox="0 0 24 24" className="absolute inset-0 m-auto size-icon-lg">
           <path
