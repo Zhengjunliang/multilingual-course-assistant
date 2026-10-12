@@ -158,6 +158,23 @@ describe("the living cat on a sign-in form", () => {
     expect(after?.mouth).toBe("smile");
   });
 
+  it("watches, frowns and looks away again with the pointer left on the send button", () => {
+    const life = born(0, () => 0.5);
+    const pointer = { cheer: true, away: true };
+    const sending = run(life, 0, 1, { ...pointer, busy: true }).at(-1)?.pose;
+    // Heard a moment after the next frame began: a frame's time is its start.
+    frown(life, 1.004);
+    const refused = run(life, 1, 1.5, pointer);
+    const after = run(life, 1.5, 1 + TIMING.frown + 0.1, pointer).at(-1)?.pose;
+
+    expect([sending?.eyes, refused[0]?.pose.eyes, refused.at(-1)?.pose.eyes, after?.eyes]).toEqual([
+      OPEN,
+      { left: "droop", right: "droop" },
+      { left: "droop", right: "droop" },
+      { left: "shut", right: "shut" },
+    ]);
+  });
+
   it("watches a form being sent rather than looking away, and does not sleep", () => {
     const life = born(0, () => 0.5);
     const last = run(life, 0, 15, { away: true, busy: true }).at(-1)?.pose;

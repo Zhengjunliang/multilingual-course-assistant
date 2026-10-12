@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, useLocation } from "react-router-dom";
 
@@ -22,6 +22,15 @@ export default function LoginPage() {
   // Wherever `RequireSession` sent this reader from, or the front page.
   const back = (location.state as { from?: string } | null)?.from ?? "/";
   const landing = useLanding(back);
+
+  // The focus goes back to the emptied password after a refusal, once the
+  // field is marked invalid and described by the failure, and only on this
+  // page: a refusal arriving after the reader has gone on to another form
+  // leaves its fields alone.
+  useEffect(() => {
+    if (landing.refusals > 0) document.getElementById("password")?.focus();
+  }, [landing.refusals]);
+
   if (account !== null && landing.phase === "idle") return <Navigate to={back} replace />;
 
   const onSubmit = async (event: FormEvent) => {
@@ -34,10 +43,9 @@ export default function LoginPage() {
         // The server answers wrong password and unknown account identically on
         // purpose (apps/accounts/serializers.py); this shows whatever it said
         // and does not try to be more helpful than that. The password goes, as
-        // the macOS sign-in window empties it, and the focus is put back there.
+        // the macOS sign-in window empties it.
         setFailure(error instanceof ApiError ? error.detail : t("auth.failed"));
         setPassword("");
-        document.getElementById("password")?.focus();
       },
     );
   };
@@ -46,7 +54,7 @@ export default function LoginPage() {
     <AuthLayout
       heading={t("auth.logInTitle")}
       refusals={landing.refusals}
-      crouching={landing.phase === "crouching"}
+      phase={landing.phase}
       footer={
         <>
           {t("auth.noAccount")}{" "}

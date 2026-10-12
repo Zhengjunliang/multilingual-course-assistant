@@ -33,7 +33,7 @@
  * filled field, after MUI's InputBase, and its `animationstart` is the sign.
  */
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import { DETAIL_STROKE, HEAD, LIVING, outline, STROKE } from "@/brand/fumetto";
 import { useReducedMotion } from "@/lib/useReducedMotion";
@@ -184,7 +184,10 @@ interface LivingMascotProps {
   hops?: number;
   /** Changes each time a sign-in form is refused, and the cat frowns. */
   refusals?: number;
-  /** The cat has just jumped here from a sign-in form: it smiles. Read when it appears. */
+  /**
+   * The cat smiles: on a sign-in form as the server accepts it, on the entry
+   * as it lands there from the form. When it appears with it, or it turns on.
+   */
   welcome?: boolean;
   /**
    * The intro (features/entry/): the cat arrives drawn in one stroke. Read
@@ -205,7 +208,6 @@ export function LivingMascot({
   const life = useRef<Life | null>(null);
   const reduced = useReducedMotion();
   const sketching = useRef(drawIn);
-  const welcoming = useRef(welcome);
   const mask = `fumetto-${useId().replace(/[^\w-]/g, "")}`;
 
   useEffect(() => {
@@ -222,8 +224,6 @@ export function LivingMascot({
     const clock = () => performance.now() / 1000;
     const cat = born(clock(), Math.random);
     life.current = cat;
-    if (welcoming.current) welcomed(cat, clock());
-    welcoming.current = false;
     const noHover = window.matchMedia(NO_HOVER);
     const pointer = { x: 0, y: 0, at: Number.NEGATIVE_INFINITY };
     /** The fields a password manager has just filled, in the order it filled them. */
@@ -344,9 +344,17 @@ export function LivingMascot({
     if (life.current !== null) hop(life.current, performance.now() / 1000);
   }, [hops]);
 
-  // The same for a refusal: a form that opens has been refused by nobody.
-  const refusalsSeen = useRef(refusals);
+  // After the cat is born above, so that one appearing with a welcome has a
+  // life to smile with.
   useEffect(() => {
+    if (welcome && life.current !== null) welcomed(life.current, performance.now() / 1000);
+  }, [welcome]);
+
+  // The same for a refusal: a form that opens has been refused by nobody.
+  // Before the frame is drawn, as the form stops being sent in the same
+  // commit: a frame in between would show the send button's smile.
+  const refusalsSeen = useRef(refusals);
+  useLayoutEffect(() => {
     if (refusals === refusalsSeen.current) return;
     refusalsSeen.current = refusals;
     if (life.current !== null) frown(life.current, performance.now() / 1000);

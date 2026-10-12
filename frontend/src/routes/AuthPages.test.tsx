@@ -13,6 +13,7 @@ import { act } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/api/http";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
 import { mount } from "@/test/mount";
@@ -174,5 +175,42 @@ describe("a registration", () => {
     await act(() => i18n.changeLanguage("it"));
 
     expect(register).toHaveBeenCalledWith("ada", "segreta-lunga", "zh-hans");
+  });
+
+  it.each([
+    {
+      refusal: "a password the validators refuse: the focus goes to it, described",
+      error: new ApiError(400, "Invalid input.", { password: ["This password is too common."] }),
+      after: { focused: "password", invalid: "true", alert: null },
+    },
+    {
+      refusal: "a failure no field carries: it is an alert",
+      error: new ApiError(429, "Troppi tentativi."),
+      after: { focused: "", invalid: null, alert: "Troppi tentativi." },
+    },
+  ])("refused, $refusal", async ({ error, after }) => {
+    const register = async () => {
+      throw error;
+    };
+    const { container, unmount } = mount(
+      <SessionContext value={{ ...VISITOR, register }}>
+        <MemoryRouter>
+          <RegisterPage />
+        </MemoryRouter>
+      </SessionContext>,
+    );
+    type(container.querySelector<HTMLInputElement>("#username"), "ada");
+    type(container.querySelector<HTMLInputElement>("#password"), "password");
+    await act(async () => {
+      container.querySelector("form")?.requestSubmit();
+    });
+    const state = {
+      focused: document.activeElement?.id,
+      invalid: container.querySelector("#password")?.getAttribute("aria-invalid") ?? null,
+      alert: container.querySelector("[role=alert]")?.textContent?.replace(/^!/, "") ?? null,
+    };
+    unmount();
+
+    expect(state).toEqual(after);
   });
 });

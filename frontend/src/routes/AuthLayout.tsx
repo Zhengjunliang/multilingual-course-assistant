@@ -29,8 +29,11 @@ interface AuthLayoutProps {
   footer: ReactNode;
   /** Changes each time the server refuses the form, and the card shakes. */
   refusals: number;
-  /** The form was accepted and the cat crouches, about to jump to the entry. */
-  crouching?: boolean;
+  /**
+   * Where the form stands (routes/landing.ts): once it is accepted the cat
+   * smiles, and crouches when it is about to jump to the entry.
+   */
+  phase: Phase;
 }
 
 /**
@@ -42,7 +45,7 @@ interface AuthLayoutProps {
  * (#173), alive and as large, with no intro: the sign-in screens are the
  * entry's other door. Its eyes rest on the username when nobody moves, and it
  * answers the form (components/LivingMascot.tsx): a refusal is the card's
- * shake and the cat's frown at once.
+ * shake and the cat's frown at once, an acceptance its smile.
  *
  * The language switch is here as well as in the application header, and it has
  * to be: before a login there is no account to read `User.locale` from, and a
@@ -61,13 +64,7 @@ interface AuthLayoutProps {
  * chin by the same fraction of it at either size: the drawing's chin is 12 of
  * its 76 units of width above its bottom edge.
  */
-export function AuthLayout({
-  heading,
-  children,
-  footer,
-  refusals,
-  crouching = false,
-}: AuthLayoutProps) {
+export function AuthLayout({ heading, children, footer, refusals, phase }: AuthLayoutProps) {
   const { t, i18n } = useTranslation();
   const reduced = useReducedMotion();
   const card = useRef<HTMLDivElement>(null);
@@ -87,9 +84,10 @@ export function AuthLayout({
         <LivingMascot
           restOn="username"
           refusals={refusals}
+          welcome={phase === "accepted" || phase === "crouching"}
           className={cn(
             "relative z-lifted w-(--cat) [view-transition-name:fumetto]",
-            crouching && "crouch",
+            phase === "crouching" && "crouch",
           )}
         />
         <div
@@ -167,9 +165,18 @@ export function AuthButton({ phase, children }: { phase: Phase; children: string
 }
 
 /** What the server said, in the warning colour after a disc with "!". */
-export function AuthFailure({ id, children }: { id?: string; children: string }) {
+export function AuthFailure({
+  id,
+  role,
+  children,
+}: {
+  id?: string;
+  /** `alert` for a failure that no field's description carries, so it is heard. */
+  role?: "alert";
+  children: string;
+}) {
   return (
-    <p id={id} className="flex items-start gap-tight text-body text-warn-ink">
+    <p id={id} role={role} className="flex items-start gap-tight text-body text-warn-ink">
       <span
         aria-hidden
         className="mt-px grid size-icon shrink-0 place-items-center rounded-full bg-warn-ink font-bold text-caption text-surface"
