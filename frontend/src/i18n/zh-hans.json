@@ -38,6 +38,7 @@
     "unpin": "取消置顶「{{title}}」",
     "pinFailed": "无法置顶这个会话。",
     "unpinFailed": "无法取消置顶这个会话。",
+    "retry": "重试",
     "campus": "学校",
     "moreCourses_one": "另有 {{count}} 门课程",
     "moreCourses_other": "另有 {{count}} 门课程",

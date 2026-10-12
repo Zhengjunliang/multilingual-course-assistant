@@ -62,6 +62,8 @@ const STORED: ConversationDetail = {
 let conversations: ConversationSummary[] = [];
 /** Whether `DELETE` fails, as a server error would. */
 let deleteFails = false;
+/** Whether `GET /api/conversations` fails, as a dropped connection would. */
+let listFails = false;
 /** Every request made, as `METHOD path`. */
 let requested: string[] = [];
 /** How many times the page asked the session provider who is signed in. */
@@ -92,7 +94,9 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   const path = String(input);
   const method = init.method ?? "GET";
   requested.push(`${method} ${path}`);
-  if (method === "GET" && path === "/api/conversations") return json(conversations);
+  if (method === "GET" && path === "/api/conversations") {
+    return listFails ? json({ detail: "Server error." }, 500) : json(conversations);
+  }
   if (method === "GET" && path === "/api/conversations/7") return json(STORED);
   if (method === "DELETE" && path.startsWith("/api/conversations/")) {
     if (deleteFails) return json({ detail: "Server error." }, 500);
@@ -346,14 +350,17 @@ describe("the chat page's address", () => {
 describe("pinning from the sidebar", () => {
   beforeEach(() => {
     conversations = [STORED_ROW, OTHER];
+    listFails = false;
     requested = [];
     vi.stubGlobal("fetch", fakeApi);
   });
 
   afterEach(() => {
+    listFails = false;
     vi.unstubAllGlobals();
   });
 
+  const title = "Quando scadono le tasse?";
   const button = (container: HTMLElement, label: string) =>
     [...container.querySelectorAll<HTMLButtonElement>("aside button")].find(
       (candidate) => candidate.getAttribute("aria-label") === label,
@@ -364,7 +371,6 @@ describe("pinning from the sidebar", () => {
     );
 
   it("moves a row to «Fissate» once the server has pinned it, and back, the focus with it", async () => {
-    const title = "Quando scadono le tasse?";
     const { container, unmount } = page("/");
     await settle();
 
@@ -391,6 +397,45 @@ describe("pinning from the sidebar", () => {
     expect(focusedOnUnpin).toBe(i18n.t("sidebar.unpin", { title }));
     expect(recent).toEqual(["/c/7", "/c/8"]);
     expect(fixed).toBeNull();
+  });
+
+  it("can be pressed again when the list that would have moved the row never came", async () => {
+    const { container, unmount } = page("/");
+    await settle();
+
+    listFails = true;
+    act(() => button(container, i18n.t("sidebar.pin", { title }))?.click());
+    await settle();
+    const waiting = button(container, i18n.t("sidebar.pin", { title }))?.getAttribute(
+      "aria-disabled",
+    );
+    listFails = false;
+    act(() => button(container, i18n.t("sidebar.pin", { title }))?.click());
+    await settle();
+    const pinned = group(container, "Fissate");
+    unmount();
+
+    expect(waiting).toBeNull();
+    expect(pinned).toEqual(["/c/8"]);
+  });
+
+  it("hands the focus to «Nuova conversazione» when the row was deleted in another tab", async () => {
+    const { container, unmount } = page("/");
+    await settle();
+
+    conversations = [STORED_ROW];
+    const pin = button(container, i18n.t("sidebar.pin", { title }));
+    act(() => {
+      pin?.focus();
+      pin?.click();
+    });
+    await settle();
+    const rows = group(container, "Recenti");
+    const focused = document.activeElement?.textContent;
+    unmount();
+
+    expect(rows).toEqual(["/c/7"]);
+    expect(focused).toBe(i18n.t("sidebar.new"));
   });
 });
 

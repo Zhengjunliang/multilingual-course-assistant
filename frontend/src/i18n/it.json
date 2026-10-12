@@ -38,6 +38,7 @@
     "unpin": "Togli «{{title}}» dalle fissate",
     "pinFailed": "Non è stato possibile fissare la conversazione.",
     "unpinFailed": "Non è stato possibile togliere la conversazione dalle fissate.",
+    "retry": "Riprova",
     "campus": "Ateneo",
     "moreCourses_one": "e un altro corso",
     "moreCourses_other": "e altri {{count}} corsi",

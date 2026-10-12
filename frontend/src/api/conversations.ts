@@ -59,7 +59,7 @@ export interface StoredMessage {
   complete: boolean;
   citations: Citation[];
   route: RouteDecision | null;
-  /** `StartEvent.search_ms`; `null` on a question and on answers stored before it existed. */
+  /** `StartEvent.search_ms`; `null` on a question. */
   search_ms: number | null;
   created_at: string;
 }

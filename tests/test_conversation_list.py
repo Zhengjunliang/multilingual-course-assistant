@@ -247,6 +247,28 @@ def test_pinned_is_the_only_field_a_conversation_takes() -> None:
     assert only_row()["title"] == "Che cos'è un ORM?"
 
 
+def test_a_form_without_pinned_is_refused_rather_than_read_as_unpinning() -> None:
+    """DRF reads a boolean missing from a form as `False`, so a form body is
+    refused whole: only JSON can say nothing about `pinned`."""
+    conversation = started(0)
+    pin(conversation, True)
+
+    response = client().patch(f"{URL}/{conversation.pk}", {"title": "x"}, format="multipart")
+
+    assert response.status_code == 415
+    assert Conversation.objects.get(pk=conversation.pk).pinned
+
+
+def test_the_browsable_api_opens_a_conversation() -> None:
+    """DRF's HTML page builds its PATCH form from a serializer of its own."""
+    Course.objects.create(code=PPM[0], name=PPM[1], locale="it")
+    conversation = started(0, [slides(PPM[0])])
+
+    response = client().get(f"{URL}/{conversation.pk}", HTTP_ACCEPT="text/html")
+
+    assert response.status_code == 200
+
+
 def test_reopening_a_conversation_returns_its_row_as_the_list_shows_it() -> None:
     Course.objects.create(code=PPM[0], name=PPM[1], locale="it")
     conversation = started(0, [slides(PPM[0]), web()])

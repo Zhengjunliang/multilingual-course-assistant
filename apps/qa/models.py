@@ -124,8 +124,7 @@ class Message(models.Model):
     citations = models.JSONField(default=list, verbose_name=_("citations"))
     route = models.JSONField(null=True, blank=True, verbose_name=_("routing decision"))
     # `StartEvent.search_ms`, kept so a reopened conversation shows the seconds
-    # it showed live. Empty on a student's turn and on answers written before
-    # the column existed.
+    # it showed live. Empty on a student's turn.
     search_ms = models.PositiveIntegerField(
         null=True, blank=True, verbose_name=_("search time (ms)")
     )

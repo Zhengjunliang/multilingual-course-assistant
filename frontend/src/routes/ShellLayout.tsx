@@ -65,19 +65,27 @@ export default function ShellLayout() {
   // answer that ends while its conversation is being deleted asks for the
   // list, the server may read it before the delete lands, and that older
   // reply, arriving after the list the delete asks for, would bring the
-  // deleted conversation back.
+  // deleted conversation back. Resolves to whether the list came: one set
+  // aside for a newer list counts, since that newer one is on its way.
   const lastAsked = useRef(0);
   const refreshConversations = useCallback(() => {
     lastAsked.current += 1;
     const asked = lastAsked.current;
-    listConversations()
-      .then((list) => {
+    return listConversations().then(
+      (list) => {
         if (asked === lastAsked.current) setConversations(list);
-      })
-      .catch((error: unknown) => refused(error));
+        return true;
+      },
+      (error: unknown) => {
+        refused(error);
+        return false;
+      },
+    );
   }, [refused]);
 
-  useEffect(refreshConversations, [refreshConversations]);
+  useEffect(() => {
+    void refreshConversations();
+  }, [refreshConversations]);
 
   // Only staff have programmes to read: a student's sidebar asks for none.
   const staff = account !== null && isStaff(account);
@@ -121,36 +129,42 @@ export default function ShellLayout() {
         const gone = error instanceof ApiError && error.status === 404;
         if (!gone) {
           refused(error);
-          refreshConversations();
+          void refreshConversations();
           return false;
         }
       }
       if (open === String(id)) void navigate("/", { replace: true });
-      refreshConversations();
+      void refreshConversations();
       return true;
     },
     [open, navigate, refreshConversations, refused],
   );
 
   // Pinning moves a row only once the server has said so, through the list
-  // it asks for next (features/chat/ConversationList.tsx). A 404 is a
-  // conversation deleted from another tab, which that list leaves out; any
-  // other failure leaves the row where it was and says so in a toast.
+  // it asks for next (features/chat/ConversationList.tsx), and resolves to
+  // whether that list came. A 404 is a conversation deleted from another tab,
+  // which that list leaves out; any other failure leaves the row where it
+  // was and says so in a toast that can try again (DESIGN.md, Components).
   const onPin = useCallback(
-    async (id: number, pinned: boolean) => {
-      try {
-        await pinConversation(id, pinned);
-      } catch (error) {
-        const gone = error instanceof ApiError && error.status === 404;
-        if (!gone) {
-          refused(error);
-          toast.error(t(pinned ? "sidebar.pinFailed" : "sidebar.unpinFailed"));
+    (id: number, pinned: boolean, title: string) => {
+      const attempt = async (): Promise<boolean> => {
+        try {
+          await pinConversation(id, pinned);
+        } catch (error) {
+          const gone = error instanceof ApiError && error.status === 404;
+          if (!gone) {
+            refused(error);
+            toast.error(t(pinned ? "sidebar.pinFailed" : "sidebar.unpinFailed"), {
+              description: title,
+              action: { label: t("sidebar.retry"), onClick: () => void attempt() },
+            });
+            void refreshConversations();
+            return false;
+          }
         }
-        refreshConversations();
-        return false;
-      }
-      refreshConversations();
-      return true;
+        return refreshConversations();
+      };
+      return attempt();
     },
     [refreshConversations, refused, t],
   );

@@ -22,6 +22,7 @@ from django.db.models import JSONField, OuterRef, Subquery
 from django.db.models.functions import Left
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveDestroyAPIView
+from rest_framework.parsers import JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -153,6 +154,9 @@ class ConversationDetailView(RetrieveDestroyAPIView):
 
     permission_classes = (IsAuthenticated,)
     serializer_class = ConversationDetailSerializer
+    # JSON only: DRF reads a boolean missing from a form as `False`, so a form
+    # body naming anything but `pinned` would unpin rather than be refused.
+    parser_classes = (JSONParser,)
 
     def get_queryset(self) -> QuerySet[Conversation]:
         conversations = summaries(self.request.user)
