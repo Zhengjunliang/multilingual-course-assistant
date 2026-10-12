@@ -18,9 +18,11 @@ export interface RouteDecision {
 }
 
 /**
- * One retrieved excerpt. `marker` is the exact bracketed label the model was
- * told to copy into its prose; matching it against the answer is the client's
- * job and is only meaningful once the whole stream has been joined.
+ * One retrieved excerpt. The answer cites it as `[n]`, its place in the list
+ * counted from one; `marker` is the bracketed label beside that number in the
+ * prompt, which answers generated before 2026-10-12 copied instead. Finding
+ * either in the answer is the client's job and is only meaningful once the
+ * whole stream has been joined.
  */
 export interface Citation {
   marker: string;

@@ -210,6 +210,27 @@ describe("an answer", () => {
     expect(html).not.toMatch(SENTINEL);
   });
 
+  it.each([
+    ["inside inline code", "Scrivi `voto [1]` così.", "voto [1]</code>"],
+    ["inside a ~~~ fence", "~~~\nvoti = [2] [1]\n~~~", "voti = [2] [1]"],
+    ["inside an indented code block", "Esempio:\n\n    voto [1][2]\n", "voto [1][2]"],
+    ["inside a link's text", "[vedi [1]](https://www.unifi.it)", "vedi [1]"],
+  ])("keeps a numbered reference %s as the answer wrote it", (_, text, shown) => {
+    const html = answer(text);
+
+    expect(html).toContain(shown);
+    expect(html).not.toContain("data-pill");
+    expect(html).not.toMatch(SENTINEL);
+  });
+
+  it("draws numbered references side by side as one pill", () => {
+    const html = answer("Le tasse scadono il 30 settembre [1][2].");
+
+    expect(count(html, "data-pill")).toBe(1);
+    expect(html).toContain('aria-label="Slide p. 3 +1');
+    expect(html).not.toMatch(SENTINEL);
+  });
+
   it("keeps LaTeX intact, and typesets it once KaTeX is loaded", async () => {
     // A set from the slides: Markdown alone would read `\{` as an escaped
     // brace and drop the backslash.
