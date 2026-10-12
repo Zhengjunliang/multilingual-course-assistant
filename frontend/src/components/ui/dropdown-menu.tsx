@@ -38,6 +38,7 @@ import { Fragment, type ReactNode, useId, useRef, useState } from "react";
 
 import { Chip } from "@/components/ui/chip";
 import { Kbd, type Shortcut } from "@/components/ui/kbd";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface MenuAction {
@@ -87,6 +88,8 @@ interface DropdownMenuProps {
   inline?: boolean;
   /** As wide as the trigger, for a trigger that is a whole row. */
   fitTrigger?: boolean;
+  /** A hint at the trigger's right (`Tooltip`), for a trigger that shows no words. */
+  hint?: string;
   /** Above the sections: who is signed in. */
   head?: ReactNode;
   sections: readonly MenuSection[];
@@ -205,23 +208,33 @@ export function DropdownMenu({
   align = "end",
   inline = false,
   fitTrigger = false,
+  hint,
   head,
   sections,
   onCloseAutoFocus,
 }: DropdownMenuProps) {
   const id = useId();
   const ChoiceItem = inline ? InlineChoice : Choice;
+  const button = (
+    <RadixMenu.Trigger
+      aria-label={ariaLabel}
+      className={
+        triggerClassName ??
+        "rounded-full focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+      }
+    >
+      {trigger}
+    </RadixMenu.Trigger>
+  );
   return (
     <RadixMenu.Root>
-      <RadixMenu.Trigger
-        aria-label={ariaLabel}
-        className={
-          triggerClassName ??
-          "rounded-full focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-        }
-      >
-        {trigger}
-      </RadixMenu.Trigger>
+      {hint === undefined ? (
+        button
+      ) : (
+        <Tooltip content={hint} side="right">
+          {button}
+        </Tooltip>
+      )}
       <RadixMenu.Portal>
         <RadixMenu.Content
           side={side}

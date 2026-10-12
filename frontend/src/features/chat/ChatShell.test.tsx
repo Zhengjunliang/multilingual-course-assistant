@@ -5,31 +5,29 @@
  *
  * The chat page wants a router and a session, and the drawer is a portal a
  * string render cannot see. The frame has neither problem — it takes its
- * sidebar as a slot and holds nothing but which panel is open — so
- * the two checks that used to be spellings of class names can be the real
- * question instead: does the button open the drawer, and does the drawer put
- * the sidebar on the page.
+ * sidebar and its rail as slots and holds nothing but which panel is open — so
+ * the checks can be the real questions: does the button open the drawer, does
+ * folding leave the rail, do the keys do what they say.
  *
- * The breakpoint is answered by the fixed column's class list. jsdom loads no
- * stylesheet and computes no media query, so it cannot say whether the column
- * is on screen at a given width; but `hidden lg:block` is in the DOM as two
- * classes, and reading them off the mounted `aside` survives the class string
- * being built with `cn(...)` or reordered, which a regex over the source did
- * not.
+ * The breakpoint is answered two ways. jsdom loads no stylesheet and computes
+ * no media query, so whether the column is on screen is read off the classes
+ * of the mounted `aside` (`hidden lg:block`, which survives the class string
+ * being built with `cn(...)` or reordered); what Ctrl K does at each width is
+ * asked of `matchMedia`, which the shell calls and these cases stand in for.
  */
 
 import { act } from "react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatShell } from "@/features/chat/ChatShell";
 import { mount } from "@/test/mount";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
-function shell() {
+function shell(onNewConversation: () => void = () => {}) {
   return mount(
     <ThemeProvider>
       <ChatShell
-        sidebar={({ onNavigate, onCollapse }) => (
+        sidebar={({ placement, onNavigate, onCollapse, searchRef, onOpenSettings }) => (
           <>
             <button type="button" onClick={onNavigate}>
               Che cos'è un ORM?
@@ -37,8 +35,23 @@ function shell() {
             <button type="button" onClick={onCollapse}>
               Chiudi la barra laterale
             </button>
+            <button type="button" onClick={onOpenSettings}>
+              Impostazioni…
+            </button>
+            <input ref={searchRef} aria-label={`Cerca (${placement})`} />
           </>
         )}
+        rail={({ onExpand, onSearch }) => (
+          <>
+            <button type="button" onClick={onExpand}>
+              Apri la barra laterale
+            </button>
+            <button type="button" onClick={onSearch}>
+              Cerca
+            </button>
+          </>
+        )}
+        onNewConversation={onNewConversation}
       >
         <p>Cosa vuoi sapere?</p>
       </ChatShell>
@@ -50,19 +63,44 @@ function countSidebars() {
   return document.body.textContent?.match(/Che cos'è un ORM\?/g)?.length ?? 0;
 }
 
-function openButton(container: HTMLElement) {
-  return container.querySelector<HTMLButtonElement>("header button");
+function button(label: string, root: ParentNode = document.body) {
+  return [...root.querySelectorAll<HTMLButtonElement>("button")].find(
+    (candidate) => candidate.textContent === label,
+  );
 }
 
-/** The fake sidebar's second button, which is the one wired to `onCollapse`. */
-function collapseButton(container: HTMLElement) {
-  return container.querySelectorAll<HTMLButtonElement>("aside button")[1];
+function press(init: KeyboardEventInit) {
+  act(() => {
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, ...init }));
+  });
+}
+
+/** The shell asks `matchMedia` whether the column exists; these cases answer. */
+function atWidth(wide: boolean) {
+  const listen = () => {};
+  vi.spyOn(window, "matchMedia").mockImplementation(
+    (query) =>
+      ({
+        matches: wide,
+        media: query,
+        addEventListener: listen,
+        removeEventListener: listen,
+      }) as unknown as MediaQueryList,
+  );
+}
+
+async function settle() {
+  // Radix moves the focus, opening and closing, in a task of its own.
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }
 
 describe("the chat frame", () => {
-  // The collapsed state outlives a component on purpose, so it has to be
+  // The folded state outlives a component on purpose, so it has to be
   // cleared between cases or one of them decides what the next one sees.
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   it("shows its children without opening anything", () => {
     const { container, unmount } = shell();
@@ -85,84 +123,54 @@ describe("the chat frame", () => {
     expect(classes).toEqual(expect.arrayContaining(["hidden", "lg:block"]));
   });
 
-  it("opens the drawer when the sidebar button is pressed", () => {
+  it("opens the drawer from the button above the page, and closes it on arrival", () => {
     const { container, unmount } = shell();
-    const button = openButton(container);
-
-    expect(button).not.toBeNull();
     // The fixed column renders the sidebar too, so counting is what tells the
     // drawer apart from it: one copy closed, two open.
-    expect(countSidebars()).toBe(1);
-
-    act(() => button?.click());
-
-    expect(countSidebars()).toBe(2);
-
+    const before = countSidebars();
+    act(() => container.querySelector<HTMLButtonElement>("header button")?.click());
+    const open = countSidebars();
+    const drawer = document.body.querySelector('[role="dialog"]');
+    act(() => button("Che cos'è un ORM?", drawer ?? document.body)?.click());
+    const after = countSidebars();
     unmount();
+
+    expect([before, open, after]).toEqual([1, 2, 1]);
   });
 
-  it("closes the drawer when the reader navigates inside it", () => {
-    const { container, unmount } = shell();
-
-    act(() => openButton(container)?.click());
-    expect(countSidebars()).toBe(2);
-
-    // The drawer's own copy of the sidebar is the last one on the page.
-    const inside = document.body.querySelectorAll<HTMLButtonElement>("button");
-    act(() => inside[inside.length - 2]?.click());
-
-    expect(countSidebars()).toBe(1);
-
-    unmount();
-  });
-
-  it("closes the fixed column, and remembers that it is closed", () => {
+  it("folds into the rail, remembers it, and unfolds from the rail", () => {
     const first = shell();
-
-    expect(countSidebars()).toBe(1);
-    act(() => collapseButton(first.container)?.click());
-    expect(countSidebars()).toBe(0);
-
+    act(() => button("Chiudi la barra laterale")?.click());
+    const folded = [countSidebars(), Boolean(button("Apri la barra laterale"))];
     first.unmount();
 
     // A fresh mount, as if the page had been reloaded. The choice is about the
     // screen someone is sitting at, so it outlives the component.
     const second = shell();
-    expect(countSidebars()).toBe(0);
-
+    const reloaded = [countSidebars(), Boolean(button("Apri la barra laterale"))];
+    act(() => button("Apri la barra laterale")?.click());
+    const unfolded = countSidebars();
     second.unmount();
+
+    expect([folded, reloaded, unfolded]).toEqual([[0, true], [0, true], 1]);
   });
 
   it("gives the focus back to what opened a dialog once it closes", async () => {
     // Opened from state, as the account menu and the keys open them, so Radix
     // has no trigger of its own to return the focus to.
-    const { container, unmount } = mount(
-      <ThemeProvider>
-        <ChatShell
-          sidebar={({ onOpenSettings }) => (
-            <button type="button" onClick={onOpenSettings}>
-              Impostazioni…
-            </button>
-          )}
-        >
-          <p>Cosa vuoi sapere?</p>
-        </ChatShell>
-      </ThemeProvider>,
-    );
-    const opener = container.querySelector<HTMLButtonElement>("aside button");
+    const { unmount } = shell();
+    const opener = button("Impostazioni…");
     act(() => {
       opener?.focus();
       opener?.click();
     });
     const heading = document.body.querySelector('[role="dialog"] h2')?.textContent;
-    const close = document.body.querySelector<HTMLButtonElement>(
-      '[role="dialog"] button[aria-label="Chiudi"]',
+    act(() =>
+      document.body
+        .querySelector<HTMLButtonElement>('[role="dialog"] button[aria-label="Chiudi"]')
+        ?.click(),
     );
-    act(() => close?.click());
-    // Radix moves focus on closing in a task of its own.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await settle();
     const back = document.activeElement === opener;
     unmount();
 
@@ -170,18 +178,44 @@ describe("the chat frame", () => {
     expect(back).toBe(true);
   });
 
-  it("brings the column back from the button that replaces it", () => {
-    const { container, unmount } = shell();
+  it("starts a conversation, and opens the settings and the shortcuts, from the keys", () => {
+    const started = vi.fn();
+    const { unmount } = shell(started);
 
-    act(() => collapseButton(container)?.click());
-    expect(countSidebars()).toBe(0);
-
-    // With the column gone the header holds two buttons: the drawer's and this.
-    const headerButtons = container.querySelectorAll<HTMLButtonElement>("header button");
-    act(() => headerButtons[1]?.click());
-
-    expect(countSidebars()).toBe(1);
-
+    press({ key: "O", ctrlKey: true, shiftKey: true });
+    press({ key: ",", ctrlKey: true });
+    const settings = document.body.querySelector('[role="dialog"] h2')?.textContent;
+    press({ key: "?" });
+    const help = document.body.querySelector('[role="dialog"] h2')?.textContent;
     unmount();
+
+    expect(started).toHaveBeenCalledOnce();
+    expect([settings, help]).toEqual(["Impostazioni", "Aiuto e scorciatoie"]);
+  });
+
+  it("unfolds the rail for Ctrl K on a wide screen, and puts the focus in the search", () => {
+    atWidth(true);
+    const { unmount } = shell();
+    act(() => button("Chiudi la barra laterale")?.click());
+
+    press({ key: "k", ctrlKey: true });
+    const focused = document.activeElement?.getAttribute("aria-label");
+    const unfolded = countSidebars();
+    unmount();
+
+    expect([unfolded, focused]).toEqual([1, "Cerca (column)"]);
+  });
+
+  it("opens the drawer for Ctrl K on a phone, the focus in its search", async () => {
+    atWidth(false);
+    const { unmount } = shell();
+
+    press({ key: "k", ctrlKey: true });
+    await settle();
+    const focused = document.activeElement?.getAttribute("aria-label");
+    const drawer = Boolean(document.body.querySelector('[role="dialog"]'));
+    unmount();
+
+    expect([drawer, focused]).toEqual([true, "Cerca (drawer)"]);
   });
 });

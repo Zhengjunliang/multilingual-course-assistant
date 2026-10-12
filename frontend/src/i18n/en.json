@@ -18,10 +18,10 @@
     "haveAccount": "Already have an account?"
   },
   "sidebar": {
-    "title": "Your conversations",
+    "title": "Menu",
     "new": "New conversation",
     "untitled": "Untitled",
-    "open": "Open conversations",
+    "open": "Open the menu",
     "collapse": "Close the sidebar",
     "expand": "Open the sidebar",
     "unreadable": "That conversation is not available.",
@@ -37,7 +37,8 @@
     "noMatch": "No conversation matches.",
     "loading": "Loading conversations",
     "emptyTitle": "No conversations yet",
-    "emptyBody": "The questions you ask stay here, so you can come back to them."
+    "emptyBody": "The questions you ask stay here, so you can come back to them.",
+    "close": "Close the menu"
   },
   "account": {
     "menu": "Open the account menu",

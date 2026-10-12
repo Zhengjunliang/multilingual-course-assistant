@@ -44,6 +44,13 @@ import { shortcuts } from "@/features/chat/shortcuts";
 import { endonym, isUiLocale, languageCode, UI_LOCALES } from "@/i18n";
 
 interface AccountMenuProps {
+  /**
+   * The sidebar's row, with the menu above it, or the folded rail's avatar
+   * alone, with the same menu at its right.
+   */
+  variant?: "row" | "avatar";
+  /** In the narrow drawer, where the language opens in place rather than to the side. */
+  inline?: boolean;
   onOpenSettings: () => void;
   onOpenHelp: () => void;
 }
@@ -61,7 +68,15 @@ function Identity({ account }: { account: Account }) {
   );
 }
 
-export function AccountMenu({ onOpenSettings, onOpenHelp }: AccountMenuProps) {
+const ROW =
+  "flex w-full items-center gap-tight rounded-card border border-transparent p-hair text-left transition-colors hover:border-line hover:bg-surface hover:shadow-raised focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 data-[state=open]:border-line data-[state=open]:bg-surface data-[state=open]:shadow-raised";
+
+export function AccountMenu({
+  variant = "row",
+  inline = false,
+  onOpenSettings,
+  onOpenHelp,
+}: AccountMenuProps) {
   const { t, i18n } = useTranslation();
   const { account, logOut, chooseLocale } = useSession();
   const after = useRef<(() => void) | null>(null);
@@ -80,19 +95,29 @@ export function AccountMenu({ onOpenSettings, onOpenHelp }: AccountMenuProps) {
       ]
     : [];
 
+  const row = variant === "row";
   return (
     <DropdownMenu
       trigger={
-        <>
+        row ? (
+          <>
+            <Avatar name={account.username} />
+            <Identity account={account} />
+            <ChevronsUpDown aria-hidden className="size-icon shrink-0 text-muted" />
+          </>
+        ) : (
           <Avatar name={account.username} />
-          <Identity account={account} />
-          <ChevronsUpDown aria-hidden className="size-icon shrink-0 text-muted" />
-        </>
+        )
       }
-      triggerClassName="flex w-full items-center gap-tight rounded-card border border-transparent p-hair text-left transition-colors hover:border-line hover:bg-surface hover:shadow-raised focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 data-[state=open]:border-line data-[state=open]:bg-surface data-[state=open]:shadow-raised"
-      side="top"
-      align="start"
-      fitTrigger
+      // The row names itself with the name and the role it shows; the avatar
+      // alone shows only initials, so it carries a name of its own.
+      ariaLabel={row ? undefined : t("account.menu")}
+      hint={row ? undefined : t("account.menu")}
+      triggerClassName={row ? ROW : undefined}
+      side={row ? "top" : "right"}
+      align={row ? "start" : "end"}
+      fitTrigger={row}
+      inline={inline}
       head={
         <span className="flex items-center gap-tight">
           <Avatar name={account.username} />

@@ -29,6 +29,7 @@ import { Breadcrumb, type Crumb } from "@/components/ui/breadcrumb";
 import { Toaster } from "@/components/ui/sonner";
 import { ChatShell, type SidebarControls } from "@/features/chat/ChatShell";
 import { ConversationSidebar } from "@/features/chat/ConversationSidebar";
+import { SidebarRail } from "@/features/chat/SidebarRail";
 import { isSessionLost } from "@/features/staff/errors";
 import { managementItems } from "@/features/staff/landing";
 import { ManagementNav } from "@/features/staff/ManagementNav";
@@ -150,25 +151,27 @@ export default function ShellLayout() {
     [programmes, items, homeLabel, refreshConversations],
   );
 
-  const sidebar = ({ onNavigate, onCollapse, onOpenSettings, onOpenHelp }: SidebarControls) => (
+  const sidebar = (controls: SidebarControls) => (
     <ConversationSidebar
       conversations={conversations}
       busy={busy}
       onDelete={onDelete}
-      onNavigate={onNavigate}
-      onCollapse={onCollapse}
-      onOpenSettings={onOpenSettings}
-      onOpenHelp={onOpenHelp}
+      controls={controls}
       management={
-        items.length > 0 ? <ManagementNav items={items} onNavigate={onNavigate} /> : undefined
+        items.length > 0 ? (
+          <ManagementNav items={items} onNavigate={controls.onNavigate} />
+        ) : undefined
       }
     />
   );
+  const rail = (controls: SidebarControls) => <SidebarRail controls={controls} items={items} />;
 
   return (
     <ShellContext value={shell}>
       <ChatShell
         sidebar={sidebar}
+        rail={rail}
+        onNewConversation={() => void navigate("/")}
         leading={
           crumbs.length > 0 ? <Breadcrumb label={t("staff.breadcrumb")} crumbs={crumbs} /> : null
         }

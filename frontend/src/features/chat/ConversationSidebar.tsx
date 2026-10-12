@@ -14,7 +14,9 @@
  * action among places (DESIGN.md, "Shapes"), and its hint gives its key. The
  * search filters the titles already loaded, in the browser; it has no
  * request of its own. The collapse button shows while the pointer or the
- * focus is in the sidebar, always on a touch screen.
+ * focus is in the sidebar, always on a touch screen; in the drawer the same
+ * place holds the drawer's close button, and the account menu opens its
+ * languages in place, since a submenu would open past a phone's edge.
  *
  * One scroller holds the Gestione group and the conversations, as the
  * prototype has it: a long list scrolls the Gestione items away rather than
@@ -24,7 +26,7 @@
  * about what it holds.
  */
 
-import { PanelLeft, SquarePen } from "lucide-react";
+import { PanelLeft, SquarePen, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -37,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { SidebarControls } from "./ChatShell";
 import { ConversationList } from "./ConversationList";
 import { SIDEBAR_ROW } from "./rows";
 import { shortcuts } from "./shortcuts";
@@ -57,13 +60,8 @@ interface ConversationSidebarProps {
    * conversation is its job, not this one's.
    */
   onDelete: (id: number) => Promise<boolean>;
-  /** Called after navigation so the narrow-screen drawer can close itself. */
-  onNavigate?: () => void;
-  /** Closes the wide-screen column. Absent on narrow screens, where the drawer wins. */
-  onCollapse?: () => void;
-  /** The shell's dialogs, which the account menu opens (ChatShell.tsx). */
-  onOpenSettings: () => void;
-  onOpenHelp: () => void;
+  /** Which mount this is, and what the shell lets it do (ChatShell.tsx). */
+  controls: SidebarControls;
   /**
    * The staff pages the account may open (features/staff/ManagementNav.tsx),
    * above the conversations.
@@ -75,12 +73,10 @@ export function ConversationSidebar({
   conversations,
   busy,
   onDelete,
-  onNavigate,
-  onCollapse,
-  onOpenSettings,
-  onOpenHelp,
+  controls,
   management,
 }: ConversationSidebarProps) {
+  const { placement, onNavigate } = controls;
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const newConversation = useRef<HTMLAnchorElement>(null);
@@ -91,15 +87,24 @@ export function ConversationSidebar({
       <div className="flex min-h-control items-center gap-tight">
         <MascotMark className="size-control-icon" />
         <p className="min-w-0 flex-1 truncate font-semibold text-ink text-title">{APP_NAME}</p>
-        {/* Only from `lg` up: below that the sidebar is a drawer, and a drawer
-            already closes by tapping outside it or pressing Escape. */}
-        {onCollapse !== undefined && (
+        {placement === "drawer" ? (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="hidden shrink-0 transition-opacity lg:inline-flex pointer-fine:opacity-0 pointer-fine:focus-visible:opacity-100 pointer-fine:group-focus-within/sidebar:opacity-100 pointer-fine:group-hover/sidebar:opacity-100"
-            onClick={onCollapse}
+            className="shrink-0"
+            onClick={controls.onClose}
+            aria-label={t("sidebar.close")}
+          >
+            <X aria-hidden className="size-icon-lg" />
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 transition-opacity pointer-fine:opacity-0 pointer-fine:focus-visible:opacity-100 pointer-fine:group-focus-within/sidebar:opacity-100 pointer-fine:group-hover/sidebar:opacity-100"
+            onClick={controls.onCollapse}
             aria-label={t("sidebar.collapse")}
           >
             <PanelLeft aria-hidden className="size-icon-lg" />
@@ -120,6 +125,7 @@ export function ConversationSidebar({
       </Tooltip>
 
       <SearchField
+        ref={controls.searchRef}
         label={t("sidebar.search")}
         placeholder={t("sidebar.search")}
         shortcut={keys.search}
@@ -141,7 +147,11 @@ export function ConversationSidebar({
       </div>
 
       <div className="border-line border-t pt-tight">
-        <AccountMenu onOpenSettings={onOpenSettings} onOpenHelp={onOpenHelp} />
+        <AccountMenu
+          inline={placement === "drawer"}
+          onOpenSettings={controls.onOpenSettings}
+          onOpenHelp={controls.onOpenHelp}
+        />
       </div>
     </div>
   );
