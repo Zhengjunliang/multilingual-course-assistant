@@ -46,7 +46,7 @@ describe("the component catalogue", () => {
     // `components/`, and #190 changed them with the rest, so they are named
     // here by hand.
     const html = page();
-    const missing = ["LineField", "PasswordField", "StatusPanel"].filter(
+    const missing = ["LineField", "PasswordField", "StatusPanel", "AppCrash"].filter(
       (name) => !html.includes(name),
     );
 

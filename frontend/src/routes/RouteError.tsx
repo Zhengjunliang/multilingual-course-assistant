@@ -27,7 +27,7 @@ export default function RouteError({ full = false }: { full?: boolean }) {
           : "flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-gutter py-room"
       }
     >
-      <StatusPanel pose="error" heading={t("crash.title")} body={t("crash.body")} alert>
+      <StatusPanel pose="error" tone="warn" heading={t("crash.title")} body={t("crash.body")} alert>
         <Button type="button" onClick={() => window.location.reload()}>
           <RotateCw aria-hidden className="size-icon" />
           {t("crash.reload")}

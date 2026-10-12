@@ -12,8 +12,8 @@
  *
  * Two limits. The critical path may not grow by more than a tenth over what it
  * weighed on 12 October 2026: a ratchet against drift, not a target. It was
- * last measured anew for the room behind the entry and the cat's jump to it
- * (#183), which took it past a tenth over the 9 October figure. The scripts
+ * last measured anew when the headings moved to Figtree and Fraunces, the
+ * largest font the first screen fetched, left it (#190). The scripts
  * may not pass 300 KiB, Alex Russell's figure for a page that loads in three
  * seconds on the 75th-percentile phone and network ("The Performance Inequality
  * Gap 2026", outside the repository). web.dev's 170 KB for the critical path
@@ -32,8 +32,8 @@ const BUILD = fileURLToPath(new URL("../dist-e2e/", import.meta.url));
 const COUNTED = new Set(["document", "stylesheet", "script", "font"]);
 const LAZY = /\/assets\/MathMarkdown-/;
 
-/** 12 October 2026: page 390, stylesheet 8 710, script 230 546, fonts 87 394. */
-const MEASURED_CRITICAL_PATH = 327_040;
+/** 12 October 2026, #190: page 385, stylesheet 9 294, script 239 264, fonts 20 085. */
+const MEASURED_CRITICAL_PATH = 269_028;
 const CRITICAL_PATH_LIMIT = Math.round(MEASURED_CRITICAL_PATH * 1.1);
 const SCRIPT_LIMIT = 300 * 1024;
 

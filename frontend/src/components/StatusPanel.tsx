@@ -1,12 +1,20 @@
 /**
  * What a screen shows when it has nothing of its own to show: the address
- * names no page, or the page broke while it was drawn. The cat in the pose
- * for it, a heading, one sentence, and the ways on.
+ * names no page, or the page broke while it was drawn. One centred panel
+ * (#190): the cat in the pose for it, in a tinted disc, the warning's when
+ * something broke; a chip with the code, where there is one (404); a
+ * heading, one sentence, and a primary and a secondary way on. A page that
+ * broke may fold the error's technical details under them, for whoever
+ * reports it, closed until asked for.
  *
  * One panel for every such screen, so a reader meets one face and one tone
  * whichever went wrong (DESIGN.md, "Components"). It holds no state and reads
  * no provider, so the outermost crash screen (AppCrash.tsx), drawn when a
- * provider itself has failed, can use it too.
+ * provider itself has failed, can use it too; that is also why the details'
+ * label is the caller's.
+ *
+ * The cat stays in the accent's line on the warning's disc: its colours are
+ * fixed (frontend/brand/README.md), the ground behind it is not.
  *
  * `alert` turns the words into a live region. An error replaces the page the
  * reader was looking at, and a screen reader must say that it did; a page
@@ -17,26 +25,62 @@ import type { ReactNode } from "react";
 
 import type { Pose } from "@/brand/fumetto";
 import { Mascot } from "@/components/Mascot";
+import { Chip } from "@/components/ui/chip";
+import { cn } from "@/lib/utils";
 
 interface StatusPanelProps {
   pose: Pose;
   heading: string;
   body: string;
+  /** A status code shown on a chip, such as "404". */
+  code?: string;
+  /** `warn` when something broke. */
+  tone?: "accent" | "warn";
+  /** The error, folded under a summary the caller names. */
+  details?: { label: string; text: string };
   /** Announces the words as they appear, for an error that replaced a page. */
   alert?: boolean;
-  /** The ways on, as links or buttons. */
+  /** The ways on, as links or buttons, the primary first. */
   children: ReactNode;
 }
 
-export function StatusPanel({ pose, heading, body, alert = false, children }: StatusPanelProps) {
+export function StatusPanel({
+  pose,
+  heading,
+  body,
+  code,
+  tone = "accent",
+  details,
+  alert = false,
+  children,
+}: StatusPanelProps) {
   return (
-    <div data-status-panel className="flex flex-col items-center gap-room text-center">
-      <Mascot pose={pose} className="size-mascot" />
-      <div role={alert ? "alert" : undefined} className="flex max-w-sm flex-col gap-hair">
+    <div
+      data-status-panel
+      className="flex w-full max-w-md flex-col items-center gap-snug rounded-card border border-line bg-surface p-room text-center shadow-raised"
+    >
+      <span
+        className={cn(
+          "grid size-mascot place-items-center rounded-full p-gutter ring-1 ring-inset",
+          tone === "warn" ? "bg-warn ring-warn-line" : "bg-accent-soft ring-accent-line",
+        )}
+      >
+        <Mascot pose={pose} className="size-full" />
+      </span>
+      {code !== undefined && <Chip>{code}</Chip>}
+      <div role={alert ? "alert" : undefined} className="flex flex-col gap-hair">
         <h1 className="font-semibold text-display text-ink">{heading}</h1>
         <p className="text-body text-muted">{body}</p>
       </div>
-      <div className="flex flex-wrap justify-center gap-tight">{children}</div>
+      <div className="mt-tight flex flex-wrap justify-center gap-tight">{children}</div>
+      {details !== undefined && (
+        <details className="w-full rounded-control border border-line border-dashed px-snug py-tight text-left text-caption text-muted">
+          <summary className="cursor-pointer">{details.label}</summary>
+          <pre className="mt-tight overflow-x-auto whitespace-pre-wrap font-mono text-caption text-ink">
+            {details.text}
+          </pre>
+        </details>
+      )}
     </div>
   );
 }

@@ -147,6 +147,12 @@ export const PAIRS = [
   },
   {
     front: "accent",
+    back: "warn",
+    min: TEXT,
+    where: "StatusPanel.tsx the cat on the warning's disc",
+  },
+  {
+    front: "accent",
     back: "tint",
     min: TEXT,
     where: "hover-card.tsx an icon in its head (routes/styleguide/overlays.tsx)",
@@ -278,7 +284,7 @@ export function parseOklch(value, name) {
 }
 
 /** OKLCH -> linear sRGB, via OKLab and the LMS cone responses. */
-export function linearRgb({ l, c, h }) {
+function linearRgb({ l, c, h }) {
   const radians = (h * Math.PI) / 180;
   const a = c * Math.cos(radians);
   const b = c * Math.sin(radians);

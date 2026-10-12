@@ -152,6 +152,9 @@ components:
   muted-on-warn:
     backgroundColor: '{colors.warn}'
     textColor: '{colors.muted}'
+  accent-on-warn:
+    backgroundColor: '{colors.warn}'
+    textColor: '{colors.accent}'
   accent-on-tint:
     backgroundColor: '{colors.tint}'
     textColor: '{colors.accent}'
@@ -245,6 +248,9 @@ components:
   muted-on-warn-dark:
     backgroundColor: '{colors.warn-dark}'
     textColor: '{colors.muted-dark}'
+  accent-on-warn-dark:
+    backgroundColor: '{colors.warn-dark}'
+    textColor: '{colors.accent-dark}'
   accent-on-tint-dark:
     backgroundColor: '{colors.tint-dark}'
     textColor: '{colors.accent-dark}'
@@ -346,9 +352,21 @@ Icons come from Lucide, at `size-icon` beside text and `size-icon-lg` standing a
 
 The primitives live in `frontend/src/components/ui/`, in the shadcn manner (Radix underneath, variants through `cva`), each exported from one file; `/styleguide` shows every one of them in both themes side by side, and its test fails on a primitive it does not show. Screens compose primitives and do not restyle them. A link that looks like a button uses `buttonVariants`. Bare text that can be pressed, the language menu in the visitor's header or the intro's Skip, shows `hover-sketch` on hover: a one-pixel ink ring turned two degrees, as if drawn round it by hand.
 
+Every component follows five rules (#190):
+
+1. **Two levels.** What matters is in `ink` at its weight; what supports it is `text-caption` in `muted` on a second line: a conversation is its title and time over its source, a table cell a name over its code, a person a name over a username, a dialog its action over its object.
+2. **Labels have a fill.** Data on a label is a `Chip`, a tint edged by a hairline: `accent` for the current state, a role or a source; neutral for a code, a kind or a language; `warn` for a failure. A quantity is a `Count`. `Badge` stays for a marker, a word that points at something rather than data about it.
+3. **Interaction is in the accent.** What is under the pointer takes `hover`, where the reader is takes `selected` with a 3 px bar, a control in focus a 2 px ring in `accent`, and a field its accent edge and a 3 px ring of `selected`. A setting that is true stays out of the accent: a chosen toggle is raised in ink. The citation pill keeps its fill (Colors).
+4. **Separation is visible.** One pixel between groups; a panel's head and foot on `tint` behind a `hairline`; lists, tables and dialogs are panels with a 1 px border and `rounded-card` corners, never whitespace alone.
+5. **Numbers and keys show.** Group titles and tabs carry a `Count`; menu items and a form dialog's primary button show their key on a `Kbd`, named in `aria-keyshortcuts`; a search field shows its key; what is on its way shows a `Spinner` or a `Skeleton`, both motionless under reduced motion.
+
+The layer holds `Button` (primary, soft, outline, ghost and warn; 28, 32 and 40 px; `pending` and `shortcut`), `Kbd`, `Chip`, `Count`, `StatusDot`, `Spinner`, `Skeleton`, `Avatar` and `AvatarStack`, `Field`, `SearchField` and `FieldError`, `ToggleGroup`, `Tabs`, `Card` with `CardHeader` and `CardFooter`, `Banner`, `Empty`, `Table`, `Breadcrumb` and `Badge`, and the overlays below; each file's opening comment says how it is used.
+
 A hint is a `Tooltip`, the inverse of the page (canvas lettering on ink), opened by a resting pointer or by keyboard focus and closed by Escape; the browser's `title` attribute is never one, and a lint rule refuses it at commit time (`frontend/biome-plugins/no-title-attribute.grit`). A component's own prop for its heading is `heading`, never `title`; an element that truly needs the attribute, such as an iframe named by it, carries a suppression with its reason. A touch screen cannot open a hint, so a hint only repeats what the visible text or the accessible name says, as the copy button's hint repeats its name.
 
-A `HoverCard` previews where a link goes: a card's surface, opened by a pointer resting on the link or by keyboard focus, closed by Escape or by leaving. Radix keeps it out of the tab order, so it never holds anything that is not reachable elsewhere, and a touch follows the link.
+A `HoverCard` previews where a link goes: a card's surface, opened by a pointer resting on the link or by keyboard focus, closed by Escape or by leaving. Radix keeps it out of the tab order, so it never holds anything that is not reachable elsewhere, and a touch follows the link. It may carry a head on `tint` saying what the link points at, and its actions as soft buttons under the body.
+
+A `Dialog` is 440 px wide: a head with the action's icon in a disc, its title and the object it acts on; a body; and a foot on `tint` holding the buttons, the primary last. A dialog that is a form is one form, so Enter sends it, and its primary button shows Enter. An `AlertDialog` is drawn the same way and opens on Cancel, so it shows no Enter; its disc and its confirming button take `warn` only when something is destroyed, and its sentence names its objects as chips. A `DropdownMenu` has a head, sections with a label where they need one, 32 px items with their key at the right, rules from edge to edge, and a choice, such as the language, as a submenu showing its current value. A toast is the page's inverse, like a hint: an icon in a disc and two lines, what happened over what it happened to; a failure has the warning's disc and a way to try again.
 
 An answer is drawn in one order (`features/chat/TurnView.tsx`), after ChatGPT and Open WebUI, with Perplexity's process line (read 11 October 2026):
 
@@ -376,7 +394,7 @@ Where a screen greets, the entry and the sign-in and registration screens, Fumet
 
 A pose appears only where words beside it say what it means. Colours, sizes, clear space and what the mark may never be combined with are in [frontend/brand/README.md](frontend/brand/README.md).
 
-A screen with nothing of its own to show is one panel, `components/StatusPanel.tsx`: the pose at `size-mascot`, a heading, one sentence and the ways on. An address that names no page shows it with the way to the start; a page that broke while drawing shows it with a reload first and the start second, its words a live region, inside the frame when only the page broke and over the window when the frame did. No screen of this kind is drawn another way, and none is blank.
+A screen with nothing of its own to show is one centred panel on `surface`, `components/StatusPanel.tsx`: the pose in a disc of `accent-soft`, of `warn` when something broke, the cat keeping its blue; a chip with the code where there is one; a heading, one sentence, and a primary and a secondary way on. An address that names no page shows it with its 404 and the way to the start; a page that broke while drawing shows it with a reload first and the start second, its words a live region, inside the frame when only the page broke and over the window when the frame did, where the error's technical details are folded under the ways on. No screen of this kind is drawn another way, and none is blank.
 
 ## Do's and Don'ts
 
