@@ -1,6 +1,10 @@
 /**
  * axe finds nothing on any screen, in either theme (#134), nor with a source
- * card open over a pill, nor with an answer's sources open.
+ * card open over a pill, nor with an answer's sources open; nor, in the shell
+ * (#191), with the account menu and its languages open, with the sidebar
+ * folded into its rail, or with the drawer open on a phone, where nothing
+ * scrolls sideways either. Escape closes those layers one at a time, which
+ * jsdom cannot show: its Radix layers stack in another order.
  *
  * WCAG 2.2 at level AA, by axe's tags for the A and AA criteria of 2.0, 2.1
  * and 2.2. The theme follows the system unless the reader picks one, so
@@ -15,8 +19,8 @@ import type { Page } from "@playwright/test";
 
 import it from "../src/i18n/it.json" with { type: "json" };
 import { expect, test } from "./api";
-import { CONVERSATION } from "./fixtures";
-import { SCREENS, visit } from "./screens";
+import { CONVERSATION, STUDENT } from "./fixtures";
+import { SCREENS, type Screen, visit } from "./screens";
 
 const WCAG_22_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
@@ -108,12 +112,18 @@ function floatingContrast(page: Page, selector: string): Promise<number[]> {
   }, selector);
 }
 
-/** The stored conversation, the one screen with an answer and its sources. */
-function stored() {
-  const screen = SCREENS.find(({ path }) => path === `/c/${CONVERSATION.id}`);
-  if (screen === undefined) throw new Error("the stored conversation is not a screen");
-  return screen;
+function screen(path: string, as: Screen["as"]): Screen {
+  const found = SCREENS.find((candidate) => candidate.path === path && candidate.as === as);
+  if (found === undefined) throw new Error(`${path} as a ${as} is not a screen`);
+  return found;
 }
+
+/** The stored conversation, the one screen with an answer and its sources. */
+const stored = () => screen(`/c/${CONVERSATION.id}`, "student");
+
+/** The account row at the sidebar's foot, named by the name and the role it shows. */
+const accountRow = (page: Page) =>
+  page.getByRole("button", { name: `${STUDENT.username} ${it.account.role.student}` });
 
 for (const colorScheme of ["light", "dark"] as const) {
   test.describe(`${colorScheme} theme`, () => {
@@ -140,5 +150,55 @@ for (const colorScheme of ["light", "dark"] as const) {
       await expect(page.getByRole("dialog", { name: it.sources.title })).toBeVisible();
       expect(await violations(page)).toEqual([]);
     });
+
+    test("the account menu and its languages open: axe finds nothing", async ({ page, api }) => {
+      await visit(page, api, screen("/", "student"));
+      await accountRow(page).click();
+      await page
+        .getByRole("menuitem", { name: new RegExp(`^${it.account.language}`) })
+        .press("ArrowRight");
+      await expect(page.getByRole("menuitemradio")).toHaveCount(3);
+      expect(await violations(page)).toEqual([]);
+    });
+
+    test("the sidebar folded into its rail: axe finds nothing", async ({ page, api }) => {
+      await page.addInitScript(() => localStorage.setItem("mca.sidebar", "closed"));
+      await visit(page, api, screen("/staff/programmes", "staff"));
+      await expect(page.getByRole("button", { name: it.sidebar.expand })).toBeVisible();
+      expect(await violations(page)).toEqual([]);
+    });
+
+    test("the drawer open on a phone: axe finds nothing, nothing scrolls sideways", async ({
+      page,
+      api,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await visit(page, api, screen("/", "student"));
+      await page.getByRole("button", { name: it.sidebar.open }).click();
+      await expect(page.getByRole("dialog", { name: it.sidebar.title })).toBeVisible();
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      expect(width, "the page's width at 375 px").toBeLessThanOrEqual(375);
+      expect(await violations(page)).toEqual([]);
+    });
   });
 }
+
+test("Escape closes the language submenu, then the menu, each handing the focus back", async ({
+  page,
+  api,
+}) => {
+  await visit(page, api, screen("/", "student"));
+  const row = accountRow(page);
+  await row.click();
+  const language = page.getByRole("menuitem", { name: new RegExp(`^${it.account.language}`) });
+  await language.press("ArrowRight");
+  await expect(page.getByRole("menu")).toHaveCount(2);
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(1);
+  await expect(language).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(row).toBeFocused();
+});

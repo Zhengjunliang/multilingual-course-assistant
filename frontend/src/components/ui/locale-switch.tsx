@@ -69,7 +69,8 @@ export function LocaleSwitch<T extends string>({
 }: LocaleSwitchProps<T>) {
   const hintId = useId();
   return (
-    <RadixMenu.Root>
+    // Not modal, for the reason dropdown-menu.tsx gives.
+    <RadixMenu.Root modal={false}>
       <RadixMenu.Trigger asChild>
         <Button type="button" variant="ghost" size="sm" className={cn("gap-hair", className)}>
           <Globe aria-hidden className="size-icon" />
