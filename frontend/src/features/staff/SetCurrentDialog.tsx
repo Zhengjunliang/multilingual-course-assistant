@@ -1,25 +1,29 @@
 /**
- * The question before switching a course's current edition, naming the
- * edition that becomes current and the one that stops being, as GitHub names
- * the old and new default branch and Vercel the deployment it promotes (outside
- * the repository: their documentation). Not destructive — switching back undoes
- * it — so the confirming button is the default ink.
+ * The question before switching a course's current edition, as a preview of
+ * the change: one row per academic year it touches, newest first, its state
+ * before and after as chips, the edition that becomes current and the one
+ * that stops being, as GitHub shows the old and new default branch and
+ * Vercel the deployment it promotes (outside the repository: their
+ * documentation); the rule behind it is the hint under them. Not
+ * destructive — switching back undoes it — so the confirming button is the
+ * accent's.
  *
  * The page offers the switch only where `can_set_current` holds, so the
  * edition it replaces is one the caller sees, or there is none. A refusal the
- * server gives anyway stays in the dialog with the button off: the switch's
- * own, `switch_needs_both`, when the edition being replaced is out of the
- * caller's reach; a missing permission; or a 404, which closes the dialog and
- * reads the page again.
+ * server gives anyway stays in the dialog, the button left on to ask again:
+ * the switch's own, `switch_needs_both`, when the edition being replaced is
+ * out of the caller's reach; a missing permission; or a 404, which closes the
+ * dialog and reads the page again.
  */
 
-import { CalendarCheck } from "lucide-react";
+import { ArrowRight, CalendarCheck } from "lucide-react";
 import { useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { type Edition, setCurrent } from "@/api/catalog";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import { Chip } from "@/components/ui/chip";
 import { useFailure } from "./context";
 import { isForbidden, isNotFound } from "./errors";
 import { Forbidden } from "./Refusal";
@@ -50,6 +54,7 @@ export function SetCurrentDialog({
 
   const confirm = async () => {
     if (edition === null) return false;
+    setRefusal(null);
     try {
       await setCurrent(edition.id);
     } catch (error) {
@@ -69,8 +74,19 @@ export function SetCurrentDialog({
     return true;
   };
 
-  // Asking again would only be refused again: the button stays off until the dialog reopens.
-  const blocked = refusal !== null;
+  // The years the switch touches, newest first, each with its state before it.
+  const rows =
+    edition === null
+      ? []
+      : [
+          { year: edition.academic_year, before: false },
+          ...(replaced === null ? [] : [{ year: replaced.academic_year, before: true }]),
+        ].sort((a, b) => b.year.localeCompare(a.year));
+  const state = (current: boolean) => (
+    <Chip tone={current ? "accent" : "neutral"}>
+      {current ? t("staff.current") : t("staff.past")}
+    </Chip>
+  );
   return (
     <AlertDialog
       open={edition !== null}
@@ -81,30 +97,28 @@ export function SetCurrentDialog({
       }}
       heading={t("staff.setCurrent.title")}
       icon={CalendarCheck}
-      description={edition?.course.name ?? ""}
+      description={edition === null ? "" : `${edition.course.name} · ${edition.course.code}`}
       cancelLabel={t("staff.cancel")}
       confirmLabel={t("staff.setCurrent.action")}
       onConfirm={confirm}
-      confirmDisabled={blocked}
       onCloseAutoFocus={onCloseAutoFocus}
     >
       {edition !== null && (
-        <div className="flex flex-col gap-hair text-body text-ink">
-          <p>
-            {replaced === null ? (
-              <Trans
-                i18nKey="staff.setCurrent.becomes"
-                values={{ year: edition.academic_year }}
-                components={{ b: <strong /> }}
-              />
-            ) : (
-              <Trans
-                i18nKey="staff.setCurrent.switch"
-                values={{ old: replaced.academic_year, new: edition.academic_year }}
-                components={{ b: <strong /> }}
-              />
-            )}
-          </p>
+        <div className="flex flex-col gap-tight">
+          <ul aria-label={t("staff.setCurrent.preview")} className="flex flex-col gap-tight">
+            {rows.map((row) => (
+              <li
+                key={row.year}
+                className="flex flex-wrap items-center gap-tight rounded-control border border-line px-snug py-tight text-body text-ink tabular-nums"
+              >
+                <span className="min-w-0 flex-1 font-semibold">{row.year}</span>
+                {state(row.before)}
+                <ArrowRight aria-hidden className="size-icon text-muted" />
+                <span className="sr-only">{t("staff.setCurrent.to")}</span>
+                {state(!row.before)}
+              </li>
+            ))}
+          </ul>
           <p className="text-caption text-muted">{t("staff.setCurrent.caption")}</p>
         </div>
       )}

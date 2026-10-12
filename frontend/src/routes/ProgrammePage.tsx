@@ -13,7 +13,7 @@
 
 import { Lock } from "lucide-react";
 import { useCallback } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 
 import { listStudyPlan, readProgramme } from "@/api/catalog";
@@ -24,7 +24,7 @@ import { useMembers } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { isNotFound } from "@/features/staff/errors";
 import { Code, PageHead } from "@/features/staff/page";
-import { StaffList } from "@/features/staff/people";
+import { StaffList, shownName } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { StudyPlanTable } from "@/features/staff/StudyPlanTable";
 import { rowCount, studyPlan } from "@/features/staff/studyPlan";
@@ -44,8 +44,13 @@ export default function ProgrammePage() {
     object: programme?.code ?? code,
     description: programme === null ? code : `${programme.name} · ${programme.code}`,
     canManage: assigns,
-    sentence: (username) =>
-      t("staff.revoke.secretariat", { username, programme: programme?.name ?? code }),
+    sentence: (person) => (
+      <Trans
+        i18nKey="staff.revoke.secretariat"
+        values={{ username: shownName(person), programme: programme?.name ?? code }}
+        components={{ person: <Chip />, programme: <Chip /> }}
+      />
+    ),
     reload: page.reload,
   });
   useCrumbs(

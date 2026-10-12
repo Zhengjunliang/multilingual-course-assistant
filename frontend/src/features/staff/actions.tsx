@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import type { Edition, MemberScope, StaffMember } from "@/api/catalog";
 import { Button } from "@/components/ui/button";
 import { AssignDialog } from "./AssignDialog";
+import { shownName } from "./people";
 import { RevokeDialog, type Revoking } from "./RevokeDialog";
 import { SetCurrentDialog } from "./SetCurrentDialog";
 
@@ -45,8 +46,8 @@ interface MembersOptions {
   /** The same, as the assign dialog names it under its title. */
   description: string;
   canManage: boolean;
-  /** The revoke question's body for `username`. */
-  sentence: (username: string) => string;
+  /** The revoke question's body for `person`, its objects as chips. */
+  sentence: (person: StaffMember) => ReactNode;
   reload: () => Promise<boolean>;
 }
 
@@ -96,14 +97,15 @@ export function useMembers({
           variant="ghost"
           size="sm"
           data-revoke
-          aria-label={t("staff.revoke.actionLabel", { username: person.username })}
+          aria-label={t("staff.revoke.actionLabel", { username: shownName(person) })}
           onClick={(event) => {
             last.current = { trigger: event.currentTarget, index: people.indexOf(person) };
             setRevoking({
               scope,
               username: person.username,
+              shown: shownName(person),
               object,
-              sentence: sentence(person.username),
+              sentence: sentence(person),
             });
           }}
         >

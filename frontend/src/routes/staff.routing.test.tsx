@@ -849,7 +849,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
     showTab(container, "Segreteria didattica");
     act(() =>
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="Revoca demo-secretariat"]')
+        .querySelector<HTMLButtonElement>('button[aria-label="Revoca Giulia Neri"]')
         ?.click(),
     );
     const confirm = [
@@ -1018,7 +1018,7 @@ describe("a write from a page", () => {
     showTab(container, "Segreteria didattica");
     act(() =>
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="Revoca demo-secretariat"]')
+        .querySelector<HTMLButtonElement>('button[aria-label="Revoca Giulia Neri"]')
         ?.click(),
     );
     const confirm = [

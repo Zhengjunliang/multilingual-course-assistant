@@ -148,8 +148,8 @@
       "title": "Make it current?",
       "done": "Current edition updated",
       "action": "Make current",
-      "becomes": "<b>{{year}}</b> becomes the current edition.",
-      "switch": "The current edition moves from <b>{{old}}</b> to <b>{{new}}</b>.",
+      "to": "becomes",
+      "preview": "What changes",
       "caption": "A course has at most one current edition."
     },
     "programmes": {
@@ -262,8 +262,8 @@
       "action": "Revoke",
       "actionLabel": "Revoke {{username}}",
       "title": "Revoke the role?",
-      "teacher": "{{username}} will no longer teach {{course}}, edition {{year}}.",
-      "secretariat": "{{username}} will no longer be part of the teaching secretariat of {{programme}}.",
+      "teacher": "<person>{{username}}</person> will no longer teach <course>{{course}}</course>, edition <year>{{year}}</year>.",
+      "secretariat": "<person>{{username}}</person> will no longer be part of the teaching secretariat of <programme>{{programme}}</programme>.",
       "done": "Role revoked",
       "gone": "{{username}} no longer held this role: it had been revoked elsewhere."
     },

@@ -3,14 +3,20 @@
  * the username the person signs in with: there is no user search, so the one
  * field takes the exact name, and Enter submits it.
  *
+ * Its head names the object, the course and its year or the programme, and
+ * its button shows its key and, while the request is on its way, its
+ * spinner. The button is never off to say why it cannot act (DESIGN.md, Do's
+ * and Don'ts): an empty name is refused under the field when it is pressed,
+ * and a missing permission is said under the field too, pressing again
+ * asking the server again, which is the one that knows.
+ *
  * The dialog stays open while the request runs and after a refusal. A refusal
  * of the name — no such user, already holding the role here — is shown at the
- * field. A missing permission is shown in the dialog, with the button off.
- * After any of them the field takes focus back: the button was off while the
- * request ran, and a browser drops the focus of a button that turns off to
- * the page, outside the dialog. A 404 means the scope left the caller's reach since
- * the page was read: the dialog closes and the page reads again, and says
- * "not found" if that is what it is now.
+ * field. After any refusal the field takes focus back: the button was off
+ * while the request ran, and a browser drops the focus of a button that turns
+ * off to the page, outside the dialog. A 404 means the scope left the
+ * caller's reach since the page was read: the dialog closes and the page
+ * reads again, and says "not found" if that is what it is now.
  */
 
 import { UserPlus } from "lucide-react";
@@ -24,6 +30,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { useFailure } from "./context";
 import { fieldErrorKey, grantPermission, isForbidden, isNotFound } from "./errors";
+import { shownName } from "./people";
 import { Forbidden } from "./Refusal";
 
 interface AssignDialogProps {
@@ -69,15 +76,21 @@ export function AssignDialog({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const name = username.trim();
-    if (scope === null || name === "" || running || forbidden) return;
+    if (scope === null || running) return;
+    if (name === "") {
+      setFieldError(t("staff.error.required"));
+      input.current?.focus();
+      return;
+    }
     setRunning(true);
     setFieldError(null);
+    setForbidden(false);
     setRefusal(null);
     try {
       const member = await addMember(scope, name);
       await onChanged();
       toast.success(t(teacher ? "staff.assign.doneTeacher" : "staff.assign.doneSecretariat"), {
-        description: `${member.username} · ${object}`,
+        description: `${shownName(member)} · ${object}`,
       });
       close();
     } catch (error) {
@@ -116,7 +129,6 @@ export function AssignDialog({
           <Button
             type="submit"
             pending={running}
-            disabled={forbidden || username.trim() === ""}
             shortcut={{ keys: "Enter", label: t("keys.enter") }}
           >
             {running ? t("staff.assign.running") : t("staff.assign.submit")}

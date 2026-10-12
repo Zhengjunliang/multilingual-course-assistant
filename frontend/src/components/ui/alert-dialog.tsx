@@ -11,7 +11,8 @@
  *
  * The confirming button is a plain `Button`, not Radix's `Action`, which would
  * close the dialog on click. Here it closes only when `onConfirm` resolves to
- * true, so a refusal is shown inside the dialog that asked, and while
+ * true, so a refusal is shown inside the dialog that asked, the button left
+ * on to ask again (DESIGN.md: a control is never disabled to say why), and while
  * `onConfirm` runs neither Escape nor Cancel closes it: a dialog gone before the
  * server answered would say "done" about something that may not be. Both
  * buttons are off while it runs, and a browser drops the focus of a button
@@ -54,8 +55,6 @@ interface AlertDialogProps {
   onConfirm: () => Promise<boolean>;
   /** The warning's tint on the disc and the confirming button, for an action that destroys something. */
   destructive?: boolean;
-  /** Keeps the confirming button off, after a refusal that asking again would only repeat. */
-  confirmDisabled?: boolean;
   onCloseAutoFocus?: (event: Event) => void;
   /** Shown above the buttons: a refusal, when there is one. */
   children?: ReactNode;
@@ -71,7 +70,6 @@ export function AlertDialog({
   confirmLabel,
   onConfirm,
   destructive = false,
-  confirmDisabled = false,
   onCloseAutoFocus,
   children,
 }: AlertDialogProps) {
@@ -131,7 +129,6 @@ export function AlertDialog({
               type="button"
               variant={destructive ? "warn" : "primary"}
               pending={running}
-              disabled={confirmDisabled}
               onClick={() => void confirm()}
             >
               {destructive && Icon !== undefined && !running && (
