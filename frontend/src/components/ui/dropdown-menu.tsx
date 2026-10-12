@@ -227,7 +227,12 @@ export function DropdownMenu({
     </RadixMenu.Trigger>
   );
   return (
-    <RadixMenu.Root>
+    // Not modal: a modal menu hides the rest of the page from assistive
+    // technology (`aria-hidden` on its root) while leaving it focusable, which
+    // axe refuses (aria-hidden-focus), and the WAI-ARIA menu pattern asks for
+    // no modality. It still closes on Escape, on a press outside and when the
+    // focus leaves it.
+    <RadixMenu.Root modal={false}>
       {hint === undefined ? (
         button
       ) : (
