@@ -410,12 +410,21 @@ describe("the row under the answer", () => {
     const close = document.body.querySelector<HTMLButtonElement>(
       'button[aria-label="Chiudi le fonti"]',
     );
-    // Radix moves focus back a task after the panel unmounts.
     await act(async () => {
       close?.click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
     });
-    const focused = document.activeElement === open;
+    // Radix moves focus back a task after the panel unmounts, which a loaded
+    // machine can push past a single `setTimeout(0)`: one run in four of the
+    // chat tests failed that way on 12 October 2026. Waited for, at most a
+    // second, rather than raced.
+    const focused = await vi
+      .waitFor(() => {
+        if (document.activeElement !== open) throw new Error("focus is elsewhere");
+      })
+      .then(
+        () => true,
+        () => false,
+      );
     const expanded = open?.getAttribute("aria-expanded");
     unmount();
 
