@@ -44,10 +44,10 @@ import remarkMath from "remark-math";
 
 import type { Citation } from "@/api/contract";
 import { HoverCard } from "@/components/ui/hover-card";
-import { remarkPills, withoutPills } from "@/lib/markers";
+import { pillSources, remarkPills, withoutPills } from "@/lib/markers";
 import { cn } from "@/lib/utils";
 import { SourceSummary } from "./SourcesPanel";
-import { shortName, sourceLink, sourcesOf } from "./sourceLabel";
+import { shortName, sourceLink } from "./sourceLabel";
 
 /** The answer's citations, which a pill's excerpt numbers index from one. */
 const PillContext = createContext<readonly Citation[]>([]);
@@ -61,15 +61,12 @@ const PillContext = createContext<readonly Citation[]>([]);
  * The pill is a link to its first excerpt, and a click follows it: a web page
  * in a new tab at that excerpt's passage, a slide at its page. Resting on it
  * or focusing it opens a card listing every source of the run, each at the
- * first excerpt the run names on it and with its own link
- * (components/ui/hover-card.tsx): two excerpts of one page are two passages,
- * and the card shows the one the answer named (#182). One entry per page, not
- * per excerpt, because a run of five excerpts of two pages made a card taller
- * than the window. The fill is what says "clickable", not a colour or a
- * border: a blue word inside an answer would read as an ordinary link
- * (index.css), and `--mark` against `--canvas` is a gated pair so the pill
- * cannot dissolve into the paragraph. Under the pointer, and while its card
- * is open, it turns to ink.
+ * excerpt the answer named on it (`pillSources`, #182) and with its own link
+ * (components/ui/hover-card.tsx). The fill is what says "clickable", not a
+ * colour or a border: a blue word inside an answer would read as an ordinary
+ * link (index.css), and `--mark` against `--canvas` is a gated pair so the
+ * pill cannot dissolve into the paragraph. Under the pointer, and while its
+ * card is open, it turns to ink.
  *
  * Numbers with no excerpt are drawn as the numbers: the plugin only emits
  * known ones, and this never throws on the rest either.
@@ -77,15 +74,9 @@ const PillContext = createContext<readonly Citation[]>([]);
 function CitationPill({ numbers }: { numbers?: string }) {
   const { t } = useTranslation();
   const citations = useContext(PillContext);
-  // One per page, in the order the run names them, each at the first excerpt
-  // the run names on it: «+N», the card and the name a screen reader hears
-  // count pages, as the sources panel does.
-  const sources = sourcesOf(
-    (numbers ?? "")
-      .split(",")
-      .map((number) => citations[Number(number) - 1])
-      .filter((citation) => citation !== undefined),
-  );
+  // One per page: «+N», the card and the name a screen reader hears count
+  // pages, as the sources panel does.
+  const sources = pillSources((numbers ?? "").split(",").map(Number), citations);
   const [first] = sources;
   if (first === undefined) return <>{numbers}</>;
 
