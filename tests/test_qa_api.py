@@ -369,11 +369,11 @@ def test_a_slides_citation_cites_the_file_and_page(index: QdrantClient) -> None:
 def test_a_marker_split_across_tokens_survives_the_join(index: QdrantClient) -> None:
     """Why the server does not decide whether a source was cited.
 
-    A citation marker is a bracketed label the model was told to copy verbatim,
-    and nothing stops the tokenizer from breaking it in half. Matching it
-    against any single token would report a marker that is plainly there as
-    absent, so the check belongs to whoever holds the joined answer — the
-    client, which also holds the marker.
+    A citation is a bracketed label, `[1]` or the marker an older answer
+    copied, and nothing stops the tokenizer from breaking it in half. Matching
+    it against any single token would report a citation that is plainly there
+    as absent, so the check belongs to whoever holds the joined answer — the
+    client, which also holds the citations.
     """
     install_engine(index, SLIDES_ROUTE, ["An ORM maps objects ", "[deck.", "pdf p.1]"])
     stream = events(ask())

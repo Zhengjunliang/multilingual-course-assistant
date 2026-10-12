@@ -1229,7 +1229,7 @@ def test_cli_answers_from_the_routed_collection_with_sources(
     out = capsys.readouterr().out
     assert "step 0: answered" in out  # the index already had it: no fetch at all
     assert "An ORM maps objects to tables" in out
-    assert "Sources:\n  [deck.pdf p.1]" in out
+    assert "Sources:\n  [1] [deck.pdf p.1]" in out
     assert streamer.messages[-1]["content"].endswith("Question: What is an ORM?")
 
 

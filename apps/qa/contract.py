@@ -50,15 +50,17 @@ if TYPE_CHECKING:
 class Citation(BaseModel):
     """One retrieved excerpt, in the shape a reader can act on.
 
-    `marker` is `rag.answer.source_marker` verbatim — the exact string the model
-    was instructed to copy into its answer — so a client can match a bracketed
-    label in the prose against this list without parsing anything.
+    The answer cites by number: `[n]` names the n-th citation of the list, the
+    number the excerpt carried in the prompt (`rag.answer.format_context`).
+    `marker` is `rag.answer.source_marker` verbatim, the label printed beside
+    that number; answers generated before 2026-10-12 were told to copy it and
+    cite by it, so a client matches it in their prose without parsing anything.
 
-    Whether a marker *did* turn up is the client's own `marker in answer` and is
-    deliberately not computed here: the answer arrives in pieces that respect no
-    boundary of their own, a marker is routinely split across two of them, and
-    the check is therefore only meaningful once the whole stream has been
-    joined — which is exactly where the client already stands.
+    Whether a citation *did* turn up is the client's own search of the answer
+    and is deliberately not computed here: the answer arrives in pieces that
+    respect no boundary of their own, a citation is routinely split across two
+    of them, and the check is therefore only meaningful once the whole stream
+    has been joined — which is exactly where the client already stands.
 
     `text` is the excerpt itself, readable without leaving the answer. A slides
     citation also carries `source_sha256`, the key under which
