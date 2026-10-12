@@ -81,7 +81,7 @@ export function AuthLayout({ heading, children, footer, refusals, phase }: AuthL
   return (
     <div className="relative flex min-h-full flex-col items-center justify-center px-gutter py-room">
       <Room clear="calc(25rem + 2 * var(--spacing-room))" />
-      <div className="relative flex w-full max-w-[25rem] flex-col items-center [--cat:var(--spacing-entry-cat-sm)] md:[--cat:var(--spacing-entry-cat)]">
+      <div className="relative flex w-full max-w-100 flex-col items-center [--cat:var(--spacing-entry-cat-sm)] md:[--cat:var(--spacing-entry-cat)]">
         <LivingMascot
           restOn="username"
           refusals={refusals}
@@ -93,7 +93,7 @@ export function AuthLayout({ heading, children, footer, refusals, phase }: AuthL
         />
         <div
           ref={card}
-          className="mt-[calc(var(--cat)*-12/76)] flex [view-transition-name:auth-card] w-full flex-col gap-room rounded-bubble bg-surface px-room pt-[calc(var(--cat)*4/76+var(--spacing-room))] pb-room shadow-overlay md:px-[2.125rem]"
+          className="mt-[calc(var(--cat)*-12/76)] flex [view-transition-name:auth-card] w-full flex-col gap-room rounded-bubble bg-surface px-room pt-[calc(var(--cat)*4/76+var(--spacing-room))] pb-room shadow-overlay md:px-8.5"
         >
           <div className="flex flex-col items-center gap-hair text-center">
             <h1 className="font-semibold text-display text-ink">{APP_NAME}</h1>

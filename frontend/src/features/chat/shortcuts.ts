@@ -7,8 +7,9 @@
  * New conversation and search are ChatGPT's (Ctrl ⇧ O, Ctrl K); the
  * settings take the comma that macOS gives every application's preferences,
  * and the list takes `?`, as GitHub, Gmail and Linear do. Apple's keyboards
- * write ⌘ where the others write Ctrl, so the caps follow the platform; either
- * key is heard on both, since a reader who presses Ctrl on a Mac means it.
+ * write ⌘ where the others write Ctrl, so the caps follow the platform, and so
+ * does the key heard: on a Mac, Ctrl stays the text field's own (Ctrl K
+ * deletes to the end of the line), as ChatGPT leaves it.
  *
  * `?` alone is a character, so it is heard only outside a field: in the
  * question box it is the end of a question.
@@ -39,14 +40,16 @@ function typingIn(target: EventTarget | null): boolean {
 }
 
 /** Which shortcut a key press is, if any. */
-export function shortcutOf(event: KeyboardEvent): ShortcutName | null {
-  if (event.altKey) return null;
+export function shortcutOf(event: KeyboardEvent, isApple: boolean = apple()): ShortcutName | null {
+  // A browser's autofill sends a keydown with no key at all.
+  if (typeof event.key !== "string" || event.altKey) return null;
   const key = event.key.toLowerCase();
-  if (event.ctrlKey || event.metaKey) {
+  if (isApple ? event.metaKey : event.ctrlKey) {
     if (key === "o" && event.shiftKey) return "newConversation";
     if (key === "k" && !event.shiftKey) return "search";
     if (key === ",") return "settings";
     return null;
   }
+  if (event.ctrlKey || event.metaKey) return null;
   return key === "?" && !typingIn(event.target) ? "help" : null;
 }
