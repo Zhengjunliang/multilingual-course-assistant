@@ -6,6 +6,7 @@ import {
   remarkPills,
   segmentAnswer,
   withoutMarkers,
+  withoutPills,
   withPills,
 } from "@/lib/markers";
 
@@ -94,6 +95,17 @@ describe("segmentAnswer, on excerpt numbers", () => {
     expect(cut("2025-26: Excerpt 3. 2026-27: [Excerpt 4]. [WEB p537]", page)).toBe(
       "2025-26: {3}. 2026-27: {4}. {1}",
     );
+  });
+
+  it("reads a marker beside an excerpt reference of its page as that excerpt", () => {
+    // The prompt's header reads "Excerpt 3 [m]:", and the model copies the
+    // pair either way round. Across a line break the two are two citations.
+    const page = Array.from({ length: 4 }, () => cite("[W]"));
+    expect(cut("19 gennaio [W] (Excerpt 3). 18 gennaio Excerpt 4 [W].\n[W]\nExcerpt 2", page)).toBe(
+      "19 gennaio {3} {3}. 18 gennaio {4} {4}.\n{1}\n{2}",
+    );
+    // Beside an excerpt of another page, a marker keeps its own page.
+    expect(cut("[A] Excerpt 2", [cite("[A]"), cite("[B]")])).toBe("{1} {2}");
   });
 
   it("leaves a marker whole when its own text holds an excerpt reference", () => {
@@ -208,5 +220,20 @@ describe("remarkPills", () => {
   it("draws a list as one pill, and two excerpts of one page as two of its numbers", () => {
     expect(pills("Vedi [Excerpt 1 e Excerpt 3].", citations)).toEqual(["1,3"]);
     expect(pills("Vedi Excerpt 1 Excerpt 2.", [cite("[A]"), cite("[A]")])).toEqual(["1,2"]);
+  });
+
+  it("draws a marker and the excerpt reference beside it as one pill of that excerpt", () => {
+    const page = Array.from({ length: 4 }, () => cite("[W]"));
+    expect(pills("19 gennaio [W] (Excerpt 3).", page)).toEqual(["3"]);
+  });
+});
+
+describe("withoutPills", () => {
+  it("writes a list back as its markers, a space between them", () => {
+    // Where a pill cannot sit, in code or in an answer that cannot be parsed.
+    const citations = [cite("[PPM 1]"), cite("[PPM 2]"), cite("[WEB 9]")];
+    expect(withoutPills(withPills("Vedi (Excerpt 1, 3).", citations), citations)).toBe(
+      "Vedi [PPM 1] [WEB 9].",
+    );
   });
 });
