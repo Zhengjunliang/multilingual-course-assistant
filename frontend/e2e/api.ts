@@ -17,7 +17,7 @@ import type { Course, Edition, Programme, StudyPlanCourse } from "@/api/catalog"
 import type { AskBody } from "@/api/client";
 import type { AnswerEvent } from "@/api/contract";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
-import { COURSE, EDITION, PROGRAMME, STUDY_PLAN, VISITOR } from "./fixtures";
+import { COURSE, EDITION, EDITION_READ, PROGRAMME, STUDY_PLAN, VISITOR } from "./fixtures";
 
 /** `sse` is a whole stream; `open` is sent and then held open, mid-answer. */
 type Reply = { status?: number; json?: unknown; sse?: AnswerEvent[]; open?: AnswerEvent[] };
@@ -125,8 +125,9 @@ export class Api {
     this.json<Programme>(`/api/catalog/programmes/${PROGRAMME.code}`, PROGRAMME);
     this.json<StudyPlanCourse[]>(`/api/catalog/programmes/${PROGRAMME.code}/courses`, STUDY_PLAN);
     this.json<Course>(`/api/catalog/courses/${COURSE.code}`, COURSE);
-    this.json<Edition[]>("/api/catalog/editions", [EDITION]);
+    this.json<Edition[]>("/api/catalog/editions", [EDITION, EDITION_READ]);
     this.json<Edition>(`/api/catalog/editions/${EDITION.id}`, EDITION);
+    this.json<Edition>(`/api/catalog/editions/${EDITION_READ.id}`, EDITION_READ);
   }
 
   /** Every question gets this stream, whole. */
