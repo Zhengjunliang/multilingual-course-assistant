@@ -6,10 +6,14 @@
  * A toast and not a line on the page: the page has moved on — a dialog
  * closed, a row changed — and the confirmation belongs to no part of it.
  * Sonner reads each toast out in a polite live region of its own, so it is
- * heard without taking focus. Its surface is this palette's, through the
- * variables Sonner styles itself with, and its theme follows the one painted;
- * outside a `ThemeProvider`, as on /styleguide, which paints both themes
- * itself, it follows the system.
+ * heard without taking focus. It is drawn here rather than by Sonner's own
+ * styles (#190): the ink ground, the inverse of the page as a tooltip is, an
+ * icon in a disc, and two lines, what happened in its weight and the object
+ * it happened to under it (`toast.success(result, { description: object })`).
+ * A failure (`toast.error`) has the warning's disc and, when the caller gives
+ * one, an action such as «Riprova», outlined in the toast's lettering. Its
+ * theme follows the one painted; outside a `ThemeProvider`, as on
+ * /styleguide, which paints both themes itself, it follows the system.
  *
  * Sonner keeps its toasts in one store for the whole page and shows those
  * still open to the next Toaster that mounts, so this one dismisses them as it
@@ -19,7 +23,8 @@
  * English, and it appends the shortcut that reaches the region.
  */
 
-import { type CSSProperties, useContext, useEffect } from "react";
+import { Check, CircleAlert } from "lucide-react";
+import { useContext, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Toaster as Sonner, toast } from "sonner";
 
@@ -34,14 +39,31 @@ export function Toaster() {
       theme={theme?.resolved ?? "system"}
       position="bottom-right"
       containerAriaLabel={t("app.notifications")}
-      style={
-        {
-          "--normal-bg": "var(--surface)",
-          "--normal-text": "var(--ink)",
-          "--normal-border": "var(--line)",
-          "--border-radius": "var(--radius-card)",
-        } as CSSProperties
-      }
+      icons={{
+        success: (
+          <span className="grid size-icon-lg place-items-center rounded-full bg-accent-soft text-accent">
+            <Check aria-hidden className="size-icon" />
+          </span>
+        ),
+        error: (
+          <span className="grid size-icon-lg place-items-center rounded-full bg-warn text-warn-ink">
+            <CircleAlert aria-hidden className="size-icon" />
+          </span>
+        ),
+      }}
+      toastOptions={{
+        unstyled: true,
+        classNames: {
+          toast:
+            "flex w-(--width) items-center gap-snug rounded-card bg-ink px-snug py-tight text-canvas shadow-overlay",
+          icon: "shrink-0",
+          content: "flex min-w-0 flex-1 flex-col",
+          title: "font-semibold text-body",
+          description: "text-caption",
+          actionButton:
+            "h-control-xs shrink-0 rounded-control border border-current/40 px-tight font-medium text-caption transition-colors hover:bg-canvas/10",
+        },
+      }}
     />
   );
 }

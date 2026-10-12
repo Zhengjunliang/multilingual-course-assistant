@@ -152,6 +152,9 @@ components:
   muted-on-warn:
     backgroundColor: '{colors.warn}'
     textColor: '{colors.muted}'
+  accent-on-tint:
+    backgroundColor: '{colors.tint}'
+    textColor: '{colors.accent}'
   ink-on-tint:
     backgroundColor: '{colors.tint}'
     textColor: '{colors.ink}'
@@ -242,6 +245,9 @@ components:
   muted-on-warn-dark:
     backgroundColor: '{colors.warn-dark}'
     textColor: '{colors.muted-dark}'
+  accent-on-tint-dark:
+    backgroundColor: '{colors.tint-dark}'
+    textColor: '{colors.accent-dark}'
   ink-on-tint-dark:
     backgroundColor: '{colors.tint-dark}'
     textColor: '{colors.ink-dark}'

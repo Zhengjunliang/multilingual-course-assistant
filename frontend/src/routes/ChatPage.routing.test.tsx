@@ -465,7 +465,7 @@ describe("a visitor's addresses", () => {
       );
     });
     const english = [...document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
-      (entry) => entry.getAttribute("lang") === "en",
+      (entry) => entry.querySelector("[lang]")?.getAttribute("lang") === "en",
     );
     act(() => english?.click());
     await settle();

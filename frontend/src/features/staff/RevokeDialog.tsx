@@ -12,6 +12,7 @@
  * elsewhere, while the second closes on the page's "not found".
  */
 
+import { UserMinus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -55,7 +56,7 @@ export function RevokeDialog({
     if (revoking === null) return false;
     setRefusal(null);
     const done = (description: string) => {
-      toast(t("staff.revoke.done"), { description });
+      toast.success(t("staff.revoke.done"), { description });
       return true;
     };
     try {
@@ -83,6 +84,7 @@ export function RevokeDialog({
         onClose();
       }}
       heading={t("staff.revoke.title")}
+      icon={UserMinus}
       description={revoking?.sentence ?? ""}
       cancelLabel={t("staff.cancel")}
       confirmLabel={t("staff.revoke.action")}

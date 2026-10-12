@@ -107,6 +107,7 @@ export function AuthLayout({ heading, children, footer, refusals, phase }: AuthL
           locales={UI_LOCALES}
           value={i18n.language}
           label={t("account.language")}
+          hint={t("account.languageHint")}
           onChange={(locale: UiLocale) => void chooseUiLocale(locale)}
         />
       </div>

@@ -19,11 +19,14 @@
  * `routes/styleguide/`, one file per group.
  */
 
+import { Trash2, UserPlus } from "lucide-react";
 import { useState } from "react";
 
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
 import { Dialog } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
 import { Basics } from "./styleguide/basics";
 import { Fields } from "./styleguide/fields";
@@ -73,15 +76,19 @@ export default function StyleguidePage() {
           <Button className="self-start" onClick={() => setDrawer(true)}>
             Open the Sheet
           </Button>
-          <Sheet open={drawer} onOpenChange={setDrawer} heading="Sheet specimen">
+          <Sheet
+            open={drawer}
+            onOpenChange={setDrawer}
+            heading="Fonti"
+            closeLabel="Chiudi le fonti"
+            count={5}
+            side="right"
+          >
             <div className="flex flex-col gap-tight p-gutter">
               <p className="text-body text-ink">
                 The drawer renders in a portal at the end of the document, which is why it follows
                 the page theme rather than either panel above.
               </p>
-              <Button variant="outline" onClick={() => setDrawer(false)}>
-                Close
-              </Button>
             </div>
           </Sheet>
 
@@ -91,14 +98,31 @@ export default function StyleguidePage() {
           <Dialog
             open={dialog}
             onOpenChange={setDialog}
-            heading="Dialog specimen"
-            description="A centred window, not a drawer."
-            closeLabel="Close"
+            heading="Assegna docente"
+            description="Basi di dati · edizione 2026/27"
+            icon={UserPlus}
+            closeLabel="Chiudi"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setDialog(false);
+            }}
+            footer={
+              <>
+                <Button type="button" variant="outline" onClick={() => setDialog(false)}>
+                  Annulla
+                </Button>
+                <Button type="submit" shortcut={{ keys: "Enter", label: "Invio" }}>
+                  Assegna
+                </Button>
+              </>
+            }
           >
-            <p className="text-body text-ink">
-              Wide enough for a form on a phone and no wider on a desk, with its own scroll so a
-              long body cannot push the close button off a short screen.
-            </p>
+            <Field
+              id="styleguide-dialog-username"
+              label="Nome utente"
+              placeholder="es. luca.verdi"
+              hint="Il nome con cui la persona accede; l'account deve già esistere."
+            />
           </Dialog>
 
           <Button className="self-start" onClick={() => setAlert(true)}>
@@ -107,10 +131,16 @@ export default function StyleguidePage() {
           <AlertDialog
             open={alert}
             onOpenChange={setAlert}
-            heading="AlertDialog specimen"
-            description="Removing mrossi from B028451 2025-2026 cannot be undone from here."
-            cancelLabel="Cancel"
-            confirmLabel="Remove"
+            heading="Revocare il ruolo?"
+            description={
+              <>
+                <Chip>luca.verdi</Chip> non sarà più docente di <Chip>Basi di dati</Chip>, edizione{" "}
+                <Chip tone="accent">2026/27</Chip>.
+              </>
+            }
+            icon={Trash2}
+            cancelLabel="Annulla"
+            confirmLabel="Revoca"
             onConfirm={async () => true}
             destructive
           />

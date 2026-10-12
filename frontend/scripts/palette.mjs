@@ -39,13 +39,14 @@ export const PAIRS = [
     front: "canvas",
     back: "ink",
     min: TEXT,
-    where: "tooltip.tsx content, AnswerMarkdown.tsx citation pill under the pointer or open",
+    where:
+      "tooltip.tsx content, sonner.tsx toast, AnswerMarkdown.tsx citation pill under the pointer or open",
   },
   {
     front: "ink",
     back: "surface",
     min: TEXT,
-    where: "card.tsx card body, sonner.tsx toast (through --normal-bg and --normal-text)",
+    where: "card.tsx card body, dialog.tsx and alert-dialog.tsx body",
   },
   {
     front: "muted",
@@ -105,13 +106,14 @@ export const PAIRS = [
     back: "accent-soft",
     min: TEXT,
     where:
-      "badge.tsx, chip.tsx and avatar.tsx accent tone, button.tsx soft variant, ConversationSidebar.tsx open conversation, ManagementNav.tsx current page",
+      "badge.tsx, chip.tsx and avatar.tsx accent tone, button.tsx soft variant, dialog.tsx disc, sonner.tsx success disc, ConversationSidebar.tsx open conversation, ManagementNav.tsx current page",
   },
   {
     front: "warn-ink",
     back: "warn",
     min: TEXT,
-    where: "TurnView.tsx failure box, button.tsx warn variant, chip.tsx warn tone",
+    where:
+      "TurnView.tsx failure box, button.tsx warn variant, chip.tsx warn tone, dialog.tsx warn disc, sonner.tsx failure disc",
   },
   {
     front: "muted",
@@ -144,10 +146,17 @@ export const PAIRS = [
     where: "banner.tsx warn sentence",
   },
   {
+    front: "accent",
+    back: "tint",
+    min: TEXT,
+    where: "hover-card.tsx an icon in its head (routes/styleguide/overlays.tsx)",
+  },
+  {
     front: "ink",
     back: "tint",
     min: TEXT,
-    where: "card.tsx CardFooter, routes/styleguide/basics.tsx the --tint swatch",
+    where:
+      "card.tsx CardFooter, hover-card.tsx head, routes/styleguide/basics.tsx the --tint swatch",
   },
   {
     front: "warn-ink",
@@ -195,7 +204,8 @@ export const TINTS = [
     tint: "hover",
     ground: "tint",
     fronts: ["ink"],
-    where: "toggle-group.tsx an option under the pointer",
+    where:
+      "toggle-group.tsx an option under the pointer, dialog.tsx an outlined button in the foot under the pointer",
   },
   {
     tint: "selected",
