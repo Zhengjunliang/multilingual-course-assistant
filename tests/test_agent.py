@@ -217,7 +217,10 @@ def entry(url: str, outlinks: Sequence[Outlink] = (), referrer: str | None = Non
 
 
 def web_hit(url: str) -> Hit:
-    return Hit(chunk=make_web_chunk("aa" * 32, "crawl", url), score=1.0)
+    """A hit whose text is its page's own: two pages with one text are one
+    passage, and the loop's answer holds each passage once."""
+    chunk = make_web_chunk("aa" * 32, "crawl", url).model_copy(update={"text": f"Page {url}."})
+    return Hit(chunk=chunk, score=1.0)
 
 
 def hub_registry() -> dict[str, RegistryEntry]:
@@ -822,12 +825,20 @@ def test_an_ephemeral_page_rides_in_ranked_not_truncated_at_its_head() -> None:
     chunk of eight, which head-of-document selection would drop."""
     filler = [
         make_web_chunk(f"{number:02d}" * 32, "live", HUB).model_copy(
-            update={"chunk_id": f"filler:{number}", "embed_text": f"orario segreteria {number}"}
+            update={
+                "chunk_id": f"filler:{number}",
+                "text": f"Orario segreteria, sportello {number}.",
+                "embed_text": f"orario segreteria {number}",
+            }
         )
         for number in range(7)
     ]
     buried = make_web_chunk("ff" * 32, "live", HUB).model_copy(
-        update={"chunk_id": "buried", "embed_text": "diploma supplement richiesta"}
+        update={
+            "chunk_id": "buried",
+            "text": "Richiesta del Diploma Supplement.",
+            "embed_text": "diploma supplement richiesta",
+        }
     )
     fetch = StubFetch(
         {
@@ -852,6 +863,36 @@ def test_an_ephemeral_page_rides_in_ranked_not_truncated_at_its_head() -> None:
     carried = [hit.chunk for hit in answered if hit.chunk.chunk_id in page_ids]
     assert len(carried) == EPHEMERAL_CHUNK_LIMIT  # the whole page never rides along
     assert buried in carried  # last in document order, first by cosine
+
+
+def test_an_ephemeral_copy_of_a_retrieved_passage_reaches_the_answer_once() -> None:
+    """The pages a step fetches join the list after `search()` collapsed it,
+    so the loop collapses again: a refused page repeating a retrieved passage
+    under another address leaves one hit, the copy fetched last."""
+    retrieved = web_hit(SEED)
+    copy = make_web_chunk("ff" * 32, "live", HUB).model_copy(
+        update={"text": retrieved.chunk.text, "fetch_date": "2026-10-12"}
+    )
+    fetch = StubFetch(
+        {
+            HUB: LiveResult(
+                persisted=False,
+                stored_now=False,
+                chunks=[copy],
+                outlinks=[],
+                verdict=RelevanceVerdict(relevant=False, reason="commercial page"),
+            )
+        }
+    )
+
+    answered, _ = run_loop(
+        ScriptedCompleter([KEEP_LOOKING, KEEP_LOOKING, ANSWERABLE]),
+        hits=[retrieved],
+        registry=hub_registry(),
+        fetch=fetch,
+    )
+
+    assert [hit.chunk for hit in answered] == [copy]
 
 
 def test_a_step_over_budget_moves_on_without_reassessing_unchanged_material() -> None:

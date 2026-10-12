@@ -94,18 +94,18 @@ def test_locale_filter_applies_to_both_prefetch_branches(client: QdrantClient) -
     assert all(hit.chunk.locale == "en" for hit in hits)
 
 
-def test_rerank_replaces_scores_and_truncates() -> None:
+def test_rerank_replaces_scores_and_sorts_the_whole_pool() -> None:
     hits = [
         Hit(chunk=make_chunk(0, SORT_TEXT), score=0.9),
         Hit(chunk=make_chunk(1, ORM_TEXT), score=0.5),
     ]
-    reranked = rerank_hits("django models", hits, KeywordReranker(), limit=1)
-    assert [hit.chunk.text for hit in reranked] == [ORM_TEXT]
-    assert reranked[0].score == 1.0
+    reranked = rerank_hits("django models", hits, KeywordReranker())
+    assert [hit.chunk.text for hit in reranked] == [ORM_TEXT, SORT_TEXT]
+    assert [hit.score for hit in reranked] == [1.0, 0.0]
 
 
 def test_rerank_of_no_hits_is_empty() -> None:
-    assert rerank_hits("anything", [], KeywordReranker(), limit=5) == []
+    assert rerank_hits("anything", [], KeywordReranker()) == []
 
 
 def test_search_without_reranker_keeps_fusion_order(client: QdrantClient) -> None:
