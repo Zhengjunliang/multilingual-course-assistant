@@ -1,6 +1,16 @@
 /**
  * A data table: the native elements, under the heading of the section it sits in.
  *
+ * A panel, as every list is (DESIGN.md, rule 4): a 1 px border and the card's
+ * corners, its head row on `--tint`, 36 px tall, behind a line, and its rows
+ * at least 54 px, room for a name over its code (rule 1), with a hairline
+ * between them. The row the reader opened and came back to with Back is
+ * `selected`: the accent at 11 % with the 3 px bar at its leading edge, as
+ * the sidebar draws where the reader is (features/chat/rows.ts says why the
+ * bar is a border). It is marked with `data-selected` and not
+ * `aria-selected`, which a row of a plain table does not take; focus going
+ * back to the row's link is what a screen reader hears.
+ *
  * Native `<table>` markup rather than a grid of `div`s with ARIA roles, since
  * the browser then gives a screen reader the rows, columns and headers itself
  * (outside the repository: WAI-ARIA APG, "Table Pattern"). A table whose
@@ -37,7 +47,7 @@ export function Table({
   return (
     <div
       className={cn(
-        "relative w-full overflow-x-auto",
+        "relative w-full overflow-x-auto rounded-card border border-line bg-surface sm:[&_tbody:last-child>tr:last-child]:border-b-0",
         frameClassName,
         "max-sm:overflow-visible max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent",
       )}
@@ -54,8 +64,15 @@ export function Table({
 
 export function TableHeader({ className, ...props }: ComponentProps<"thead">) {
   return (
-    // biome-ignore lint/a11y/noRedundantRoles: restores the role a stacked table loses in WebKit
-    <thead role="rowgroup" className={cn("max-sm:sr-only", className)} {...props} />
+    <thead
+      // biome-ignore lint/a11y/noRedundantRoles: restores the role a stacked table loses in WebKit
+      role="rowgroup"
+      className={cn(
+        "[&>tr]:h-auto [&>tr]:border-line [&>tr>th:first-child]:rounded-tl-card [&>tr>th:last-child]:rounded-tr-card max-sm:sr-only",
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
@@ -70,13 +87,25 @@ export function TableBody({ className, ...props }: ComponentProps<"tbody">) {
   );
 }
 
-export function TableRow({ className, ...props }: ComponentProps<"tr">) {
+const SELECTED =
+  "data-selected:bg-selected data-selected:hover:bg-selected data-selected:before:absolute data-selected:before:inset-y-tight data-selected:before:left-0 data-selected:before:rounded-r-full data-selected:before:border-accent data-selected:before:border-l-(length:--spacing-bar)";
+
+export function TableRow({
+  className,
+  selected = false,
+  ...props
+}: ComponentProps<"tr"> & {
+  /** The row the reader opened, on coming back to the table. */
+  selected?: boolean;
+}) {
   return (
     <tr
       // biome-ignore lint/a11y/noRedundantRoles: restores the role a stacked table loses in WebKit
       role="row"
+      data-selected={selected || undefined}
       className={cn(
-        "border-line border-b transition-colors hover:bg-hover",
+        "h-table-row border-hairline border-b transition-colors hover:bg-hover max-sm:h-auto",
+        SELECTED,
         "max-sm:flex max-sm:flex-col max-sm:gap-hair max-sm:rounded-card max-sm:border max-sm:bg-surface max-sm:p-snug max-sm:shadow-raised",
         className,
       )}
@@ -91,7 +120,7 @@ export function TableHead({ className, ...props }: ComponentProps<"th">) {
     <th
       role="columnheader"
       className={cn(
-        "whitespace-nowrap px-tight py-tight text-left font-medium text-caption text-muted",
+        "h-table-head whitespace-nowrap bg-tint px-snug text-left font-semibold text-caption text-muted",
         className,
       )}
       {...props}
@@ -113,7 +142,7 @@ export function TableCell({
       // biome-ignore lint/a11y/noRedundantRoles: restores the role a stacked table loses in WebKit
       role="cell"
       className={cn(
-        "px-tight py-tight align-middle text-ink",
+        "px-snug py-tight align-middle text-ink",
         "max-sm:flex max-sm:gap-tight max-sm:p-0 max-sm:text-left",
         className,
       )}

@@ -3,7 +3,7 @@
  * its own to show, and what the outermost crash screen draws.
  */
 
-import { ArrowLeft, RotateCw, SquarePen } from "lucide-react";
+import { ArrowLeft, BookOpen, Lock, RotateCw, SquarePen } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { StatusPanel } from "@/components/StatusPanel";
@@ -26,6 +26,27 @@ export function Status() {
           <Link to="/styleguide" className={buttonVariants()}>
             <ArrowLeft aria-hidden className="size-icon" />
             Torna all'inizio
+          </Link>
+          <Link to="/styleguide" className={buttonVariants({ variant: "ghost" })}>
+            <SquarePen aria-hidden className="size-icon" />
+            Nuova conversazione
+          </Link>
+        </StatusPanel>
+      </Specimen>
+
+      <Specimen
+        name="Refusal"
+        note="The same panel for a staff page whose object cannot be read: a lock in the disc rather than the cat, the page being out of reach rather than lost, its code, and the reader's own start first."
+      >
+        <StatusPanel
+          icon={Lock}
+          code="404"
+          heading="Non trovato"
+          body="Questa pagina non esiste o non è visibile al tuo account." // spellchecker:disable-line
+        >
+          <Link to="/styleguide" className={buttonVariants()}>
+            <BookOpen aria-hidden className="size-icon" />
+            Torna ai miei insegnamenti
           </Link>
           <Link to="/styleguide" className={buttonVariants({ variant: "ghost" })}>
             <SquarePen aria-hidden className="size-icon" />

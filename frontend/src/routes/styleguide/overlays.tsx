@@ -191,7 +191,7 @@ export function Overlays() {
 
       <Specimen
         name="AlertDialog"
-        note="A question before an action that destroys or replaces something, drawn as Dialog is; the disc and the confirming button take the warning's tint only when something is destroyed. Focus opens on Cancel; it closes only once the action is done. Portalled, and shown below."
+        note="A question before an action that destroys or replaces something, drawn as Dialog is; the disc and the confirming button take the warning's tint only when something is destroyed, and the button then repeats the disc's icon. Focus opens on Cancel; it closes only once the action is done. Portalled, and shown below."
       />
     </>
   );

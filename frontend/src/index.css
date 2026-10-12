@@ -195,11 +195,17 @@
   --spacing-rail: 3.75rem;
   /* The bar in the accent at the leading edge of where the reader is. */
   --spacing-bar: 0.1875rem;
+  /* A data table's head row and its rows (components/ui/table.tsx), at the
+     prototype's 36 and 54 px: a row holds a name over its code. */
+  --spacing-table-head: 2.25rem;
+  --spacing-table-row: 3.375rem;
 
-  /* Glyph sizes. Two, because an icon beside body text and an icon standing
-     alone in a header button are the only two jobs icons have here. */
+  /* Glyph sizes, one per job: an icon beside body text, an icon standing
+     alone in a header button, and an icon standing for a whole screen in the
+     disc of a status panel (components/StatusPanel.tsx). */
   --spacing-icon: 1rem;
   --spacing-icon-lg: 1.25rem;
+  --spacing-icon-xl: 2.25rem;
 
   /* A person's avatar at its smallest, inside a line of text or a stack; at 32
      and 40 px it is as tall as the control beside it (components/ui/avatar.tsx). */

@@ -123,7 +123,7 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
           {query.trim() === "" ? t("staff.plan.noCurriculum") : t("staff.plan.noMatch")}
         </p>
       ) : (
-        <Table frameClassName="rounded-card border border-line bg-surface sm:[&_tbody:last-child_tr:last-child]:border-b-0 lg:overflow-visible">
+        <Table frameClassName="lg:overflow-visible">
           <TableHeader>
             <TableRow>
               <TableHead>{t("staff.plan.course")}</TableHead>

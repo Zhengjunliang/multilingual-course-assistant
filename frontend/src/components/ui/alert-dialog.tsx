@@ -25,9 +25,11 @@
  * Drawn as `dialog.tsx` is (#190): the action's icon in a disc beside the
  * question, the sentence of what will happen, which may name its objects as
  * chips, and the buttons on the tinted foot. The disc and the confirming
- * button take the warning's tint only when something is destroyed. The
- * confirming button shows no Enter: focus opens on Cancel, where Enter
- * cancels.
+ * button take the warning's tint only when something is destroyed, and the
+ * button then repeats the disc's icon before its words, so what it destroys
+ * reads on the button itself; while it runs the spinner takes the icon's
+ * place. The confirming button shows no Enter: focus opens on Cancel, where
+ * Enter cancels.
  */
 
 import * as RadixAlertDialog from "@radix-ui/react-alert-dialog";
@@ -64,7 +66,7 @@ export function AlertDialog({
   onOpenChange,
   heading,
   description,
-  icon,
+  icon: Icon,
   cancelLabel,
   confirmLabel,
   onConfirm,
@@ -108,7 +110,7 @@ export function AlertDialog({
           className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-floating flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-110 flex-col overflow-hidden rounded-card border border-line bg-surface shadow-overlay"
         >
           <div className="flex min-h-0 gap-snug overflow-y-auto p-room">
-            {icon !== undefined && <DialogDisc icon={icon} warn={destructive} />}
+            {Icon !== undefined && <DialogDisc icon={Icon} warn={destructive} />}
             <div className="flex min-w-0 flex-1 flex-col gap-tight">
               <RadixAlertDialog.Title className="font-semibold text-ink text-title">
                 {heading}
@@ -132,6 +134,9 @@ export function AlertDialog({
               disabled={confirmDisabled}
               onClick={() => void confirm()}
             >
+              {destructive && Icon !== undefined && !running && (
+                <Icon aria-hidden className="size-icon" />
+              )}
               {confirmLabel}
             </Button>
           </DialogFooter>

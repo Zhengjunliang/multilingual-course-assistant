@@ -132,7 +132,7 @@ export default function CoursePage() {
         )}
       </Section>
       <Section heading={t("staff.course.editions")} sub={t("staff.course.editionsSub")}>
-        <Table frameClassName="rounded-card border border-line bg-surface sm:[&_tbody:last-child_tr:last-child]:border-b-0">
+        <Table>
           <TableHeader>
             <TableRow>
               <TableHead>{t("staff.course.year")}</TableHead>

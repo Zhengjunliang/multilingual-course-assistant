@@ -196,8 +196,9 @@ export const TINTS = [
   {
     tint: "hover",
     ground: "surface",
-    fronts: ["ink"],
-    where: "button.tsx ghost and outline variants under the pointer, in a card or a dialog",
+    fronts: ["ink", "muted"],
+    where:
+      "button.tsx ghost and outline variants under the pointer, in a card or a dialog; table.tsx a row under the pointer, its name and the code under it",
   },
   {
     tint: "hover",
@@ -216,8 +217,9 @@ export const TINTS = [
   {
     tint: "selected",
     ground: "surface",
-    fronts: ["accent"],
-    where: "button.tsx soft variant under the pointer",
+    fronts: ["accent", "ink", "muted"],
+    where:
+      "button.tsx soft variant under the pointer; table.tsx the row the reader opened, on coming back to the table, its name and the code under it",
   },
 ];
 
