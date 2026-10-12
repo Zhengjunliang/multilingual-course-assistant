@@ -304,6 +304,8 @@ interface Page extends Mounted {
   path: () => string;
   /** Moves the router as the history would, without a link on the page. */
   go: (to: string) => Promise<void>;
+  /** The browser's Back. */
+  back: () => Promise<void>;
 }
 
 function page(path: string): Page {
@@ -319,6 +321,7 @@ function page(path: string): Page {
     ...mounted,
     path: () => `${router.state.location.pathname}${router.state.location.search}`,
     go: (to) => router.navigate(to),
+    back: () => router.navigate(-1),
   };
 }
 
@@ -506,18 +509,25 @@ describe("the programme pages", () => {
       title: text(container.querySelector("main h1")),
       columns: [...container.querySelectorAll("main th")].map(text),
       links: [...container.querySelectorAll("main tbody a")].map((a) => a.getAttribute("href")),
-      rows: [...container.querySelectorAll<HTMLTableRowElement>("main tbody tr")].map((tr) =>
-        text(tr.cells[4]),
-      ),
+      rows: [...container.querySelectorAll<HTMLTableRowElement>("main tbody tr")].map((tr) => [
+        text(tr.cells[0]),
+        text(tr.cells[3]),
+      ]),
+      chips: [...container.querySelectorAll("main header .flex-wrap > span")].map(text),
       crumbs: crumbs(container),
     };
     unmount();
 
     expect(seen).toEqual({
       title: "Corsi di laurea",
-      columns: ["Codice", "Nome", "Curriculum", "Insegnamenti", "Segreteria didattica", "Apri"],
+      columns: ["Corso di laurea", "Curriculum", "Insegnamenti", "Segreteria didattica", "Apri"],
+      chips: ["2 corsi di laurea"],
       links: ["/staff/programmes/B047", "/staff/programmes/B222"],
-      rows: ["Giulia Neri", "Nessuno"],
+      // The name over the code, and the secretariat by name.
+      rows: [
+        ["INGEGNERIA INFORMATICAB047", "Giulia Neri"],
+        ["INGEGNERIA GESTIONALEB222", "Nessuno"],
+      ],
       crumbs: ["Corsi di laurea (current)"],
     });
   });
@@ -637,6 +647,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
       note: (container.textContent ?? "").includes(
         "Due codici, un solo insegnamento: ogni edizione vale per entrambi i curriculum.",
       ),
+      tabs: [...container.querySelectorAll('main [role="tab"]')].map(text),
       editions: [...container.querySelectorAll<HTMLTableRowElement>("main tbody tr")].map((tr) => [
         tr.querySelector("a")?.getAttribute("href"),
         text(tr.cells[1]),
@@ -652,10 +663,12 @@ describe("a course, an edition, and a teacher's own courses", () => {
 
     expect(seen).toEqual({
       title: "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE",
-      cards: ["INGEGNERIA INFORMATICAB047"],
+      cards: ["INGEGNERIA INFORMATICA"],
       note: true,
+      // Behind its tab, kept mounted.
+      tabs: ["Edizioni2", `${i18n.t("staff.course.inPlan")}1`],
       editions: [
-        ["/staff/editions/5?programme=B047", "—", "demo-colleague, demo-teacher"],
+        ["/staff/editions/5?programme=B047", "Non corrente", "demo-colleague, demo-teacher"],
         ["/staff/editions/4?programme=B047", "Corrente", "demo-teacher"],
       ],
       crumbs: [
@@ -680,7 +693,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
     unmount();
 
     expect(seen).toEqual({
-      cards: ["INGEGNERIA INFORMATICAB047", "INGEGNERIA GESTIONALEB222"],
+      cards: ["INGEGNERIA INFORMATICA", "INGEGNERIA GESTIONALE"],
       shared: true,
     });
   });
@@ -691,20 +704,30 @@ describe("a course, an edition, and a teacher's own courses", () => {
     await settle();
     const seen = {
       path: path(),
-      cards: [...container.querySelectorAll("main h2")].map(text),
-      rows: [...container.querySelectorAll("main li")].map((li) => [
-        li.querySelector("a")?.getAttribute("href"),
-        text(li),
+      chips: [...container.querySelectorAll("main header .flex-wrap > span")].map(text),
+      rows: [...container.querySelectorAll<HTMLTableRowElement>("main tbody tr")].map((tr) => [
+        tr.querySelector("a")?.getAttribute("href"),
+        text(tr.querySelector("a")),
+        [...tr.cells].slice(1).map(text),
       ]),
     };
     unmount();
 
     expect(seen).toEqual({
       path: "/staff/mine",
-      cards: ["PROGETTAZIONE E PRODUZIONE MULTIMEDIALE"],
+      chips: ["2 edizioni"],
+      // The link names the year, since both rows are the same course.
       rows: [
-        ["/staff/editions/5", "2025-2026demo-colleague, demo-teacherImposta come corrente"],
-        ["/staff/editions/4", "2024-2025Correntedemo-teacher"],
+        [
+          "/staff/editions/5",
+          "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026",
+          ["2025-2026", "Non corrente", "demo-colleague, demo-teacher", "Imposta come corrente"],
+        ],
+        [
+          "/staff/editions/4",
+          "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2024-2025",
+          ["2024-2025", "Corrente", "demo-teacher", ""],
+        ],
       ],
     });
   });
@@ -757,24 +780,87 @@ describe("a course, an edition, and a teacher's own courses", () => {
     reader = who;
     const { container, unmount } = page(path);
     await settle();
+    const banner = [...container.querySelectorAll("main p")].find(
+      (p) => p.textContent === "Puoi vedere questa edizione, ma non assegnare docenti.",
+    );
+    const way = banner?.parentElement?.parentElement?.querySelector("a");
     const seen = {
+      chips: [...container.querySelectorAll("main header .flex-wrap > span")].map(text),
       people: [...container.querySelectorAll("main ul li")].map(text),
       crumbs: crumbs(container),
-      footnote: (container.textContent ?? "").includes(
-        "Solo la segreteria didattica e l'amministratore assegnano i docenti.",
-      ),
+      banner: banner === undefined ? null : [text(way), way?.getAttribute("href")],
+      assign: text(container.querySelector("main header [data-assign]")),
     };
     unmount();
 
     expect(seen).toEqual({
+      chips: ["2025-2026", "Non corrente", "B028451"],
       // The reader is marked as themselves; whoever may assign gets a "Revoca" per row.
       people:
         who === TEACHER
           ? ["demo-colleagueDocente", "demo-teachertuDocente"]
           : ["demo-colleagueDocenteRevoca", "demo-teacherDocenteRevoca"],
       crumbs: trail,
-      footnote,
+      // The banner and its way back where the button would be, or the button.
+      banner: footnote ? ["Torna ai miei insegnamenti", "/staff/mine"] : null,
+      assign: footnote ? null : "Assegna docente",
     });
+  });
+
+  it("marks and focuses the row a reader opened on coming back with Back, its path kept", async () => {
+    reader = SECRETARIAT;
+    const { container, unmount, back, path } = page("/staff/courses/B028451?programme=B047");
+    await settle();
+    const before = container.querySelectorAll("main tr[data-selected]").length;
+    act(() =>
+      container.querySelector<HTMLAnchorElement>('main a[href^="/staff/editions/5"]')?.click(),
+    );
+    await settle();
+    await act(() => back());
+    await settle();
+    const row = container.querySelector("main tr[data-selected]");
+    const seen = [
+      before,
+      path(),
+      row?.querySelector("a")?.getAttribute("href"),
+      document.activeElement === row?.querySelector("a"),
+    ];
+    unmount();
+
+    expect(seen).toEqual([
+      0,
+      "/staff/courses/B028451?programme=B047",
+      "/staff/editions/5?programme=B047",
+      true,
+    ]);
+  });
+
+  it("leaves the focus where a dialog puts it once the page reads again after Back", async () => {
+    reader = ADMIN;
+    const { container, unmount, back } = page("/staff/programmes/B047");
+    await settle();
+    act(() =>
+      container.querySelector<HTMLAnchorElement>('main a[href^="/staff/courses/"]')?.click(),
+    );
+    await settle();
+    await act(() => back());
+    await settle();
+    const marked = document.activeElement?.closest("tr")?.hasAttribute("data-selected");
+    showTab(container, "Segreteria didattica");
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Revoca demo-secretariat"]')
+        ?.click(),
+    );
+    const confirm = [
+      ...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+    ].find((candidate) => candidate.textContent === "Revoca");
+    act(() => confirm?.click());
+    await settle();
+    const focused = document.activeElement?.textContent?.trim();
+    unmount();
+
+    expect([marked, focused]).toEqual([true, "Assegna segreteria"]);
   });
 
   it("shows nothing of one edition while the next is read", async () => {

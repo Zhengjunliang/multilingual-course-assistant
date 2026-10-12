@@ -12,7 +12,8 @@
  * need no frame of its own (ui/table.tsx). A row opens its course, reached
  * through this programme: the course's name is the row's one link, stretched
  * over it, and its code and the curricula that list it are the line under it
- * (rule 1).
+ * (rule 1). Coming back with Back marks the row the reader opened
+ * (openedRow.ts), a course under two years being two rows.
  */
 
 import { ChevronRight } from "lucide-react";
@@ -34,6 +35,7 @@ import {
 import { ToggleGroup } from "@/components/ui/toggle-group";
 import { FILTER, isFilterKey } from "@/features/chat/shortcuts";
 import { coursePath } from "./crumbs";
+import { useOpenedRow } from "./openedRow";
 import { PlanNotes } from "./PlanNotes";
 import { PeopleInline } from "./people";
 import { studyPlan, yearCounts } from "./studyPlan";
@@ -52,6 +54,7 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
   const [year, setYear] = useState(ALL);
   const [query, setQuery] = useState("");
   const search = useRef<HTMLInputElement>(null);
+  const { opened, open } = useOpenedRow(true);
   const groups = studyPlan(rows, programme, curriculum === ALL ? null : curriculum, query);
   const years = studyPlan(rows, programme, null, "").map((group) => group.year);
   const counts = yearCounts(years, groups);
@@ -157,10 +160,15 @@ export function StudyPlanTable({ rows, programme }: StudyPlanTableProps) {
                 </th>
               </tr>
               {group.rows.map((row) => (
-                <TableRow key={row.course.code} className="relative cursor-pointer">
+                <TableRow
+                  key={row.course.code}
+                  selected={opened === `${row.course.code}:${group.year}`}
+                  className="relative cursor-pointer"
+                >
                   <TableCell>
                     <Link
                       to={coursePath(row.course.code, programme)}
+                      onClick={open(`${row.course.code}:${group.year}`)}
                       className="block font-semibold uppercase after:absolute after:inset-0 focus-visible:outline-2 focus-visible:outline-accent"
                     >
                       {row.course.name}

@@ -154,9 +154,9 @@
     },
     "programmes": {
       "title": "Degree programmes",
+      "count_one": "{{count}} degree programme",
+      "count_other": "{{count}} degree programmes",
       "empty": "No degree programme in your scope.",
-      "code": "Code",
-      "name": "Name",
       "sub": "Every degree programme on the site, with its teaching secretariat.",
       "subScoped": "The degree programmes whose teaching secretariat you belong to.",
       "curriculum": "Curricula",
@@ -222,6 +222,7 @@
     },
     "open": "Open",
     "current": "Current",
+    "past": "Not current",
     "course": {
       "inPlan": "In the study plan of",
       "twoCodesBoth": "Two codes, one course: each edition counts for both curricula.",
@@ -234,13 +235,14 @@
       "status": "Status"
     },
     "edition": {
-      "sub": "Edition {{year}} · {{programmes}}",
       "teachers": "The edition's teachers",
       "empty": "No teacher is assigned to this edition.",
       "onlyStaff": "Only the teaching secretariat and the administrator assign teachers."
     },
     "mine": {
       "title": "My courses",
+      "count_one": "{{count}} edition",
+      "count_other": "{{count}} editions",
       "sub": "The editions you are assigned to as a teacher.",
       "empty": "No course assigned.",
       "note": "A course has at most one current edition; changing it takes the permission on both editions."

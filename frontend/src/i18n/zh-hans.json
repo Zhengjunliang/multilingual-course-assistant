@@ -154,9 +154,9 @@
     },
     "programmes": {
       "title": "专业",
+      "count_one": "{{count}} 个专业",
+      "count_other": "{{count}} 个专业",
       "empty": "你负责的范围内没有专业。",
-      "code": "代码",
-      "name": "名称",
       "sub": "本站的全部学位专业，及其教学秘书处。",
       "subScoped": "你所在教学秘书处的学位专业。",
       "curriculum": "方向",
@@ -222,6 +222,7 @@
     },
     "open": "打开",
     "current": "当前",
+    "past": "非当前",
     "course": {
       "inPlan": "所在学习计划",
       "twoCodesBoth": "两个代码，同一门课：每个版本对两个方向都有效。",
@@ -234,13 +235,14 @@
       "status": "状态"
     },
     "edition": {
-      "sub": "{{year}} 版本 · {{programmes}}",
       "teachers": "本版本的教师",
       "empty": "本版本没有指派教师。",
       "onlyStaff": "只有教学秘书和管理员能指派教师。"
     },
     "mine": {
       "title": "我的课程",
+      "count_one": "{{count}} 个版本",
+      "count_other": "{{count}} 个版本",
       "sub": "你作为教师被指派的版本。",
       "empty": "没有指派的课程。",
       "note": "一门课程最多有一个当前版本；更换它需要对两个版本都有权限。"
