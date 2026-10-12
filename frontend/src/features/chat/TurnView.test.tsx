@@ -316,6 +316,21 @@ describe("a pill in the answer", () => {
     ]);
   });
 
+  it("merged over two excerpts of one page, previews the page once, at the first it names", () => {
+    // One card entry per page, as «+N» counts them: a run of five excerpts of
+    // two pages made a card taller than the window.
+    vi.useFakeTimers();
+    const { container, unmount } = mounted(
+      turn({ answer: "Le sessioni invernali [Excerpt 4][Excerpt 3].", citations: CALENDAR }),
+    );
+    const pills = [...container.querySelectorAll<HTMLAnchorElement>("a[data-pill]")].map(opened);
+    unmount();
+
+    expect(pills).toEqual([
+      { at: expect.stringContaining("Sessione invernale 2026-27"), shows: [CALENDAR_TEXTS[3]] },
+    ]);
+  });
+
   it("cited by the page's marker, previews and opens the page's first excerpt", () => {
     vi.useFakeTimers();
     const { container, unmount } = mounted(
