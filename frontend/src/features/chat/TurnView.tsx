@@ -18,12 +18,12 @@
  * answered and keeps every other turn object as it was.
  */
 
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { Mascot } from "@/components/Mascot";
-import { badgesOf, citedMarkers, resolveExcerptRefs } from "@/lib/markers";
+import { citedMarkers } from "@/lib/markers";
 import { AnswerActions } from "./AnswerActions";
 import { AnswerStream } from "./AnswerStream";
 import { ProcessLine } from "./ProcessLine";
@@ -70,13 +70,9 @@ export const TurnView = memo(function TurnView({
   visitor,
 }: TurnViewProps) {
   const { t } = useTranslation();
-  // Kept by identity: the answer's badges hang off this array, and a new one on
-  // every render would redraw them.
-  const badges = useMemo(() => badgesOf(turn.citations), [turn.citations]);
-  // Resolution waits for `complete` for the same reason marker matching does:
-  // "[Excerpt 2]" is routinely split across two token events.
-  const answer = turn.complete ? resolveExcerptRefs(turn.answer, turn.citations) : turn.answer;
-  const cited = turn.complete ? citedMarkers(answer, badges) : null;
+  // References are read only once the answer is complete: a marker, or
+  // "[Excerpt 2]", is routinely split across two token events.
+  const cited = turn.complete ? citedMarkers(turn.answer, turn.citations) : null;
   const working = thinking || live;
   const waiting = working && turn.answer === "";
 
@@ -108,9 +104,8 @@ export const TurnView = memo(function TurnView({
               working. Then the caret, alone until the first word. */}
           {(turn.answer !== "" || (live && turn.route !== null)) && (
             <AnswerStream
-              text={answer}
+              text={turn.answer}
               lang={turn.locale ?? undefined}
-              badges={badges}
               complete={turn.complete}
               live={live}
               citations={turn.citations}
@@ -119,8 +114,7 @@ export const TurnView = memo(function TurnView({
 
           {!working && (
             <AnswerActions
-              answer={answer}
-              badges={badges}
+              answer={turn.answer}
               citations={turn.citations}
               cited={cited}
               complete={turn.complete}

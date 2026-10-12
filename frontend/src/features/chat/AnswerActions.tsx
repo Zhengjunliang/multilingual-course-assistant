@@ -16,7 +16,7 @@ import { useTranslation } from "react-i18next";
 import type { Citation } from "@/api/contract";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { type Badge, withoutMarkers } from "@/lib/markers";
+import { withoutMarkers } from "@/lib/markers";
 import { SourceIcon, SourcesPanel } from "./SourcesPanel";
 import { sourcesOf } from "./sourceLabel";
 
@@ -27,9 +27,8 @@ const COPIED_MS = 2000;
 const STACKED = 3;
 
 interface AnswerActionsProps {
-  /** The answer with its references resolved, as the prose shows it. */
+  /** The answer as the model wrote it, references and all. */
   answer: string;
-  badges: readonly Badge[];
   citations: readonly Citation[];
   /** The markers the answer used; `null` for an answer that did not finish. */
   cited: ReadonlySet<string> | null;
@@ -37,7 +36,7 @@ interface AnswerActionsProps {
   complete: boolean;
 }
 
-export function AnswerActions({ answer, badges, citations, cited, complete }: AnswerActionsProps) {
+export function AnswerActions({ answer, citations, cited, complete }: AnswerActionsProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
@@ -50,7 +49,7 @@ export function AnswerActions({ answer, badges, citations, cited, complete }: An
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(withoutMarkers(answer, badges));
+      await navigator.clipboard.writeText(withoutMarkers(answer, citations));
       setCopied(true);
     } catch {
       // The browser refused the clipboard (an insecure origin, a denied
