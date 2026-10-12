@@ -11,13 +11,14 @@
  * is two rows (features/staff/studyPlan.ts).
  */
 
-import { Lock } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { useCallback } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { listStudyPlan, readProgramme } from "@/api/catalog";
 import { Banner } from "@/components/ui/banner";
+import { buttonVariants } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Tabs } from "@/components/ui/tabs";
 import { useMembers } from "@/features/staff/actions";
@@ -105,7 +106,22 @@ export default function ProgrammePage() {
                   {members.assign}
                 </div>
                 {!assigns && (
-                  <Banner icon={Lock} heading={t("staff.refusal.cannot.assignSecretariat")} />
+                  <Banner
+                    icon={Lock}
+                    heading={t("staff.refusal.cannot.assignSecretariat")}
+                    action={
+                      // The reader's own start, unless it is this programme already.
+                      back.to === `/staff/programmes/${encodeURIComponent(code)}` ? undefined : (
+                        <Link
+                          to={back.to}
+                          className={buttonVariants({ variant: "outline", size: "sm" })}
+                        >
+                          <ArrowLeft aria-hidden className="size-icon" />
+                          {back.label}
+                        </Link>
+                      )
+                    }
+                  />
                 )}
                 <StaffList
                   people={programme.secretariat}

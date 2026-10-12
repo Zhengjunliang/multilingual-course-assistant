@@ -393,6 +393,8 @@ beforeEach(() => {
   switchable = true;
   held = null;
   lost = false;
+  // Each test is a tab of its own: no row noted by another (features/staff/openedRow.ts).
+  sessionStorage.clear();
   vi.stubGlobal("fetch", fakeApi);
 });
 
@@ -579,6 +581,27 @@ describe("the programme pages", () => {
           : "Giulia Neritudemo-secretariatSegreteria",
       ],
       banner: footnote,
+    });
+  });
+
+  it("starts the plan on every year and curriculum chosen, and keeps a year pressed again", async () => {
+    reader = ADMIN;
+    const { container, unmount } = page("/staff/programmes/B047");
+    await settle();
+    const chosen = () =>
+      [...container.querySelectorAll('main [role="radio"][aria-checked="true"]')].map(text);
+    const atStart = chosen();
+    const third = [...container.querySelectorAll<HTMLButtonElement>('main [role="radio"]')].find(
+      (option) => option.textContent?.startsWith("3°"),
+    );
+    act(() => third?.click());
+    act(() => third?.click());
+    const again = chosen();
+    unmount();
+
+    expect({ atStart, again }).toEqual({
+      atStart: ["Tutti1", "Tutti"],
+      again: ["3° anno1", "Tutti"],
     });
   });
 
@@ -833,6 +856,25 @@ describe("a course, an edition, and a teacher's own courses", () => {
       "/staff/editions/5?programme=B047",
       true,
     ]);
+  });
+
+  it("marks nothing on a page loaded afresh, though the last one loaded afresh noted a row", async () => {
+    reader = TEACHER;
+    const mine = page("/staff/mine");
+    await settle();
+    act(() =>
+      mine.container.querySelector<HTMLAnchorElement>('main a[href="/staff/editions/5"]')?.click(),
+    );
+    await settle();
+    mine.unmount();
+    reader = SECRETARIAT;
+    // Another page opened from the address bar: its first entry, like the last one's.
+    const { container, unmount } = page("/staff/courses/B028451?programme=B047");
+    await settle();
+    const marked = container.querySelectorAll("main tr[data-selected]").length;
+    unmount();
+
+    expect(marked).toBe(0);
   });
 
   it("leaves the focus where a dialog puts it once the page reads again after Back", async () => {
