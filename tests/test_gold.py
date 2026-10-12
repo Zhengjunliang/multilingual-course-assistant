@@ -10,7 +10,7 @@ from types import ModuleType
 import pytest
 from test_agent import ScriptedCompleter
 from test_index import StubDense, StubSparse, make_chunk
-from test_search import ORM_TEXT, TASSE_TEXT, TASSE_URL, make_web_chunk
+from test_search import ORM_TEXT, TASSE_TEXT, TASSE_URL, KeywordReranker, make_web_chunk
 
 from rag.gold import (
     EVAL_SCOPE,
@@ -122,6 +122,41 @@ def test_each_gold_set_keeps_its_own_id_prefix_and_answer_files() -> None:
     refs = [row["answer_ref"] for rows in sets.values() for row in rows]
     assert len(ids) == len(set(ids))
     assert len(refs) == len(set(refs))
+
+
+def test_cli_min_score_reports_how_many_sources_each_question_kept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    qdrant_path = tmp_path / "qdrant"
+    qdrant = open_client(qdrant_path)
+    ensure_collection(qdrant, StubDense().dimension())
+    texts = [ORM_TEXT, "Django views render the templates.", "Merge sort splits the array."]
+    index_chunks(
+        qdrant, [make_chunk(i, text) for i, text in enumerate(texts)], StubDense(), StubSparse()
+    )
+    qdrant.close()
+
+    # KeywordReranker calls a text relevant when it holds the question's first
+    # word: two texts answer the first question, one the second.
+    questions = [
+        make_question(page=1).model_copy(update={"question": "django views"}),
+        make_question(page=3).model_copy(update={"id": "q002", "question": "merge sort"}),
+    ]
+    gold_file = tmp_path / "smoke.jsonl"
+    gold_file.write_text(
+        "".join(question.model_dump_json() + "\n" for question in questions), encoding="utf-8"
+    )
+    monkeypatch.setattr("rag.index.build_dense_encoder", lambda model_name: StubDense())
+    monkeypatch.setattr("rag.index.build_sparse_encoder", StubSparse)
+    monkeypatch.setattr("rag.gold.build_reranker", lambda model_name: KeywordReranker())
+
+    main([str(gold_file), "--qdrant", str(qdrant_path), "--min-score", "0.5"])
+    out = capsys.readouterr().out
+    assert "hit@5: 2/2 (100%)" in out
+    assert "questions by number of sources, min score 0.5: 1: 1, 2: 1" in out
+
+    main([str(gold_file), "--qdrant", str(qdrant_path)])
+    assert "questions by number of sources" not in capsys.readouterr().out
 
 
 def test_cli_reports_hits_and_rate(

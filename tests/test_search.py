@@ -303,6 +303,22 @@ def test_client_fusion_ranks_and_scores_like_qdrant_rrf_when_nothing_ties(tmp_pa
     ]
 
 
+def test_a_relevance_cutoff_keeps_what_the_reranker_calls_relevant_and_never_nothing(
+    client: QdrantClient,
+) -> None:
+    def texts(query: str, reranker: Reranker | None) -> list[str]:
+        hits = search(
+            client, query, StubDense(), StubSparse(), reranker, scope=None, limit=3, min_score=0.5
+        )
+        return [hit.chunk.text for hit in hits]
+
+    assert texts("django models", KeywordReranker()) == [ORM_TEXT]
+    # Nothing relevant: the best of what there is, rather than an empty grounding set.
+    assert len(texts("kubernetes", KeywordReranker())) == 1
+    # Fusion scores are ranks, not judgements: without a reranker nothing is cut.
+    assert len(texts("django models", None)) == 3
+
+
 def test_search_with_reranker_promotes_its_ranking(client: QdrantClient) -> None:
     hits = search(
         client, "django orm", StubDense(), StubSparse(), KeywordReranker(), scope=None, limit=1

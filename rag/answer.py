@@ -31,6 +31,7 @@ from rag.llm import (
 from rag.probe import configure_cli_logging
 from rag.search import (
     DEFAULT_RERANK_MODEL,
+    RELEVANCE_CUTOFF,
     Hit,
     build_reranker,
     search,
@@ -249,6 +250,7 @@ def main(argv: list[str] | None = None) -> None:
         reranker,
         scope=None,
         limit=args.top_k,
+        min_score=RELEVANCE_CUTOFF,
         collections=tuple(args.collection) if args.collection else (COLLECTION,),
     )
     client.close()

@@ -45,7 +45,7 @@ from apps.qa.contract import Citation, EndEvent, ErrorEvent, Event, StartEvent, 
 from rag.agent import collections_for, route
 from rag.answer import answer
 from rag.chunk import detect_locale
-from rag.search import search
+from rag.search import RELEVANCE_CUTOFF, search
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterator, Sequence
@@ -60,8 +60,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# The CLI default (`rag.answer`, `rag.agent`), restated rather than imported
-# because those are argparse defaults rather than a shared constant.
+# The most sources an answer is given: `search()` keeps fewer when the reranker
+# calls the rest irrelevant (`RELEVANCE_CUTOFF`). The CLI default (`rag.answer`,
+# `rag.agent`), restated rather than imported because those are argparse
+# defaults rather than a shared constant.
 TOP_K = 5
 
 # How long a request may wait for the one in front of it. Answers take tens of
@@ -223,6 +225,7 @@ class Engine:
                 self.reranker,
                 scope=scope,
                 limit=TOP_K,
+                min_score=RELEVANCE_CUTOFF,
                 collections=available,
             )
         except ResponseHandlingException as exc:

@@ -65,7 +65,7 @@ from rag.llm import (
 )
 from rag.passages import collapse
 from rag.probe import configure_cli_logging
-from rag.search import DEFAULT_RERANK_MODEL, Hit, build_reranker, search
+from rag.search import DEFAULT_RERANK_MODEL, RELEVANCE_CUTOFF, Hit, build_reranker, search
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -823,6 +823,7 @@ def main(argv: list[str] | None = None) -> None:
             reranker,
             scope=None,
             limit=args.top_k,
+            min_score=RELEVANCE_CUTOFF,
             collections=collections_for(decision),
         )
 
