@@ -33,8 +33,6 @@ interface Occurrence {
   at: number;
   end: number;
   excerpts: number[];
-  /** The marker the model wrote, for a reference that is one. */
-  marker?: string;
 }
 
 /**
@@ -77,59 +75,30 @@ function excerptRefs(answer: string, citations: readonly Citation[]): Occurrence
   return found;
 }
 
-/**
- * Where the answer writes a marker, as the prompt asks it to. A marker names a
- * page, and stands for that page's first excerpt, its best-ranked, unless an
- * excerpt reference beside it says which (`besideExcerpts`).
- */
-function markerRefs(answer: string, citations: readonly Citation[]): Occurrence[] {
+/** Each page's marker, and the number of its first excerpt, its best-ranked. */
+function firstExcerpts(citations: readonly Citation[]): Map<string, number> {
   const first = new Map<string, number>();
   citations.forEach((citation, index) => {
     if (!first.has(citation.marker)) first.set(citation.marker, index + 1);
   });
+  return first;
+}
+
+/**
+ * Where the answer writes a marker, as the prompt asks it to. A marker names a
+ * page, and stands for that page's first excerpt (`pillSources` says when a
+ * pill shows another).
+ */
+function markerRefs(answer: string, citations: readonly Citation[]): Occurrence[] {
   const found: Occurrence[] = [];
-  for (const [marker, excerpt] of first) {
+  for (const [marker, excerpt] of firstExcerpts(citations)) {
     let at = answer.indexOf(marker);
     while (at !== -1) {
-      found.push({ at, end: at + marker.length, excerpts: [excerpt], marker });
+      found.push({ at, end: at + marker.length, excerpts: [excerpt] });
       at = answer.indexOf(marker, at + marker.length);
     }
   }
   return found;
-}
-
-/** Only spaces or tabs: two references on one line, written side by side. */
-const SIDE_BY_SIDE = /^[ \t]*$/;
-
-/**
- * A marker written right beside an excerpt reference of its own page, as the
- * prompt's header reads ("Excerpt 3 [m]:", rag/answer.py) and the model copies
- * it, stands for that excerpt rather than the page's first: the pair is one
- * citation. The reference before the marker is looked at first, as the header
- * puts it there.
- */
-function besideExcerpts(
-  taken: readonly Occurrence[],
-  answer: string,
-  citations: readonly Citation[],
-): void {
-  taken.forEach((reference, index) => {
-    if (reference.marker === undefined) return;
-    for (const other of [taken[index - 1], taken[index + 1]]) {
-      if (other === undefined || other.marker !== undefined) continue;
-      const between =
-        other.end <= reference.at
-          ? answer.slice(other.end, reference.at)
-          : answer.slice(reference.end, other.at);
-      const same = other.excerpts.filter(
-        (number) => citationOf(citations, number)?.marker === reference.marker,
-      );
-      if (SIDE_BY_SIDE.test(between) && same.length > 0) {
-        reference.excerpts = same;
-        return;
-      }
-    }
-  });
 }
 
 /**
@@ -152,16 +121,11 @@ export function segmentAnswer(answer: string, citations: readonly Citation[]): S
   const found = [...excerptRefs(answer, citations), ...markerRefs(answer, citations)].sort(
     (a, b) => a.at - b.at || b.end - a.end,
   );
-  const taken: Occurrence[] = [];
-  for (const occurrence of found) {
-    // One that overlaps something already taken is dropped.
-    if (occurrence.at >= (taken.at(-1)?.end ?? 0)) taken.push(occurrence);
-  }
-  besideExcerpts(taken, answer, citations);
 
   const segments: Segment[] = [];
   let cursor = 0;
-  for (const { at, end, excerpts } of taken) {
+  for (const { at, end, excerpts } of found) {
+    if (at < cursor) continue; // overlaps something already taken
     if (at > cursor) segments.push({ kind: "text", at: cursor, text: answer.slice(cursor, at) });
     segments.push({ kind: "reference", at, excerpts });
     cursor = end;
@@ -279,9 +243,10 @@ function needsBreak(text: string, at: number): boolean {
 
 /**
  * A complete answer with each reference replaced by the sentinels of its
- * excerpts, a space between them, ready to parse: `remarkPills` draws them as
- * one pill, and where a pill cannot sit they are written back as the markers
- * they stand for, a space between them, as the model would have written them.
+ * excerpts, side by side, ready to parse. Nothing stands between them: GFM's
+ * late autolink pass runs on to an ASCII space, so a space there would let
+ * `remarkPills` cut the link after the first pill and leave the rest in a
+ * text node of their own, two pills where the answer wrote one reference.
  *
  * Any sentinel character already in the answer goes first, spelled out or as a
  * character reference: the characters are this format's, and a stray one would
@@ -294,7 +259,7 @@ export function withPills(answer: string, citations: readonly Citation[]): strin
     .map((segment) => {
       if (segment.kind === "text") return segment.text;
       const pills = segment.excerpts.map((number) => `${PILL_OPEN}${number}${PILL_CLOSE}`);
-      return (needsBreak(clean, segment.at) ? PILL_BREAK : "") + pills.join(" ");
+      return (needsBreak(clean, segment.at) ? PILL_BREAK : "") + pills.join("");
     })
     .join("");
 }
@@ -317,13 +282,47 @@ export interface MdNode {
 
 /**
  * A `withPills` answer as plain prose again: sentinels written back as the
- * markers of their excerpts, and strays dropped. For an answer that cannot be
- * drawn as Markdown, and for text a pill cannot sit in.
+ * markers of their excerpts, a space between two that one reference put side
+ * by side, and strays dropped. For an answer that cannot be drawn as Markdown,
+ * and for text a pill cannot sit in.
  */
 export function withoutPills(text: string, citations: readonly Citation[]): string {
   return text
-    .replace(PILL, (_, number: string) => citationOf(citations, number)?.marker ?? number)
+    .replace(PILL, (pill: string, number: string, at: number) => {
+      const written = citationOf(citations, number)?.marker ?? number;
+      return text.startsWith(PILL_OPEN, at + pill.length) ? `${written} ` : written;
+    })
     .replace(SENTINELS, "");
+}
+
+/**
+ * The sources a pill stands for, given the excerpt numbers it was drawn from:
+ * one per page, in the order the pill names them, each at the first excerpt
+ * the pill names on it other than the page's first, else at the page's first.
+ *
+ * A marker can only name its page's first excerpt, so where the pill also
+ * holds another number of that page — "[m] (Excerpt 3)", the pair the
+ * prompt's header shows, or a marker and a number a line apart, which
+ * `remarkPills` draws as one pill — the number is the passage the answer
+ * meant. One excerpt per page, as «+N» and the sources panel count them: a
+ * card listing each excerpt of a run of five over two pages stood taller than
+ * the window.
+ */
+export function pillSources(
+  numbers: readonly number[],
+  citations: readonly Citation[],
+): Citation[] {
+  const first = firstExcerpts(citations);
+  const chosen = new Map<string, number>();
+  for (const number of numbers) {
+    const marker = citationOf(citations, number)?.marker;
+    if (marker === undefined) continue;
+    const held = chosen.get(marker);
+    if (held === undefined || held === first.get(marker)) chosen.set(marker, number);
+  }
+  return [...chosen.values()]
+    .map((number) => citationOf(citations, number))
+    .filter((citation) => citation !== undefined);
 }
 
 /** Where a sentinel is shown as the marker it stands for: text a pill cannot sit in. */

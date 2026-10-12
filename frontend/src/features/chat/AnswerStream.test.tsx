@@ -125,6 +125,17 @@ describe("an answer", () => {
     // the next ASCII space: after full-width punctuation, and inside a `[`.
     ["after a link found late", `详情见官网（www.unifi.it）${WEB}的说明。`, "</a><a"],
     ["inside an open bracket", `[vedi https://x.it/a${SLIDES}]`, "</a><a"],
+    // A list of excerpts there too: its pills stay one.
+    [
+      "after a link found late, written as an excerpt list",
+      "详情见官网（www.unifi.it）[Excerpt 1 e Excerpt 2]的说明。",
+      "</a><a",
+    ],
+    [
+      "inside an open bracket, written as an excerpt list",
+      "[vedi https://x.it/a(Excerpt 1, 2)]",
+      "</a><a",
+    ],
   ])("makes one pill of a marker %s, with no link inside it", (_, text, around) => {
     const html = answer(text);
 

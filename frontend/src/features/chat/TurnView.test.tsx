@@ -316,7 +316,7 @@ describe("a pill in the answer", () => {
     ]);
   });
 
-  it("merged over two excerpts of one page, previews the page once, at the first it names", () => {
+  it("merged over two excerpts of one page, previews the page once, at the first number it names", () => {
     // One card entry per page, as «+N» counts them: a run of five excerpts of
     // two pages made a card taller than the window.
     vi.useFakeTimers();

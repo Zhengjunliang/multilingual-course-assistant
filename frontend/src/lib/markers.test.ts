@@ -3,6 +3,7 @@ import type { Citation } from "@/api/contract";
 import {
   citedMarkers,
   type MdNode,
+  pillSources,
   remarkPills,
   segmentAnswer,
   withoutMarkers,
@@ -95,17 +96,6 @@ describe("segmentAnswer, on excerpt numbers", () => {
     expect(cut("2025-26: Excerpt 3. 2026-27: [Excerpt 4]. [WEB p537]", page)).toBe(
       "2025-26: {3}. 2026-27: {4}. {1}",
     );
-  });
-
-  it("reads a marker beside an excerpt reference of its page as that excerpt", () => {
-    // The prompt's header reads "Excerpt 3 [m]:", and the model copies the
-    // pair either way round. Across a line break the two are two citations.
-    const page = Array.from({ length: 4 }, () => cite("[W]"));
-    expect(cut("19 gennaio [W] (Excerpt 3). 18 gennaio Excerpt 4 [W].\n[W]\nExcerpt 2", page)).toBe(
-      "19 gennaio {3} {3}. 18 gennaio {4} {4}.\n{1}\n{2}",
-    );
-    // Beside an excerpt of another page, a marker keeps its own page.
-    expect(cut("[A] Excerpt 2", [cite("[A]"), cite("[B]")])).toBe("{1} {2}");
   });
 
   it("leaves a marker whole when its own text holds an excerpt reference", () => {
@@ -222,9 +212,41 @@ describe("remarkPills", () => {
     expect(pills("Vedi Excerpt 1 Excerpt 2.", [cite("[A]"), cite("[A]")])).toEqual(["1,2"]);
   });
 
-  it("draws a marker and the excerpt reference beside it as one pill of that excerpt", () => {
+  it("draws a marker and an excerpt number beside it as one pill, whatever space parts them", () => {
+    // The prompt's header reads "Excerpt 3 [m]:", and the model copies the
+    // pair either way round; `pillSources` then shows the numbered excerpt.
     const page = Array.from({ length: 4 }, () => cite("[W]"));
-    expect(pills("19 gennaio [W] (Excerpt 3).", page)).toEqual(["3"]);
+    expect(
+      [
+        "[W] (Excerpt 3).",
+        "Excerpt 3 [W].",
+        "[W]\nExcerpt 3.",
+        "[W] (Excerpt 3).",
+        "[W]　Excerpt 3。",
+      ].map((answer) => pills(answer, page)),
+    ).toEqual([["1,3"], ["3,1"], ["1,3"], ["1,3"], ["1,3"]]);
+  });
+});
+
+describe("pillSources", () => {
+  // Four excerpts of one page, then a page of its own.
+  const citations = [...Array.from({ length: 4 }, () => cite("[W]")), cite("[N]")];
+  /** The excerpts a pill drawn from `numbers` shows, by their numbers. */
+  const shown = (numbers: number[]) =>
+    pillSources(numbers, citations).map((citation) => citations.indexOf(citation) + 1);
+
+  it("shows the excerpt a number names over the first one its page's marker stands for", () => {
+    expect([shown([1, 3]), shown([3, 1]), shown([1])]).toEqual([[3], [3], [1]]);
+  });
+
+  it("shows each page once, in the order the pill names them, at the first number it names", () => {
+    // "[W] [N] Excerpt 2": the marker of [W], the marker of [N], then [W]'s
+    // second excerpt.
+    expect([shown([1, 5, 2]), shown([4, 3])]).toEqual([[2, 5], [4]]);
+  });
+
+  it("leaves out a number with no excerpt behind it", () => {
+    expect(shown([0, 9, 5])).toEqual([5]);
   });
 });
 
