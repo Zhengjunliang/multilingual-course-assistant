@@ -7,7 +7,60 @@
  * as tokens arrive would report a citation missing and then wrong.
  */
 
+import remarkCjkFriendly from "remark-cjk-friendly";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import remarkParse from "remark-parse";
+import { type PluggableList, unified } from "unified";
 import type { Citation } from "@/api/contract";
+
+/**
+ * The Markdown an answer is written in, as `AnswerMarkdown` draws it and as
+ * `segmentAnswer` reads where its code is.
+ *
+ * remark-cjk-friendly after remark-gfm, as its README asks: it lets bold open
+ * and close next to the full-width punctuation of Chinese text. remark-math
+ * only marks `$$…$$` as math here, so that Markdown escapes leave its
+ * backslashes alone; typesetting it is MathMarkdown's job. A single `$` is not
+ * math: answers quote prices.
+ */
+export const ANSWER_SYNTAX: PluggableList = [
+  remarkGfm,
+  remarkCjkFriendly,
+  [remarkMath, { singleDollarTextMath: false }],
+];
+
+const answerParser = unified().use(remarkParse).use(ANSWER_SYNTAX);
+
+/** A parsed node's extent in the answer, the part of mdast `literalSpans` reads. */
+interface Spanned {
+  type: string;
+  position?: { start: { offset?: number }; end: { offset?: number } };
+  children?: Spanned[];
+}
+
+/**
+ * Where the answer holds code, math or raw HTML, as offsets: a reference
+ * written there is text, as `remarkPills` shows it, so `x = [1]` in a code
+ * block is neither a citation nor dropped from a copy. An answer the parser
+ * cannot take, nested too deep, has none, and is read as prose throughout.
+ */
+function literalSpans(answer: string): Array<[number, number]> {
+  const spans: Array<[number, number]> = [];
+  const visit = (node: Spanned) => {
+    const { start, end } = node.position ?? { start: {}, end: {} };
+    if (LITERAL_VALUES.has(node.type) && start.offset !== undefined && end.offset !== undefined) {
+      spans.push([start.offset, end.offset]);
+    }
+    node.children?.forEach(visit);
+  };
+  try {
+    visit(answerParser.parse(answer));
+  } catch {
+    return [];
+  }
+  return spans;
+}
 
 /**
  * The citation an excerpt number names, if the answer has one under it.
@@ -137,12 +190,13 @@ export type Segment =
  * Where two references start at one offset the longer is taken, so a marker
  * that is a prefix of another — two pages of the same deck differ only by a
  * digit — cannot shadow it; overlapping references are dropped rather than
- * nested.
+ * nested. A reference inside code, math or raw HTML is prose (`literalSpans`).
  */
 export function segmentAnswer(answer: string, citations: readonly Citation[]): Segment[] {
-  const found = [...excerptRefs(answer, citations), ...markerRefs(answer, citations)].sort(
-    (a, b) => a.at - b.at || b.end - a.end,
-  );
+  const literal = literalSpans(answer);
+  const found = [...excerptRefs(answer, citations), ...markerRefs(answer, citations)]
+    .filter(({ at }) => !literal.some(([start, end]) => start <= at && at < end))
+    .sort((a, b) => a.at - b.at || b.end - a.end);
 
   const segments: Segment[] = [];
   let cursor = 0;
