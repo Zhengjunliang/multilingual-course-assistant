@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import i18n, { initialLocale, UI_LOCALES, type UiLocale } from "@/i18n";
+import i18n, { initialLocale, languageList, languageName, UI_LOCALES, type UiLocale } from "@/i18n";
 
 describe("the interface language", () => {
   it.each(UI_LOCALES)("resolves %s to its own catalogue", async (locale) => {
@@ -41,5 +41,16 @@ describe("the language the interface starts in", () => {
     { languages: ["en-GB"], stored: "fr", starts: "en" },
   ])("is $starts for $languages with $stored remembered", ({ languages, stored, starts }) => {
     expect(initialLocale(languages, stored)).toBe(starts);
+  });
+});
+
+describe("a language named in the interface's", () => {
+  it("is one name, or several as one phrase", () => {
+    expect(languageName("en", "it")).toBe("inglese");
+    expect(languageList(["it", "en"], "it")).toBe("italiano e inglese");
+  });
+
+  it("is the tag itself when no language has it", () => {
+    expect(languageName("", "it")).toBe("");
   });
 });

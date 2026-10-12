@@ -46,6 +46,26 @@ export function languageCode(locale: string): string {
 }
 
 /**
+ * A language's name in the interface's language `ui`: "inglese", "English",
+ * "英语". A tag `Intl.DisplayNames` cannot read, from a stored excerpt, is
+ * shown as it is rather than allowed to throw.
+ */
+export function languageName(locale: string, ui: string): string {
+  try {
+    return new Intl.DisplayNames([ui], { type: "language" }).of(locale) ?? locale;
+  } catch {
+    return locale;
+  }
+}
+
+/** Several languages named in `ui` as one phrase: "italiano e inglese". */
+export function languageList(locales: readonly string[], ui: string): string {
+  return new Intl.ListFormat(ui, { type: "conjunction" }).format(
+    locales.map((locale) => languageName(locale, ui)),
+  );
+}
+
+/**
  * The interface language a browser language tag asks for, or `null` when it
  * asks for none of them.
  *
