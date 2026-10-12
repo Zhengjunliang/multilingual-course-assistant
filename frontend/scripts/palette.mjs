@@ -114,10 +114,40 @@ export const PAIRS = [
     where: "TurnView.tsx failure box, button.tsx warn variant, chip.tsx warn tone",
   },
   {
+    front: "muted",
+    back: "tint",
+    min: TEXT,
+    where: "toggle-group.tsx an option not chosen, card.tsx CardFooter's caption",
+  },
+  {
+    front: "ink",
+    back: "accent-soft",
+    min: TEXT,
+    where: "banner.tsx info title",
+  },
+  {
+    front: "muted",
+    back: "accent-soft",
+    min: TEXT,
+    where: "banner.tsx info sentence",
+  },
+  {
+    front: "ink",
+    back: "warn",
+    min: TEXT,
+    where: "banner.tsx warn title",
+  },
+  {
+    front: "muted",
+    back: "warn",
+    min: TEXT,
+    where: "banner.tsx warn sentence",
+  },
+  {
     front: "ink",
     back: "tint",
     min: TEXT,
-    where: "routes/styleguide/basics.tsx the --tint swatch",
+    where: "card.tsx CardFooter, routes/styleguide/basics.tsx the --tint swatch",
   },
   {
     front: "warn-ink",
@@ -160,6 +190,12 @@ export const TINTS = [
     ground: "sidebar",
     fronts: ["ink"],
     where: "button.tsx ghost variant under the pointer, ConversationSidebar.tsx icon buttons",
+  },
+  {
+    tint: "hover",
+    ground: "tint",
+    fronts: ["ink"],
+    where: "toggle-group.tsx an option under the pointer",
   },
   {
     tint: "selected",

@@ -9,8 +9,8 @@
  * frame that scrolls. The frame is also the
  * containing block of what is positioned inside it — a screen-reader label, a
  * row's stretched link — so nothing absolute escapes it and widens the page. A
- * row under the pointer wears `--mark`, the same quiet fill as everywhere else
- * something can be acted on.
+ * row under the pointer wears `--hover`, the accent's 6 %, as everything else
+ * under the pointer does.
  *
  * Below `sm` every row stacks into a card, the U.S. Web Design System's
  * "stacked" table (outside the repository): a phone has no width for five
@@ -76,7 +76,7 @@ export function TableRow({ className, ...props }: ComponentProps<"tr">) {
       // biome-ignore lint/a11y/noRedundantRoles: restores the role a stacked table loses in WebKit
       role="row"
       className={cn(
-        "border-line border-b transition-colors hover:bg-mark",
+        "border-line border-b transition-colors hover:bg-hover",
         "max-sm:flex max-sm:flex-col max-sm:gap-hair max-sm:rounded-card max-sm:border max-sm:bg-surface max-sm:p-snug max-sm:shadow-raised",
         className,
       )}
