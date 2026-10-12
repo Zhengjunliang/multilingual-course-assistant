@@ -17,7 +17,7 @@ describe("cn", () => {
     ],
     ["two colours", ["text-ink", "text-muted"], "text-muted"],
     ["two sizes", ["text-caption", "text-body"], "text-body"],
-    ["two heights", ["min-h-field", "min-h-control-icon"], "min-h-control-icon"],
+    ["two heights", ["min-h-control-sm", "min-h-control-icon"], "min-h-control-icon"],
     ["two paddings", ["px-snug py-tight", "px-hair"], "py-tight px-hair"],
     ["two corners", ["rounded-control", "rounded-full"], "rounded-full"],
     ["two shadows", ["shadow-raised", "shadow-none"], "shadow-none"],

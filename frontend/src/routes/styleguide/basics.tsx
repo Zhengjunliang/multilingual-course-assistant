@@ -67,15 +67,15 @@ export function Basics() {
         {(["chip", "control", "card", "bubble"] as const).map((corner) => (
           <span
             key={corner}
-            className={`${CORNERS[corner]} flex size-field items-end border border-line bg-surface p-hair font-mono text-caption text-muted`}
+            className={`${CORNERS[corner]} flex size-mascot items-end border border-line bg-surface p-hair font-mono text-caption text-muted`}
           >
             {corner}
           </span>
         ))}
-        <span className="flex size-field items-end rounded-card bg-surface p-hair font-mono text-caption text-muted shadow-raised">
+        <span className="flex size-mascot items-end rounded-card bg-surface p-hair font-mono text-caption text-muted shadow-raised">
           raised
         </span>
-        <span className="flex size-field items-end rounded-card bg-surface p-hair font-mono text-caption text-muted shadow-overlay">
+        <span className="flex size-mascot items-end rounded-card bg-surface p-hair font-mono text-caption text-muted shadow-overlay">
           overlay
         </span>
       </Specimen>

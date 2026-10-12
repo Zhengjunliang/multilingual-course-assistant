@@ -9,9 +9,7 @@ import { useState } from "react";
 import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
 import { Field, FieldError, SearchField } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Tabs } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup } from "@/components/ui/toggle-group";
 import { Specimen, type Theme } from "./Specimen";
 
@@ -155,14 +153,6 @@ export function Fields({ theme }: { theme: Theme }) {
         note="What was refused, after an icon, under the field it is about; shared by Field and the sign-in card's fields."
       >
         <FieldError>Nome utente o password non corretti.</FieldError>
-      </Specimen>
-
-      <Specimen name="Input" note="One control height, shared with the default button.">
-        <Input placeholder="Input" />
-      </Specimen>
-
-      <Specimen name="Textarea" note="Starts at the field height and grows downward only.">
-        <Textarea placeholder="Textarea" />
       </Specimen>
 
       <Specimen

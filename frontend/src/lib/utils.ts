@@ -6,7 +6,7 @@ import { extendTailwindMerge } from "tailwind-merge";
  * them it takes `text-display` for a colour, so `text-display text-ink` kept
  * only the ink and the heading lost its size; a size and a colour are two
  * groups, and only two of one group conflict. The other way round, it does
- * not see two of one group as a conflict: `min-h-field min-h-control` kept
+ * not see two of one group as a conflict: `min-h-control-icon min-h-control` kept
  * both, and the stylesheet's order, not the later class, decided which won.
  */
 const twMerge = extendTailwindMerge({
@@ -22,7 +22,6 @@ const twMerge = extendTailwindMerge({
         "control-sm",
         "control-icon",
         "control",
-        "field",
         "icon",
         "icon-lg",
         "avatar-sm",
