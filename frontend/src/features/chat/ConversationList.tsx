@@ -49,9 +49,10 @@ interface ConversationListProps {
   busy: number | null;
   /**
    * Resolves to whether the server took it and the list that shows it came,
-   * or would leave the row out (routes/ShellLayout.tsx).
+   * or would leave the row out (routes/ShellLayout.tsx); `retry` is how a
+   * failure offers to try again.
    */
-  onPin: (id: number, pinned: boolean, title: string) => Promise<boolean>;
+  onPin: (id: number, pinned: boolean, title: string, retry: () => void) => Promise<boolean>;
   /** Resolves to whether the server deleted it (routes/ShellLayout.tsx leaves it). */
   onDelete: (id: number) => Promise<boolean>;
   onNavigate?: () => void;
@@ -104,7 +105,11 @@ export function ConversationList({
   const pin = async (conversation: ConversationSummary) => {
     const pinned = !conversation.pinned;
     setMoving({ id: conversation.id, pinned });
-    if (!(await onPin(conversation.id, pinned, titleOf(conversation)))) setMoving(null);
+    const retry = () => void pin(conversation);
+    if (!(await onPin(conversation.id, pinned, titleOf(conversation), retry))) {
+      // Only this row's: another may have been pressed meanwhile.
+      setMoving((current) => (current?.id === conversation.id ? null : current));
+    }
   };
 
   const confirm = async () => {
