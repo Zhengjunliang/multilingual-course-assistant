@@ -2,6 +2,95 @@
 
 What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; every number is reproducible with the commands in its entry's *Reproducibility* section. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
+## 2026-10-12 — Each passage once, sources by the reranker, citations by number: the gold sets hold, copies leave the top 5, no excerpt number in the prose
+
+Retrieval and generation changed as [decisions.md](decisions.md), 2026-10-12, *A result list holds each passage once, as many as the reranker judges relevant, and an answer cites them by number*, records, one commit per step, for `#124` and `#187`. Everything ran on the local Qdrant service (`unifi_web` 29098 points, all crawled; `slides` 1234), whose index none of the steps changes; generation on Qwen3-4B q4 through the local Ollama, greedy.
+
+### 1. The repeats in the index
+
+The two counts of `#124` on `unifi_web`, taken again after the last step:
+
+| Grouped by | Distinct | Under 2+ URLs | URLs involved | Points in those groups |
+| --- | --- | --- | --- | --- |
+| `text` (the sparse input) | 20753 | 3029 | 640 | 10196 (35%) |
+| `embed_text` (the dense input) | 21406 | 3023 | 441 | 9502 (33%) |
+
+Both rows are the counts `#124` reported before the change, to the point: the index is untouched, and the change acts on result lists.
+
+### 2. The repeats in the result lists
+
+Each gold question's top 5, retrieved as `rag.gold` retrieves it, with the retrieval of `550c1b4` and after the last step: the pairs of hits with equal text, and the pairs of web hits with unequal text that are near-duplicates by the rule of section 5.
+
+| Set | Path | Equal-text pairs, before | after | Near-duplicate pairs, before | after |
+| --- | --- | --- | --- | --- | --- |
+| campus | rerank | 22, on 12 questions | **0** | 11, on 8 questions | **0** |
+| campus | no rerank | 18, on 12 questions | **0** | 5, on 5 questions | **0** |
+| smoke | both | 0 | 0 | 0 | 0 |
+
+Before, with the reranker, equal texts sat in the top 5 of `c002`, `c004`, `c006`, `c008`, `c009`, `c010`, `c015`, `c018`, `c024`, `c026`, `c031` and `c032`, six of them with two pairs or more, and near-duplicates in that of `c004`, `c011`, `c018`, `c019`, `c021`, `c022`, `c028` and `c029`. After the last step no campus question holds a repeated or a near-duplicate text in its top 5, on either path.
+
+### 3. The gold sets, step by step
+
+Each step is named by its commit's subject. The totals are the same at every step, and the last step gives the same HIT or MISS on every question as the first, but for `c034` without the reranker: the retrieval of `550c1b4` scored it a MISS when the step was measured and a HIT after the restarts of section 4, the tie of `#124` at a branch's cut, which every step after it scores a MISS on every run.
+
+| Step | smoke, rerank | smoke, no rerank | campus, rerank | campus, no rerank |
+| --- | --- | --- | --- | --- |
+| before: *test(gold): list the verified aliases of twelve campus answer pages*, the retrieval of `550c1b4` | 38/40 | 37/40 | 28/32 | 21/32 or 22/32 |
+| *fix(search): equal scores rank by point id inside each branch, not by the server* | 38/40 | 37/40 | 28/32 | 21/32 |
+| *feat(search): a result list holds each passage once* | 38/40 | 37/40 | 28/32 | 21/32 |
+| *feat(search): the number of sources follows the reranker's judgement* | 38/40 | 37/40 | 28/32 | 21/32 |
+| *fix(search): copies of a passage join whatever their ranks, never two paragraphs of a page* | 38/40 | 37/40 | 28/32 | 21/32 |
+
+The aliases come first so that the rows after them score a question on its page, whichever address survives: without them, collapsing equal texts alone turns `c006`, `c008`, `c024` and `c026` from HIT to MISS. The `top:` column moved where top hits tie: with the point-id order on `c002`, `c006`, `c024` and `c032` with the reranker and on `c010` and `c032` without it, and with the collapse on `c004` without the reranker, whose top hit became its newest student guide.
+
+With the product's cut-off, `rag.gold --min-score 0.5` after the last step: smoke 38/40, campus 28/32, the totals of the table. Questions by number of sources kept:
+
+| Set | 1 | 2 | 3 | 4 | 5 |
+| --- | --- | --- | --- | --- | --- |
+| smoke | 5 | 9 | 3 | 5 | 18 |
+| campus | 0 | 0 | 1 | 0 | 31 |
+
+The reranker judges nearly every campus top 5 relevant, so the cut-off reaches the course questions far more often than the campus ones.
+
+### 4. Three restarts
+
+Three runs at the step before the last, each after `docker compose restart qdrant` and the service's health check: both gold sets with and without the reranker, and each branch's top 20 for every gold question, the input of `#25`'s dense-only and sparse-only arms. The three runs agree pairwise on every line: the HIT or MISS and the `top:` column of every question on the four arms, and every branch's points, order and scores. Before the change, the same restart moved `c034` from MISS to HIT without the reranker and changed the `top:` column of six reranked campus questions (entry of 2026-09-29, section 4). The last step leaves the branches as they are, and its four gold runs gave the lines of these three.
+
+### 5. The near-duplicate rule on its labelled set
+
+On `gold/near-duplicates.jsonl`, the rule joins 169 of the 211 pairs labelled the same passage and 1 of the 65 labelled different: the same procedure article in the Erasmus call and in the call for students from outside the EU. The copies of `#187`'s passage are two pairs of equal texts that share 25 of 50 shingles across the pairs, every number of the shorter text in the longer, which is why the threshold is 0.5.
+
+### 6. Citations and the answer's language
+
+The first ten questions of `gold/smoke.jsonl`, each retrieved once (reranker, cut-off 0.5, at most five, `slides`) and answered in `it`, `en` and `zh`: thirty answers under the prompt of `550c1b4` and thirty under the numbered one.
+
+| Prompt | A valid `[n]` | An excerpt named by number in the prose | A marker copied | A number glued to a word, a list in one bracket | In the language asked, it · en · zh |
+| --- | --- | --- | --- | --- | --- |
+| before | 3/30 | 16/30 | 10/30 | 0/30 | 6/10 · 10/10 · 2/10 |
+| numbered | **30/30** | **0/30** | 0/30 | 0/30 | 4/10 · 10/10 · 1/10 |
+
+An excerpt is named by number when a word for excerpt or source (`excerpt`, `estratto`, `fonte`, `source`, `摘录`, `片段`, `来源`, `资料`, and their plurals) stands beside a number, in either order, brackets allowed; every `[Excerpt N]` of the prompt before counts here. A `[n]` is valid when n names one of the retrieved excerpts. Under the numbered prompt every answer cites, and no answer names an excerpt any other way.
+
+The questions are English, and asked for Italian or Chinese the model answered in English 15 times in 20, 12 under the prompt before. The language is not what this change targets, and thirty answers cannot tell 5 in 20 from 8; the full smoke set in three languages, 120 answers, runs with `#27`.
+
+In the browser, `#187`'s question ("dove si trova il dipartimento di studio di morgani") was answered with pills and no excerpt number; the passage on the Centro Didattico Morgagni appeared once, from the 2026-27 student guide, and two reports of the CPDS whose excerpts carry one heading read apart by their file names.
+
+### Reproducibility
+
+```bash
+uv run python -m rag.gold gold/smoke.jsonl                       # and gold/campus.jsonl; --no-rerank for the other arm
+uv run python -m rag.gold gold/campus.jsonl --min-score 0.5      # the cut-off and the sources per question
+uv run python -m rag.passages --measure gold/near-duplicates.jsonl
+bash data/passages-124-187/determinism.sh OUT                    # section 4
+PYTHONPATH=. uv run python data/passages-124-187/dupcount.py index          # section 1
+PYTHONPATH=. uv run python data/passages-124-187/dupcount.py lists rerank   # section 2; norerank for the other arm
+PYTHONPATH=. uv run python data/passages-124-187/gencheck.py OUT.jsonl      # section 6; needs Ollama
+uv run python data/passages-124-187/genscan.py OUT.jsonl                    # the citation patterns
+uv run python data/passages-124-187/genlang.py OUT.jsonl                    # the answer's language
+```
+
+The index count scrolls every `unifi_web` point and groups by the field; a group is under 2+ URLs when its points carry two or more distinct `url`. The list count retrieves each gold question's top 5 as `rag.gold` does, in its target collection with the edition scope and the crawl only, without the cut-off, and counts the pairs of hits with equal text and the pairs of web hits with unequal text that are near-duplicates by the rule, which the script computes itself so that it also runs on the code before the change, with `BEFORE` naming a directory that holds `git archive 550c1b4 rag` unpacked (`counts.sh` runs both sides and the gold sets on the code before). The branch comparison calls `branch_search` for each gold question and branch with `limit` 20 and the filter `rag.gold` applies, and writes each point's id and score to six decimals. The generation check passes the `rag/answer.py` of `550c1b4` as a second argument for the prompt before; the answer's language is Chinese when a fifth of its characters are CJK, else Italian or English by the commoner of ten stopwords each. Scripts and answers are kept in `data/passages-124-187/`, outside git.
+
 ## 2026-10-08 — Quoting the text the project did not write: the gate holds, a tag written inline is copied
 
 The prompts were changed to hold every excerpt, earlier turn, anchor and page sample between `<quoted>` tags, under a system prompt that says what the tags hold ([decisions.md](decisions.md), 2026-10-08, *Text the project did not write enters every prompt as quoted material*). Each prompt was measured before the change, at `7660c29`, and after it, on Qwen3-4B q4 through the local Ollama, greedy, the gate with `seed=0`.

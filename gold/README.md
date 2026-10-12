@@ -17,6 +17,8 @@ The questions that retrieval and routing are scored on, and the labelled sets of
 - **Automatic growth**: from 0/N before the run to at least ⌈0.7 N⌉ after it (5 of the 7 questions).
 - **Relevance gate**: at least 18 of the 20 labels.
 
+hit@5 scores the first five hits with no relevance cut-off, so the arms with and without the reranker compare; `rag.gold --min-score 0.5` applies the product's cut-off and also prints how many sources each question kept.
+
 The measured values are in [docs/experiment-log.md](../docs/experiment-log.md), entries of 2026-08-24 and 2026-09-14; the automatic-growth remeasurement is 🔜 M3 `#24`, and a gate measurement that can be repeated needs frozen page content (`#83`). The course side of the gold sets is English only: the set covering both scenarios in EN, IT and ZH is 🔜 M3 `#19`.
 
 ## Storage
@@ -60,7 +62,7 @@ One question per line, for example the first row of `smoke.jsonl`:
 
 ## near-duplicates.jsonl
 
-**Not a gold question either**: each row is a pair of `unifi_web` chunks and whether they are one passage. The pairs are every two chunks at different addresses, with unequal texts and a 3-shingle Jaccard of 0.3 or more, that met in the reranked top 20 of a campus question or of the question of #187 ("dove si trova il dipartimento di studio di morgani"), retrieved on the crawl snapshot at `5a05da1`. The set was frozen by a commit of its own before the rule it measures was written. A row names its chunks, never their text: the text is derived from the crawled pages and stays in the index.
+**Not a gold question either**: each row is a pair of `unifi_web` chunks and whether they are one passage. The pairs are every two chunks at different addresses, with unequal texts and a 3-shingle Jaccard of 0.3 or more, that met in the reranked top 20 of a campus question or of the question of #187 ("dove si trova il dipartimento di studio di morgani"), retrieved on the crawl snapshot with the retrieval of `550c1b4`. The set was frozen by a commit of its own before the rule it measures was written. A row names its chunks, never their text: the text is derived from the crawled pages and stays in the index.
 
 ```json
 {"a": {"url": "https://...", "chunk_index": 7, "ingest_source": "crawl"}, "b": {"url": "https://...", "chunk_index": 9, "ingest_source": "crawl"}, "label": "same"}
