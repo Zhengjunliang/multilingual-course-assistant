@@ -936,7 +936,9 @@ def test_the_sidebar_lists_a_students_own_conversations(index: QdrantClient) -> 
     install_engine(index, SLIDES_ROUTE, ["An answer."])
     events(ask())
     stranger = User.objects.create_user(username="stranger")
-    Conversation.objects.create(owner=stranger, locale="it")
+    theirs = Conversation.objects.create(owner=stranger, locale="it")
+    # Held something, or the list would leave it out for that alone.
+    Message.objects.create(conversation=theirs, role=Message.Role.USER, text="?", locale="it")
 
     body = client_for().get(CONVERSATIONS_URL).json()
 
@@ -973,8 +975,7 @@ def test_reopening_a_conversation_returns_what_the_stream_delivered(
     assert answer_message["citations"] == start_of(stream)["citations"]
     assert answer_message["route"] == start_of(stream)["route"]
     assert answer_message["search_ms"] == start_of(stream)["search_ms"]
-    # The student's half has no search of its own: the column is empty there,
-    # as on every answer stored before it existed.
+    # The student's half has no search of its own: the column is empty there.
     assert body["messages"][0]["search_ms"] is None
 
 
@@ -984,6 +985,8 @@ def test_somebody_elses_conversation_is_not_there_to_open(method: str) -> None:
     something real. A delete gets the same answer and deletes nothing."""
     stranger = User.objects.create_user(username="stranger")
     theirs = Conversation.objects.create(owner=stranger, locale="it")
+    # Held something, or it would be missing for that alone.
+    Message.objects.create(conversation=theirs, role=Message.Role.USER, text="?", locale="it")
 
     response = getattr(client_for(), method)(f"{CONVERSATIONS_URL}/{theirs.pk}")
 

@@ -61,7 +61,7 @@ interface ConversationSidebarProps {
    */
   onDelete: (id: number) => Promise<boolean>;
   /** Pins or unpins a conversation and resolves to whether the server did. */
-  onPin: (id: number, pinned: boolean) => Promise<boolean>;
+  onPin: (id: number, pinned: boolean, title: string) => Promise<boolean>;
   /** Which mount this is, and what the shell lets it do (ChatShell.tsx). */
   controls: SidebarControls;
   /**

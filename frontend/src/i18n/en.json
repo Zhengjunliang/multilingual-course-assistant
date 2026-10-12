@@ -38,6 +38,7 @@
     "unpin": "Unpin \"{{title}}\"",
     "pinFailed": "The conversation could not be pinned.",
     "unpinFailed": "The conversation could not be unpinned.",
+    "retry": "Try again",
     "campus": "University",
     "moreCourses_one": "and one more course",
     "moreCourses_other": "and {{count}} more courses",

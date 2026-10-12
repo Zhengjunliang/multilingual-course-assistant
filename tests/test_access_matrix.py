@@ -41,7 +41,7 @@ from test_route_permissions import DELEGATED, routes, served
 from test_sources_api import PDF, SHA, write_sidecar
 
 from apps.qa import sources
-from apps.qa.models import Conversation
+from apps.qa.models import Conversation, Message
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -160,7 +160,13 @@ def deck(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.usefixtures("deck")
 def test_who_may_call_each_route() -> None:
     w = world()
-    target = targets(w, Conversation.objects.create(owner=w.student, locale="it"))
+    conversation = Conversation.objects.create(owner=w.student, locale="it")
+    # A conversation with no messages is missing to its owner too
+    # (apps/qa/conversation_views.py, `summaries`).
+    Message.objects.create(
+        conversation=conversation, role=Message.Role.USER, text="Quando?", locale="it"
+    )
+    target = targets(w, conversation)
     callers: dict[str, User | None] = {user.username: user for user in everyone(w)}
     callers[ANONYMOUS] = None
 

@@ -258,7 +258,10 @@ class ConversationSerializer(serializers.ModelSerializer[Conversation]):
         citations: list[dict[str, Any]] | None = getattr(conversation, LAST_CITATIONS)
         if citations is None:
             return None
-        named: dict[str, CourseName] = self.context[COURSE_NAMES]
+        # Missing only from a serializer DRF builds itself, as the browsable
+        # API does for its form; each code then stands for its course, as one
+        # no `Course` holds does.
+        named: dict[str, CourseName] = self.context.get(COURSE_NAMES, {})
         source = {
             "courses": [
                 named.get(code, CourseName(name=code, locale=None))

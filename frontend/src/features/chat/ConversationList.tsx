@@ -16,7 +16,9 @@
  *
  * Pinning waits for the server and moves the row once the list it asks for
  * arrives; the focus follows the row to its new group, since the button it
- * was on is gone and a new one stands there.
+ * was on is gone and a new one stands there. A row deleted in another tab
+ * meanwhile leaves with that list, and the focus goes where a deletion's
+ * would.
  *
  * Deleting asks first, and the dialog stays open until the server has
  * answered and cannot be dismissed meanwhile (ui/alert-dialog.tsx): closing it
@@ -45,12 +47,15 @@ interface ConversationListProps {
   query: string;
   /** The conversation being answered, whose deletion stops its answer. */
   busy: number | null;
-  /** Resolves to whether the server pinned or unpinned it (routes/ShellLayout.tsx). */
-  onPin: (id: number, pinned: boolean) => Promise<boolean>;
+  /**
+   * Resolves to whether the server took it and the list that shows it came,
+   * or would leave the row out (routes/ShellLayout.tsx).
+   */
+  onPin: (id: number, pinned: boolean, title: string) => Promise<boolean>;
   /** Resolves to whether the server deleted it (routes/ShellLayout.tsx leaves it). */
   onDelete: (id: number) => Promise<boolean>;
   onNavigate?: () => void;
-  /** Where focus goes once a deletion has taken the button it was on away. */
+  /** Where focus goes once a deletion, here or in another tab, has taken the button it was on away. */
   focusAfterDelete: RefObject<HTMLElement | null>;
 }
 
@@ -85,9 +90,9 @@ export function ConversationList({
     setMoving(null);
     // Only a focus the move took away: the reader may have gone on meanwhile.
     if (document.activeElement === null || document.activeElement === document.body) {
-      pinButtons.current.get(moving.id)?.focus();
+      (pinButtons.current.get(moving.id) ?? focusAfterDelete.current)?.focus();
     }
-  }, [conversations, moving]);
+  }, [conversations, moving, focusAfterDelete]);
 
   const titleOf = (conversation: ConversationSummary) =>
     conversation.title || t("sidebar.untitled");
@@ -99,7 +104,7 @@ export function ConversationList({
   const pin = async (conversation: ConversationSummary) => {
     const pinned = !conversation.pinned;
     setMoving({ id: conversation.id, pinned });
-    if (!(await onPin(conversation.id, pinned))) setMoving(null);
+    if (!(await onPin(conversation.id, pinned, titleOf(conversation)))) setMoving(null);
   };
 
   const confirm = async () => {
