@@ -47,7 +47,7 @@ import { HoverCard } from "@/components/ui/hover-card";
 import { pillSources, remarkPills, withoutPills } from "@/lib/markers";
 import { cn } from "@/lib/utils";
 import { SourceSummary } from "./SourcesPanel";
-import { shortName, sourceLink } from "./sourceLabel";
+import { distinctions, shortName, sourceLink } from "./sourceLabel";
 
 /** The answer's citations, which a pill's excerpt numbers index from one. */
 const PillContext = createContext<readonly Citation[]>([]);
@@ -92,6 +92,7 @@ function CitationPill({ numbers }: { numbers?: string }) {
     names: sources.map((source) => shortName(source, t)).join(", "),
   });
   const pill = <span className="whitespace-nowrap">{shown}</span>;
+  const told = distinctions(sources);
   const look =
     "mx-0.5 inline-flex items-center rounded-full bg-mark px-tight align-baseline font-medium text-caption text-muted no-underline transition-colors hover:bg-ink hover:text-canvas data-[state=open]:bg-ink data-[state=open]:text-canvas";
 
@@ -101,7 +102,7 @@ function CitationPill({ numbers }: { numbers?: string }) {
         const to = sourceLink(source);
         return (
           <div key={source.marker} className="flex flex-col gap-hair">
-            <SourceSummary citation={source} />
+            <SourceSummary citation={source} distinction={told.get(source.marker)} />
             {to !== null && (
               <a
                 href={to}

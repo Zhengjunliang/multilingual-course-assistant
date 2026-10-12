@@ -2,9 +2,9 @@
  * Linking the prose back to the excerpts it was grounded on.
  *
  * This runs once, after `end`, and never during the stream. The reason is in
- * `apps/qa/contract.py`: a marker is routinely split across two `token` events,
- * so `marker in answer` is only meaningful on the joined answer. Highlighting
- * as tokens arrive would report a marker missing and then wrong.
+ * `apps/qa/contract.py`: a citation is routinely split across two `token`
+ * events, so finding one is only meaningful on the joined answer. Highlighting
+ * as tokens arrive would report a citation missing and then wrong.
  */
 
 import type { Citation } from "@/api/contract";
@@ -13,9 +13,9 @@ import type { Citation } from "@/api/contract";
  * The citation an excerpt number names, if the answer has one under it.
  *
  * Excerpts are numbered from one in citation order, as the generation prompt
- * numbers them (rag/answer.py `Excerpt {number} {marker}:`), so "Excerpt 3"
- * names `citations[2]`. Two chunks of one page share a marker and are two
- * excerpts, so the number, not the marker, says which passage was meant.
+ * numbers them (rag/answer.py, `[3] {marker}`), so `[3]` names `citations[2]`.
+ * Two chunks of one page share a marker and are two excerpts, so the number,
+ * not the marker, says which passage was meant.
  */
 function citationOf(citations: readonly Citation[], number: number | string): Citation | undefined {
   return citations[Number(number) - 1];
@@ -28,21 +28,36 @@ const EXCERPT_LIST =
 /** One excerpt reference: bracketed, parenthesised, or bare. */
 const EXCERPT_REF = /\[Excerpt\s+(\d+)\]|\(Excerpt\s+(\d+)\)|\bExcerpt\s+(\d+)\b/g;
 
-/** A stretch of the answer that refers to excerpts, by their numbers. */
+/**
+ * A numbered reference, `[3]`, the way the generation prompt asks the model to
+ * cite: one number in each pair of brackets, several side by side, `[1][3]`.
+ * Not after a letter, a digit or `_`, where `a[1]` is an index, and not before
+ * `(`, where `[1](url)` is a Markdown link; `[1, 2]` and `[1-3]` stay prose.
+ */
+const NUMBER_REF = /(?<!\w)\[(\d+)\](?!\()/g;
+
+/**
+ * A stretch of the answer that refers to excerpts, by their numbers.
+ * `numbered` when the answer wrote the number itself, `[3]`, rather than a
+ * marker or "Excerpt 3": text a pill cannot sit in gets back what was written.
+ */
 interface Occurrence {
   at: number;
   end: number;
   excerpts: number[];
+  numbered: boolean;
 }
 
 /**
- * Where the answer names excerpts by number.
+ * Where the answer names excerpts by number, as `[3]`, or as "Excerpt 3".
  *
- * The system prompt forbids writing "Excerpt N" and the small quantized model
- * writes it anyway — bracketed, parenthesised, or bare. The reference is
- * exact, more so than a marker: it names one excerpt, where a marker names
- * a page, and two excerpts of one page are two passages the reader can be
- * sent to.
+ * `[3]` is how the prompt asks for a citation. "Excerpt N" is how answers
+ * written under the earlier prompt cite, which numbered its excerpts that way
+ * and forbade writing it, and the small quantized model wrote it anyway —
+ * bracketed, parenthesised, or bare; those answers are stored and reopened.
+ * A number is exact, more so than a marker: it names one excerpt, where a
+ * marker names a page, and two excerpts of one page are two passages the
+ * reader can be sent to.
  *
  * A list in one pair of brackets, "[Excerpt 3 e Excerpt 5]" or "(Excerpt 1,
  * 2)", is one reference to all its excerpts, brackets and conjunctions
@@ -60,16 +75,23 @@ interface Occurrence {
  */
 function excerptRefs(answer: string, citations: readonly Citation[]): Occurrence[] {
   const found: Occurrence[] = [];
+  const end = (match: RegExpExecArray) => match.index + match[0].length;
+  for (const match of answer.matchAll(NUMBER_REF)) {
+    const number = Number(match[1]);
+    if (citationOf(citations, number) !== undefined) {
+      found.push({ at: match.index, end: end(match), excerpts: [number], numbered: true });
+    }
+  }
   for (const match of answer.matchAll(EXCERPT_LIST)) {
     const excerpts = [...match[0].matchAll(/\d+/g)].map(([number]) => Number(number));
     if (excerpts.every((number) => citationOf(citations, number) !== undefined)) {
-      found.push({ at: match.index, end: match.index + match[0].length, excerpts });
+      found.push({ at: match.index, end: end(match), excerpts, numbered: false });
     }
   }
   for (const match of answer.matchAll(EXCERPT_REF)) {
     const number = Number(match[1] ?? match[2] ?? match[3]);
     if (citationOf(citations, number) !== undefined) {
-      found.push({ at: match.index, end: match.index + match[0].length, excerpts: [number] });
+      found.push({ at: match.index, end: end(match), excerpts: [number], numbered: false });
     }
   }
   return found;
@@ -94,7 +116,7 @@ function markerRefs(answer: string, citations: readonly Citation[]): Occurrence[
   for (const [marker, excerpt] of firstExcerpts(citations)) {
     let at = answer.indexOf(marker);
     while (at !== -1) {
-      found.push({ at, end: at + marker.length, excerpts: [excerpt] });
+      found.push({ at, end: at + marker.length, excerpts: [excerpt], numbered: false });
       at = answer.indexOf(marker, at + marker.length);
     }
   }
@@ -107,7 +129,7 @@ function markerRefs(answer: string, citations: readonly Citation[]): Occurrence[
  */
 export type Segment =
   | { kind: "text"; at: number; text: string }
-  | { kind: "reference"; at: number; excerpts: number[] };
+  | { kind: "reference"; at: number; excerpts: number[]; numbered: boolean };
 
 /**
  * The answer, cut into prose and references to its excerpts.
@@ -124,10 +146,10 @@ export function segmentAnswer(answer: string, citations: readonly Citation[]): S
 
   const segments: Segment[] = [];
   let cursor = 0;
-  for (const { at, end, excerpts } of found) {
+  for (const { at, end, excerpts, numbered } of found) {
     if (at < cursor) continue; // overlaps something already taken
     if (at > cursor) segments.push({ kind: "text", at: cursor, text: answer.slice(cursor, at) });
-    segments.push({ kind: "reference", at, excerpts });
+    segments.push({ kind: "reference", at, excerpts, numbered });
     cursor = end;
   }
   if (cursor < answer.length) {
@@ -193,7 +215,9 @@ export function withoutMarkers(answer: string, citations: readonly Citation[]): 
  * answer is complete each reference becomes a sentinel per excerpt it names —
  * OPEN, the excerpt's number, CLOSE, all characters no model writes and no
  * Markdown syntax reacts to — and `remarkPills` turns the sentinels into pills
- * in the parsed tree.
+ * in the parsed tree. A reference the answer wrote as its number, `[3]`, opens
+ * with NUMBERED instead, so that where no pill can sit it reads `[3]` again
+ * rather than a marker the answer never wrote.
  * LibreChat carries its citations through the parse the same way. Encoding and
  * decoding live here together because they are one format.
  *
@@ -207,14 +231,16 @@ export function withoutMarkers(answer: string, citations: readonly Citation[]): 
  */
 export const PILL_OPEN = String.fromCharCode(0xe000);
 export const PILL_CLOSE = String.fromCharCode(0xe001);
+export const PILL_NUMBERED = String.fromCharCode(0xe002);
 export const PILL_BREAK = String.fromCharCode(0xfeff);
 
-const SENTINELS = new RegExp(`[${PILL_OPEN}${PILL_CLOSE}${PILL_BREAK}]`, "g");
-const PILL = new RegExp(`${PILL_OPEN}([0-9]+)${PILL_CLOSE}`, "g");
-const PILL_START = new RegExp(`[${PILL_BREAK}${PILL_OPEN}]`);
+const OPENERS = `${PILL_OPEN}${PILL_NUMBERED}`;
+const SENTINELS = new RegExp(`[${OPENERS}${PILL_CLOSE}${PILL_BREAK}]`, "g");
+const PILL = new RegExp(`([${OPENERS}])([0-9]+)${PILL_CLOSE}`, "g");
+const PILL_START = new RegExp(`[${PILL_BREAK}${OPENERS}]`);
 // The sentinels written as character references, which the parser would decode
 // into sentinels after `withPills` had cleaned the answer.
-const SENTINEL_REFERENCES = /&#(?:x0*(?:e000|e001|feff)|0*(?:57344|57345|65279));/gi;
+const SENTINEL_REFERENCES = /&#(?:x0*(?:e000|e001|e002|feff)|0*(?:57344|57345|57346|65279));/gi;
 const WHITESPACE = /\s/;
 /** What may stand between two pills that are drawn as one: space, and BREAK. */
 const GAP = new RegExp(`^[\\s${PILL_BREAK}]*$`);
@@ -258,7 +284,8 @@ export function withPills(answer: string, citations: readonly Citation[]): strin
   return segmentAnswer(clean, citations)
     .map((segment) => {
       if (segment.kind === "text") return segment.text;
-      const pills = segment.excerpts.map((number) => `${PILL_OPEN}${number}${PILL_CLOSE}`);
+      const open = segment.numbered ? PILL_NUMBERED : PILL_OPEN;
+      const pills = segment.excerpts.map((number) => `${open}${number}${PILL_CLOSE}`);
       return (needsBreak(clean, segment.at) ? PILL_BREAK : "") + pills.join("");
     })
     .join("");
@@ -281,16 +308,17 @@ export interface MdNode {
 }
 
 /**
- * A `withPills` answer as plain prose again: sentinels written back as the
- * markers of their excerpts, a space between two that one reference put side
- * by side, and strays dropped. For an answer that cannot be drawn as Markdown,
- * and for text a pill cannot sit in.
+ * A `withPills` answer as plain prose again: a numbered reference written back
+ * as `[3]`, any other as the marker of its excerpt with a space before the
+ * next pill one reference put beside it, and strays dropped. For an answer
+ * that cannot be drawn as Markdown, and for text a pill cannot sit in.
  */
 export function withoutPills(text: string, citations: readonly Citation[]): string {
   return text
-    .replace(PILL, (pill: string, number: string, at: number) => {
+    .replace(PILL, (pill: string, open: string, number: string, at: number) => {
+      if (open === PILL_NUMBERED) return `[${number}]`;
       const written = citationOf(citations, number)?.marker ?? number;
-      return text.startsWith(PILL_OPEN, at + pill.length) ? `${written} ` : written;
+      return OPENERS.includes(text[at + pill.length] ?? "\n") ? `${written} ` : written;
     })
     .replace(SENTINELS, "");
 }
@@ -340,8 +368,8 @@ const IMAGES = new Set(["image", "imageReference"]);
  * «name +1» when it spans two pages: ChatGPT and Open WebUI merge a run of
  * citations the same way (read 11 October 2026). Where a pill cannot sit —
  * code, math, raw HTML, a link's text (the pill is a link, and a link inside a
- * link is invalid), an image's alt — the sentinel is written back as the
- * marker's own text.
+ * link is invalid), an image's alt — the sentinel is written back as text
+ * (`withoutPills`).
  *
  * Nothing here throws, whatever the model wrote. A number with no excerpt
  * behind it and a sentinel without its pair are dropped to plain text: the
@@ -361,7 +389,7 @@ export function remarkPills(citations: readonly Citation[]) {
       if (cleaned !== "") nodes.push({ type: "text", value: cleaned });
     };
     for (const match of value.matchAll(PILL)) {
-      const number = match[1] ?? "";
+      const number = match[2] ?? "";
       const between = value.slice(cursor, match.index);
       const last = nodes.at(-1);
       const numbers = last?.data?.hProperties?.numbers;

@@ -106,6 +106,33 @@ describe("segmentAnswer, on excerpt numbers", () => {
   });
 });
 
+describe("segmentAnswer, on numbered references", () => {
+  const citations = [cite("[PPM 1]"), cite("[PPM 2]"), cite("[WEB 9]")];
+
+  it("reads each number in its own brackets, alone or side by side", () => {
+    expect(cut("Le tasse [1]. Due rate [1][3]. 课程[2]。", citations)).toBe(
+      "Le tasse {1}. Due rate {1}{3}. 课程{2}。",
+    );
+  });
+
+  it("marks a reference written as a number, and only that one", () => {
+    expect(
+      segmentAnswer("[2] [PPM 1]", citations)
+        .filter((segment) => segment.kind === "reference")
+        .map((segment) => segment.numbered),
+    ).toEqual([true, false]);
+  });
+
+  it("leaves an index, a list, a range, a link and a number with no excerpt as prose", () => {
+    const prose = "a[1], [1, 2], [1-3], [1](https://www.unifi.it), [4], [0]";
+    expect(cut(prose, citations)).toBe(prose);
+  });
+
+  it("still reads the excerpt references of answers written before them", () => {
+    expect(cut("Vedi [Excerpt 2] e [3].", citations)).toBe("Vedi {2} e {3}.");
+  });
+});
+
 describe("segmentAnswer, on markers", () => {
   it("does not let a marker shadow the longer one it is a prefix of", () => {
     // The markers are constructed, not taken from a real citation, and that is
@@ -121,7 +148,7 @@ describe("segmentAnswer, on markers", () => {
     // is left stranded in prose.
     expect(segmentAnswer("See [A][B] now.", [cite("[A]"), cite("[A][B]")])).toEqual([
       { kind: "text", at: 0, text: "See " },
-      { kind: "reference", at: 4, excerpts: [2] },
+      { kind: "reference", at: 4, excerpts: [2], numbered: false },
       { kind: "text", at: 10, text: " now." },
     ]);
   });
@@ -130,9 +157,9 @@ describe("segmentAnswer, on markers", () => {
     // `withPills` reads the character before each reference off its `at`.
     expect(segmentAnswer("x [A] y [A] z", [cite("[A]")])).toEqual([
       { kind: "text", at: 0, text: "x " },
-      { kind: "reference", at: 2, excerpts: [1] },
+      { kind: "reference", at: 2, excerpts: [1], numbered: false },
       { kind: "text", at: 5, text: " y " },
-      { kind: "reference", at: 8, excerpts: [1] },
+      { kind: "reference", at: 8, excerpts: [1], numbered: false },
       { kind: "text", at: 11, text: " z" },
     ]);
   });
@@ -144,9 +171,9 @@ describe("segmentAnswer, on markers", () => {
     const citations = [cite("[PPM 1]"), cite("[WEB 2]")];
     expect(segmentAnswer("Before [PPM 1] middle [WEB 2] after.", citations)).toEqual([
       { kind: "text", at: 0, text: "Before " },
-      { kind: "reference", at: 7, excerpts: [1] },
+      { kind: "reference", at: 7, excerpts: [1], numbered: false },
       { kind: "text", at: 14, text: " middle " },
-      { kind: "reference", at: 22, excerpts: [2] },
+      { kind: "reference", at: 22, excerpts: [2], numbered: false },
       { kind: "text", at: 29, text: " after." },
     ]);
   });
@@ -162,6 +189,7 @@ describe("citedMarkers", () => {
   it("counts a page cited by its marker or by one of its excerpts", () => {
     const citations = [cite("[A]"), cite("[A]"), cite("[B]"), cite("[C]")];
     expect(citedMarkers("Vedi Excerpt 2 e [B].", citations)).toEqual(new Set(["[A]", "[B]"]));
+    expect(citedMarkers("Vedi [2][4].", citations)).toEqual(new Set(["[A]", "[C]"]));
   });
 });
 
@@ -175,6 +203,12 @@ describe("withoutMarkers", () => {
         citations,
       ),
     ).toBe("Le tasse scadono il 30 settembre.\n- Prima rata");
+  });
+
+  it("drops numbered references the same way", () => {
+    expect(withoutMarkers("Le tasse scadono il 30 settembre [1][2].", citations)).toBe(
+      "Le tasse scadono il 30 settembre.",
+    );
   });
 
   it("takes the space after a marker that opened a line, and ends where the text does", () => {
@@ -205,6 +239,11 @@ describe("remarkPills", () => {
 
   it("keeps pills apart where words stand between them", () => {
     expect(pills("Prima [PPM 1], poi [PPM 3].", citations)).toEqual(["1", "3"]);
+  });
+
+  it("draws numbers side by side as one pill, and apart where words part them", () => {
+    expect(pills("Scadono il 30 settembre [1][2].", citations)).toEqual(["1,2"]);
+    expect(pills("Prima [1], poi [3].", citations)).toEqual(["1", "3"]);
   });
 
   it("draws a list as one pill, and two excerpts of one page as two of its numbers", () => {
@@ -256,6 +295,13 @@ describe("withoutPills", () => {
     const citations = [cite("[PPM 1]"), cite("[PPM 2]"), cite("[WEB 9]")];
     expect(withoutPills(withPills("Vedi (Excerpt 1, 3).", citations), citations)).toBe(
       "Vedi [PPM 1] [WEB 9].",
+    );
+  });
+
+  it("writes numbered references back as the answer wrote them", () => {
+    const citations = [cite("[PPM 1]"), cite("[PPM 2]"), cite("[WEB 9]")];
+    expect(withoutPills(withPills("Vedi [1][3] e [2] [PPM 1].", citations), citations)).toBe(
+      "Vedi [1][3] e [2] [PPM 1].",
     );
   });
 });

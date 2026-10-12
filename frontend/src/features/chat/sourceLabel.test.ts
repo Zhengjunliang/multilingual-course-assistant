@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import type { Citation } from "@/api/contract";
 import i18n from "@/i18n";
-import { excerptOf, hostOf, shortName, sourceLink, sourcesOf, titleOf } from "./sourceLabel";
+import {
+  distinctions,
+  excerptOf,
+  hostOf,
+  shortName,
+  sourceLink,
+  sourcesOf,
+  titleOf,
+} from "./sourceLabel";
 
 const t = i18n.getFixedT("it");
 
@@ -78,6 +86,58 @@ describe("the sources of an answer", () => {
     const again = { ...first, text: "Un altro estratto della stessa pagina." };
 
     expect(sourcesOf([first, slide(3), again])).toEqual([first, slide(3)]);
+  });
+});
+
+describe("what tells sources apart", () => {
+  const GUIDES = "https://ingegneria.unifi.it/upload/sub/guida-dello-studente/";
+  const told = (sources: Citation[]) =>
+    sources.map((source) => distinctions(sources).get(source.marker));
+
+  it("gives two pages of one host and one title the file names that set them apart", () => {
+    const heading = ["Centro Didattico Morgagni"];
+    expect(
+      told([
+        web(`${GUIDES}GUIDA%20STUDENTE%202020-21_ultime%20revisioni.pdf`, heading),
+        web(`${GUIDES}guida-studente-2016_2017.pdf`, heading),
+        web("https://www.unifi.it/p602.html", heading),
+      ]),
+    ).toEqual([
+      "GUIDA STUDENTE 2020-21_ultime revisioni.pdf",
+      "guida-studente-2016_2017.pdf",
+      undefined,
+    ]);
+  });
+
+  it("reaches back to the folders where the file names match, and keeps a query", () => {
+    expect(
+      told([
+        web("https://ingegneria.unifi.it/a/x/index.html", ["Home"]),
+        web("https://ingegneria.unifi.it/b/x/index.html", ["Home"]),
+        web("https://ingegneria.unifi.it/b/x/index.html?newlang=ita", ["Home"]),
+      ]),
+    ).toEqual(["a/x/index.html", "b/x/index.html", "index.html?newlang=ita"]);
+  });
+
+  it("tells two versions of one page apart by the day each was fetched", () => {
+    const crawled = web("https://www.unifi.it/tasse", ["Tasse"]);
+    const fetched = {
+      ...crawled,
+      marker: "[https://www.unifi.it/tasse · 2026-10-12]",
+      fetch_date: "2026-10-12",
+    };
+    expect(told([crawled, fetched])).toEqual(["2026-09-20", "2026-10-12"]);
+  });
+
+  it("leaves sources that read differently, and slides, as they are", () => {
+    expect(
+      told([
+        web("https://www.unifi.it/a", ["Tasse"]),
+        web("https://www.unifi.it/b", ["Borse"]),
+        slide(3, ["Compressione"]),
+        slide(4, ["Compressione"]),
+      ]),
+    ).toEqual([undefined, undefined, undefined, undefined]);
   });
 });
 

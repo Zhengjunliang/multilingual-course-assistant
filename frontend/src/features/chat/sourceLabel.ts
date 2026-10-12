@@ -57,6 +57,59 @@ export function sourcesOf(citations: readonly Citation[]): Citation[] {
   });
 }
 
+/** A URL's path, as segments a reader can read, its query kept on the last. */
+function pathOf(url: string): string[] {
+  try {
+    const { pathname, search } = new URL(url);
+    const segments = pathname.split("/").filter(Boolean);
+    const last = `${segments.pop() ?? ""}${search}`;
+    return [...segments, last].filter(Boolean).map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    });
+  } catch {
+    return [url];
+  }
+}
+
+/**
+ * What tells apart, in one list, web sources that would read the same.
+ *
+ * Retrieval keeps each passage once (rag/passages.py), yet two pages may still
+ * share a host and a title: the student guides of two years, two calls of one
+ * office. Each of those gets the end of its path, as few segments as set it
+ * apart from the others, the way VS Code names two open files of one name by
+ * their folders (`workbench.editor.labelFormat`, read 12 October 2026). Two
+ * versions of one page share their path, and are told apart by the day each
+ * was fetched. A slide names its edition already (`SourceSummary`), and a
+ * source that reads like no other gets nothing.
+ */
+export function distinctions(sources: readonly Citation[]): Map<string, string> {
+  const alike = new Map<string, Citation[]>();
+  for (const source of sources) {
+    if (source.kind !== "web" || source.url === null) continue;
+    const key = `${hostOf(source.url)}\n${titleOf(source)}`;
+    alike.set(key, [...(alike.get(key) ?? []), source]);
+  }
+  const told = new Map<string, string>();
+  for (const group of alike.values()) {
+    if (group.length < 2) continue;
+    const paths = group.map((source) => pathOf(source.url ?? ""));
+    group.forEach((source, index) => {
+      const own = paths[index] ?? [];
+      const endOf = (path: readonly string[], count: number) => path.slice(-count).join("/");
+      const count = own.findIndex((_, from) =>
+        paths.every((other, at) => at === index || endOf(other, from + 1) !== endOf(own, from + 1)),
+      );
+      told.set(source.marker, count === -1 ? (source.fetch_date ?? "") : endOf(own, count + 1));
+    });
+  }
+  return told;
+}
+
 /** How many words of the excerpt each end of a text fragment quotes. */
 const FRAGMENT_WORDS = 4;
 
