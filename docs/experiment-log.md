@@ -40,6 +40,7 @@ Each step is named by its commit's subject. The totals are the same at every ste
 | *feat(search): a result list holds each passage once* | 38/40 | 37/40 | 28/32 | 21/32 |
 | *feat(search): the number of sources follows the reranker's judgement* | 38/40 | 37/40 | 28/32 | 21/32 |
 | *fix(search): copies of a passage join whatever their ranks, never two paragraphs of a page* | 38/40 | 37/40 | 28/32 | 21/32 |
+| *fix(search): equal texts group first, so a copy never bridges two paragraphs of a page* | 38/40 | 37/40 | 28/32 | 21/32 |
 
 The aliases come first so that the rows after them score a question on its page, whichever address survives: without them, collapsing equal texts alone turns `c006`, `c008`, `c024` and `c026` from HIT to MISS. The `top:` column moved where top hits tie: with the point-id order on `c002`, `c006`, `c024` and `c032` with the reranker and on `c010` and `c032` without it, and with the collapse on `c004` without the reranker, whose top hit became its newest student guide.
 
