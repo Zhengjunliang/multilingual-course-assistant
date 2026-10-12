@@ -54,7 +54,7 @@ export const TIMING = {
   frown: 1.3,
   /** A password manager's fill: the eyes rest this long on each field it filled. */
   glance: 0.45,
-  /** How long the cat smiles on landing on the entry. */
+  /** How long the cat smiles at an accepted sign-in form, and on landing on the entry. */
   welcome: 1.5,
 } as const;
 
@@ -150,7 +150,7 @@ export function glancing(life: Life, now: number): number | null {
   return since >= 0 && since < 2 * TIMING.glance ? Math.floor(since / TIMING.glance) : null;
 }
 
-/** The cat has just landed on the entry from a sign-in form. */
+/** A sign-in form under the cat has been accepted, or it has just landed on the entry from one. */
 export function welcome(life: Life, now: number): void {
   poke(life, now);
   life.happyUntil = now + TIMING.welcome;
@@ -164,7 +164,10 @@ export interface Senses {
   gaze: { x: number; y: number } | null;
   /** The question box has focus: the ears perk, and the cat stays awake. */
   typing: boolean;
-  /** The pointer is on the send button: happy eyes, a quick tail. */
+  /**
+   * The pointer is on the send button: happy eyes, a quick tail, unless a
+   * refusal, a form being sent or a password holds its face.
+   */
   cheer: boolean;
   /** The focus is in a password field or on its eye: the cat looks away. */
   away: boolean;

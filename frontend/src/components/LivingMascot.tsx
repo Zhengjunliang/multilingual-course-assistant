@@ -2,12 +2,13 @@
  * Fumetto alive, where a screen greets (#173): it blinks, flicks an ear,
  * sways the speech bubble's tip like a tail and breathes; its eyes follow the
  * pointer, or the text being typed, and rest on the question box when nobody
- * moves; it smiles while the pointer is on the send button, hops when a
- * question goes, and falls asleep after ten idle seconds until something moves.
- * On a sign-in form (#183) it shuts its eyes and turns aside while a password
- * is typed, peeks with one eye while the letters are shown, watches the form
- * being sent, frowns at a refusal, glances at the fields a password manager
- * fills, and smiles when it lands on the entry.
+ * moves; it smiles while the pointer is on the send button, unless something
+ * else holds its face, hops when a question goes, and falls asleep after ten
+ * idle seconds until something moves. On a sign-in form (#183) it shuts its
+ * eyes and turns aside while a password is typed, peeks with one eye while
+ * the letters are shown, watches the form being sent, frowns at a refusal,
+ * glances at the fields a password manager fills, and smiles when the form is
+ * accepted and when it lands on the entry.
  * components/mascotLife.ts decides all of that; this draws it.
  *
  * One `requestAnimationFrame` loop changes the drawing's attributes in place,
@@ -25,7 +26,8 @@
  * What the cat reacts to is marked on the page rather than handed in, and the
  * cat asks each frame, so a control need not know the cat exists and one that
  * goes away leaves no reaction behind: `data-mascot-cheer` on the send button
- * and the sign-in button (a smile while the pointer is on it),
+ * and the sign-in button (a smile while the pointer is on it and nothing
+ * else holds the cat's face),
  * `data-mascot-busy` on the sign-in button while it is sent (the eyes on it),
  * and `data-mascot-away` around a password field and its eye
  * (components/PasswordField.tsx). A password manager's fill fires no input
