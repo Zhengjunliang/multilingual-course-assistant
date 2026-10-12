@@ -40,13 +40,13 @@ export function Tabs<T extends string>({ label, tabs, defaultValue, className }:
     >
       <RadixTabs.List
         aria-label={label}
-        className="flex gap-hair overflow-x-auto border-line border-b"
+        className="flex gap-hair overflow-x-auto shadow-[inset_0_-1px_var(--line)]"
       >
         {tabs.map((tab) => (
           <RadixTabs.Trigger
             key={tab.value}
             value={tab.value}
-            className="group -mb-px inline-flex h-control items-center gap-tight whitespace-nowrap border-transparent border-b-2 px-tight font-medium text-body text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-2 data-[state=active]:border-accent data-[state=active]:text-ink"
+            className="group inline-flex h-control items-center gap-tight whitespace-nowrap border-transparent border-b-2 px-tight font-medium text-body text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-2 data-[state=active]:border-accent data-[state=active]:text-ink"
           >
             {tab.label}
             {tab.count !== undefined && (
