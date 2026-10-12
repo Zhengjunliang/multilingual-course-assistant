@@ -1,6 +1,6 @@
 # Gold sets
 
-The questions that retrieval and routing are scored on, and the relevance gate's labelled set. This file owns their schema, the id prefixes, the writing rules and the acceptance thresholds; `rag/gold.py`, `rag/golddraft.py` and `rag/live.py` cite it.
+The questions that retrieval and routing are scored on, and the labelled sets of the relevance gate and of near-duplicate passages. This file owns their schema, the id prefixes, the writing rules and the acceptance thresholds; `rag/gold.py`, `rag/golddraft.py` and `rag/live.py` cite it.
 
 | File | Prefix | Size | What it is | How it was written |
 | --- | --- | --- | --- | --- |
@@ -9,6 +9,7 @@ The questions that retrieval and routing are scored on, and the relevance gate's
 | `campus.jsonl` | `c` | 32 questions: EN 12 · IT 13 · ZH 7 | campus questions, scored by URL | drafted by `rag.golddraft` from pages in the index, checked by Claude row by row, then sampled by URL by the author |
 | `campus-autogrow.jsonl` | `g` | 7 questions | questions whose answer pages are deliberately **not** in the index (form PDFs included), for the automatic-growth acceptance run | drafted by `rag.golddraft` from the outlink graph, checked the same way |
 | `relevance-gate.jsonl` | — | 20 URLs: 10 relevant, 10 irrelevant | the relevance gate's labelled set; not questions (section below) | drafted by an LLM, checked by Claude, sampled by the author |
+| `near-duplicates.jsonl` | — | 276 pairs of web chunks: 211 same, 65 different | the labelled set the near-duplicate threshold is chosen on; not questions (section below) | labelled by Claude pair by pair, 20 pairs sampled by the author |
 
 **Acceptance thresholds**, owned here:
 
@@ -56,6 +57,19 @@ One question per line, for example the first row of `smoke.jsonl`:
 | `url` | the page to judge: 10 relevant (DSU, CISIA and a PDF among the borderline cases) and 10 irrelevant (commercial pages, and login pages inside the unifi domain as hard negatives) |
 | `label` | `relevant` (should be stored) or `irrelevant` (should not); the criterion is whether the content belongs in the campus knowledge base, not the domain |
 | `note` | the reason for the label, for sampling checks and error analysis |
+
+## near-duplicates.jsonl
+
+**Not a gold question either**: each row is a pair of `unifi_web` chunks and whether they are one passage. The pairs are every two chunks at different addresses, with unequal texts and a 3-shingle Jaccard of 0.3 or more, that met in the reranked top 20 of a campus question or of the question of #187 ("dove si trova il dipartimento di studio di morgani"), retrieved on the crawl snapshot at `5a05da1`. The set was frozen by a commit of its own before the rule it measures was written. A row names its chunks, never their text: the text is derived from the crawled pages and stays in the index.
+
+```json
+{"a": {"url": "https://...", "chunk_index": 7, "ingest_source": "crawl"}, "b": {"url": "https://...", "chunk_index": 9, "ingest_source": "crawl"}, "label": "same"}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `a`, `b` | a chunk, by the point's `url`, `chunk_index` and `ingest_source` |
+| `label` | `same`: one text is a copy, a reformatting or a later edition in the same series of the other (a student guide of another year, a regulation of another year, a page under another address), so that a reader shown only the newest loses nothing. `different`: each says something the other does not — another paragraph, another call or programme, another year's report, a summary beside its full text — however much wording they share |
 
 ## Writing rules
 
