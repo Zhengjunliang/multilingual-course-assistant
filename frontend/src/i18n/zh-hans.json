@@ -101,9 +101,13 @@
     "running": "正在检索 · {{seconds}} 秒",
     "done": "检索完成 · {{seconds}} 秒",
     "doneUntimed": "检索完成",
-    "searchedIn": "检索了{{where}}",
+    "searchedIn": "检索了<where>{{where}}</where>",
     "read_one": "读了 {{count}} 个片段",
-    "read_other": "读了 {{count}} 个片段"
+    "read_other": "读了 {{count}} 个片段",
+    "cited_one": "引用了 {{count}} 个来源",
+    "cited_other": "引用了 {{count}} 个来源",
+    "asked": "提问语言：{{language}}",
+    "languages": "提问语言：{{language}}；来源语言：{{sources}}"
   },
   "sources": {
     "slide": "幻灯片第 {{page}} 页",
@@ -116,11 +120,19 @@
     "pill_one": "{{shown}}，来源",
     "pill_other": "{{shown}}，来源：{{names}}",
     "copyCitation": "复制引用",
-    "citationCopied": "已复制引用"
+    "citationCopied": "已复制引用",
+    "open": "来源（{{count}}）",
+    "cited": "回答中引用",
+    "filter": "来源类型",
+    "filterAll": "全部",
+    "filterSlides": "幻灯片",
+    "filterWeb": "网页"
   },
   "answer": {
     "copy": "复制回答",
-    "copied": "已复制回答"
+    "copied": "已复制回答",
+    "searchTime": "检索用时",
+    "seconds": "{{seconds}} 秒"
   },
   "code": {
     "copy": "复制",

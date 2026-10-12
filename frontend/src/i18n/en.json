@@ -101,9 +101,13 @@
     "running": "Searching · {{seconds}} s",
     "done": "Search complete · {{seconds}} s",
     "doneUntimed": "Search complete",
-    "searchedIn": "Searched {{where}}",
+    "searchedIn": "Searched <where>{{where}}</where>",
     "read_one": "Read {{count}} excerpt",
-    "read_other": "Read {{count}} excerpts"
+    "read_other": "Read {{count}} excerpts",
+    "cited_one": "{{count}} source cited",
+    "cited_other": "{{count}} sources cited",
+    "asked": "Asked in {{language}}",
+    "languages": "Asked in {{language}}, sources in {{sources}}"
   },
   "sources": {
     "slide": "Slide p. {{page}}",
@@ -116,11 +120,19 @@
     "pill_one": "{{shown}}, source",
     "pill_other": "{{shown}}, sources: {{names}}",
     "copyCitation": "Copy the citation",
-    "citationCopied": "Citation copied"
+    "citationCopied": "Citation copied",
+    "open": "Sources ({{count}})",
+    "cited": "Cited in the answer",
+    "filter": "Kind of source",
+    "filterAll": "All",
+    "filterSlides": "Slides",
+    "filterWeb": "Web"
   },
   "answer": {
     "copy": "Copy the answer",
-    "copied": "Answer copied"
+    "copied": "Answer copied",
+    "searchTime": "Search time",
+    "seconds": "{{seconds}} s"
   },
   "code": {
     "copy": "Copy",

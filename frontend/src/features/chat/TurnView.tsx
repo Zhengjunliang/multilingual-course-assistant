@@ -18,7 +18,7 @@
  * answered and keeps every other turn object as it was.
  */
 
-import { memo } from "react";
+import { memo, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -26,6 +26,7 @@ import { Mascot } from "@/components/Mascot";
 import { citedMarkers } from "@/lib/markers";
 import { AnswerActions } from "./AnswerActions";
 import { AnswerStream } from "./AnswerStream";
+import { HighlightContext } from "./CitationPill";
 import { ProcessLine } from "./ProcessLine";
 import { LanguageChip } from "./SourceParts";
 import type { Turn } from "./useAsk";
@@ -73,7 +74,12 @@ export const TurnView = memo(function TurnView({
   const { t } = useTranslation();
   // References are read only once the answer is complete: a marker, or
   // "[Excerpt 2]", is routinely split across two token events.
-  const cited = turn.complete ? citedMarkers(turn.answer, turn.citations) : null;
+  const cited = useMemo(
+    () => (turn.complete ? citedMarkers(turn.answer, turn.citations) : null),
+    [turn.complete, turn.answer, turn.citations],
+  );
+  // The source pointed at in the sources panel, whose pills the answer marks.
+  const [highlighted, setHighlighted] = useState<string | null>(null);
   const working = thinking || live;
   const waiting = working && turn.answer === "";
 
@@ -103,19 +109,23 @@ export const TurnView = memo(function TurnView({
             route={turn.route}
             searchMs={turn.searchMs}
             citations={turn.citations}
+            cited={cited}
+            locale={turn.locale}
           />
 
           {/* Nothing under the process line until the search is over: the
               cat's thinking pose and the line's count say the turn is
               working. Then the caret, alone until the first word. */}
           {(turn.answer !== "" || (live && turn.route !== null)) && (
-            <AnswerStream
-              text={turn.answer}
-              lang={turn.locale ?? undefined}
-              complete={turn.complete}
-              live={live}
-              citations={turn.citations}
-            />
+            <HighlightContext value={highlighted}>
+              <AnswerStream
+                text={turn.answer}
+                lang={turn.locale ?? undefined}
+                complete={turn.complete}
+                live={live}
+                citations={turn.citations}
+              />
+            </HighlightContext>
           )}
 
           {!working && (
@@ -124,6 +134,8 @@ export const TurnView = memo(function TurnView({
               citations={turn.citations}
               cited={cited}
               complete={turn.complete}
+              searchMs={turn.searchMs}
+              onHighlight={setHighlighted}
             />
           )}
 

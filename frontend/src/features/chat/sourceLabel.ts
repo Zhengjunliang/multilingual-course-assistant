@@ -84,7 +84,7 @@ function pathOf(url: string): string[] {
  * apart from the others, the way VS Code names two open files of one name by
  * their folders (`workbench.editor.labelFormat`, read 12 October 2026). Two
  * versions of one page share their path, and are told apart by the day each
- * was fetched. A slide names its edition already (`SourceSummary`), and a
+ * was fetched. A slide names its edition already (SourcesPanel.tsx), and a
  * source that reads like no other gets nothing.
  */
 export function distinctions(sources: readonly Citation[]): Map<string, string> {

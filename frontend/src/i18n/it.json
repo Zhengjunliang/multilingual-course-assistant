@@ -101,9 +101,13 @@
     "running": "Ricerca in corso · {{seconds}} s",
     "done": "Ricerca completata · {{seconds}} s",
     "doneUntimed": "Ricerca completata",
-    "searchedIn": "Cercato in {{where}}",
+    "searchedIn": "Cercato in <where>{{where}}</where>",
     "read_one": "Letto {{count}} estratto",
-    "read_other": "Letti {{count}} estratti"
+    "read_other": "Letti {{count}} estratti",
+    "cited_one": "{{count}} fonte citata",
+    "cited_other": "{{count}} fonti citate",
+    "asked": "Domanda in {{language}}",
+    "languages": "Domanda in {{language}}, fonti in {{sources}}"
   },
   "sources": {
     "slide": "Slide p. {{page}}",
@@ -116,11 +120,19 @@
     "pill_one": "{{shown}}, fonte",
     "pill_other": "{{shown}}, fonti: {{names}}",
     "copyCitation": "Copia la citazione",
-    "citationCopied": "Citazione copiata"
+    "citationCopied": "Citazione copiata",
+    "open": "Fonti ({{count}})",
+    "cited": "Citate nella risposta",
+    "filter": "Tipo di fonte",
+    "filterAll": "Tutte",
+    "filterSlides": "Slide",
+    "filterWeb": "Web"
   },
   "answer": {
     "copy": "Copia la risposta",
-    "copied": "Risposta copiata"
+    "copied": "Risposta copiata",
+    "searchTime": "Tempo di ricerca",
+    "seconds": "{{seconds}} s"
   },
   "code": {
     "copy": "Copia",

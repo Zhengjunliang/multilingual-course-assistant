@@ -14,7 +14,7 @@ import { Chip } from "@/components/ui/chip";
 import { Tooltip } from "@/components/ui/tooltip";
 import { languageCode, languageName } from "@/i18n";
 import { cn } from "@/lib/utils";
-import { citationText, excerptOf, hostOf, titleOf } from "./sourceLabel";
+import { citationText } from "./sourceLabel";
 import { useCopy } from "./useCopy";
 
 /** A web page's or a slide's mark, beside its name. */
@@ -63,46 +63,6 @@ export function CopyCitation({ citation }: { citation: Citation }) {
       </Tooltip>
       <span role="status" className="sr-only">
         {copied ? t("sources.citationCopied") : ""}
-      </span>
-    </>
-  );
-}
-
-/**
- * Where a source is, its title, and the start of the excerpt. A slide also
- * names its edition, as code and year, the way Open edX course runs and UniFi's
- * Moodle titles name one; a slide stored before the year existed shows none.
- * `distinction` is what sets the source apart from another of its list that
- * reads the same (`distinctions`), after where it is.
- */
-export function SourceSummary({
-  citation,
-  distinction,
-}: {
-  citation: Citation;
-  distinction?: string | undefined;
-}) {
-  const { t } = useTranslation();
-  const where =
-    citation.kind === "web" && citation.url !== null
-      ? hostOf(citation.url)
-      : t("sources.filePage", { file: citation.source_file, page: citation.page });
-  return (
-    <>
-      <span className="flex min-w-0 items-center gap-tight text-caption text-muted">
-        <SourceIcon citation={citation} />
-        <span className="truncate">{distinction ? `${where} · ${distinction}` : where}</span>
-      </span>
-      {citation.kind === "slides" && citation.academic_year != null && (
-        <span className="font-mono text-caption text-muted">
-          {citation.course} · {citation.academic_year}
-        </span>
-      )}
-      <span lang={citation.locale} className="font-medium text-ink">
-        {titleOf(citation)}
-      </span>
-      <span lang={citation.locale} className="text-muted">
-        {excerptOf(citation.text)}
       </span>
     </>
   );
