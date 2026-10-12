@@ -6,8 +6,11 @@
  * at least 54 px, room for a name over its code (rule 1), with a hairline
  * between them. The row the reader opened and came back to with Back is
  * `selected`: the accent at 11 % with the 3 px bar at its leading edge, as
- * the sidebar draws where the reader is (features/chat/rows.ts says why the
- * bar is a border). It is marked with `data-selected` and not
+ * the sidebar draws where the reader is. The bar is an inset shadow of the
+ * row's first cell, not a pseudo-element of the row: Chrome lays a row's
+ * generated box out as a cell of its own, absolutely positioned or not,
+ * and every cell after it moves a column; a stacked row has none, its card
+ * tinted alone. It is marked with `data-selected` and not
  * `aria-selected`, which a row of a plain table does not take; focus going
  * back to the row's link is what a screen reader hears.
  *
@@ -88,7 +91,7 @@ export function TableBody({ className, ...props }: ComponentProps<"tbody">) {
 }
 
 const SELECTED =
-  "data-selected:bg-selected data-selected:hover:bg-selected data-selected:before:absolute data-selected:before:inset-y-tight data-selected:before:left-0 data-selected:before:rounded-r-full data-selected:before:border-accent data-selected:before:border-l-(length:--spacing-bar)";
+  "data-selected:bg-selected data-selected:hover:bg-selected sm:data-selected:[&>td:first-child]:shadow-[inset_var(--spacing-bar)_0_var(--color-accent)]";
 
 export function TableRow({
   className,
