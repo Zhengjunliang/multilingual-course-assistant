@@ -10,6 +10,7 @@
     "password": "密码",
     "passwordHint": "至少 8 个字符。",
     "showPassword": "显示密码",
+    "capsLock": "大写锁定已打开",
     "logIn": "登录",
     "register": "注册",
     "failed": "登录失败。",

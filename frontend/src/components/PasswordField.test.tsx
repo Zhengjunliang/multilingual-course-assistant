@@ -111,4 +111,34 @@ describe("a password field", () => {
 
     expect([before, after]).toEqual(["text", "password"]);
   });
+
+  it("says Caps Lock is on while the field has the focus, and stops saying it when it leaves", () => {
+    const { container, unmount } = mount(<Form />);
+    const input = container.querySelector("input");
+    const said = () => container.querySelector("[aria-live=polite]")?.textContent ?? "";
+    const key = (type: string, capsLock: boolean) =>
+      act(() => {
+        input?.dispatchEvent(
+          new KeyboardEvent(type, { key: "A", modifierCapsLock: capsLock, bubbles: true }),
+        );
+      });
+
+    act(() => input?.focus());
+    const atFocus = said();
+    key("keydown", true);
+    const on = said();
+    key("keyup", false);
+    const off = said();
+    key("keydown", true);
+    act(() => input?.blur());
+    const left = said();
+    unmount();
+
+    expect({ atFocus, on, off, left }).toEqual({
+      atFocus: "",
+      on: i18n.t("auth.capsLock"),
+      off: "",
+      left: "",
+    });
+  });
 });

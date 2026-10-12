@@ -23,17 +23,26 @@
  * Edge draws an eye of its own in a password input; index.css hides it, so
  * the field has one way to show the letters, not two.
  *
+ * While the input has the focus and Caps Lock is on, a chip under it says
+ * so, as macOS's and Windows' sign-in fields do (#190): a password typed in
+ * capitals is refused with nothing on the screen to say why. A browser tells
+ * the state only with a key or pointer event, so the chip appears at the
+ * first key pressed, and leaves with the focus. It is a polite live region,
+ * heard once when it appears.
+ *
  * The field and its eye are marked `data-mascot-away`: while the focus is in
  * either, the living cat looks away (components/LivingMascot.tsx), so this
  * field need not know the cat exists.
  */
 
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowBigUp, Eye, EyeOff } from "lucide-react";
+import type { KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { LineField } from "@/components/LineField";
 import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
 
 interface PasswordFieldProps {
   id: string;
@@ -59,7 +68,10 @@ export function PasswordField({
 }: PasswordFieldProps) {
   const { t } = useTranslation();
   const [shown, setShown] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const readCapsLock = (event: KeyboardEvent<HTMLInputElement>) =>
+    setCapsLock(event.getModifierState("CapsLock"));
 
   useEffect(() => {
     const field = input.current;
@@ -91,6 +103,9 @@ export function PasswordField({
         required
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onKeyDown={readCapsLock}
+        onKeyUp={readCapsLock}
+        onBlur={() => setCapsLock(false)}
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
         trailing={
@@ -109,6 +124,14 @@ export function PasswordField({
           </Button>
         }
       />
+      <div aria-live="polite">
+        {capsLock && (
+          <Chip className="mt-tight">
+            <ArrowBigUp aria-hidden className="size-icon" />
+            {t("auth.capsLock")}
+          </Chip>
+        )}
+      </div>
     </div>
   );
 }

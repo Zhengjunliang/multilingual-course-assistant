@@ -160,27 +160,3 @@ export function AuthButton({ phase, children }: { phase: Phase; children: string
     </Button>
   );
 }
-
-/** What the server said, in the warning colour after a disc with "!". */
-export function AuthFailure({
-  id,
-  role,
-  children,
-}: {
-  id?: string;
-  /** `alert` for a failure that no field's description carries, so it is heard. */
-  role?: "alert";
-  children: string;
-}) {
-  return (
-    <p id={id} role={role} className="flex items-start gap-tight text-body text-warn-ink">
-      <span
-        aria-hidden
-        className="mt-px grid size-icon shrink-0 place-items-center rounded-full bg-warn-ink font-bold text-caption text-surface"
-      >
-        !
-      </span>
-      {children}
-    </p>
-  );
-}

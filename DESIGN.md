@@ -142,6 +142,9 @@ components:
   warn-ink-on-surface:
     backgroundColor: '{colors.surface}'
     textColor: '{colors.warn-ink}'
+  warn-ink-on-canvas:
+    backgroundColor: '{colors.canvas}'
+    textColor: '{colors.warn-ink}'
   ink-on-hover-over-canvas:
     backgroundColor: '{colors.hover-over-canvas}'
     textColor: '{colors.ink}'
@@ -211,6 +214,9 @@ components:
   warn-ink-on-surface-dark:
     backgroundColor: '{colors.surface-dark}'
     textColor: '{colors.warn-ink-dark}'
+  warn-ink-on-canvas-dark:
+    backgroundColor: '{colors.canvas-dark}'
+    textColor: '{colors.warn-ink-dark}'
   ink-on-hover-over-canvas-dark:
     backgroundColor: '{colors.hover-over-canvas-dark}'
     textColor: '{colors.ink-dark}'
@@ -271,7 +277,7 @@ Five sizes carry the interface, and a sixth needs a reason: `caption`, `body`, `
 
 ## Layout
 
-Distances are named by what they are for, never by a step: `hair`, `tight`, `snug`, `gutter` and `room` for the rhythm inside and between things; `control-sm`, `control-icon`, `control` and `field` for the heights three components must agree on; `icon` and `icon-lg` for glyphs; `avatar` and `mascot` for the cat. A component that writes `px-4` or `h-10` fails the component layer's test.
+Distances are named by what they are for, never by a step: `hair`, `tight`, `snug`, `gutter` and `room` for the rhythm inside and between things; `control-xs`, `control-sm` and `control` for a button's three heights (28, 32 and 40 px, a field's being the last), `control-icon` for an icon button and `field` for a block of text to write in; `icon` and `icon-lg` for glyphs; `avatar-sm` for a person's smallest avatar, which at 32 and 40 px matches the control beside it; `avatar` and `mascot` for the cat. A component that writes `px-4` or `h-10` fails the component layer's test.
 
 The page never scrolls sideways at 375 px. The chat column and the composer share one width; the sidebar is a column from `lg` and a drawer below it. Below `sm` a data table stacks each row into a card, its cells labelled with their columns, because a phone has no width for five columns.
 
@@ -307,9 +313,9 @@ An answer is drawn in one order (`features/chat/TurnView.tsx`), after ChatGPT an
 - **The answer**, in Figtree at `text-reading`, its citations as pills: `rounded-full`, `text-caption`, the source's short name (the host without `www.`, or the slide's page), a run of them as «name +N». A pill links to its source, a web page at its passage and a slide at its page, and previews every source of its run in a `HoverCard`; its accessible name starts with what it shows.
 - **Under a settled answer**, a ghost icon button that copies the answer without its markers, and the sources button, an outlined pill with up to three stacked source marks, which opens the sources panel: a `Sheet` from the right, full width below `sm`, the cited sources first and the rest after them under a heading of their own, never marked as unused, and every source in one list when the answer cited none. Closing it gives focus back to the button.
 
-A password is typed into `components/PasswordField.tsx`, with an eye inside the field, after Edge's own reveal and Material 3's secure text field: a toggle button whose name, "Show password", never changes, its state in `aria-pressed`, which a screen reader announces. Pressing it with a pointer leaves the focus in the field. The letters are hidden again when the form is sent and when the page returns from the back-forward cache, and Edge's own eye in the field is hidden, so there is one way to show them.
+A password is typed into `components/PasswordField.tsx`, with an eye inside the field, after Edge's own reveal and Material 3's secure text field: a toggle button whose name, "Show password", never changes, its state in `aria-pressed`, which a screen reader announces. Pressing it with a pointer leaves the focus in the field. The letters are hidden again when the form is sent and when the page returns from the back-forward cache, and Edge's own eye in the field is hidden, so there is one way to show them. While the field has the focus and Caps Lock is on, a neutral chip under it says so, as the macOS and Windows sign-in fields do.
 
-The sign-in and registration forms sit on a card with no border (`routes/AuthLayout.tsx`): `surface`, `rounded-bubble` and `shadow-overlay`, the living cat's head sitting on its top edge. Their fields are `components/LineField.tsx`, after Material 3's filled text field: an underline in `muted`, which is the field's only edge, the label inside the field floating up to four fifths of its size on focus, once filled or once a password manager has filled it, and an accent line growing from the left while the focus is in the field, `warn-ink` while the field is refused. The submit button is a full pill: an arrow slides in under the pointer or the focus, a spinner turns while the server decides and a check is drawn in when it accepts, after Stripe Checkout's pay button, and it is `aria-disabled` from the send until the page leaves. What the server refused is a line in `warn-ink` after a disc with "!", tied to its field by `aria-describedby`; a refused sign-in shakes the card once, after the macOS sign-in window, and empties the password. The registration's password carries a hint of its minimum length.
+The sign-in and registration forms sit on a card with no border (`routes/AuthLayout.tsx`): `surface`, `rounded-bubble` and `shadow-overlay`, the living cat's head sitting on its top edge. Their fields are `components/LineField.tsx`, after Material 3's filled text field: an underline in `muted`, which is the field's only edge, the label inside the field floating up to four fifths of its size on focus, once filled or once a password manager has filled it, and an accent line growing from the left while the focus is in the field, `warn-ink` while the field is refused. The submit button is a full pill: an arrow slides in under the pointer or the focus, a spinner turns while the server decides and a check is drawn in when it accepts, after Stripe Checkout's pay button, and it is `aria-disabled` from the send until the page leaves. What the server refused is a line in `warn-ink` after an icon (`FieldError`, the same as a form field's in a page), under its field and tied to it by `aria-describedby`; a refused sign-in shakes the card once, after the macOS sign-in window, and empties the password. The registration's password carries a hint of its minimum length.
 
 Behind the sign-in, the registration and the entry stands a room drawn in the cat's line (`features/entry/Room.tsx`), after the Firewatch website's layered scene: a bookshelf with a plant and a paper plane, a window with clouds, a desk with a lamp, a mug and books, in `accent` at `--room-strength` (0.42 light, 0.5 dark), with lines that keep their width at any size. It stands in two wings anchored to the lower corners, each at most half of what the card or the question box leaves free, so no line runs under them or under any text; on a phone the wings stand in a strip under the form. It draws itself in once per page load, after a visitor's first-visit intro when one plays, and then moves only with the pointer, three depths of at most 10 px, never by itself, so it needs no pause control; under reduced motion it is whole and motionless, and a device that cannot hover gets no parallax. It leaves with the entry, fading as the entry recedes, and the conversation keeps the grain alone.
 
