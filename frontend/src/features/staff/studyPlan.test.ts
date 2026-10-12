@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Course, CurriculumEntry, ProgrammeName, StudyPlanCourse } from "@/api/catalog";
-import { fold, type PlanGroup, studyPlan } from "./studyPlan";
+import { fold, type PlanGroup, rowCount, studyPlan, yearCounts } from "./studyPlan";
 
 const B047: ProgrammeName = { code: "B047", name: "INGEGNERIA INFORMATICA", locale: "it" };
 const B222: ProgrammeName = { code: "B222", name: "INGEGNERIA GESTIONALE", locale: "it" };
@@ -121,5 +121,27 @@ describe("a study plan", () => {
 
   it("folds accents and case", () => {
     expect(fold("Università È")).toBe("universita e");
+  });
+});
+
+describe("a study plan's counts", () => {
+  // Statistics in the first year for one curriculum, in the second for the other.
+  const twice = row("B000003", "STATISTICA", [
+    entry(B047, TA, 1, "B000003"),
+    entry(B047, TS, 2, "B000003"),
+  ]);
+  const plan = [...ROWS, twice];
+
+  it("count a course under each year that lists it", () => {
+    expect(rowCount(studyPlan(plan, PLAN, null, ""))).toBe(6);
+  });
+
+  it.each([
+    ["every curriculum, nothing searched", null, "", [3, 1, 2]],
+    ["one curriculum", TA, "", [3, 0, 1]],
+    ["a search", null, "statist", [1, 1, 0]],
+  ])("give each year the rows it shows under %s", (_, curriculum, query, counts) => {
+    const groups = studyPlan(plan, PLAN, curriculum, query);
+    expect(yearCounts([1, 2, 3], groups).map(({ count }) => count)).toEqual(counts);
   });
 });

@@ -179,16 +179,14 @@
     "source": "Study plan from the Cineca course catalogue.",
     "you": "you",
     "plan": {
-      "title": "Courses",
-      "sub_one": "The study plan, by year of study: {{count}} course.",
-      "sub_other": "The study plan, by year of study: {{count}} courses.",
+      "title": "Study plan",
       "curricula": "Curricula: {{list}}",
       "search": "Search by name or code",
       "searchLabel": "Search for a course",
       "filter": "Curriculum",
+      "yearFilter": "Year of study",
       "all": "All",
       "course": "Course",
-      "entries": "Study plan entries",
       "current": "Current edition",
       "teachers": "Teachers",
       "noTeacher": "No teacher assigned",
@@ -208,8 +206,7 @@
     "secretariat": {
       "title": "Teaching secretariat",
       "sub": "Manages the editions of the courses in this study plan.",
-      "empty": "No member of the teaching secretariat.",
-      "onlyAdmin": "Only the administrator assigns the teaching secretariat."
+      "empty": "No member of the teaching secretariat."
     },
     "refusal": {
       "notFound": "Not found",
@@ -279,6 +276,7 @@
     "search": "Search the conversations",
     "settings": "Open the settings",
     "help": "Show the shortcuts",
+    "filter": "Filter the study plan's courses",
     "send": "Send the question",
     "newLine": "Start a new line in the question",
     "close": "Close a menu or a window"

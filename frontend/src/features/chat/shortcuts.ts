@@ -12,7 +12,10 @@
  * deletes to the end of the line), as ChatGPT leaves it.
  *
  * `?` alone is a character, so it is heard only outside a field: in the
- * question box it is the end of a question.
+ * question box it is the end of a question. So is `/`, which a page with a
+ * filter takes to put the focus in it, as GitHub, Gmail and YouTube do: the
+ * study plan's (features/staff/StudyPlanTable.tsx). It waits while any layer
+ * is open, the narrow-screen drawer included, since the filter is behind it.
  */
 
 import type { Shortcut } from "@/components/ui/kbd";
@@ -34,6 +37,8 @@ export function shortcuts(isApple: boolean = apple()): Record<ShortcutName, Shor
   };
 }
 
+export const FILTER: Shortcut = { keys: "/", label: "/" };
+
 function typingIn(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
@@ -52,4 +57,11 @@ export function shortcutOf(event: KeyboardEvent, isApple: boolean = apple()): Sh
   }
   if (event.ctrlKey || event.metaKey) return null;
   return key === "?" && !typingIn(event.target) ? "help" : null;
+}
+
+/** Whether a key press is the page filter's `/`: no modifier but the one some layouts type it with. */
+export function isFilterKey(event: KeyboardEvent): boolean {
+  if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return false;
+  if (typingIn(event.target)) return false;
+  return document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]') === null;
 }

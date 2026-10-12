@@ -99,6 +99,7 @@ export default function EditionPage() {
         </div>
         <StaffList
           people={data.teachers}
+          staffRole="teacher"
           empty={t("staff.edition.empty")}
           action={members.action}
         />

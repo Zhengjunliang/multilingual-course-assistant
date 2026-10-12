@@ -14,7 +14,7 @@ import { useTranslation } from "react-i18next";
 
 import { Dialog } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
-import { shortcuts } from "@/features/chat/shortcuts";
+import { FILTER, shortcuts } from "@/features/chat/shortcuts";
 
 interface ShortcutsDialogProps {
   open: boolean;
@@ -31,6 +31,7 @@ export function ShortcutsDialog({ open, onOpenChange, onCloseAutoFocus }: Shortc
     [t("shortcuts.search"), keys.search.label],
     [t("shortcuts.settings"), keys.settings.label],
     [t("shortcuts.help"), keys.help.label],
+    [t("shortcuts.filter"), FILTER.label],
     [t("shortcuts.send"), t("keys.enter")],
     [t("shortcuts.newLine"), `${t("keys.shift")} ${t("keys.enter")}`],
     [t("shortcuts.close"), t("keys.escape")],

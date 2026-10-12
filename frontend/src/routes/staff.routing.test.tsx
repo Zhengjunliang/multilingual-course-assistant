@@ -322,6 +322,25 @@ function page(path: string): Page {
   };
 }
 
+/** Shows the tab whose label starts with `label`, as a press of the pointer does: Radix's trigger answers the mousedown. */
+function showTab(container: HTMLElement, label: string) {
+  const tab = [...container.querySelectorAll('main [role="tab"]')].find((candidate) =>
+    candidate.textContent?.startsWith(label),
+  );
+  act(() => {
+    tab?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+  });
+}
+
+/** A key pressed with the focus on the page, outside any field. */
+function press(key: string) {
+  act(() => {
+    document.body.dispatchEvent(
+      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
+  });
+}
+
 async function settle() {
   for (let turn = 0; turn < 4; turn += 1) {
     await act(async () => {
@@ -498,7 +517,7 @@ describe("the programme pages", () => {
       title: "Corsi di laurea",
       columns: ["Codice", "Nome", "Curriculum", "Insegnamenti", "Segreteria didattica", "Apri"],
       links: ["/staff/programmes/B047", "/staff/programmes/B222"],
-      rows: ["demo-secretariat", "Nessuno"],
+      rows: ["Giulia Neri", "Nessuno"],
       crumbs: ["Corsi di laurea (current)"],
     });
   });
@@ -520,20 +539,67 @@ describe("the programme pages", () => {
     reader = who;
     const { container, unmount } = page("/staff/programmes/B047");
     await settle();
-    const body = container.textContent ?? "";
+    const banner = [...container.querySelectorAll("main p")].some(
+      (p) => p.textContent === "Solo l'amministratore assegna la segreteria didattica.",
+    );
     const seen = {
       title: text(container.querySelector("main h1")),
+      chips: [...container.querySelectorAll("main header .flex-wrap > span")].map(text),
       crumbs: crumbs(container),
+      tabs: [...container.querySelectorAll('main [role="tab"]')].map(text),
+      years: [...container.querySelectorAll('main [aria-label="Anno di corso"] button')].map(text),
       group: text(container.querySelector('main th[scope="colgroup"]')),
-      footnote: body.includes("Solo l'amministratore assegna la segreteria didattica."),
+      people: [...container.querySelectorAll("main ul li")].map(text),
+      banner,
     };
     unmount();
 
     expect(seen).toEqual({
       title: "INGEGNERIA INFORMATICA",
+      chips: ["B047", "TECNICO APPLICATIVO", "TECNICO SCIENTIFICO", "1 insegnamento"],
       crumbs: path,
+      // Each tab and each year with the rows it shows.
+      tabs: [`${i18n.t("staff.plan.title")}1`, "Segreteria didattica1"],
+      years: ["Tutti1", "3° anno1"],
       group: "3° anno · 1 insegnamento",
-      footnote,
+      // Behind its tab, kept mounted: name over username, and the role.
+      people: [
+        who === ADMIN
+          ? "Giulia Neridemo-secretariatSegreteriaRevoca"
+          : "Giulia Neritudemo-secretariatSegreteria",
+      ],
+      banner: footnote,
+    });
+  });
+
+  it("puts the focus in the plan's filter on /, typing nothing, and keeps the filter across the tabs", async () => {
+    reader = ADMIN;
+    const { container, unmount } = page("/staff/programmes/B047");
+    await settle();
+    const field = container.querySelector<HTMLInputElement>('main input[type="search"]');
+    press("/");
+    const reached = [document.activeElement === field, field?.value];
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    act(() => {
+      setter?.call(field, "fisica");
+      field?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    showTab(container, "Segreteria didattica");
+    act(() => field?.blur());
+    // Behind another tab, the plan's filter is not where "/" goes.
+    press("/");
+    const away = document.activeElement === field;
+    showTab(container, i18n.t("staff.plan.title"));
+    const kept = [
+      field?.value,
+      (container.textContent ?? "").includes("Nessun insegnamento corrisponde"),
+    ];
+    unmount();
+
+    expect({ reached, away, kept }).toEqual({
+      reached: [true, ""],
+      away: false,
+      kept: ["fisica", true],
     });
   });
 
@@ -704,8 +770,8 @@ describe("a course, an edition, and a teacher's own courses", () => {
       // The reader is marked as themselves; whoever may assign gets a "Revoca" per row.
       people:
         who === TEACHER
-          ? ["demo-colleague", "demo-teachertu"]
-          : ["demo-colleagueRevoca", "demo-teacherRevoca"],
+          ? ["demo-colleagueDocente", "demo-teachertuDocente"]
+          : ["demo-colleagueDocenteRevoca", "demo-teacherDocenteRevoca"],
       crumbs: trail,
       footnote,
     });
@@ -780,6 +846,7 @@ describe("a write from a page", () => {
     reader = ADMIN;
     const { container, unmount } = page("/staff/programmes/B047");
     await settle();
+    showTab(container, "Segreteria didattica");
     const assign = container.querySelector<HTMLButtonElement>("main [data-assign]");
     act(() => {
       assign?.focus();
@@ -862,6 +929,7 @@ describe("a write from a page", () => {
     reader = ADMIN;
     const { container, unmount } = page("/staff/programmes/B047");
     await settle();
+    showTab(container, "Segreteria didattica");
     act(() =>
       container
         .querySelector<HTMLButtonElement>('button[aria-label="Revoca demo-secretariat"]')

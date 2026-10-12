@@ -11,7 +11,10 @@
  * every programme. A course appears under each year of study its entries in
  * this programme name, with only those entries; the curriculum filter keeps
  * the entries of one curriculum, and the search keeps the courses whose name
- * or any code holds the query, accents and case aside.
+ * or any code holds the query, accents and case aside. The year filter
+ * narrows what those two leave to one year of study, and each year's count
+ * is the rows that year shows under them, so picking a year shows exactly
+ * the number beside it.
  */
 
 import type {
@@ -127,4 +130,20 @@ export function studyPlan(
       year,
       rows: list.sort((a, b) => a.course.name.localeCompare(b.course.name, "it")),
     }));
+}
+
+/** How many rows `groups` show: a course under two years of study is two rows. */
+export function rowCount(groups: readonly PlanGroup[]): number {
+  return groups.reduce((sum, group) => sum + group.rows.length, 0);
+}
+
+/** Each of `years`, with how many rows `groups` show in it; zero where none is left. */
+export function yearCounts(
+  years: readonly number[],
+  groups: readonly PlanGroup[],
+): { year: number; count: number }[] {
+  return years.map((year) => ({
+    year,
+    count: groups.find((group) => group.year === year)?.rows.length ?? 0,
+  }));
 }
