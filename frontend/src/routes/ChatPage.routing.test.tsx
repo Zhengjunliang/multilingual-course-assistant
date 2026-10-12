@@ -20,14 +20,18 @@ import type { Account } from "@/api/account";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
+import { summary } from "@/test/conversations";
 import { type Mounted, mount } from "@/test/mount";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
-const STORED: ConversationDetail = {
+const STORED_ROW = summary({
   id: 7,
-  locale: "it",
   created_at: "2026-09-28T10:00:00Z",
   title: "Che cos'è un ORM?",
+});
+
+const STORED: ConversationDetail = {
+  ...STORED_ROW,
   messages: [
     {
       id: 1,
@@ -38,6 +42,7 @@ const STORED: ConversationDetail = {
       citations: [],
       route: null,
       search_ms: null,
+      created_at: STORED_ROW.created_at,
     },
     {
       id: 2,
@@ -48,6 +53,7 @@ const STORED: ConversationDetail = {
       citations: [],
       route: null,
       search_ms: null,
+      created_at: STORED_ROW.created_at,
     },
   ],
 };
@@ -103,7 +109,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     // A visitor's question is filed nowhere, as the server has it.
     if (history !== undefined) return answerStream(null, question);
     conversations = [
-      { id: 9, locale: "it", created_at: "2026-09-29T09:00:00Z", title: question },
+      summary({ id: 9, created_at: "2026-09-29T09:00:00Z", title: question }),
       ...conversations,
     ];
     return answerStream(9, question);
@@ -202,19 +208,15 @@ function deleting(title: string) {
   };
 }
 
-const OTHER: ConversationSummary = {
+const OTHER = summary({
   id: 8,
-  locale: "it",
   created_at: "2026-09-27T10:00:00Z",
   title: "Quando scadono le tasse?",
-};
+});
 
 describe("the chat page's address", () => {
   beforeEach(() => {
-    conversations = [
-      { id: STORED.id, locale: STORED.locale, created_at: STORED.created_at, title: STORED.title },
-      OTHER,
-    ];
+    conversations = [STORED_ROW, OTHER];
     deleteFails = false;
     vi.stubGlobal("fetch", fakeApi);
   });

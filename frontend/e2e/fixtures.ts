@@ -126,7 +126,11 @@ export const CONVERSATION: ConversationDetail = {
   id: 7,
   locale: "it",
   created_at: "2026-10-08T10:00:00Z",
+  last_message_at: "2026-10-08T10:00:02Z",
   title: CAMPUS_QUESTION,
+  title_locale: "it",
+  pinned: false,
+  last_source: { courses: [], web: true },
   messages: [
     {
       id: 1,
@@ -137,6 +141,7 @@ export const CONVERSATION: ConversationDetail = {
       citations: [],
       route: null,
       search_ms: null,
+      created_at: "2026-10-08T10:00:00Z",
     },
     {
       id: 2,
@@ -147,6 +152,7 @@ export const CONVERSATION: ConversationDetail = {
       citations: [WEB_CITATION],
       route: CAMPUS_ROUTE,
       search_ms: 2400,
+      created_at: "2026-10-08T10:00:02Z",
     },
   ],
 };

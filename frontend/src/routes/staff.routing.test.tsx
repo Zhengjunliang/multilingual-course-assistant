@@ -21,6 +21,7 @@ import type { Course, Edition, Programme, StudyPlanCourse } from "@/api/catalog"
 import type { ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
+import { summary } from "@/test/conversations";
 import { type Mounted, mount } from "@/test/mount";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
@@ -224,7 +225,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   }
   if (method === "POST" && path === "/api/ask") {
     conversations = [
-      { id: 9, locale: "it", created_at: "2026-10-05T09:00:00Z", title: "q" },
+      summary({ id: 9, created_at: "2026-10-05T09:00:00Z", title: "q" }),
       ...conversations,
     ];
     return endlessAnswer(init.signal);
@@ -354,7 +355,7 @@ function crumbs(container: HTMLElement) {
 }
 
 beforeEach(() => {
-  conversations = [{ id: 7, locale: "it", created_at: "2026-10-04T10:00:00Z", title: "ORM" }];
+  conversations = [summary({ id: 7, created_at: "2026-10-04T10:00:00Z", title: "ORM" })];
   asked.length = 0;
   stopped = false;
   stoppedAtDelete = null;

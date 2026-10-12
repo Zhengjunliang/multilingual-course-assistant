@@ -17,12 +17,13 @@ import { describe, expect, it } from "vitest";
 import type { ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
+import { summary } from "@/test/conversations";
 import { mount } from "@/test/mount";
 import { ConversationSidebar } from "./ConversationSidebar";
 
 const ROWS: ConversationSummary[] = [
-  { id: 7, locale: "it", created_at: "2026-09-28T10:00:00Z", title: "Che cos'è un ORM?" },
-  { id: 8, locale: "it", created_at: "2026-09-27T10:00:00Z", title: "Quando scadono le tasse?" },
+  summary({ id: 7, created_at: "2026-09-28T10:00:00Z", title: "Che cos'è un ORM?" }),
+  summary({ id: 8, created_at: "2026-09-27T10:00:00Z", title: "Quando scadono le tasse?" }),
 ];
 
 function sidebar(conversations: ConversationSummary[] | null) {

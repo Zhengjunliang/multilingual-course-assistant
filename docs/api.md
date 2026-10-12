@@ -50,9 +50,13 @@ An anonymous caller has no stored conversation: it omits `conversation_id`, gets
 
 | Method and path | Does |
 | --------------- | ---- |
-| `GET /api/conversations` | the sidebar list; titles derive from the first question, and conversations with no messages are not listed |
-| `GET /api/conversations/<id>` | one conversation with its messages; someone else's is **404, not 403** — a 403 would confirm the id exists |
+| `GET /api/conversations` | the sidebar list, pinned conversations first, each group by its last message, newest first; a row is `id`, `locale`, `created_at`, `last_message_at`, `title`, `title_locale`, `pinned` and `last_source` (below) |
+| `GET /api/conversations/<id>` | one conversation, its row as the list shows it with its `messages`; someone else's is **404, not 403** — a 403 would confirm the id exists |
+| `PATCH /api/conversations/<id>` | `{"pinned": true}` or `false` pins or unpins it and answers with its row (200); `pinned` is the only field a conversation takes, and there is no `PUT`; someone else's is 404 |
 | `DELETE /api/conversations/<id>` | deletes one of your conversations with its messages (204); someone else's is 404; a question queued for a conversation deleted meanwhile is refused with 400 |
+
+- A row's fields other than `pinned` derive from its messages and are never stored: `title` is the first question cut to 60 characters, `title_locale` the language that question was asked in (`Message.locale`: a conversation has no single language), `last_message_at` the time of its last message. `last_source` is what its newest answer with excerpts drew on, `{"courses": [{"name", "locale"}], "web": bool}`: the courses of its slides excerpts in citation order, each once, named as `Course` names them (a code no course holds is shown as stored, with a `null` locale), and whether any excerpt was a university page. An answer refused for want of excerpts is skipped for the one before, and `last_source` is `null` when every answer was. The list costs the same queries for one conversation and for thirty.
+- Pinning reorders nothing: the pinned rows follow their last message like the rest, so unpinning returns a row to its place (LibreChat and LobeChat order theirs the same way). A conversation with no messages, which a question refused with a 503 leaves behind, is not listed, opened, pinned or deleted: its id never reached the client.
 
 - The last 3 turns (`HISTORY_WINDOW_TURNS`, [apps/qa/models.py](../apps/qa/models.py)) go into the prompt with the next question. The window is capped because the 4B model's context is the same space the retrieved excerpts need.
 - **The router sees only the student's past questions**; the generator sees whole turns, with answers cut to 400 characters and stripped of their citations (an old `[2]` or marker names an excerpt of that turn, not of this one). History is always one `user` message, never alternating roles: the router is asked to output one JSON object, and a real `assistant` prose turn demonstrates the opposite. The sha256 of both prompts is pinned in `tests/test_agent.py` and `tests/test_answer.py`.

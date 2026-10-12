@@ -6,7 +6,7 @@ This file owns the website's relational schema: its entities and relationships, 
 
 ## Entities and relationships
 
-✅ `User` exists in `apps/accounts/models.py`, `Conversation` and `Message` in `apps/qa/models.py`, `DegreeProgramme`, `Course`, `CourseEdition` and `CurriculumEntry` in `apps/catalog/models.py`, and `RoleAssignment` in `apps/roles/models.py`. 🔜 M5: every other entity below. `CourseEdition` is the centre: it owns the content, scopes a teacher, and is what a slides chunk's `course` and `academic_year` name. Rows with user-visible text carry `locale` — programme and course names, `Syllabus`, `ReadingItem`; relation tables and `CourseMaterial` do not, since a file's language is recorded per chunk.
+✅ `User` exists in `apps/accounts/models.py`, `Conversation` and `Message` in `apps/qa/models.py`, `DegreeProgramme`, `Course`, `CourseEdition` and `CurriculumEntry` in `apps/catalog/models.py`, and `RoleAssignment` in `apps/roles/models.py`. 🔜 M5: every other entity below. `CourseEdition` is the centre: it owns the content, scopes a teacher, and is what a slides chunk's `course` and `academic_year` name. Rows with user-visible text carry `locale` — programme and course names, `Syllabus`, `ReadingItem`; relation tables and `CourseMaterial` do not, since a file's language is recorded per chunk. Of a conversation only `Conversation.pinned` is set by its owner; what its sidebar row shows besides, its title and that title's language, its last message's time and what its last answer drew on, is derived from its `Message` rows when the list is read, never stored ([api.md](api.md)).
 
 ```mermaid
 erDiagram
