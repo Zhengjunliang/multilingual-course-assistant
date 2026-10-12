@@ -41,6 +41,8 @@ interface SheetProps {
    * opened from state alone leaves focus on the page's body when it closes.
    */
   trigger?: ReactElement;
+  /** As it opens: where the focus goes, when not to its first control (Radix's `onOpenAutoFocus`). */
+  onOpenAutoFocus?: (event: Event) => void;
   children: ReactNode;
 }
 
@@ -52,6 +54,7 @@ export function Sheet({
   count,
   side = "left",
   trigger,
+  onOpenAutoFocus,
   children,
 }: SheetProps) {
   return (
@@ -60,6 +63,7 @@ export function Sheet({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-backdrop bg-black/40" />
         <Dialog.Content
+          onOpenAutoFocus={onOpenAutoFocus}
           className={cn(
             "fixed inset-y-0 z-floating flex flex-col border-line bg-surface shadow-overlay",
             side === "left"

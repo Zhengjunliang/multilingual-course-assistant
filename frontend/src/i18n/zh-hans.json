@@ -18,10 +18,10 @@
     "haveAccount": "已经有账号了？"
   },
   "sidebar": {
-    "title": "你的会话",
+    "title": "菜单",
     "new": "新会话",
     "untitled": "未命名",
-    "open": "打开会话列表",
+    "open": "打开菜单",
     "collapse": "收起侧栏",
     "expand": "展开侧栏",
     "unreadable": "这个会话不可用。",
@@ -37,7 +37,8 @@
     "noMatch": "没有匹配的会话。",
     "loading": "正在加载会话",
     "emptyTitle": "还没有会话",
-    "emptyBody": "你问过的问题会留在这里，方便以后接着看。"
+    "emptyBody": "你问过的问题会留在这里，方便以后接着看。",
+    "close": "关闭菜单"
   },
   "account": {
     "menu": "打开账号菜单",

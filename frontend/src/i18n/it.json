@@ -18,10 +18,10 @@
     "haveAccount": "Hai già un account?"
   },
   "sidebar": {
-    "title": "Le tue conversazioni",
+    "title": "Menu",
     "new": "Nuova conversazione",
     "untitled": "Senza titolo",
-    "open": "Apri le conversazioni",
+    "open": "Apri il menu",
     "collapse": "Chiudi la barra laterale",
     "expand": "Apri la barra laterale",
     "unreadable": "Questa conversazione non è disponibile.",
@@ -37,7 +37,8 @@
     "noMatch": "Nessuna conversazione corrisponde.",
     "loading": "Caricamento delle conversazioni",
     "emptyTitle": "Ancora nessuna conversazione",
-    "emptyBody": "Le domande che fai restano qui, così puoi riprenderle."
+    "emptyBody": "Le domande che fai restano qui, così puoi riprenderle.",
+    "close": "Chiudi il menu"
   },
   "account": {
     "menu": "Apri il menu dell'account",

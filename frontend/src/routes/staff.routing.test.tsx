@@ -885,7 +885,7 @@ describe("the shell across pages", () => {
     reader = SECRETARIAT;
     const { container, unmount, path } = page("/");
     await settle();
-    click(container.querySelector<HTMLButtonElement>('button[aria-label="Apri le conversazioni"]'));
+    click(container.querySelector<HTMLButtonElement>('button[aria-label="Apri il menu"]'));
     const drawer = document.body.querySelector('[role="dialog"]');
     click(drawer?.querySelector<HTMLAnchorElement>('nav[aria-label="Gestione"] a'));
     await settle();

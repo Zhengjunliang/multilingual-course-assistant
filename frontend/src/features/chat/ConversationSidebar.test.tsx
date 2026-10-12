@@ -43,8 +43,17 @@ function sidebar(conversations: ConversationSummary[] | null) {
           conversations={conversations}
           busy={null}
           onDelete={async () => true}
-          onOpenSettings={() => {}}
-          onOpenHelp={() => {}}
+          controls={{
+            placement: "column",
+            onNavigate: () => {},
+            onCollapse: () => {},
+            onExpand: () => {},
+            onClose: () => {},
+            onSearch: () => {},
+            searchRef: { current: null },
+            onOpenSettings: () => {},
+            onOpenHelp: () => {},
+          }}
         />
       </SessionContext>
     </MemoryRouter>,
