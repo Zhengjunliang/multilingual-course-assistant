@@ -36,6 +36,7 @@ import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, ChevronRight, type LucideIcon } from "lucide-react";
 import { Fragment, type ReactNode, useId, useRef, useState } from "react";
 
+import { Chip } from "@/components/ui/chip";
 import { Kbd, type Shortcut } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +55,8 @@ interface MenuChoice {
   label: string;
   /** The option chosen, whose label the row shows. */
   value: string;
-  options: readonly { value: string; label: string; lang?: string }[];
+  /** `code`, when there is one, is shown on a chip before the label, as a language's is. */
+  options: readonly { value: string; label: string; lang?: string; code?: string }[];
   onValueChange: (value: string) => void;
 }
 
@@ -83,6 +85,8 @@ interface DropdownMenuProps {
   align?: "start" | "end";
   /** Choices open in place under their row rather than in a submenu. */
   inline?: boolean;
+  /** As wide as the trigger, for a trigger that is a whole row. */
+  fitTrigger?: boolean;
   /** Above the sections: who is signed in. */
   head?: ReactNode;
   sections: readonly MenuSection[];
@@ -127,6 +131,11 @@ function Options({ item, className }: { item: MenuChoice; className?: string }) 
     >
       {item.options.map((option) => (
         <RadixMenu.RadioItem key={option.value} value={option.value} className={ITEM}>
+          {option.code !== undefined && (
+            <Chip size="sm" aria-hidden>
+              {option.code}
+            </Chip>
+          )}
           <span lang={option.lang} className="flex-1">
             {option.label}
           </span>
@@ -195,6 +204,7 @@ export function DropdownMenu({
   side = "bottom",
   align = "end",
   inline = false,
+  fitTrigger = false,
   head,
   sections,
   onCloseAutoFocus,
@@ -218,7 +228,7 @@ export function DropdownMenu({
           align={align}
           sideOffset={8}
           onCloseAutoFocus={() => onCloseAutoFocus?.()}
-          className={SURFACE}
+          className={cn(SURFACE, fitTrigger && "w-(--radix-dropdown-menu-trigger-width)")}
         >
           {head !== undefined && (
             <>

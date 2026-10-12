@@ -8,6 +8,12 @@ describe("the avatar", () => {
     expect(render(<Avatar name="junliang" />)).toContain(">J<");
   });
 
+  it("shows the first letters of its first two words, as a username writes them", () => {
+    expect(render(<Avatar name="demo-student" />)).toContain(">DS<");
+    expect(render(<Avatar name="Laura  Conti" />)).toContain(">LC<");
+    expect(render(<Avatar name="a.b_c" />)).toContain(">AB<");
+  });
+
   it("renders without a letter rather than breaking on an empty name", () => {
     // `Account.username` is required by the serializer, so this is not a state
     // the API can produce — but a component that throws on "" is a component

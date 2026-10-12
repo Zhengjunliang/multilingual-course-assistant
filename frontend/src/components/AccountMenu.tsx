@@ -41,7 +41,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Chip } from "@/components/ui/chip";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { shortcuts } from "@/features/chat/shortcuts";
-import { endonym, isUiLocale, UI_LOCALES } from "@/i18n";
+import { endonym, isUiLocale, languageCode, UI_LOCALES } from "@/i18n";
 
 interface AccountMenuProps {
   onOpenSettings: () => void;
@@ -92,6 +92,7 @@ export function AccountMenu({ onOpenSettings, onOpenHelp }: AccountMenuProps) {
       triggerClassName="flex w-full items-center gap-tight rounded-card border border-transparent p-hair text-left transition-colors hover:border-line hover:bg-surface hover:shadow-raised focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 data-[state=open]:border-line data-[state=open]:bg-surface data-[state=open]:shadow-raised"
       side="top"
       align="start"
+      fitTrigger
       head={
         <span className="flex items-center gap-tight">
           <Avatar name={account.username} />
@@ -116,6 +117,7 @@ export function AccountMenu({ onOpenSettings, onOpenHelp }: AccountMenuProps) {
                 value: locale,
                 label: endonym(locale),
                 lang: locale,
+                code: languageCode(locale),
               })),
               onValueChange: (locale) => {
                 if (isUiLocale(locale)) void chooseLocale(locale);
