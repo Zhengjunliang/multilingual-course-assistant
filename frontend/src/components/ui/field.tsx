@@ -13,7 +13,10 @@
  *
  * The focus is the box's: its edge turns to the accent and a 3 px ring of
  * `--selected` grows round it, so the ring follows the box rather than the
- * bare input inside it. A refused box keeps the warning's edge.
+ * bare input inside it. A refused box keeps the warning's edge, focused or
+ * not, its ring a tint of the same. `announce` makes the refusal an alert,
+ * for a form that refuses after it is sent while the focus stays where it
+ * was: moving the focus back to a field that already has it reads nothing.
  *
  * `SearchField` is the box alone, for a filter: a magnifier, no visible label
  * (its name is `aria-label`, since the magnifier says what it is for) and the
@@ -27,7 +30,9 @@ import { Kbd, type Shortcut } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 
 const BOX =
-  "flex items-center gap-tight rounded-control border bg-surface text-muted transition-colors focus-within:border-accent focus-within:ring-3 focus-within:ring-selected";
+  "flex items-center gap-tight rounded-control border bg-surface text-muted transition-colors focus-within:ring-3";
+const CALM = "border-line focus-within:border-accent focus-within:ring-selected";
+const REFUSED = "border-warn-line focus-within:ring-warn-line/25";
 const INPUT =
   "min-w-0 flex-1 self-stretch bg-transparent text-body text-ink outline-none placeholder:text-muted";
 
@@ -55,6 +60,8 @@ interface FieldProps extends Omit<ComponentProps<"input">, "id"> {
   hint?: string;
   /** What was refused and how to put it right. */
   error?: string;
+  /** Reads the refusal out as it appears. */
+  announce?: boolean;
   /** Shows how much of `maxLength` the value uses; the field must be controlled. */
   counter?: boolean;
 }
@@ -65,6 +72,7 @@ export function Field({
   icon: Icon,
   hint,
   error,
+  announce = false,
   counter = false,
   className,
   ...input
@@ -78,20 +86,15 @@ export function Field({
   ]
     .filter((part) => part !== undefined)
     .join(" ");
-  const length = typeof input.value === "string" ? [...input.value].length : 0;
+  // UTF-16 units, as `maxLength` counts them.
+  const length = typeof input.value === "string" ? input.value.length : 0;
 
   return (
     <div className="flex flex-col gap-hair">
       <label htmlFor={id} className="font-semibold text-body text-ink">
         {label}
       </label>
-      <div
-        className={cn(
-          BOX,
-          "h-control px-snug",
-          error === undefined ? "border-line" : "border-warn-line",
-        )}
-      >
+      <div className={cn(BOX, "h-control px-snug", error === undefined ? CALM : REFUSED)}>
         {Icon !== undefined && <Icon aria-hidden className="size-icon shrink-0" />}
         <input
           {...input}
@@ -101,7 +104,11 @@ export function Field({
           className={cn(INPUT, className)}
         />
       </div>
-      {error !== undefined && <FieldError id={errorId}>{error}</FieldError>}
+      {error !== undefined && (
+        <FieldError id={errorId} role={announce ? "alert" : undefined}>
+          {error}
+        </FieldError>
+      )}
       {hint !== undefined && (
         <p id={hintId} className="text-caption text-muted">
           {hint}
@@ -124,7 +131,7 @@ interface SearchFieldProps extends Omit<ComponentProps<"input">, "type"> {
 
 export function SearchField({ label, shortcut, className, ...input }: SearchFieldProps) {
   return (
-    <div className={cn(BOX, "h-control-icon border-line pr-hair pl-tight", className)}>
+    <div className={cn(BOX, CALM, "h-control-icon pr-hair pl-tight", className)}>
       <Search aria-hidden className="size-icon shrink-0" />
       <input
         {...input}

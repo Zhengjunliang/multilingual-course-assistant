@@ -26,3 +26,14 @@ it("shows its key on a cap screen readers skip, and names it as the shortcut", (
   expect(html).toContain('aria-keyshortcuts="Enter"');
   expect(html).toMatch(/<kbd aria-hidden="true"[^>]*>Invio<\/kbd>/);
 });
+
+it("keeps the caller's own busy state and key when it has no pending or shortcut of its own", () => {
+  const html = render(
+    <Button aria-busy aria-keyshortcuts="Control+K">
+      Cerca
+    </Button>,
+  );
+
+  expect(html).toContain('aria-busy="true"');
+  expect(html).toContain('aria-keyshortcuts="Control+K"');
+});

@@ -66,14 +66,19 @@ export function Button({
   shortcut,
   disabled,
   children,
+  "aria-busy": busy,
+  "aria-keyshortcuts": keys,
   ...props
 }: ButtonProps) {
+  // The caller's own `aria-busy` and `aria-keyshortcuts` stand when the button
+  // has no `pending` or `shortcut` of its own: the sign-in button says it is
+  // busy itself, and a Tooltip with a key names it on the button it wraps.
   return (
     <button
       {...props}
       disabled={disabled === true || pending}
-      aria-busy={pending || undefined}
-      aria-keyshortcuts={shortcut?.keys}
+      aria-busy={pending || busy || undefined}
+      aria-keyshortcuts={shortcut?.keys ?? keys}
       className={cn(
         buttonVariants({ variant, size }),
         pending && "disabled:opacity-100",

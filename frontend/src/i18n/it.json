@@ -246,5 +246,8 @@
       "gone": "{{username}} non aveva più questo ruolo: era già stato revocato altrove."
     },
     "retry": "Riprova"
+  },
+  "keys": {
+    "enter": "Invio"
   }
 }

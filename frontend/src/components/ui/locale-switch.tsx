@@ -36,6 +36,7 @@
 
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, Globe } from "lucide-react";
+import { useId } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -76,6 +77,7 @@ export function LocaleSwitch<T extends string>({
   hint,
   className,
 }: LocaleSwitchProps<T>) {
+  const hintId = useId();
   return (
     <RadixMenu.Root>
       <RadixMenu.Trigger asChild>
@@ -93,6 +95,7 @@ export function LocaleSwitch<T extends string>({
         <RadixMenu.Content
           align="start"
           sideOffset={8}
+          aria-describedby={hint === undefined ? undefined : hintId}
           className="z-floating flex min-w-56 flex-col rounded-card border border-line bg-surface p-hair shadow-overlay"
         >
           <RadixMenu.Label className="px-tight pt-tight pb-hair font-semibold text-caption text-muted uppercase">
@@ -132,7 +135,10 @@ export function LocaleSwitch<T extends string>({
           {hint !== undefined && (
             <>
               <RadixMenu.Separator className="-mx-hair my-hair h-px bg-line" />
-              <RadixMenu.Label className="max-w-56 px-tight py-hair text-caption text-muted">
+              <RadixMenu.Label
+                id={hintId}
+                className="max-w-56 px-tight py-hair text-caption text-muted"
+              >
                 {hint}
               </RadixMenu.Label>
             </>

@@ -15,6 +15,11 @@
  * theme follows the one painted; outside a `ThemeProvider`, as on
  * /styleguide, which paints both themes itself, it follows the system.
  *
+ * The description's colour is marked important: Sonner injects a rule outside
+ * any layer, which `unstyled` does not turn off, that sets a dark-themed
+ * toast's description to a near-white, and an unlayered rule beats every
+ * utility. On the ink ground of the dark theme, which is light, it vanished.
+ *
  * Sonner keeps its toasts in one store for the whole page and shows those
  * still open to the next Toaster that mounts, so this one dismisses them as it
  * goes: a toast shown just before signing out would greet the next sign-in.
@@ -59,7 +64,7 @@ export function Toaster() {
           icon: "shrink-0",
           content: "flex min-w-0 flex-1 flex-col",
           title: "font-semibold text-body",
-          description: "text-caption",
+          description: "text-caption text-canvas!",
           actionButton:
             "h-control-xs shrink-0 rounded-control border border-current/40 px-tight font-medium text-caption transition-colors hover:bg-canvas/10",
         },

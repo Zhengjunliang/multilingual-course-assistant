@@ -246,5 +246,8 @@
       "gone": "{{username}} no longer held this role: it had been revoked elsewhere."
     },
     "retry": "Try again"
+  },
+  "keys": {
+    "enter": "Enter"
   }
 }
