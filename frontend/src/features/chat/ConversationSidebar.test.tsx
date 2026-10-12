@@ -81,6 +81,15 @@ const rowTitles = (container: HTMLElement) =>
   [...container.querySelectorAll('a[href^="/c/"]')].map((row) => row.firstChild?.textContent);
 
 describe("the conversation sidebar", () => {
+  it("marks itself as the sidebar's panel, so the shell's keys work in the drawer", () => {
+    // useShellShortcuts.ts holds the keys back in any dialog without this mark.
+    const { container, unmount } = sidebar(ROWS);
+    const marked = container.firstElementChild?.hasAttribute("data-sidebar-panel");
+    unmount();
+
+    expect(marked).toBe(true);
+  });
+
   it("shows rows on their way while the list loads, never the empty panel", () => {
     const { container, unmount } = sidebar(null);
     const loading = container.querySelector('[role="status"]')?.getAttribute("aria-label");

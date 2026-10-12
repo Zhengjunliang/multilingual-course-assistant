@@ -210,6 +210,32 @@ describe("the chat frame", () => {
     ]);
   });
 
+  it("holds the keys back while another dialog is open, whatever has the focus", () => {
+    // A deletion's confirmation waiting for the server: its buttons are
+    // disabled and the focus is on the page's body, outside the dialog.
+    const started = vi.fn();
+    const { unmount } = shell(started);
+    const waiting = document.createElement("div");
+    waiting.setAttribute("role", "alertdialog");
+    document.body.append(waiting);
+    const shortcut = new KeyboardEvent("keydown", {
+      key: "O",
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      document.body.dispatchEvent(shortcut);
+    });
+    waiting.remove();
+    unmount();
+
+    expect(started).not.toHaveBeenCalled();
+    // Kept from the browser all the same, which would open its bookmarks.
+    expect(shortcut.defaultPrevented).toBe(true);
+  });
+
   it("unfolds the rail for Ctrl K on a wide screen, and puts the focus in the search", () => {
     atWidth(true);
     const { unmount } = shell();
