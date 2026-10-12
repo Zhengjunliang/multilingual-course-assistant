@@ -2,25 +2,30 @@
  * `/staff/editions/:id`: one academic year of a course, and who teaches it.
  *
  * An edition outside the caller's scope is a 404, and the page says "not
- * found". Who may assign a teacher here is the edition's `permissions`; anyone
- * else reads who teaches it and why they cannot change that. The course's
- * other editions are read too, for the one a switch to this edition replaces. The path it was
- * reached through is `?programme=`, or the teacher's own courses when no
- * programme the reader may view lists it (features/staff/crumbs.ts).
+ * found". Who may assign a teacher here is the edition's `permissions`: the
+ * button is in the page's head beside the switch, and anyone else reads, in a
+ * banner where it would be, why they cannot, with the way back to their own
+ * start. The course's other editions are read too, for the one a switch to
+ * this edition replaces. The path it was reached through is `?programme=`,
+ * or the teacher's own courses when no programme the reader may view lists
+ * it (features/staff/crumbs.ts).
  */
 
+import { ArrowLeft, Lock } from "lucide-react";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { listEditions, readEdition } from "@/api/catalog";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Banner } from "@/components/ui/banner";
+import { buttonVariants } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
+import { Count } from "@/components/ui/count";
 import { useMembers, useSetCurrent } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine } from "@/features/staff/crumbs";
 import { isNotFound } from "@/features/staff/errors";
-import { Code, Note, PageHead } from "@/features/staff/page";
+import { Code, PageHead } from "@/features/staff/page";
 import { StaffList } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { useCrumbs, useShell } from "./shell";
@@ -76,26 +81,43 @@ export default function EditionPage() {
   return (
     <>
       <PageHead
-        chips={
-          <>
-            <Code>{`${course.code} · ${year}`}</Code>
-            {data.is_current && <Badge>{t("staff.current")}</Badge>}
-          </>
-        }
         heading={course.name}
         caps
-        sub={t("staff.edition.sub", {
-          year,
-          programmes: programmeLine(course.entries, i18n.language),
-        })}
-        actions={switching.button(data)}
+        chips={
+          <>
+            <Chip className="tabular-nums">{year}</Chip>
+            <Chip tone={data.is_current ? "accent" : "neutral"}>
+              {data.is_current ? t("staff.current") : t("staff.past")}
+            </Chip>
+            <Code>{course.code}</Code>
+          </>
+        }
+        sub={programmeLine(course.entries, i18n.language)}
+        actions={
+          <>
+            {switching.button(data)}
+            {members.assign}
+          </>
+        }
       />
-      <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center gap-snug border-line border-b px-snug py-tight">
-          <h2 className="min-w-0 flex-1 font-semibold text-body text-ink">
-            {t("staff.edition.teachers")}
-          </h2>
-          {members.assign}
+      {!assigns && (
+        <Banner
+          icon={Lock}
+          heading={t("staff.refusal.cannot.assignTeacher")}
+          action={
+            <Link to={back.to} className={buttonVariants({ variant: "outline", size: "sm" })}>
+              <ArrowLeft aria-hidden className="size-icon" />
+              {back.label}
+            </Link>
+          }
+        >
+          {t("staff.edition.onlyStaff")}
+        </Banner>
+      )}
+      <section className="flex flex-col gap-snug">
+        <div className="flex items-center gap-tight">
+          <h2 className="font-semibold text-ink text-title">{t("staff.edition.teachers")}</h2>
+          <Count value={data.teachers.length} />
         </div>
         <StaffList
           people={data.teachers}
@@ -103,8 +125,7 @@ export default function EditionPage() {
           empty={t("staff.edition.empty")}
           action={members.action}
         />
-        {!assigns && <Note foot>{t("staff.edition.onlyStaff")}</Note>}
-      </Card>
+      </section>
       {members.dialogs}
       {switching.dialog}
     </>

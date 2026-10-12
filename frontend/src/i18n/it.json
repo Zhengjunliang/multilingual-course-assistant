@@ -154,9 +154,9 @@
     },
     "programmes": {
       "title": "Corsi di laurea",
+      "count_one": "{{count}} corso di laurea",
+      "count_other": "{{count}} corsi di laurea",
       "empty": "Nessun corso di laurea di tua competenza.",
-      "code": "Codice",
-      "name": "Nome",
       "sub": "Tutti i corsi di laurea del sito, con la loro segreteria didattica.",
       "subScoped": "I corsi di laurea di cui fai parte della segreteria didattica.",
       "curriculum": "Curriculum",
@@ -222,6 +222,7 @@
     },
     "open": "Apri",
     "current": "Corrente",
+    "past": "Non corrente",
     "course": {
       "inPlan": "Nel piano di studi di",
       "twoCodesBoth": "Due codici, un solo insegnamento: ogni edizione vale per entrambi i curriculum.",
@@ -234,13 +235,14 @@
       "status": "Stato"
     },
     "edition": {
-      "sub": "Edizione {{year}} · {{programmes}}",
       "teachers": "Docenti dell'edizione",
       "empty": "Nessun docente assegnato a questa edizione.",
       "onlyStaff": "Solo la segreteria didattica e l'amministratore assegnano i docenti."
     },
     "mine": {
       "title": "I miei insegnamenti",
+      "count_one": "{{count}} edizione",
+      "count_other": "{{count}} edizioni",
       "sub": "Le edizioni a cui sei assegnato come docente.",
       "empty": "Nessun insegnamento assegnato.",
       "note": "Un insegnamento ha al massimo un'edizione corrente; cambiarla richiede il permesso su entrambe le edizioni."
