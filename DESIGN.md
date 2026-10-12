@@ -87,7 +87,6 @@ spacing:
   control-sm: '2rem'
   control-icon: '2.25rem'
   control: '2.5rem'
-  field: '5rem'
   icon: '1rem'
   icon-lg: '1.25rem'
   avatar-sm: '1.5rem'
@@ -315,7 +314,7 @@ Five sizes carry the interface, and a sixth needs a reason: `caption`, `body`, `
 
 ## Layout
 
-Distances are named by what they are for, never by a step: `hair`, `tight`, `snug`, `gutter` and `room` for the rhythm inside and between things; `control-xs`, `control-sm` and `control` for a button's three heights (28, 32 and 40 px, a field's being the last), `control-icon` for an icon button and `field` for a block of text to write in; `icon` and `icon-lg` for glyphs; `avatar-sm` for a person's smallest avatar, which at 32 and 40 px matches the control beside it; `avatar` and `mascot` for the cat. A component that writes `px-4` or `h-10` fails the component layer's test.
+Distances are named by what they are for, never by a step: `hair`, `tight`, `snug`, `gutter` and `room` for the rhythm inside and between things; `control-xs`, `control-sm` and `control` for a button's three heights (28, 32 and 40 px, a field's being the last) and `control-icon` for an icon button; `icon` and `icon-lg` for glyphs; `avatar-sm` for a person's smallest avatar, which at 32 and 40 px matches the control beside it; `avatar` and `mascot` for the cat. A component that writes `px-4` or `h-10` fails the component layer's test.
 
 The page never scrolls sideways at 375 px. The chat column and the composer share one width; the sidebar is a column from `lg` and a drawer below it. Below `sm` a data table stacks each row into a card, its cells labelled with their columns, because a phone has no width for five columns.
 

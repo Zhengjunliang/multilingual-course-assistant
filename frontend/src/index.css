@@ -189,7 +189,6 @@
   --spacing-control-sm: 2rem;
   --spacing-control-icon: 2.25rem;
   --spacing-control: 2.5rem;
-  --spacing-field: 5rem;
 
   /* Glyph sizes. Two, because an icon beside body text and an icon standing
      alone in a header button are the only two jobs icons have here. */
