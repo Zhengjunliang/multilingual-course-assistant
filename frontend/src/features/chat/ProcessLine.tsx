@@ -9,8 +9,8 @@
  * whoever wants to know how it was found.
  *
  * The seconds once done are the server's (`StartEvent.search_ms`), stored with
- * the answer, so a conversation reopened later shows the same number; an
- * answer stored before they were kept shows none. The running count is this
+ * the answer, so a conversation reopened later shows the same number; a turn
+ * without them shows none. The running count is this
  * line's own, from when the turn appeared, since the server says nothing until
  * the search is over.
  *

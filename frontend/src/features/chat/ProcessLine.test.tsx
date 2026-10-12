@@ -73,7 +73,7 @@ describe("the process line", () => {
     expect({ summary, open }).toEqual({ summary: "Ricerca completata · 3 s", open: false });
   });
 
-  it("gives no seconds for an answer stored before they were kept, and never 0 s", () => {
+  it("gives no seconds when the server sent none, and never 0 s", () => {
     const untimed = mount(
       <ProcessLine running={false} route={ROUTE} searchMs={null} citations={[]} />,
     );

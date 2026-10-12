@@ -65,22 +65,26 @@ export default function ShellLayout() {
   // answer that ends while its conversation is being deleted asks for the
   // list, the server may read it before the delete lands, and that older
   // reply, arriving after the list the delete asks for, would bring the
-  // deleted conversation back. Resolves to whether the list came: one set
-  // aside for a newer list counts, since that newer one is on its way.
+  // deleted conversation back. Resolves to whether the newest list came: one
+  // set aside answers as the newer one does.
   const lastAsked = useRef(0);
+  const newest = useRef<Promise<boolean>>(Promise.resolve(true));
   const refreshConversations = useCallback(() => {
     lastAsked.current += 1;
     const asked = lastAsked.current;
-    return listConversations().then(
+    const request = listConversations().then(
       (list) => {
-        if (asked === lastAsked.current) setConversations(list);
+        if (asked !== lastAsked.current) return newest.current;
+        setConversations(list);
         return true;
       },
       (error: unknown) => {
         refused(error);
-        return false;
+        return asked === lastAsked.current ? false : newest.current;
       },
     );
+    newest.current = request;
+    return request;
   }, [refused]);
 
   useEffect(() => {
@@ -144,27 +148,26 @@ export default function ShellLayout() {
   // it asks for next (features/chat/ConversationList.tsx), and resolves to
   // whether that list came. A 404 is a conversation deleted from another tab,
   // which that list leaves out; any other failure leaves the row where it
-  // was and says so in a toast that can try again (DESIGN.md, Components).
+  // was and says so in a toast whose «Riprova» is the list's own `retry`
+  // (DESIGN.md, Components), so a second try waits and moves the focus as
+  // the first did.
   const onPin = useCallback(
-    (id: number, pinned: boolean, title: string) => {
-      const attempt = async (): Promise<boolean> => {
-        try {
-          await pinConversation(id, pinned);
-        } catch (error) {
-          const gone = error instanceof ApiError && error.status === 404;
-          if (!gone) {
-            refused(error);
-            toast.error(t(pinned ? "sidebar.pinFailed" : "sidebar.unpinFailed"), {
-              description: title,
-              action: { label: t("sidebar.retry"), onClick: () => void attempt() },
-            });
-            void refreshConversations();
-            return false;
-          }
+    async (id: number, pinned: boolean, title: string, retry: () => void) => {
+      try {
+        await pinConversation(id, pinned);
+      } catch (error) {
+        const gone = error instanceof ApiError && error.status === 404;
+        if (!gone) {
+          refused(error);
+          toast.error(t(pinned ? "sidebar.pinFailed" : "sidebar.unpinFailed"), {
+            description: title,
+            action: { label: t("sidebar.retry"), onClick: retry },
+          });
+          void refreshConversations();
+          return false;
         }
-        return refreshConversations();
-      };
-      return attempt();
+      }
+      return refreshConversations();
     },
     [refreshConversations, refused, t],
   );

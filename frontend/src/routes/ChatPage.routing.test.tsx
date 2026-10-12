@@ -64,6 +64,8 @@ let conversations: ConversationSummary[] = [];
 let deleteFails = false;
 /** Whether `GET /api/conversations` fails, as a dropped connection would. */
 let listFails = false;
+/** How many `PATCH`es fail before one goes through, as a server error would. */
+let pinFailures = 0;
 /** Every request made, as `METHOD path`. */
 let requested: string[] = [];
 /** How many times the page asked the session provider who is signed in. */
@@ -106,6 +108,10 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return new Response(null, { status: 204 });
   }
   if (method === "PATCH" && path.startsWith("/api/conversations/")) {
+    if (pinFailures > 0) {
+      pinFailures -= 1;
+      return json({ detail: "Server error." }, 500);
+    }
     const id = Number(path.slice("/api/conversations/".length));
     const row = conversations.find((listed) => listed.id === id);
     if (row === undefined) return json({ detail: "Not found." }, 404);
@@ -351,12 +357,14 @@ describe("pinning from the sidebar", () => {
   beforeEach(() => {
     conversations = [STORED_ROW, OTHER];
     listFails = false;
+    pinFailures = 0;
     requested = [];
     vi.stubGlobal("fetch", fakeApi);
   });
 
   afterEach(() => {
     listFails = false;
+    pinFailures = 0;
     vi.unstubAllGlobals();
   });
 
@@ -416,6 +424,28 @@ describe("pinning from the sidebar", () => {
     unmount();
 
     expect(waiting).toBeNull();
+    expect(pinned).toEqual(["/c/8"]);
+  });
+
+  it("says a failed pin in a toast naming the conversation, whose «Riprova» pins it", async () => {
+    const { container, unmount } = page("/");
+    await settle();
+
+    pinFailures = 1;
+    act(() => button(container, i18n.t("sidebar.pin", { title }))?.click());
+    await settle();
+    const toast = document.body.querySelector("[data-sonner-toast]");
+    const said = toast?.textContent;
+    const retry = [...(toast?.querySelectorAll("button") ?? [])].find(
+      (candidate) => candidate.textContent === i18n.t("sidebar.retry"),
+    );
+    act(() => retry?.click());
+    await settle();
+    const pinned = group(container, "Fissate");
+    unmount();
+
+    expect(said).toContain(i18n.t("sidebar.pinFailed"));
+    expect(said).toContain(title);
     expect(pinned).toEqual(["/c/8"]);
   });
 
