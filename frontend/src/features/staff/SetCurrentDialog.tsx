@@ -13,6 +13,7 @@
  * reads the page again.
  */
 
+import { CalendarCheck } from "lucide-react";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -62,7 +63,7 @@ export function SetCurrentDialog({
       return false;
     }
     await onChanged();
-    toast(t("staff.setCurrent.done"), {
+    toast.success(t("staff.setCurrent.done"), {
       description: `${edition.course.name} · ${edition.academic_year}`,
     });
     return true;
@@ -79,6 +80,7 @@ export function SetCurrentDialog({
         onClose();
       }}
       heading={t("staff.setCurrent.title")}
+      icon={CalendarCheck}
       description={edition?.course.name ?? ""}
       cancelLabel={t("staff.cancel")}
       confirmLabel={t("staff.setCurrent.action")}

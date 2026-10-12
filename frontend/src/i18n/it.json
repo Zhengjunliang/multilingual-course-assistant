@@ -41,6 +41,7 @@
     "theme": "Tema",
     "themeCaption": "Vale su questo dispositivo, non sull'account.",
     "language": "Lingua",
+    "languageHint": "Le risposte seguono la lingua della domanda, non quella dell'interfaccia.",
     "logOut": "Esci",
     "close": "Chiudi",
     "admin": "Amministrazione"

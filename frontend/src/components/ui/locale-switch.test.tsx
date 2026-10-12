@@ -25,6 +25,7 @@ function opened(onChange: (locale: string) => void = () => {}) {
       locales={["it", "en", "zh-hans"]}
       value="it"
       label="Lingua"
+      hint="Le risposte seguono la lingua della domanda."
       onChange={onChange}
     />,
   );
@@ -42,8 +43,15 @@ describe("the language menu", () => {
     const { container, unmount } = mount(
       <LocaleSwitch locales={["it", "en"]} value="it" label="Lingua" onChange={() => {}} />,
     );
+    const trigger = container.querySelector("button");
+    const heard = [...(trigger?.querySelectorAll(".sr-only, [lang]") ?? [])].map(
+      (part) => part.textContent,
+    );
 
-    expect(container.querySelector("button")?.textContent).toBe("LinguaItaliano");
+    expect({ heard, code: trigger?.querySelector("span[aria-hidden=true]")?.textContent }).toEqual({
+      heard: ["Lingua", "Italiano"],
+      code: "IT",
+    });
     expect(document.body.querySelector('[role="menu"]')).toBeNull();
 
     unmount();
@@ -52,7 +60,9 @@ describe("the language menu", () => {
   it("names each language in itself, in its own language", () => {
     const { unmount } = opened();
 
-    expect(entries().map((entry) => [entry.getAttribute("lang"), entry.textContent])).toEqual([
+    const named = entries().map((entry) => entry.querySelector("[lang]"));
+
+    expect(named.map((name) => [name?.getAttribute("lang"), name?.textContent])).toEqual([
       ["it", "Italiano"],
       ["en", "English"],
       ["zh-hans", "简体中文"],
@@ -81,5 +91,18 @@ describe("the language menu", () => {
     expect(onChange).toHaveBeenCalledWith("zh-hans");
 
     unmount();
+  });
+
+  it("names each other language in the interface's too, and says what the choice leaves alone", () => {
+    const { unmount } = opened();
+    const glosses = entries().map((entry) => entry.querySelector(".text-muted")?.textContent);
+    const hint = document.body.querySelector('[role="menu"]')?.lastElementChild?.textContent;
+    unmount();
+
+    expect({ own: glosses[0], english: glosses[1], hint }).toEqual({
+      own: "",
+      english: "inglese",
+      hint: "Le risposte seguono la lingua della domanda.",
+    });
   });
 });

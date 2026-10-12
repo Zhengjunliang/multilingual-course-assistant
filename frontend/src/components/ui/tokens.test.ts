@@ -67,6 +67,20 @@ describe("the component layer", () => {
     expect(raw).toEqual([]);
   });
 
+  it("fills what is under the pointer with the accent's tint, not the grey", () => {
+    // #190, rule 3: hover is `--hover`, the accent at 6 %. `--mark` stays the
+    // fill of a pill, a count and a skeleton, which are not under a pointer.
+    const grey: string[] = [];
+
+    for (const file of componentFiles()) {
+      for (const [hover] of sourceOf(file).matchAll(/\b(?:hover|data-highlighted):bg-mark\b/g)) {
+        grey.push(`${file}: ${hover}`);
+      }
+    }
+
+    expect(grey).toEqual([]);
+  });
+
   it("keeps no parallel version of a component", () => {
     // CLAUDE.md rule 6: one correct implementation, and history lives in git.
     // A `-old` or `-v2` beside a component is the shape that rule forbids, and

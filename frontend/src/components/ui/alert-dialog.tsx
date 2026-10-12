@@ -21,12 +21,21 @@
  * Where focus lands on closing is the caller's, through Radix's own
  * `onCloseAutoFocus`: Radix returns it to the element that opened the dialog,
  * and a dialog opened from a row the action removes has no such element left.
+ *
+ * Drawn as `dialog.tsx` is (#190): the action's icon in a disc beside the
+ * question, the sentence of what will happen, which may name its objects as
+ * chips, and the buttons on the tinted foot. The disc and the confirming
+ * button take the warning's tint only when something is destroyed. The
+ * confirming button shows no Enter: focus opens on Cancel, where Enter
+ * cancels.
  */
 
 import * as RadixAlertDialog from "@radix-ui/react-alert-dialog";
+import type { LucideIcon } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { DialogDisc, DialogFooter } from "@/components/ui/dialog";
 
 interface AlertDialogProps {
   open: boolean;
@@ -34,12 +43,14 @@ interface AlertDialogProps {
   onOpenChange: (open: boolean) => void;
   heading: string;
   /** What will happen, naming the thing it happens to. Read out with the heading. */
-  description: string;
+  description: ReactNode;
+  /** The action's icon, in the disc beside the heading. */
+  icon?: LucideIcon;
   cancelLabel: string;
   confirmLabel: string;
   /** Does the thing; resolves to whether it was done, and the dialog closes only then. */
   onConfirm: () => Promise<boolean>;
-  /** The warning's tint on the confirming button, for an action that destroys something. */
+  /** The warning's tint on the disc and the confirming button, for an action that destroys something. */
   destructive?: boolean;
   /** Keeps the confirming button off, after a refusal that asking again would only repeat. */
   confirmDisabled?: boolean;
@@ -53,6 +64,7 @@ export function AlertDialog({
   onOpenChange,
   heading,
   description,
+  icon,
   cancelLabel,
   confirmLabel,
   onConfirm,
@@ -93,18 +105,21 @@ export function AlertDialog({
         <RadixAlertDialog.Overlay className="fixed inset-0 z-backdrop bg-black/40" />
         <RadixAlertDialog.Content
           onCloseAutoFocus={onCloseAutoFocus}
-          className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-floating flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-sm flex-col gap-room overflow-y-auto rounded-card border border-line bg-surface p-gutter shadow-overlay"
+          className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-floating flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-110 flex-col overflow-hidden rounded-card border border-line bg-surface shadow-overlay"
         >
-          <div className="flex flex-col gap-hair">
-            <RadixAlertDialog.Title className="font-semibold text-ink text-title">
-              {heading}
-            </RadixAlertDialog.Title>
-            <RadixAlertDialog.Description className="text-body text-muted">
-              {description}
-            </RadixAlertDialog.Description>
+          <div className="flex min-h-0 gap-snug overflow-y-auto p-room">
+            {icon !== undefined && <DialogDisc icon={icon} warn={destructive} />}
+            <div className="flex min-w-0 flex-1 flex-col gap-tight">
+              <RadixAlertDialog.Title className="font-semibold text-ink text-title">
+                {heading}
+              </RadixAlertDialog.Title>
+              <RadixAlertDialog.Description className="text-body text-muted">
+                {description}
+              </RadixAlertDialog.Description>
+              {children}
+            </div>
           </div>
-          {children}
-          <div className="flex flex-wrap justify-end gap-tight">
+          <DialogFooter>
             <RadixAlertDialog.Cancel asChild>
               <Button ref={cancel} type="button" variant="outline" disabled={running}>
                 {cancelLabel}
@@ -119,7 +134,7 @@ export function AlertDialog({
             >
               {confirmLabel}
             </Button>
-          </div>
+          </DialogFooter>
         </RadixAlertDialog.Content>
       </RadixAlertDialog.Portal>
     </RadixAlertDialog.Root>

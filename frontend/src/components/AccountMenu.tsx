@@ -50,27 +50,37 @@ export function AccountMenu() {
       <DropdownMenu
         ariaLabel={t("account.menu")}
         trigger={<Avatar name={account.username} />}
-        label={account.username}
+        head={<p className="truncate font-semibold text-body text-ink">{account.username}</p>}
         onCloseAutoFocus={() => {
           if (!wantsDialog.current) return;
           wantsDialog.current = false;
           setDialogOpen(true);
         }}
-        entries={[
+        sections={[
           {
             key: "account",
-            icon: UserRound,
-            label: t("account.title"),
-            onSelect: () => {
-              wantsDialog.current = true;
-            },
+            items: [
+              {
+                key: "account",
+                icon: UserRound,
+                label: t("account.title"),
+                onSelect: () => {
+                  wantsDialog.current = true;
+                },
+              },
+              ...admin,
+            ],
           },
-          ...admin,
           {
-            key: "logout",
-            icon: LogOut,
-            label: t("account.logOut"),
-            onSelect: () => void logOut(),
+            key: "session",
+            items: [
+              {
+                key: "logout",
+                icon: LogOut,
+                label: t("account.logOut"),
+                onSelect: () => void logOut(),
+              },
+            ],
           },
         ]}
       />

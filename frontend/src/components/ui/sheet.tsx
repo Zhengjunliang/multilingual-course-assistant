@@ -7,12 +7,17 @@
  * moved into it, focus returned on close, Escape, and the rest of the page
  * hidden from a screen reader while it is open. Those are the parts that get
  * skipped when a drawer is two divs and a boolean.
+ *
+ * A panel with a visible head may carry a count after its heading, such as
+ * how many sources it lists (#190, rule 5).
  */
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Count } from "@/components/ui/count";
 import { cn } from "@/lib/utils";
 
 interface SheetProps {
@@ -26,6 +31,8 @@ interface SheetProps {
    * without it, as the sidebar, the heading is for a screen reader only.
    */
   closeLabel?: string;
+  /** After the visible heading: how many things the panel holds. */
+  count?: number;
   /** The edge it comes from. The right one is the full width of a phone. */
   side?: "left" | "right";
   /**
@@ -42,6 +49,7 @@ export function Sheet({
   onOpenChange,
   heading,
   closeLabel,
+  count,
   side = "left",
   trigger,
   children,
@@ -62,13 +70,19 @@ export function Sheet({
           {closeLabel === undefined ? (
             <Dialog.Title className="sr-only">{heading}</Dialog.Title>
           ) : (
-            <div className="flex items-center justify-between gap-tight border-line border-b py-tight pr-tight pl-gutter">
+            <div className="flex items-center gap-tight border-line border-b py-tight pr-tight pl-gutter">
               <Dialog.Title className="font-semibold text-body text-ink">{heading}</Dialog.Title>
-              <Dialog.Close
-                aria-label={closeLabel}
-                className="grid size-control-icon place-items-center rounded-control text-muted transition-colors hover:bg-mark hover:text-ink"
-              >
-                <X aria-hidden className="size-icon" />
+              {count !== undefined && <Count value={count} />}
+              <Dialog.Close asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={closeLabel}
+                  className="ml-auto"
+                >
+                  <X aria-hidden className="size-icon" />
+                </Button>
               </Dialog.Close>
             </div>
           )}

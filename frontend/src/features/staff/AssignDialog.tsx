@@ -13,6 +13,7 @@
  * "not found" if that is what it is now.
  */
 
+import { UserPlus } from "lucide-react";
 import { type FormEvent, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -75,7 +76,7 @@ export function AssignDialog({
     try {
       const member = await addMember(scope, name);
       await onChanged();
-      toast(t(teacher ? "staff.assign.doneTeacher" : "staff.assign.doneSecretariat"), {
+      toast.success(t(teacher ? "staff.assign.doneTeacher" : "staff.assign.doneSecretariat"), {
         description: `${member.username} · ${object}`,
       });
       close();
@@ -103,44 +104,46 @@ export function AssignDialog({
       }}
       heading={t(teacher ? "staff.assign.teacher" : "staff.assign.secretariat")}
       description={description}
+      icon={UserPlus}
       closeLabel={t("staff.cancel")}
       onCloseAutoFocus={onCloseAutoFocus}
-    >
-      <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-room">
-        <Field
-          ref={input}
-          id={fieldId}
-          label={t("staff.assign.username")}
-          hint={t("staff.assign.hint")}
-          error={fieldError ?? undefined}
-          // Where a reader expects to type the moment the dialog opens.
-          autoFocus
-          value={username}
-          onChange={(event) => {
-            setUsername(event.target.value);
-            setFieldError(null);
-          }}
-          autoComplete="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          placeholder={t("staff.assign.placeholder")}
-          className="font-mono"
-        />
-        {forbidden && scope !== null && <Forbidden permission={grantPermission(scope)} />}
-        {refusal !== null && (
-          <p role="alert" className="text-body text-warn-ink">
-            {refusal}
-          </p>
-        )}
-        <div className="flex flex-wrap justify-end gap-tight">
+      onSubmit={(event) => void submit(event)}
+      footer={
+        <>
           <Button type="button" variant="outline" onClick={close} disabled={running}>
             {t("staff.cancel")}
           </Button>
-          <Button type="submit" disabled={running || forbidden || username.trim() === ""}>
+          <Button type="submit" pending={running} disabled={forbidden || username.trim() === ""}>
             {running ? t("staff.assign.running") : t("staff.assign.submit")}
           </Button>
-        </div>
-      </form>
+        </>
+      }
+    >
+      <Field
+        ref={input}
+        id={fieldId}
+        label={t("staff.assign.username")}
+        hint={t("staff.assign.hint")}
+        error={fieldError ?? undefined}
+        // Where a reader expects to type the moment the dialog opens.
+        autoFocus
+        value={username}
+        onChange={(event) => {
+          setUsername(event.target.value);
+          setFieldError(null);
+        }}
+        autoComplete="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        placeholder={t("staff.assign.placeholder")}
+        className="font-mono"
+      />
+      {forbidden && scope !== null && <Forbidden permission={grantPermission(scope)} />}
+      {refusal !== null && (
+        <p role="alert" className="text-body text-warn-ink">
+          {refusal}
+        </p>
+      )}
     </Dialog>
   );
 }

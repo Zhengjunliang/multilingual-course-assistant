@@ -14,7 +14,7 @@
  * it treats a pointer press as a request to open.
  */
 
-import { LogOut, UserRound } from "lucide-react";
+import { Globe, LogOut, UserRound } from "lucide-react";
 import { act } from "react";
 import { describe, expect, it } from "vitest";
 
@@ -35,11 +35,36 @@ function menu() {
     <DropdownMenu
       ariaLabel="Account"
       trigger={<Avatar name="junliang" />}
-      label="junliang"
-      caption="Studente"
-      entries={[
-        { key: "account", icon: UserRound, label: "Account", onSelect: () => {} },
-        { key: "logout", icon: LogOut, label: "Esci", onSelect: () => {} },
+      head={<p>junliang</p>}
+      sections={[
+        {
+          key: "account",
+          items: [
+            {
+              key: "account",
+              icon: UserRound,
+              label: "Account",
+              onSelect: () => {},
+              shortcut: { keys: "Control+Comma", label: "Ctrl ," },
+            },
+            {
+              key: "language",
+              icon: Globe,
+              label: "Lingua",
+              value: "it",
+              options: [
+                { value: "it", label: "Italiano", lang: "it" },
+                { value: "en", label: "English", lang: "en" },
+              ],
+              onValueChange: () => {},
+            },
+          ],
+        },
+        {
+          key: "session",
+          label: "Sessione",
+          items: [{ key: "logout", icon: LogOut, label: "Esci", onSelect: () => {} }],
+        },
       ]}
     />,
   );
@@ -74,5 +99,29 @@ describe("the account menu", () => {
     expect(container.querySelector("button")?.getAttribute("aria-label")).toBe("Account");
 
     unmount();
+  });
+
+  it("labels its sections, names each item's key, and shows a choice's current value", () => {
+    const { container, unmount } = menu();
+    const trigger = container.querySelector("button");
+    if (trigger !== null) press(trigger);
+    const items = [...document.body.querySelectorAll('[role="menuitem"]')];
+    const account = items.find((item) => item.textContent?.startsWith("Account"));
+    const language = items.find((item) => item.textContent?.startsWith("Lingua"));
+    const group = document.body.querySelector('[role="group"][aria-labelledby]');
+    const seen = {
+      keys: account?.getAttribute("aria-keyshortcuts"),
+      submenu: language?.getAttribute("aria-haspopup"),
+      current: language?.textContent,
+      section: document.getElementById(group?.getAttribute("aria-labelledby") ?? "")?.textContent,
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      keys: "Control+Comma",
+      submenu: "menu",
+      current: "LinguaItaliano",
+      section: "Sessione",
+    });
   });
 });

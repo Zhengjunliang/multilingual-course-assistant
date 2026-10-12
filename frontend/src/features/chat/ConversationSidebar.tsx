@@ -194,6 +194,7 @@ export function ConversationSidebar({
           if (!open) close();
         }}
         heading={t("sidebar.deleteTitle")}
+        icon={Trash2}
         description={
           pending === null
             ? ""

@@ -84,8 +84,8 @@ describe("the account dialog", () => {
         new PointerEvent("pointerdown", { bubbles: true, button: 0, ctrlKey: false }),
       );
     });
-    const offered = [...document.body.querySelectorAll('[role="menuitemradio"]')].map((entry) =>
-      entry.getAttribute("lang"),
+    const offered = [...document.body.querySelectorAll('[role="menuitemradio"] [lang]')].map(
+      (name) => name.getAttribute("lang"),
     );
     expect(offered).toEqual(["it", "en", "zh-hans"]);
 

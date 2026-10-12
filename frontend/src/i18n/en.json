@@ -41,6 +41,7 @@
     "theme": "Theme",
     "themeCaption": "Applies to this device, not to your account.",
     "language": "Language",
+    "languageHint": "Answers follow the language of the question, not the interface's.",
     "logOut": "Sign out",
     "close": "Close",
     "admin": "Administration"
