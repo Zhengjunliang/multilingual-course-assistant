@@ -25,10 +25,16 @@ interface AppCrashState {
   error: unknown;
 }
 
-/** The error as a reader can copy it into a report: its stack, or what was thrown. */
+/**
+ * The error as a reader can copy it into a report: its name and message, then
+ * its stack, or what was thrown. Chrome's stack starts with "Name: message";
+ * Firefox's and Safari's hold the frames alone, so the head is added there.
+ */
 function details(error: unknown): string {
-  if (error instanceof Error) return error.stack ?? `${error.name}: ${error.message}`;
-  return String(error);
+  if (!(error instanceof Error)) return String(error);
+  const head = `${error.name}: ${error.message}`;
+  const stack = error.stack ?? "";
+  return stack.startsWith(head) ? stack : `${head}\n${stack}`.trimEnd();
 }
 
 export class AppCrash extends Component<{ children: ReactNode }, AppCrashState> {

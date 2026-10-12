@@ -104,9 +104,15 @@ async function settle() {
 const dialog = () => document.body.querySelector('[role="dialog"], [role="alertdialog"]');
 const body = () => document.body.textContent ?? "";
 
+/** The button a screen reader names `label`: its text without what is hidden from it, such as a key's cap. */
 function button(label: string) {
+  const name = (candidate: HTMLButtonElement) => {
+    const copy = candidate.cloneNode(true) as HTMLElement;
+    for (const hidden of copy.querySelectorAll("[aria-hidden=true]")) hidden.remove();
+    return copy.textContent?.trim();
+  };
   return [...document.body.querySelectorAll<HTMLButtonElement>("button")].find(
-    (candidate) => candidate.textContent?.trim() === label,
+    (candidate) => name(candidate) === label,
   );
 }
 

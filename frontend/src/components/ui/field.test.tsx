@@ -31,6 +31,13 @@ describe("a field", () => {
     expect(quiet["aria-invalid"]).toBeUndefined();
   });
 
+  it("reads a refusal out as it appears when asked to, and not otherwise", () => {
+    const quiet = render(<Field id="user" label="Nome utente" error="Nessun account." />);
+    const loud = render(<Field id="user" label="Nome utente" error="Nessun account." announce />);
+
+    expect([quiet.includes('role="alert"'), loud.includes('role="alert"')]).toEqual([false, true]);
+  });
+
   it("counts the characters of its value against its maximum", () => {
     const html = render(
       <Field

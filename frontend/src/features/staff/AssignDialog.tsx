@@ -113,7 +113,12 @@ export function AssignDialog({
           <Button type="button" variant="outline" onClick={close} disabled={running}>
             {t("staff.cancel")}
           </Button>
-          <Button type="submit" pending={running} disabled={forbidden || username.trim() === ""}>
+          <Button
+            type="submit"
+            pending={running}
+            disabled={forbidden || username.trim() === ""}
+            shortcut={{ keys: "Enter", label: t("keys.enter") }}
+          >
             {running ? t("staff.assign.running") : t("staff.assign.submit")}
           </Button>
         </>
@@ -125,6 +130,7 @@ export function AssignDialog({
         label={t("staff.assign.username")}
         hint={t("staff.assign.hint")}
         error={fieldError ?? undefined}
+        announce
         // Where a reader expects to type the moment the dialog opens.
         autoFocus
         value={username}
