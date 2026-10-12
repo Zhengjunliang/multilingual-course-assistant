@@ -49,7 +49,10 @@ _LONG_RANGE = re.compile(r"(?<!\d)20(\d{2})[-_]20(\d{2})(?!\d)")
 _SHORT_RANGE = re.compile(r"(?<!\d)(?:20)?(\d{2})[-_](\d{2})(?!\d)")
 
 
-@lru_cache(maxsize=4096)
+# Large enough for the pool of one search, whose texts every pair comparison
+# reads again; a long-running server process keeps no more than that, since a
+# text's shingles cost tens of kilobytes and another question brings others.
+@lru_cache(maxsize=256)
 def _features(text: str) -> tuple[frozenset[tuple[str, ...]], frozenset[str]]:
     """The 3-word shingles and the numbers of a text, a PDF's hyphenated line
     breaks joined first so that `didat-\\ntici` reads as one word."""
@@ -113,26 +116,45 @@ def _survivor(copies: Sequence[Hit]) -> Hit:
     return copies[max(range(len(copies)), key=newest)]
 
 
+def _paragraphs_of_one_page(a: Chunk, b: Chunk) -> bool:
+    return a.url == b.url and a.content_hash == b.content_hash and a.text != b.text
+
+
 def collapse(hits: Sequence[Hit]) -> list[Hit]:
-    """Each passage once, in the order of its best-ranked copy. A hit joins the
-    first group, by rank, that holds a copy of it, so a chain of editions each
-    close to the next collapses even where the first and the last are far
-    apart. The group keeps its best score and shows its newest copy, so a
-    citation's URL is always the page its text came from."""
-    groups: list[list[Hit]] = []
-    for hit in hits:
-        group = next(
-            (group for group in groups if any(same_passage(hit.chunk, m.chunk) for m in group)),
-            None,
-        )
-        if group is None:
-            groups.append([hit])
-        else:
-            group.append(hit)
-    return [
-        _survivor(group).model_copy(update={"score": max(hit.score for hit in group)})
-        for group in groups
-    ]
+    """Each passage once, in the order of its best-ranked copy.
+
+    A hit joins every group that holds a copy of it, and the groups it joins
+    become one, so a chain of editions each close to the next is one passage
+    whatever order the ranking brings them in, though the first and the last
+    are far apart. A group never takes two paragraphs of one page version: a
+    copy of one of them at another address may be a near-duplicate of the
+    other, and would otherwise carry both into one passage. The group keeps
+    its best score and shows its newest copy, so a citation's URL is always
+    the page its text came from."""
+    groups: list[list[int]] = []
+    for index, hit in enumerate(hits):
+        home = [index]
+        for group in [*groups]:
+            if not any(same_passage(hit.chunk, hits[member].chunk) for member in group):
+                continue
+            if any(
+                _paragraphs_of_one_page(hits[a].chunk, hits[b].chunk) for a in home for b in group
+            ):
+                continue
+            if home == [index]:
+                group.append(index)
+                home = group
+            else:
+                home.extend(group)
+                groups.remove(group)
+        if home == [index]:
+            groups.append(home)
+    collapsed: list[Hit] = []
+    for group in groups:
+        copies = [hits[member] for member in sorted(group)]
+        best = max(hit.score for hit in copies)
+        collapsed.append(_survivor(copies).model_copy(update={"score": best}))
+    return collapsed
 
 
 def main(argv: list[str] | None = None) -> None:

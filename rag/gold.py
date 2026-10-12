@@ -301,7 +301,7 @@ def main(argv: list[str] | None = None) -> None:
             min_score=args.min_score,
             collections=(question.target,),
             # Single passthrough, no per-collection branching: `search()` drops
-            # both web-source conditions on every non-web prefetch branch.
+            # both web-source conditions on every non-web branch.
             ingest_source=ingest_source,
             ingest_run_id=args.snapshot,
         )

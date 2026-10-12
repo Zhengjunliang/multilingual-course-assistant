@@ -334,7 +334,7 @@ def search(
     the best there is. It applies only with a reranker (`RELEVANCE_CUTOFF`).
 
     The web-source conditions apply only to the
-    `unifi_web` branch (the eval-isolation rule, docs/architecture.md): slides prefetches never
+    `unifi_web` branch (the eval-isolation rule, docs/architecture.md): slides branches never
     carry them, so slides retrieval semantics cannot drift with web features.
     `scope` applies only to the slides branch, the other way round: in
     `unifi_web`, `course` is a site-section slug that no edition matches."""
