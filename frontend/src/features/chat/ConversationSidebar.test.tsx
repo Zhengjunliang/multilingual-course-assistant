@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 /**
- * The sidebar's delete action, where the page cannot show it: where focus
- * goes when the question is cancelled.
+ * The sidebar's states and its delete action, where the page cannot show
+ * them: rows on their way, no conversations at all, a search that finds
+ * nothing, and where focus goes when a deletion is cancelled.
  *
  * Deleting through the dialog, and where the page goes afterwards, is asserted
  * on the whole application: in routes/ChatPage.routing.test.tsx, and with an
@@ -14,6 +15,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import type { ConversationSummary } from "@/api/conversations";
+import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
 import { mount } from "@/test/mount";
 import { ConversationSidebar } from "./ConversationSidebar";
@@ -23,6 +25,32 @@ const ROWS: ConversationSummary[] = [
   { id: 8, locale: "it", created_at: "2026-09-27T10:00:00Z", title: "Quando scadono le tasse?" },
 ];
 
+function sidebar(conversations: ConversationSummary[] | null) {
+  return mount(
+    <MemoryRouter>
+      <SessionContext
+        value={{
+          account: { id: 1, username: "reader", locale: "it", is_superuser: false, roles: [] },
+          logIn: async () => {},
+          register: async () => {},
+          logOut: async () => {},
+          chooseLocale: async () => {},
+          forget: () => {},
+          recheck: async () => {},
+        }}
+      >
+        <ConversationSidebar
+          conversations={conversations}
+          busy={null}
+          onDelete={async () => true}
+          onOpenSettings={() => {}}
+          onOpenHelp={() => {}}
+        />
+      </SessionContext>
+    </MemoryRouter>,
+  );
+}
+
 function deleteButton(title: string) {
   const label = i18n.t("sidebar.delete", { title });
   return [...document.body.querySelectorAll<HTMLButtonElement>("button")].find(
@@ -30,13 +58,69 @@ function deleteButton(title: string) {
   );
 }
 
+function search(container: HTMLElement, text: string) {
+  const field = container.querySelector<HTMLInputElement>('input[type="search"]');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  act(() => {
+    if (field === null) return;
+    setter?.call(field, text);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+const rowTitles = (container: HTMLElement) =>
+  [...container.querySelectorAll('a[href^="/c/"]')].map((row) => row.firstChild?.textContent);
+
 describe("the conversation sidebar", () => {
-  it("hands focus back to the delete button when the question is cancelled", async () => {
-    const { unmount } = mount(
-      <MemoryRouter>
-        <ConversationSidebar conversations={ROWS} busy={null} onDelete={async () => true} />
-      </MemoryRouter>,
+  it("shows rows on their way while the list loads, never the empty panel", () => {
+    const { container, unmount } = sidebar(null);
+    const loading = container.querySelector('[role="status"]')?.getAttribute("aria-label");
+    const text = container.textContent;
+    unmount();
+
+    expect(loading).toBe(i18n.t("sidebar.loading"));
+    expect(text).not.toContain(i18n.t("sidebar.emptyTitle"));
+  });
+
+  it("shows the empty panel once the server has said there is nothing", () => {
+    const { container, unmount } = sidebar([]);
+    const text = container.textContent;
+    const rows = rowTitles(container);
+    unmount();
+
+    expect(text).toContain(i18n.t("sidebar.emptyTitle"));
+    expect(rows).toEqual([]);
+  });
+
+  it("counts the conversations, each with when it started", () => {
+    const { container, unmount } = sidebar(ROWS);
+    const heading = container.querySelector('nav[aria-label="Recenti"] h2')?.textContent;
+    const times = [...container.querySelectorAll("a time")].map((time) =>
+      time.getAttribute("datetime"),
     );
+    unmount();
+
+    expect(heading).toBe("Recenti2");
+    expect(times).toEqual(ROWS.map((row) => row.created_at));
+  });
+
+  it("filters the titles as the search is typed, and says when nothing matches", () => {
+    const { container, unmount } = sidebar(ROWS);
+
+    search(container, "tasse");
+    const found = rowTitles(container);
+    search(container, "mensa");
+    const none = rowTitles(container);
+    const text = container.textContent;
+    unmount();
+
+    expect(found).toEqual(["Quando scadono le tasse?"]);
+    expect(none).toEqual([]);
+    expect(text).toContain(i18n.t("sidebar.noMatch"));
+  });
+
+  it("hands focus back to the delete button when the question is cancelled", async () => {
+    const { unmount } = sidebar(ROWS);
     const trigger = deleteButton("Che cos'è un ORM?");
     act(() => {
       trigger?.focus();

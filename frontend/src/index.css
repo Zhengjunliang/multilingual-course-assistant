@@ -139,7 +139,6 @@
 @theme inline {
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
-  --color-sidebar: var(--sidebar);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
@@ -189,6 +188,13 @@
   --spacing-control-sm: 2rem;
   --spacing-control-icon: 2.25rem;
   --spacing-control: 2.5rem;
+
+  /* The signed-in shell's sidebar, open and folded into its rail of icons
+     (features/chat/ChatShell.tsx), at the prototype's widths. */
+  --spacing-sidebar: 16.5rem;
+  --spacing-rail: 3.75rem;
+  /* The bar in the accent at the leading edge of where the reader is. */
+  --spacing-bar: 0.1875rem;
 
   /* Glyph sizes. Two, because an icon beside body text and an icon standing
      alone in a header button are the only two jobs icons have here. */
@@ -314,7 +320,6 @@
 :root {
   --canvas: oklch(99% 0.003 247);
   --surface: oklch(100% 0 0);
-  --sidebar: oklch(97% 0.005 247);
   --ink: oklch(25% 0.012 247);
   --muted: oklch(47% 0.012 247);
   --line: oklch(90% 0.006 247);
@@ -332,7 +337,6 @@
 [data-theme="dark"] {
   --canvas: oklch(14% 0.008 247);
   --surface: oklch(18% 0.01 247);
-  --sidebar: oklch(21% 0.012 247);
   --ink: oklch(95% 0.004 247);
   --muted: oklch(73% 0.01 247);
   --line: oklch(28% 0.012 247);
@@ -350,9 +354,10 @@
 /*
  * The grain: a fine, still noise over the ground (#173), so that the empty
  * screen around the cat reads as paper rather than as a flat fill. It lies on
- * `--canvas` alone, through `bg-ground` below; a card, a dialog or the sidebar
- * paints its own fill over it, and an element that shows the ground uses
- * `bg-ground` rather than `bg-canvas`, so the ground has no flat patches.
+ * `--canvas` alone, through `bg-ground` below; a card or a dialog paints its
+ * own fill over it, and an element that shows the ground, the sidebar among
+ * them, uses `bg-ground` rather than `bg-canvas`, so the ground has no flat
+ * patches.
  *
  * Each theme's tile is the same noise in the accent's hue, oklch(66% 0.053
  * 247) written as the filter's linear-light values, at its own strength: at

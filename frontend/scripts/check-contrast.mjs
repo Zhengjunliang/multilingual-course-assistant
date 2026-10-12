@@ -53,7 +53,6 @@ const ACCENT_MIN_CHROMA = 0.08;
 const GREYS = [
   "canvas",
   "surface",
-  "sidebar",
   "ink",
   "muted",
   "line",
@@ -79,8 +78,6 @@ const OTHER_HUE = ["warn", "warn-line", "warn-ink"];
 const STEP = 2;
 
 const LADDER = [
-  { a: "mark", b: "sidebar", where: "ConversationSidebar.tsx and ManagementNav.tsx hover" },
-  { a: "accent-soft", b: "sidebar", where: "ConversationSidebar.tsx open conversation" },
   {
     a: "mark",
     b: "surface",

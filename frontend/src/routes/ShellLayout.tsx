@@ -1,7 +1,7 @@
 /**
  * The frame every signed-in page shares: the chat shell, its sidebar of
- * conversations and Gestione items, and the header with the breadcrumb and
- * the account; the page itself is the `<Outlet>`.
+ * conversations, Gestione items and the account, and the header with the
+ * breadcrumb; the page itself is the `<Outlet>`.
  *
  * A layout route (React Router's own pattern) rather than a shell each page
  * renders for itself: the sidebar is wired once, so moving between the chat
@@ -25,7 +25,6 @@ import { deleteConversation, listConversations } from "@/api/conversations";
 import { ApiError } from "@/api/http";
 import { isStaff } from "@/auth/staff";
 import { useSession } from "@/auth/useSession";
-import { AccountMenu } from "@/components/AccountMenu";
 import { Breadcrumb, type Crumb } from "@/components/ui/breadcrumb";
 import { Toaster } from "@/components/ui/sonner";
 import { ChatShell, type SidebarControls } from "@/features/chat/ChatShell";
@@ -41,7 +40,9 @@ export default function ShellLayout() {
   const navigate = useNavigate();
   const open = useMatch("/c/:conversationId")?.params.conversationId;
 
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  // `null` until the first list arrives, so the sidebar shows rows on their
+  // way rather than telling a reader with conversations that they have none.
+  const [conversations, setConversations] = useState<ConversationSummary[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [crumbs, setCrumbs] = useState<readonly Crumb[]>([]);
   const [programmes, setProgrammes] = useState<{ data: Programme[] | null; error: unknown }>({
@@ -149,13 +150,15 @@ export default function ShellLayout() {
     [programmes, items, homeLabel, refreshConversations],
   );
 
-  const sidebar = ({ onNavigate, onCollapse }: SidebarControls) => (
+  const sidebar = ({ onNavigate, onCollapse, onOpenSettings, onOpenHelp }: SidebarControls) => (
     <ConversationSidebar
       conversations={conversations}
       busy={busy}
       onDelete={onDelete}
       onNavigate={onNavigate}
       onCollapse={onCollapse}
+      onOpenSettings={onOpenSettings}
+      onOpenHelp={onOpenHelp}
       management={
         items.length > 0 ? <ManagementNav items={items} onNavigate={onNavigate} /> : undefined
       }
@@ -169,7 +172,6 @@ export default function ShellLayout() {
         leading={
           crumbs.length > 0 ? <Breadcrumb label={t("staff.breadcrumb")} crumbs={crumbs} /> : null
         }
-        controls={<AccountMenu />}
       >
         <Outlet />
       </ChatShell>

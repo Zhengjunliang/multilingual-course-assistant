@@ -1,14 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * The densest new surface in this interface, and the reason the suite has a
- * document at all.
- *
- * Eight things have to be on screen at once — a name, three themes, three
- * languages and a way out — and every one of them is inside a Radix portal, so
- * a string render returns the empty string and proves nothing. Before the
- * document, this whole screen would have been a line on the manual checklist,
- * re-walked by hand after every change.
+ * The settings: the theme alone, and a line saying where the language went.
  *
  * `ThemeProvider` is the real one rather than a fake context, because the
  * assertion worth making is that clicking "dark" *changes the theme* — which
@@ -20,28 +13,15 @@
 import { act } from "react";
 import { describe, expect, it } from "vitest";
 
-import { SessionContext } from "@/auth/SessionProvider";
 import { CANVAS, CANVAS_DARK } from "@/brand/fumetto";
-import { AccountDialog } from "@/components/AccountDialog";
+import { SettingsDialog } from "@/components/SettingsDialog";
 import { mount } from "@/test/mount";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
 function dialog() {
   return mount(
     <ThemeProvider>
-      <SessionContext
-        value={{
-          account: { id: 1, username: "junliang", locale: "it", is_superuser: false, roles: [] },
-          logIn: async () => {},
-          register: async () => {},
-          logOut: async () => {},
-          chooseLocale: async () => {},
-          forget: () => {},
-          recheck: async () => {},
-        }}
-      >
-        <AccountDialog open onOpenChange={() => {}} />
-      </SessionContext>
+      <SettingsDialog open onOpenChange={() => {}} />
     </ThemeProvider>,
   );
 }
@@ -50,46 +30,22 @@ function buttonLabelled(text: string) {
   return [...document.body.querySelectorAll("button")].find((b) => b.textContent?.includes(text));
 }
 
-describe("the account dialog", () => {
-  it("names who is signed in", () => {
+describe("the settings dialog", () => {
+  it("offers all three themes, says the choice is per device, and holds nothing else", () => {
     const { unmount } = dialog();
-
-    expect(document.body.textContent).toContain("junliang");
-    expect(document.body.textContent).toContain("Profilo");
-
+    const offered = ["Di sistema", "Chiaro", "Scuro"].map((label) => buttonLabelled(label));
+    const text = document.body.textContent;
+    const menus = document.body.querySelectorAll('[aria-haspopup="menu"]').length;
     unmount();
-  });
 
-  it("offers all three themes and says the choice is per device", () => {
-    const { unmount } = dialog();
-
-    for (const label of ["Di sistema", "Chiaro", "Scuro"]) {
-      expect(buttonLabelled(label)).toBeDefined();
-    }
+    for (const button of offered) expect(button).toBeDefined();
     // The distinction ThemeProvider argues for, in front of the reader rather
     // than only in a source comment.
-    expect(document.body.textContent).toContain("questo dispositivo");
-
-    unmount();
-  });
-
-  it("offers all three interface languages", () => {
-    const { unmount } = dialog();
-
-    const trigger = buttonLabelled("Italiano");
-    expect(trigger).toBeDefined();
-    // Radix opens a menu on pointerdown, not on click (dropdown-menu.test.tsx).
-    act(() => {
-      trigger?.dispatchEvent(
-        new PointerEvent("pointerdown", { bubbles: true, button: 0, ctrlKey: false }),
-      );
-    });
-    const offered = [...document.body.querySelectorAll('[role="menuitemradio"] [lang]')].map(
-      (name) => name.getAttribute("lang"),
-    );
-    expect(offered).toEqual(["it", "en", "zh-hans"]);
-
-    unmount();
+    expect(text).toContain("questo dispositivo");
+    // The language is the account menu's now, and the dialog says so.
+    expect(text).toContain("menu dell'account");
+    expect(menus).toBe(0);
+    expect(buttonLabelled("Esci")).toBeUndefined();
   });
 
   it("actually changes the theme when one is chosen", () => {
@@ -128,13 +84,5 @@ describe("the account dialog", () => {
 
     expect(dark).toEqual([CANVAS_DARK, CANVAS_DARK]);
     expect(light).toEqual([CANVAS, CANVAS]);
-  });
-
-  it("keeps a way out of the session", () => {
-    const { unmount } = dialog();
-
-    expect(buttonLabelled("Esci")).toBeDefined();
-
-    unmount();
   });
 });

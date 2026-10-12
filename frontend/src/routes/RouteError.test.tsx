@@ -148,7 +148,7 @@ describe("a page that throws", () => {
     const seen = {
       panel: panel(container),
       inMain: container.querySelector("main [data-status-panel]") !== null,
-      sidebar: container.querySelector("aside nav") !== null,
+      sidebar: container.querySelector('aside a[href="/"]') !== null,
       reported: reported(),
     };
     unmount();

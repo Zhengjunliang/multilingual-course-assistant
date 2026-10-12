@@ -20,7 +20,6 @@
   "sidebar": {
     "title": "你的会话",
     "new": "新会话",
-    "empty": "还没有会话。",
     "untitled": "未命名",
     "open": "打开会话列表",
     "collapse": "收起侧栏",
@@ -32,19 +31,33 @@
     "deleteBodyAnswering": "「{{title}}」及其回答将被永久删除。正在生成的回答会停止。",
     "deleteConfirm": "删除",
     "cancel": "取消",
-    "deleteFailed": "无法删除这个会话。"
+    "deleteFailed": "无法删除这个会话。",
+    "recent": "最近",
+    "search": "搜索",
+    "noMatch": "没有匹配的会话。",
+    "loading": "正在加载会话",
+    "emptyTitle": "还没有会话",
+    "emptyBody": "你问过的问题会留在这里，方便以后接着看。"
   },
   "account": {
-    "title": "账号",
     "menu": "打开账号菜单",
-    "profile": "个人资料",
     "theme": "主题",
     "themeCaption": "只对这台设备生效，不跟随账号。",
     "language": "语言",
     "languageHint": "回答跟随提问所用的语言，而不是界面的语言。",
     "logOut": "退出登录",
     "close": "关闭",
-    "admin": "管理后台"
+    "admin": "管理后台",
+    "settings": "设置",
+    "settingsItem": "设置…",
+    "help": "帮助与快捷键",
+    "languageInMenu": "语言在账号菜单里切换。",
+    "role": {
+      "admin": "管理员",
+      "secretariat": "教学秘书",
+      "teacher": "教师",
+      "student": "学生"
+    }
   },
   "theme": {
     "system": "跟随系统",
@@ -247,7 +260,18 @@
     },
     "retry": "重试"
   },
+  "shortcuts": {
+    "newConversation": "新会话",
+    "search": "搜索会话",
+    "settings": "打开设置",
+    "help": "显示快捷键",
+    "send": "发送问题",
+    "newLine": "在问题里换行",
+    "close": "关闭菜单或窗口"
+  },
   "keys": {
-    "enter": "回车"
+    "enter": "回车",
+    "shift": "Shift",
+    "escape": "Esc"
   }
 }

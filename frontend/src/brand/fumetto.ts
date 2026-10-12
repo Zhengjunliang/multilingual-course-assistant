@@ -135,6 +135,8 @@ const DROOPING = [
   "M19.4 37.4L29.6 34.6C29.8 39.6 27.8 42.6 24.6 42.6C21.4 42.6 19.4 40.2 19.4 37.4Z",
   "M35 34.6L45.2 37.4C45.2 40.2 43.2 42.6 40 42.6C36.8 42.6 34.8 39.6 35 34.6Z",
 ];
+/** Closed the other way up from the welcome pose's smile: asleep. */
+const SLEEPING = ["M19.8 38.4Q24.6 42.8 29.4 38.4", "M35.2 38.4Q40 42.8 44.8 38.4"];
 const MOUTH = "M29.4 46.8Q31 48.8 32.4 46.8Q33.8 48.8 35.4 46.8";
 /** On the right cheek only: the bubble's tail takes the left. */
 const WHISKERS = "M52.2 40.8L56.8 40.2M52 43.8L56.4 44.2";
@@ -193,6 +195,14 @@ export const POSES = {
     fills: [],
     dots: [{ cx: 58, cy: 21, r: 1.5 }],
   },
+  /** Nothing yet, such as a list of conversations not started: asleep, two "z" rising. */
+  sleep: {
+    eyes: [],
+    pupils: [],
+    strokes: [...SLEEPING, MOUTH, WHISKERS, "M53 13.2H58L53 18.8H58", "M58.8 5H62.2L58.8 9H62.2"],
+    fills: [],
+    dots: [],
+  },
 } as const satisfies Record<string, Drawing>;
 
 export type Pose = keyof typeof POSES;
@@ -213,7 +223,7 @@ export const LIVING = {
   whiskers: WHISKERS,
   happyEyes: POSES.welcome.strokes.slice(0, 2),
   stars: POSES.welcome.fills,
-  sleepingEyes: ["M19.8 38.4Q24.6 42.8 29.4 38.4", "M35.2 38.4Q40 42.8 44.8 38.4"],
+  sleepingEyes: SLEEPING,
   droopingEyes: DROOPING,
   flatMouth: POSES.thinking.strokes[0],
   yawn: "M30 47Q32.4 45.2 34.8 47Q35.2 52 32.4 52.4Q29.6 52 30 47Z",

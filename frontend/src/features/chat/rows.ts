@@ -11,7 +11,18 @@
  * The search folds case and accents on both sides, so "perche" finds
  * "Perché": a reader typing fast leaves the accents out, and a title written
  * by the server keeps them.
+ *
+ * How a row of the sidebar is drawn, a conversation or a Gestione page alike
+ * (DESIGN.md, the five rules): the accent at 6 % under the pointer, and where
+ * the reader is, the accent at 11 % with a 3 px bar at its leading edge and
+ * the label in the accent at 600.
  */
+
+export const SIDEBAR_ROW =
+  "relative flex min-h-control-sm items-center gap-tight rounded-control px-tight text-body text-ink transition-colors hover:bg-hover";
+
+export const SIDEBAR_ROW_CURRENT =
+  "bg-selected font-semibold text-accent hover:bg-selected before:absolute before:inset-y-tight before:left-0 before:w-bar before:rounded-r-full before:bg-accent";
 
 const DAY = 24 * 60 * 60 * 1000;
 

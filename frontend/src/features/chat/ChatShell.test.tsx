@@ -4,8 +4,8 @@
  * The frame, asserted by using it.
  *
  * The chat page wants a router and a session, and the drawer is a portal a
- * string render cannot see. The frame has neither problem — it takes
- * its sidebar and its controls as slots and holds nothing but a boolean — so
+ * string render cannot see. The frame has neither problem — it takes its
+ * sidebar as a slot and holds nothing but which panel is open — so
  * the two checks that used to be spellings of class names can be the real
  * question instead: does the button open the drawer, and does the drawer put
  * the sidebar on the page.
@@ -23,24 +23,26 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { ChatShell } from "@/features/chat/ChatShell";
 import { mount } from "@/test/mount";
+import { ThemeProvider } from "@/theme/ThemeProvider";
 
 function shell() {
   return mount(
-    <ChatShell
-      sidebar={({ onNavigate, onCollapse }) => (
-        <>
-          <button type="button" onClick={onNavigate}>
-            Che cos'è un ORM?
-          </button>
-          <button type="button" onClick={onCollapse}>
-            Chiudi la barra laterale
-          </button>
-        </>
-      )}
-      controls={<span>Assistente del corso</span>}
-    >
-      <p>Cosa vuoi sapere?</p>
-    </ChatShell>,
+    <ThemeProvider>
+      <ChatShell
+        sidebar={({ onNavigate, onCollapse }) => (
+          <>
+            <button type="button" onClick={onNavigate}>
+              Che cos'è un ORM?
+            </button>
+            <button type="button" onClick={onCollapse}>
+              Chiudi la barra laterale
+            </button>
+          </>
+        )}
+      >
+        <p>Cosa vuoi sapere?</p>
+      </ChatShell>
+    </ThemeProvider>,
   );
 }
 
@@ -62,11 +64,11 @@ describe("the chat frame", () => {
   // cleared between cases or one of them decides what the next one sees.
   beforeEach(() => localStorage.clear());
 
-  it("shows its controls and its children without opening anything", () => {
+  it("shows its children without opening anything", () => {
     const { container, unmount } = shell();
 
-    expect(container.textContent).toContain("Assistente del corso");
     expect(container.textContent).toContain("Cosa vuoi sapere?");
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
 
     unmount();
   });
@@ -129,6 +131,43 @@ describe("the chat frame", () => {
     expect(countSidebars()).toBe(0);
 
     second.unmount();
+  });
+
+  it("gives the focus back to what opened a dialog once it closes", async () => {
+    // Opened from state, as the account menu and the keys open them, so Radix
+    // has no trigger of its own to return the focus to.
+    const { container, unmount } = mount(
+      <ThemeProvider>
+        <ChatShell
+          sidebar={({ onOpenSettings }) => (
+            <button type="button" onClick={onOpenSettings}>
+              Impostazioni…
+            </button>
+          )}
+        >
+          <p>Cosa vuoi sapere?</p>
+        </ChatShell>
+      </ThemeProvider>,
+    );
+    const opener = container.querySelector<HTMLButtonElement>("aside button");
+    act(() => {
+      opener?.focus();
+      opener?.click();
+    });
+    const heading = document.body.querySelector('[role="dialog"] h2')?.textContent;
+    const close = document.body.querySelector<HTMLButtonElement>(
+      '[role="dialog"] button[aria-label="Chiudi"]',
+    );
+    act(() => close?.click());
+    // Radix moves focus on closing in a task of its own.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const back = document.activeElement === opener;
+    unmount();
+
+    expect(heading).toBe("Impostazioni");
+    expect(back).toBe(true);
   });
 
   it("brings the column back from the button that replaces it", () => {

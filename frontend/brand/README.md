@@ -13,7 +13,7 @@ The mark of UniGuide AI and the mascot of its interface: a cat whose head is a s
 | `fumetto-<pose>.svg` | A pose as a blue line, for light grounds |
 | `fumetto-<pose>-dark.svg` | The same pose in the lighter blue, for dark grounds |
 
-The poses are `avatar`, `welcome`, `thinking`, `error` and `not-found`. The browser and platform icons built from the mark sit in `frontend/public/`: `favicon.ico`, `icon.svg`, `apple-touch-icon.png`, the three `icon-*.png`, `manifest.webmanifest`, and `og.png`, a 1200 × 630 image for link previews, which a page links by an absolute address.
+The poses are `avatar`, `welcome`, `thinking`, `error`, `not-found` and `sleep`. The browser and platform icons built from the mark sit in `frontend/public/`: `favicon.ico`, `icon.svg`, `apple-touch-icon.png`, the three `icon-*.png`, `manifest.webmanifest`, and `og.png`, a 1200 × 630 image for link previews, which a page links by an absolute address.
 
 ## Using it
 

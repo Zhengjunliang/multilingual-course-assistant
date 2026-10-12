@@ -6,7 +6,6 @@ colors:
   primary: '{colors.accent}'
   canvas: '#FAFCFE'
   surface: '#FFFFFF'
-  sidebar: '#F2F5F8'
   ink: '#1D2227'
   muted: '#565C61'
   line: '#DBDEE2'
@@ -21,13 +20,11 @@ colors:
   warn-ink: '#A2031F'
   hover-over-canvas: '#EBF1F6'
   hover-over-surface: '#F0F4F7'
-  hover-over-sidebar: '#E4EBF1'
   hover-over-tint: '#E8EEF4'
   selected-over-canvas: '#DFE9F0'
   selected-over-surface: '#E3EBF1'
   canvas-dark: '#07090C'
   surface-dark: '#0E1216'
-  sidebar-dark: '#14191E'
   ink-dark: '#ECEFF1'
   muted-dark: '#A3A8AE'
   line-dark: '#242A2F'
@@ -42,7 +39,6 @@ colors:
   warn-ink-dark: '#FFB7B2'
   hover-over-canvas-dark: '#0F171F'
   hover-over-surface-dark: '#161F28'
-  hover-over-sidebar-dark: '#1B252F'
   hover-over-tint-dark: '#121B24'
   selected-over-canvas-dark: '#162430'
   selected-over-surface-dark: '#1C2B38'
@@ -87,6 +83,9 @@ spacing:
   control-sm: '2rem'
   control-icon: '2.25rem'
   control: '2.5rem'
+  sidebar: '16.5rem'
+  rail: '3.75rem'
+  bar: '0.1875rem'
   icon: '1rem'
   icon-lg: '1.25rem'
   avatar-sm: '1.5rem'
@@ -109,12 +108,6 @@ components:
     textColor: '{colors.muted}'
   muted-on-surface:
     backgroundColor: '{colors.surface}'
-    textColor: '{colors.muted}'
-  ink-on-sidebar:
-    backgroundColor: '{colors.sidebar}'
-    textColor: '{colors.ink}'
-  muted-on-sidebar:
-    backgroundColor: '{colors.sidebar}'
     textColor: '{colors.muted}'
   ink-on-mark:
     backgroundColor: '{colors.mark}'
@@ -170,11 +163,11 @@ components:
   ink-on-hover-over-canvas:
     backgroundColor: '{colors.hover-over-canvas}'
     textColor: '{colors.ink}'
+  muted-on-hover-over-canvas:
+    backgroundColor: '{colors.hover-over-canvas}'
+    textColor: '{colors.muted}'
   ink-on-hover-over-surface:
     backgroundColor: '{colors.hover-over-surface}'
-    textColor: '{colors.ink}'
-  ink-on-hover-over-sidebar:
-    backgroundColor: '{colors.hover-over-sidebar}'
     textColor: '{colors.ink}'
   ink-on-hover-over-tint:
     backgroundColor: '{colors.hover-over-tint}'
@@ -205,12 +198,6 @@ components:
     textColor: '{colors.muted-dark}'
   muted-on-surface-dark:
     backgroundColor: '{colors.surface-dark}'
-    textColor: '{colors.muted-dark}'
-  ink-on-sidebar-dark:
-    backgroundColor: '{colors.sidebar-dark}'
-    textColor: '{colors.ink-dark}'
-  muted-on-sidebar-dark:
-    backgroundColor: '{colors.sidebar-dark}'
     textColor: '{colors.muted-dark}'
   ink-on-mark-dark:
     backgroundColor: '{colors.mark-dark}'
@@ -266,11 +253,11 @@ components:
   ink-on-hover-over-canvas-dark:
     backgroundColor: '{colors.hover-over-canvas-dark}'
     textColor: '{colors.ink-dark}'
+  muted-on-hover-over-canvas-dark:
+    backgroundColor: '{colors.hover-over-canvas-dark}'
+    textColor: '{colors.muted-dark}'
   ink-on-hover-over-surface-dark:
     backgroundColor: '{colors.hover-over-surface-dark}'
-    textColor: '{colors.ink-dark}'
-  ink-on-hover-over-sidebar-dark:
-    backgroundColor: '{colors.hover-over-sidebar-dark}'
     textColor: '{colors.ink-dark}'
   ink-on-hover-over-tint-dark:
     backgroundColor: '{colors.hover-over-tint-dark}'
@@ -305,11 +292,11 @@ A university lab tool that answers questions about a course and the campus, in t
 
 Every colour is a token with a job, named in `index.css` and used through its utility (`bg-surface`, `text-muted`), never as a raw value or a Tailwind palette step. The dark theme swaps the same names, so no component carries a second set of classes.
 
-- **Grounds**: `canvas` is the page, under the grain: a fine noise in the accent's hue that never moves, at most 7 % over the light ground and 5.6 % over the dark one, painted with the ground by `bg-ground`. `surface` is a card or a field on it, `sidebar` the conversation column, and neither carries the grain. `tint`, two points off `surface`, is the ground of a panel's head or foot: a card's, a dialog's, a table's head. `mark` is the quiet fill of a citation pill at rest, a count, a neutral chip and a skeleton.
+- **Grounds**: `canvas` is the page, under the grain: a fine noise in the accent's hue that never moves, at most 7 % over the light ground and 5.6 % over the dark one, painted with the ground by `bg-ground`. `surface` is a card or a field on it and carries no grain; the sidebar stands on the ground itself, one line between it and the page. `tint`, two points off `surface`, is the ground of a panel's head or foot: a card's, a dialog's, a table's head. `mark` is the quiet fill of a citation pill at rest, a count, a neutral chip and a skeleton.
 - **Text**: `ink` for everything read, `muted` for what supports it (a subtitle, an excerpt, an idle row). There is no third grey.
 - **Lines**: `line` separates panels, and only that; `hairline`, a step lighter, separates what is inside one panel, its rows and its foot. A card is told apart by its outline, not by a step of fill.
 - **The accent**: `accent` is the university website's blue, `accent-ink` the text that sits on it, `accent-soft` the tint of a chip in the accent and of a soft button, edged by `accent-line`.
-- **Interaction**, in the accent: `hover`, the accent at 6 % (9 % in the dark theme), fills whatever is under the pointer, a row, a menu item, a ghost or outlined button; `selected`, at 11 % (17 %), marks where the reader is, with a 3 px bar in the accent at its leading edge, and rings a field that has the focus. Both are the accent laid over whatever ground is behind them, translucent so the grain shows through. 🔜 (M4, #191) The sidebar's open conversation and current management page take `selected`; they wear `accent-soft` until then.
+- **Interaction**, in the accent: `hover`, the accent at 6 % (9 % in the dark theme), fills whatever is under the pointer, a row, a menu item, a ghost or outlined button; `selected`, at 11 % (17 %), marks where the reader is, with a 3 px bar in the accent at its leading edge, and rings a field that has the focus. Both are the accent laid over whatever ground is behind them, translucent so the grain shows through. The sidebar's open conversation and current management page take it.
 - **The warning**: `warn`, `warn-line` and `warn-ink` are the one other hue, for a failure and for confirming that something will be destroyed. Nothing else is red.
 
 A citation pill says it can be clicked by its fill, never by colour: `mark` at rest, `ink` with canvas lettering under the pointer and while its card is open. Blue inside the prose would read as an ordinary link. Every pair of colours the interface puts together is listed in [frontend/scripts/palette.mjs](frontend/scripts/palette.mjs) and held to 4.5:1 in both themes by `npm run check:contrast`, a translucent one laid over each ground it sits on first; a new pair is added there before it ships. Contrast is measured on the bare ground: on the grain's strongest pixel muted text, the faintest, keeps 6.2:1 in light and 7.9:1 in dark. axe cannot measure text over a background image, so `frontend/e2e/a11y.spec.ts` hides the grain before it runs and fails on any contrast axe leaves unmeasured.
@@ -389,6 +376,7 @@ Fumetto is drawn by `components/Mascot.tsx` from the one drawing in `frontend/sr
 | `thinking` | Beside an answer until its first word, pulsing |
 | `error` | Beside an answer that failed, and on the panel of a page that broke |
 | `notFound` | An address the application does not have, and a staff page whose object cannot be read |
+| `sleep` | The sidebar's list of conversations before the first one, in a disc of `accent-soft` |
 
 Where a screen greets, the entry and the sign-in and registration screens, Fumetto is alive: `components/LivingMascot.tsx`, at `w-entry-cat` (`w-entry-cat-sm` on a phone), its behaviour in `components/mascotLife.ts`. Awake, it blinks, flicks an ear, sways the bubble's tip and breathes, and its eyes go to the pointer, to the caret of the focused field, or to the question box when nobody moves. It smiles while the pointer is on an element marked `data-mascot-cheer`, the send button, unless something else holds its face, and when it hops as a question goes. After ten idle seconds it yawns and sleeps, eyes closed and a "z" rising, until a pointer, key or wheel wakes it with a double blink. On the sign-in and registration forms it answers the form, after Darin Senneff's Yeti and Telegram Web's monkey: while the password field or its eye has the focus (`data-mascot-away`) it shuts its eyes and turns its head aside, and one eye opens while the letters are shown; it watches the button while the form is sent (`data-mascot-busy`); a refusal makes it shake its head under drooping lids, with a flat mouth; a password manager's fill, which fires no input event, makes it glance at each filled field, caught by the `autofill` animation's start; an accepted form makes it smile, and it lands on the entry smiling. With reduced motion it does not move, and that setting is the only stop: nothing on the page stops it, which falls short of the stop control WCAG 2.2.2 asks of motion that lasts beyond five seconds. The face beside an answer is the motionless `Mascot`. A visitor's first visit opens on an intro, once and skippable: the cat drawn in one stroke, then the caption written in six languages before the interface's own, its name the settled caption throughout.
 

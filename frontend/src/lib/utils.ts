@@ -22,6 +22,9 @@ const twMerge = extendTailwindMerge({
         "control-sm",
         "control-icon",
         "control",
+        "sidebar",
+        "rail",
+        "bar",
         "icon",
         "icon-lg",
         "avatar-sm",
@@ -36,7 +39,6 @@ const twMerge = extendTailwindMerge({
       color: [
         "canvas",
         "surface",
-        "sidebar",
         "ink",
         "muted",
         "line",
