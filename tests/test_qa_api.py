@@ -992,8 +992,7 @@ def test_somebody_elses_conversation_is_not_there_to_open(method: str) -> None:
 
 
 def test_a_student_deletes_their_own_conversation_and_its_messages() -> None:
-    """Deleting is hard and takes the messages with it; nothing edits a
-    conversation, since its title derives from the first question."""
+    """Deleting is hard and takes the messages with it."""
     mine = Conversation.objects.create(owner=student(), locale="it")
     Message.objects.create(
         conversation=mine, role=Message.Role.USER, text="?", locale="it", complete=True
@@ -1003,8 +1002,6 @@ def test_a_student_deletes_their_own_conversation_and_its_messages() -> None:
     )
     url = f"{CONVERSATIONS_URL}/{mine.pk}"
 
-    assert client_for().patch(url, {"title": "x"}, format="json").status_code == 405
-    assert client_for().put(url, {"title": "x"}, format="json").status_code == 405
     assert client_for().delete(url).status_code == 204
     assert not Conversation.objects.filter(pk=mine.pk).exists()
     assert not Message.objects.exists()

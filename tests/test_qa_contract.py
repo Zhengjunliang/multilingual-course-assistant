@@ -17,7 +17,9 @@ branch nobody wrote.
 
 The request direction is mirrored too, in `frontend/src/api/client.ts`: the
 body's fields against the DRF serializers, and the caps a client stays inside
-against the constants the server enforces.
+against the constants the server enforces. So are the conversation endpoints,
+in `frontend/src/api/conversations.ts`, whose shapes are DRF serializers too:
+by their field names, as tests/test_catalog_contract.py holds the catalogue's.
 """
 
 from __future__ import annotations
@@ -41,6 +43,10 @@ from apps.qa.serializers import (
     MAX_HISTORY_ANSWER_CHARS,
     MAX_QUESTION_CHARS,
     AskRequest,
+    ConversationSerializer,
+    CourseNameSerializer,
+    MessageSerializer,
+    SourceSerializer,
     TurnSerializer,
 )
 from rag.agent import RouteDecision
@@ -51,6 +57,7 @@ if TYPE_CHECKING:
 API = Path(__file__).resolve().parent.parent / "frontend" / "src" / "api"
 MIRROR = API / "contract.ts"
 REQUEST_MIRROR = API / "client.ts"
+CONVERSATION_MIRROR = API / "conversations.ts"
 
 # Every model that crosses the wire. `RouteDecision` is here because `StartEvent`
 # embeds it verbatim rather than copying its fields (apps/qa/contract.py), so the
@@ -132,6 +139,20 @@ def test_the_request_mirror_declares_exactly_the_serializers_fields() -> None:
 
     assert fields(declaration(client, "AskBody")) == set(AskRequest().fields)
     assert fields(declaration(client, "HistoryTurn")) == set(TurnSerializer().fields)
+
+
+def test_the_conversation_mirror_declares_exactly_the_serializers_fields() -> None:
+    conversations = CONVERSATION_MIRROR.read_text(encoding="utf-8")
+    mirrored = {
+        "ConversationSummary": ConversationSerializer,
+        "ConversationSource": SourceSerializer,
+        "CourseName": CourseNameSerializer,
+        "StoredMessage": MessageSerializer,
+    }
+
+    declared = {name: fields(declaration(conversations, name)) for name in mirrored}
+
+    assert declared == {name: set(serializer().fields) for name, serializer in mirrored.items()}
 
 
 def test_the_request_mirror_keeps_the_servers_caps() -> None:

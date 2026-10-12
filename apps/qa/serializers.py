@@ -9,7 +9,7 @@ directions, so they stay here with the rest of the DRF layer.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -174,26 +174,99 @@ class MessageSerializer(serializers.ModelSerializer[Message]):
         )
 
 
+# What apps/qa/conversation_views.py annotates each conversation with: the
+# excerpts of its newest answer that had any; and what it puts in the context,
+# the courses those excerpts name, by code.
+LAST_CITATIONS = "last_citations"
+COURSE_NAMES = "course_names"
+
+
+class CourseName(TypedDict):
+    name: str
+    # None for a code no `Course` holds, which is shown as stored.
+    locale: str | None
+
+
+def slides_courses(citations: list[dict[str, Any]]) -> list[str]:
+    """The course codes the slides excerpts name, in citation order, each once."""
+    return list(
+        dict.fromkeys(citation["course"] for citation in citations if citation["kind"] == "slides")
+    )
+
+
+class CourseNameSerializer(serializers.Serializer):
+    """A course an answer drew on, as `Course` names it, in the language it is named in."""
+
+    name = serializers.CharField()
+    locale = serializers.CharField(allow_null=True)
+
+
+class SourceSerializer(serializers.Serializer):
+    """What a conversation's newest answer with excerpts drew on.
+
+    Read from `citations` rather than from the routing decision: the route
+    says where the answer was searched, the excerpts what it was given. A web
+    excerpt is the university's whatever its site section, and a slides excerpt
+    names its course by code. The first course is the first excerpt's, the one
+    the reranker put first.
+    """
+
+    courses = CourseNameSerializer(many=True)
+    web = serializers.BooleanField()
+
+
+class PinSerializer(serializers.Serializer):
+    """The one field of a conversation its owner writes."""
+
+    pinned = serializers.BooleanField()
+
+
 class ConversationSerializer(serializers.ModelSerializer[Conversation]):
     """A conversation in a list: enough to draw a sidebar row and no more.
 
-    `title` is derived rather than stored. A stored title is a second copy of
-    the first question, free to disagree with it the moment either is edited.
+    Everything but `pinned` is derived from the messages, in the query that
+    reads the list (apps/qa/conversation_views.py): the title is the first
+    question cut to `TITLE_CHARS`, in the language that question was asked in
+    (`Message.locale`, since a conversation has no single language); the row's
+    time is its last message's; `last_source` is what its newest answer with
+    excerpts drew on, or null when every answer was refused for want of any.
+    A stored title would be a second copy of the first question, free to
+    disagree with it.
     """
 
-    title = serializers.SerializerMethodField()
+    title = serializers.CharField(read_only=True)
+    title_locale = serializers.CharField(read_only=True)
+    last_message_at = serializers.DateTimeField(read_only=True)
+    # Not `source`, which every DRF field already has: the kwarg naming the
+    # attribute a field reads.
+    last_source = serializers.SerializerMethodField()
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Conversation
-        fields = ("id", "locale", "created_at", "title")
-
-    def get_title(self, conversation: Conversation) -> str:
-        first = (
-            Message.objects.filter(conversation=conversation, role=Message.Role.USER)
-            .values_list("text", flat=True)
-            .first()
+        fields = (
+            "id",
+            "locale",
+            "created_at",
+            "last_message_at",
+            "title",
+            "title_locale",
+            "pinned",
+            "last_source",
         )
-        return (first or "")[:TITLE_CHARS]
+
+    def get_last_source(self, conversation: Conversation) -> dict[str, Any] | None:
+        citations: list[dict[str, Any]] | None = getattr(conversation, LAST_CITATIONS)
+        if citations is None:
+            return None
+        named: dict[str, CourseName] = self.context[COURSE_NAMES]
+        source = {
+            "courses": [
+                named.get(code, CourseName(name=code, locale=None))
+                for code in slides_courses(citations)
+            ],
+            "web": any(citation["kind"] == "web" for citation in citations),
+        }
+        return SourceSerializer(source).data
 
 
 class ConversationDetailSerializer(ConversationSerializer):

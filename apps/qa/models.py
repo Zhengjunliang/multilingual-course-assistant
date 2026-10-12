@@ -3,8 +3,11 @@
 Two models and no more. What a follow-up needs is the previous questions and
 answers in order; everything else a chat product usually stores — titles,
 folders, sharing, edits — is a feature this thesis is not making a claim about.
-The sidebar's title is derived from the first message rather than stored,
-because a stored one is a second copy of that text free to disagree with it.
+The one thing an owner sets on a conversation is whether it is pinned. What a
+sidebar row shows besides — its title and that title's language, when it last
+moved, what its last answer drew on — is derived from the messages rather than
+stored (apps/qa/conversation_views.py), because a stored copy is a second
+version of that text free to disagree with it.
 
 **Why the citations, the routing decision and the search time are columns
 here.** They arrive in the `start` event, which exists once and is gone.
@@ -65,6 +68,10 @@ class Conversation(models.Model):
         verbose_name=_("language"),
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("created at"))
+    # A flag rather than the moment of pinning: the pinned group is ordered by
+    # last activity like the rest of the list, so pinning never reorders it
+    # (LibreChat and LobeChat do the same; docs/api.md).
+    pinned = models.BooleanField(default=False, verbose_name=_("pinned"))
 
     class Meta:
         ordering = ("-created_at", "-id")
