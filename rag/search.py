@@ -1,11 +1,11 @@
 """Hybrid retrieval over the Qdrant index built by `rag.index`.
 
-One query fans out into two prefetch branches — dense (Qwen3-Embedding, query
-prompt) and sparse (BM25) — fused with Reciprocal Rank Fusion, then optionally
-reordered by Qwen3-Reranker. Payload filters (`--locale`, `--scope`) must sit
-inside *each* prefetch branch: with fusion queries the embedded Qdrant ignores
-a top-level filter (verified empirically). Equal fused scores rank by point id,
-not in whatever order a server returns them (`hybrid_search`).
+One query runs two branches — dense (Qwen3-Embedding, query prompt) and sparse
+(BM25) — under the same payload filter (`--locale`, `--scope`), fused on the
+client with Reciprocal Rank Fusion, then optionally reordered by
+Qwen3-Reranker. Equal scores rank by point id, inside each branch
+(`branch_search`) and after the fusion (`fuse_rrf`), not in whatever order a
+server returns them.
 
     uv run python -m rag.search "What is an ORM?"
     uv run python -m rag.search "What is an ORM?" --scope B028451:2025-2026
@@ -50,6 +50,11 @@ DEFAULT_RERANK_MODEL = "Qwen/Qwen3-Reranker-0.6B"
 
 # Fusion sees this many candidates per branch; the reranker sees the fused pool.
 PREFETCH_LIMIT = 20
+
+# Qdrant's own RRF constant (`DEFAULT_RRF_K` in reciprocal_rank_fusion.rs, and
+# qdrant-client's `hybrid/fusion.py`): a point at rank r, counted from 0,
+# scores 1 / (r + RRF_K) in each branch that holds it.
+RRF_K = 2
 
 
 class Hit(BaseModel):
@@ -174,6 +179,60 @@ def payload_filter(
     return models.Filter(must=conditions) if conditions else None
 
 
+def branch_search(
+    client: QdrantClient,
+    collection: str,
+    query: list[float] | qmodels.SparseVector,
+    *,
+    using: str,
+    query_filter: qmodels.Filter | None,
+    limit: int,
+) -> list[qmodels.ScoredPoint]:
+    """One branch, dense or sparse, ranked by score and then by point id.
+
+    A server that searches its segments in parallel returns equal scores in no
+    fixed order and cuts a tie at `limit` wherever that order puts it, so the
+    same question could keep a different point on every run; equal scores are
+    common, since one text under two addresses is two points with the same
+    vectors. The request therefore asks for one point more than it keeps: while
+    that point ties with the last one kept, the tie may run on past the cut, and
+    the request doubles until it does not or the collection runs out. Every
+    point of the tie at the cut is then in hand, and the point id decides."""
+    if limit < 1:
+        return []
+    fetch = limit
+    while True:
+        points = client.query_points(
+            collection,
+            query=query,
+            using=using,
+            query_filter=query_filter,
+            limit=fetch + 1,
+            with_payload=True,
+        ).points
+        if len(points) <= fetch or points[fetch].score < points[fetch - 1].score:
+            break
+        fetch *= 2
+    ranked = sorted(points[:fetch], key=lambda point: (-point.score, str(point.id)))
+    return ranked[:limit]
+
+
+def fuse_rrf(branches: Sequence[Sequence[qmodels.ScoredPoint]]) -> list[qmodels.ScoredPoint]:
+    """Reciprocal Rank Fusion with Qdrant's formula (`RRF_K`), on the client so
+    that equal fused scores rank by point id: a point first in one branch and
+    second in the other ties with its mirror image, and Qdrant's fusion does
+    not break ties. Each point comes back once, its score the fused one."""
+    fused: dict[str, float] = {}
+    first_seen: dict[str, qmodels.ScoredPoint] = {}
+    for branch in branches:
+        for rank, point in enumerate(branch):
+            key = str(point.id)
+            fused[key] = fused.get(key, 0.0) + 1 / (rank + RRF_K)
+            first_seen.setdefault(key, point)
+    order = sorted(fused, key=lambda key: (-fused[key], key))
+    return [first_seen[key].model_copy(update={"score": fused[key]}) for key in order]
+
+
 def hybrid_search(
     client: QdrantClient,
     query: str,
@@ -196,35 +255,23 @@ def hybrid_search(
     query_filter = payload_filter(
         locale, scope=scope, ingest_source=ingest_source, ingest_run_id=ingest_run_id
     )
-    response = client.query_points(
-        collection,
-        prefetch=[
-            models.Prefetch(
-                query=dense.encode_query(query),
-                using=DENSE_VECTOR,
-                limit=prefetch_limit,
-                filter=query_filter,
-            ),
-            models.Prefetch(
-                query=models.SparseVector(indices=indices, values=values),
-                using=SPARSE_VECTOR,
-                limit=prefetch_limit,
-                filter=query_filter,
-            ),
-        ],
-        query=models.FusionQuery(fusion=models.Fusion.RRF),
-        # The whole fused pool, at most one prefetch_limit per branch, cut to
-        # `limit` here rather than by the server: RRF gives equal scores to
-        # points at equal ranks, and a server that searches its segments in
-        # parallel returns equal scores in no fixed order, so the same question
-        # could keep a different point at the cut on every run.
-        limit=2 * prefetch_limit,
-        with_payload=True,
-    )
-    ranked = sorted(response.points, key=lambda point: (-point.score, str(point.id)))
+    branches = [
+        branch_search(
+            client,
+            collection,
+            vector,
+            using=using,
+            query_filter=query_filter,
+            limit=prefetch_limit,
+        )
+        for vector, using in (
+            (dense.encode_query(query), DENSE_VECTOR),
+            (models.SparseVector(indices=indices, values=values), SPARSE_VECTOR),
+        )
+    ]
     return [
         Hit(chunk=Chunk.model_validate(point.payload), score=point.score)
-        for point in ranked[:limit]
+        for point in fuse_rrf(branches)[:limit]
     ]
 
 

@@ -1,7 +1,7 @@
 """Retrieval must honor the two-sided vector contract, apply payload filters
-inside every prefetch branch (a top-level filter is silently ignored under
-fusion — verified against the embedded Qdrant), and keep the reranker an
-optional, swappable stage. All tests run offline on stub encoders."""
+to both branches, rank equal scores the same way whatever order the server
+returns them in, and keep the reranker an optional, swappable stage. All tests
+run offline on stub encoders."""
 
 import inspect
 import subprocess
@@ -136,24 +136,14 @@ class FixedSparseQuery:
         return ([1], [1.0])
 
 
-TIED = (make_chunk(0, ORM_TEXT), make_chunk(1, SORT_TEXT))
+VectorRow = tuple[Chunk, list[float], models.SparseVector]
 
 
-@pytest.fixture
-def tied_client(tmp_path: Path) -> Iterator[QdrantClient]:
-    """Two points with one fused score, and a third below them: RRF scores
-    ranks, so a point first in one branch and second in the other ties with its
-    mirror image."""
+def vector_client(tmp_path: Path, rows: Sequence[VectorRow]) -> QdrantClient:
+    """An index whose points carry the vectors given, so a test can place each
+    point at the rank it needs in each branch under `FixedQuery`."""
     qdrant = open_client(tmp_path / "qdrant")
     ensure_collection(qdrant, FixedQuery().dimension())
-    vectors = [
-        # dense rank 1, sparse rank 2
-        (TIED[0], [1.0, 0.1, 0.0, 0.0], models.SparseVector(indices=[1], values=[1.0])),
-        # dense rank 2, sparse rank 1
-        (TIED[1], [1.0, 0.3, 0.0, 0.0], models.SparseVector(indices=[1], values=[2.0])),
-        # dense rank 3 only
-        (make_chunk(2), [0.0, 0.0, 1.0, 0.0], models.SparseVector(indices=[3], values=[1.0])),
-    ]
     qdrant.upsert(
         COLLECTION,
         [
@@ -162,20 +152,58 @@ def tied_client(tmp_path: Path) -> Iterator[QdrantClient]:
                 vector={DENSE_VECTOR: dense, SPARSE_VECTOR: sparse},
                 payload=chunk.model_dump(),
             )
-            for chunk, dense, sparse in vectors
+            for chunk, dense, sparse in rows
+        ],
+    )
+    return qdrant
+
+
+def ties_reversed(real: Callable[..., Any], branches: list[str]) -> Callable[..., Any]:
+    """A stand-in for `query_points` that answers the way a Qdrant server
+    searching its segments in parallel may: best score first, equal scores in
+    the reverse of the index's order, cut to the limit it is asked for. It
+    records the vector each request searched."""
+
+    def query_points(*args: Any, limit: int, using: str, **kwargs: Any) -> Any:
+        branches.append(using)
+        response = real(*args, limit=100, using=using, **kwargs)
+        points = response.points
+        order = sorted(range(len(points)), key=lambda i: (-points[i].score, -i))
+        return response.model_copy(update={"points": [points[i] for i in order][:limit]})
+
+    return query_points
+
+
+def by_point_id(chunks: Sequence[Chunk]) -> list[str]:
+    return [chunk.chunk_id for chunk in sorted(chunks, key=lambda c: point_id_of(c.chunk_id))]
+
+
+TIED = (make_chunk(0, ORM_TEXT), make_chunk(1, SORT_TEXT))
+
+
+@pytest.fixture
+def tied_client(tmp_path: Path) -> Iterator[QdrantClient]:
+    """Two points with one fused score, and a third below them: RRF scores
+    ranks, so a point first in one branch and second in the other ties with its
+    mirror image."""
+    qdrant = vector_client(
+        tmp_path,
+        [
+            # dense rank 1, sparse rank 2
+            (TIED[0], [1.0, 0.1, 0.0, 0.0], models.SparseVector(indices=[1], values=[1.0])),
+            # dense rank 2, sparse rank 1
+            (TIED[1], [1.0, 0.3, 0.0, 0.0], models.SparseVector(indices=[1], values=[2.0])),
+            # dense rank 3 only
+            (make_chunk(2), [0.0, 0.0, 1.0, 0.0], models.SparseVector(indices=[3], values=[1.0])),
         ],
     )
     yield qdrant
     qdrant.close()
 
 
-def test_equal_fusion_scores_rank_by_point_id_whatever_order_the_index_returns(
+def test_equal_fusion_scores_rank_by_point_id_whatever_order_the_server_returns(
     tied_client: QdrantClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A Qdrant server searching its segments in parallel returns equal scores
-    in no fixed order. The stand-in below returns them reversed and cut to the
-    limit it is asked for, the way such a server may: the hits must not move."""
-
     def ranked(limit: int) -> list[str]:
         hits = hybrid_search(
             tied_client, "q", FixedQuery(), FixedSparseQuery(), scope=None, limit=limit
@@ -183,19 +211,96 @@ def test_equal_fusion_scores_rank_by_point_id_whatever_order_the_index_returns(
         return [hit.chunk.chunk_id for hit in hits]
 
     as_stored = ranked(1), ranked(3)
-    real = tied_client.query_points
-
-    def ties_reversed(*args: Any, limit: int, **kwargs: Any) -> Any:
-        response = real(*args, limit=100, **kwargs)
-        points = response.points
-        # Best score first, equal scores in the reverse of the index's order.
-        order = sorted(range(len(points)), key=lambda i: (-points[i].score, -i))
-        return response.model_copy(update={"points": [points[i] for i in order][:limit]})
-
-    monkeypatch.setattr(tied_client, "query_points", ties_reversed)
+    branches: list[str] = []
+    monkeypatch.setattr(
+        tied_client, "query_points", ties_reversed(tied_client.query_points, branches)
+    )
     assert (ranked(1), ranked(3)) == as_stored
-    by_id = sorted(TIED, key=lambda chunk: point_id_of(chunk.chunk_id))
-    assert as_stored[1][:2] == [chunk.chunk_id for chunk in by_id]
+    assert set(branches) == {DENSE_VECTOR, SPARSE_VECTOR}
+    assert as_stored[1][:2] == by_point_id(TIED)
+
+
+TWINS = (make_chunk(0, ORM_TEXT), make_chunk(1, ORM_TEXT))
+
+
+@pytest.fixture
+def twin_client(tmp_path: Path) -> Iterator[QdrantClient]:
+    """One text under two addresses: two points with the same vectors, so they
+    tie inside each branch, and a third below them in both."""
+    twin_dense = [1.0, 0.0, 0.0, 0.0]
+    qdrant = vector_client(
+        tmp_path,
+        [
+            *((twin, twin_dense, models.SparseVector(indices=[1], values=[2.0])) for twin in TWINS),
+            (make_chunk(2), [1.0, 1.0, 0.0, 0.0], models.SparseVector(indices=[1], values=[1.0])),
+        ],
+    )
+    yield qdrant
+    qdrant.close()
+
+
+def test_a_tie_at_a_branch_cut_keeps_the_lower_point_id_whatever_order_the_server_returns(
+    twin_client: QdrantClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The branch keeps one point of the two, so which one may not depend on the
+    order the server returns the tie in; the request has to reach past the tie
+    to know where it ends."""
+
+    def kept() -> list[str]:
+        hits = hybrid_search(
+            twin_client,
+            "q",
+            FixedQuery(),
+            FixedSparseQuery(),
+            scope=None,
+            limit=1,
+            prefetch_limit=1,
+        )
+        return [hit.chunk.chunk_id for hit in hits]
+
+    as_stored = kept()
+    branches: list[str] = []
+    monkeypatch.setattr(
+        twin_client, "query_points", ties_reversed(twin_client.query_points, branches)
+    )
+    assert kept() == as_stored == by_point_id(TWINS)[:1]
+    assert set(branches) == {DENSE_VECTOR, SPARSE_VECTOR}
+
+
+def test_client_fusion_ranks_and_scores_like_qdrant_rrf_when_nothing_ties(tmp_path: Path) -> None:
+    """The fusion moved from the server to the client (`fuse_rrf`); without
+    ties both must give the same order and the same scores."""
+    chunks = [make_chunk(index) for index in range(4)]
+    # dense order 0 1 2 3, sparse order 2 0 1: fused 0 2 1 3, no two scores equal
+    qdrant = vector_client(
+        tmp_path,
+        [
+            (chunks[0], [1.0, 0.0, 0.0, 0.0], models.SparseVector(indices=[1], values=[2.0])),
+            (chunks[1], [1.0, 0.5, 0.0, 0.0], models.SparseVector(indices=[1], values=[1.0])),
+            (chunks[2], [1.0, 1.0, 0.0, 0.0], models.SparseVector(indices=[1], values=[3.0])),
+            (chunks[3], [0.5, 1.0, 0.0, 0.0], models.SparseVector(indices=[2], values=[1.0])),
+        ],
+    )
+    hits = hybrid_search(qdrant, "q", FixedQuery(), FixedSparseQuery(), scope=None, limit=4)
+    server = qdrant.query_points(
+        COLLECTION,
+        prefetch=[
+            models.Prefetch(query=FixedQuery().encode_query("q"), using=DENSE_VECTOR, limit=20),
+            models.Prefetch(
+                query=models.SparseVector(indices=[1], values=[1.0]), using=SPARSE_VECTOR, limit=20
+            ),
+        ],
+        query=models.FusionQuery(fusion=models.Fusion.RRF),
+        limit=4,
+        with_payload=True,
+    ).points
+    qdrant.close()
+
+    assert [hit.chunk.chunk_id for hit in hits] == [chunks[i].chunk_id for i in (0, 2, 1, 3)]
+    assert [(hit.chunk.chunk_id, hit.score) for hit in hits] == [
+        (Chunk.model_validate(point.payload).chunk_id, pytest.approx(point.score))
+        for point in server
+    ]
 
 
 def test_search_with_reranker_promotes_its_ranking(client: QdrantClient) -> None:
@@ -258,10 +363,10 @@ def test_web_source_conditions_reach_only_the_unifi_web_branches(
     two_collection_client: QdrantClient,
 ) -> None:
     """The eval-isolation rule (docs/architecture.md): a crawl-only search must
-    not see the live version of a page, so `ingest_source` sits inside BOTH
-    unifi_web prefetch branches — a top-level filter is ignored under fusion,
-    and one unfiltered branch lets the live version back into the fused list —
-    and inside NONE of the slides branches, whose chunks carry no source."""
+    not see the live version of a page, so `ingest_source` filters BOTH
+    unifi_web branches — one unfiltered branch lets the live version back into
+    the fused list — and NONE of the slides branches, whose chunks carry no
+    source."""
     live = make_web_chunk(2, TASSE_TEXT).model_copy(update={"ingest_source": "live"})
     index_chunks(two_collection_client, [live], StubDense(), StubSparse(), WEB_COLLECTION)
 
@@ -327,10 +432,10 @@ def test_scope_decides_which_slides_editions_a_search_sees(
     scope: list[EditionKey] | None,
     editions: set[EditionKey],
 ) -> None:
-    """The scope sits inside both slides prefetch branches and in no web one:
-    at the top level fusion ignores it and the other edition leaks back in; in
-    the web branches no page matches it, and campus answers vanish. `[]` sees
-    no slides at all, never every edition."""
+    """The scope filters both slides branches and no web one: in one slides
+    branch alone the other edition leaks back into the fused list; in the web
+    branches no page matches it, and campus answers vanish. `[]` sees no slides
+    at all, never every edition."""
     last_year = make_chunk(0, ORM_TEXT)
     last_year = last_year.model_copy(
         update={
