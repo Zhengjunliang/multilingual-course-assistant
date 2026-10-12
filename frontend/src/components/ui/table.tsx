@@ -6,8 +6,8 @@
  * at least 54 px, room for a name over its code (rule 1), with a hairline
  * between them. The row the reader opened and came back to with Back is
  * `selected`: the accent at 11 % with the 3 px bar at its leading edge, as
- * the sidebar draws where the reader is. The bar is an inset shadow of the
- * row's first cell, not a pseudo-element of the row: Chrome lays a row's
+ * the sidebar draws where the reader is. The bar is drawn inset along the
+ * row's first cell, not as a pseudo-element of the row: Chrome lays a row's
  * generated box out as a cell of its own, absolutely positioned or not,
  * and every cell after it moves a column; a stacked row has none, its card
  * tinted alone. It is marked with `data-selected` and not
