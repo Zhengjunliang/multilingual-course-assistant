@@ -41,7 +41,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { cn } from "@/lib/utils";
 
-export interface LocaleSwitchProps<T extends string> {
+interface LocaleSwitchProps<T extends string> {
   locales: readonly T[];
   value: string;
   onChange: (locale: T) => void;

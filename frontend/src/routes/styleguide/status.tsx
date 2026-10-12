@@ -1,31 +1,63 @@
 /**
  * The catalogue's status screens: what a page shows when it has nothing of
- * its own to show.
+ * its own to show, and what the outermost crash screen draws.
  */
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, RotateCw, SquarePen } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { StatusPanel } from "@/components/StatusPanel";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Specimen } from "./Specimen";
 
 export function Status() {
   return (
-    <Specimen
-      name="StatusPanel"
-      note="One panel for every screen with nothing of its own: the cat in the pose for it, a heading, a sentence and the ways on."
-    >
-      <StatusPanel
-        pose="notFound"
-        heading="Pagina non trovata"
-        body="A questo indirizzo non c'è nessuna pagina: il link potrebbe essere sbagliato o non più valido."
+    <>
+      <Specimen
+        name="StatusPanel"
+        note="One centred panel for every screen with nothing of its own: the cat in a tinted disc, a code chip where there is one, a heading, a sentence and a primary and a secondary way on."
       >
-        <Link to="/styleguide" className={buttonVariants({ variant: "outline" })}>
-          <ArrowLeft aria-hidden className="size-icon" />
-          Torna all'inizio
-        </Link>
-      </StatusPanel>
-    </Specimen>
+        <StatusPanel
+          pose="notFound"
+          code="404"
+          heading="Pagina non trovata"
+          body="A questo indirizzo non c'è nessuna pagina: il link potrebbe essere sbagliato o non più valido."
+        >
+          <Link to="/styleguide" className={buttonVariants()}>
+            <ArrowLeft aria-hidden className="size-icon" />
+            Torna all'inizio
+          </Link>
+          <Link to="/styleguide" className={buttonVariants({ variant: "ghost" })}>
+            <SquarePen aria-hidden className="size-icon" />
+            Nuova conversazione
+          </Link>
+        </StatusPanel>
+      </Specimen>
+
+      <Specimen
+        name="AppCrash"
+        note="The panel when a page broke: the warning's disc, a reload first and the start second, and the error's technical details folded under them, from the error the boundary holds."
+      >
+        <StatusPanel
+          pose="error"
+          tone="warn"
+          heading="Questa pagina si è bloccata"
+          body="Qualcosa è andato storto mentre la pagina si apriva. Ricaricala."
+          details={{
+            label: "Dettagli tecnici",
+            text: "TypeError: Cannot read properties of undefined (reading 'code')\n    at CoursePage (CoursePage.tsx)",
+          }}
+        >
+          <Button type="button">
+            <RotateCw aria-hidden className="size-icon" />
+            Ricarica la pagina
+          </Button>
+          <Link to="/styleguide" className={buttonVariants({ variant: "outline" })}>
+            <ArrowLeft aria-hidden className="size-icon" />
+            Torna all'inizio
+          </Link>
+        </StatusPanel>
+      </Specimen>
+    </>
   );
 }

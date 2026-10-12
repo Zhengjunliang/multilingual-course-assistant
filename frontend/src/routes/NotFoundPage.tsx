@@ -19,8 +19,13 @@ export default function NotFoundPage() {
 
   return (
     <main className="flex min-h-full flex-col items-center justify-center px-gutter py-room">
-      <StatusPanel pose="notFound" heading={t("notFound.title")} body={t("notFound.body")}>
-        <Link to="/" className={buttonVariants({ variant: "outline" })}>
+      <StatusPanel
+        pose="notFound"
+        code="404"
+        heading={t("notFound.title")}
+        body={t("notFound.body")}
+      >
+        <Link to="/" className={buttonVariants()}>
           <ArrowLeft aria-hidden className="size-icon" />
           {t("notFound.home")}
         </Link>

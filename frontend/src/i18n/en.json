@@ -108,7 +108,8 @@
     "title": "This page stopped working",
     "body": "Something went wrong while the page was opening. Reload it; if it happens again, go back to the start.",
     "reload": "Reload the page",
-    "home": "Back to the start"
+    "home": "Back to the start",
+    "details": "Technical details"
   },
   "staff": {
     "cancel": "Cancel",

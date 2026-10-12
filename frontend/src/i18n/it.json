@@ -108,7 +108,8 @@
     "title": "Questa pagina si è bloccata",
     "body": "Qualcosa è andato storto mentre la pagina si apriva. Ricaricala; se succede ancora, torna all'inizio.",
     "reload": "Ricarica la pagina",
-    "home": "Torna all'inizio"
+    "home": "Torna all'inizio",
+    "details": "Dettagli tecnici"
   },
   "staff": {
     "cancel": "Annulla",
