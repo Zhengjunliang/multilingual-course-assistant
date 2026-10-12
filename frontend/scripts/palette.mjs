@@ -45,13 +45,14 @@ export const PAIRS = [
     front: "ink",
     back: "surface",
     min: TEXT,
-    where: "card.tsx:19 card body, sonner.tsx toast (through --normal-bg and --normal-text)",
+    where: "card.tsx card body, sonner.tsx toast (through --normal-bg and --normal-text)",
   },
   {
     front: "muted",
     back: "canvas",
     min: TEXT,
-    where: "EmptyState.tsx subtitle, ChatShell.tsx icon-only buttons (button.tsx ghost)",
+    where:
+      "EntryScreen.tsx and StatusPanel.tsx subtitle, ChatShell.tsx icon-only buttons (button.tsx ghost)",
   },
   {
     front: "muted",
@@ -100,7 +101,7 @@ export const PAIRS = [
     where:
       "badge.tsx state word, ConversationSidebar.tsx open conversation, ManagementNav.tsx current page",
   },
-  { front: "warn-ink", back: "warn", min: TEXT, where: "TurnView.tsx:110 failure box" },
+  { front: "warn-ink", back: "warn", min: TEXT, where: "TurnView.tsx failure box" },
   {
     front: "warn-ink",
     back: "surface",
@@ -109,6 +110,16 @@ export const PAIRS = [
   },
   { front: "accent-ink", back: "warn-ink", min: TEXT, where: "button.tsx destructive variant" },
 ];
+
+/**
+ * The translucent tokens (index.css, the themes' second blocks), each over a
+ * ground it is laid on, with the tokens written on it. A tint has no contrast
+ * of its own: what a reader sees is the tint over that ground, so the gate
+ * lays one over the other before it measures, and holds the result a step
+ * apart from the ground (check-contrast.mjs, the ladder), since a row under
+ * the pointer that cannot be told from its neighbours has not changed.
+ */
+export const TINTS = [];
 
 /**
  * The cat's files are written in hex (src/brand/fumetto.ts), because an SVG or
@@ -140,10 +151,13 @@ export const THEMES = [
  * worse, finding some. Stripping comments first makes that impossible instead
  * of leaving it to whoever edits the file next to remember.
  */
-export function declarations(css, selector) {
+export function declarations(css, selector, nth = 1) {
   const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
-  const start = source.indexOf(selector);
-  if (start === -1) throw new Error(`no ${selector} block in index.css`);
+  let start = -1;
+  for (let found = 0; found < nth; found += 1) {
+    start = source.indexOf(selector, start + 1);
+    if (start === -1) throw new Error(`no block ${nth} of ${selector} in index.css`);
+  }
   const open = source.indexOf("{", start);
   const close = source.indexOf("}", open);
   const block = source.slice(open + 1, close);
@@ -193,9 +207,50 @@ export function srgb(colour) {
   return linearRgb(colour).map((channel) => Math.min(1, Math.max(0, encode(channel))));
 }
 
-/** The colour as the screen shows it, in the six-digit hex the brand files use. */
-export function hex(colour) {
-  return `#${srgb(colour)
+/**
+ * The translucent colours of a theme, from its second block: each written as
+ * `color-mix(in oklab, var(--x) N%, transparent)`, a token of the first block
+ * at a strength, returned as { of: "x", alpha }. Mixing with `transparent` in
+ * a premultiplied space leaves the colour whole and scales its alpha, so that
+ * is all the mix means. The block's other declarations, the pill and the
+ * grain, are not colours this gate measures, and are skipped.
+ */
+export function translucents(css, selector) {
+  const found = new Map();
+  for (const [name, value] of declarations(css, selector, 2)) {
+    if (!value.startsWith("color-mix(")) continue;
+    const match = /^color-mix\(in oklab, var\(--([\w-]+)\) ([\d.]+)%, transparent\)$/.exec(value);
+    if (match === null)
+      throw new Error(`--${name} is not a token mixed with transparent: ${value}`);
+    found.set(name, { of: match[1], alpha: Number(match[2]) / 100 });
+  }
+  return found;
+}
+
+/**
+ * What a translucent colour shows over a ground, as gamma-encoded channels:
+ * a browser lays one colour over another in gamma-encoded sRGB, so the mix is
+ * taken there.
+ */
+export function over(colour, alpha, ground) {
+  const top = srgb(colour);
+  return srgb(ground).map((channel, index) => alpha * top[index] + (1 - alpha) * channel);
+}
+
+/** The OKLab lightness of gamma-encoded channels, the inverse of `linearRgb` for L alone. */
+export function lightness(channels) {
+  const [r, g, b] = channels.map((channel) =>
+    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+  );
+  const lCone = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const mCone = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const sCone = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return 0.2104542553 * lCone + 0.793617785 * mCone - 0.0040720468 * sCone;
+}
+
+/** Gamma-encoded channels in the six-digit hex the brand files use. */
+export function hexOf(channels) {
+  return `#${channels
     .map((channel) =>
       Math.round(channel * 255)
         .toString(16)
@@ -203,4 +258,9 @@ export function hex(colour) {
     )
     .join("")
     .toUpperCase()}`;
+}
+
+/** The colour as the screen shows it, in the six-digit hex the brand files use. */
+export function hex(colour) {
+  return hexOf(srgb(colour));
 }

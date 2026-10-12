@@ -31,17 +31,27 @@ const CSS = readFileSync(fileURLToPath(new URL("../index.css", import.meta.url))
   "",
 );
 
-function block(selector: string): string {
-  const start = CSS.indexOf(selector);
-  expect(start, `no ${selector} block in index.css`).toBeGreaterThan(-1);
+/** The body of the `nth` block a selector opens. */
+function block(selector: string, nth = 1): string {
+  let start = -1;
+  for (let found = 0; found < nth; found += 1) start = CSS.indexOf(selector, start + 1);
+  expect(start, `no block ${nth} of ${selector} in index.css`).toBeGreaterThan(-1);
   const open = CSS.indexOf("{", start);
   return CSS.slice(open + 1, CSS.indexOf("}", open));
 }
 
-/** The `--x` names a block declares, in source order. */
+/**
+ * The colour tokens a theme declares, in source order: its first block, then
+ * the colours of its second, a token mixed with transparent (`--hover`). The
+ * rest of the second block, the pill and the grain, is not a colour a
+ * utility names.
+ */
 function declared(selector: string): string[] {
   const names: string[] = [];
   for (const match of block(selector).matchAll(/--([\w-]+)\s*:/g)) {
+    names.push(match[1] ?? "");
+  }
+  for (const match of block(selector, 2).matchAll(/--([\w-]+)\s*:\s*color-mix\(/g)) {
     names.push(match[1] ?? "");
   }
   return names;

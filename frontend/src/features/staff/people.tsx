@@ -53,11 +53,9 @@ export function StaffList({ people, empty, action }: StaffListProps) {
       {people.map((person) => (
         <li key={person.id} className="flex items-center gap-snug px-snug py-tight">
           <Avatar name={person.username} />
-          <span className="flex min-w-0 flex-1 items-center gap-tight font-mono text-body text-ink">
-            <span className="truncate">{person.username}</span>
-            {person.username === account?.username && (
-              <Badge className="font-sans">{t("staff.you")}</Badge>
-            )}
+          <span className="flex min-w-0 flex-1 items-center gap-tight text-body text-ink">
+            <span className="truncate font-mono">{person.username}</span>
+            {person.username === account?.username && <Badge>{t("staff.you")}</Badge>}
           </span>
           {action?.(person)}
         </li>

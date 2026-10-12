@@ -1,12 +1,12 @@
 /**
- * A data table: the native elements, named by a caption.
+ * A data table: the native elements, under the heading of the section it sits in.
  *
  * Native `<table>` markup rather than a grid of `div`s with ARIA roles, since
  * the browser then gives a screen reader the rows, columns and headers itself
- * (outside the repository: WAI-ARIA APG, "Table Pattern"); the caption is what
- * the table is called. A table whose headers stick to the top of the page lets
- * its frame go where the screen is wide enough (`frameClassName`), since a
- * sticky cell sticks to the nearest frame that scrolls. The frame is also the
+ * (outside the repository: WAI-ARIA APG, "Table Pattern"). A table whose
+ * headers stick to the top of the page lets its frame go where the screen is
+ * wide enough (`frameClassName`), since a sticky cell sticks to the nearest
+ * frame that scrolls. The frame is also the
  * containing block of what is positioned inside it — a screen-reader label, a
  * row's stretched link — so nothing absolute escapes it and widens the page. A
  * row under the pointer wears `--mark`, the same quiet fill as everywhere else
@@ -49,15 +49,6 @@ export function Table({
         {...props}
       />
     </div>
-  );
-}
-
-export function TableCaption({ className, ...props }: ComponentProps<"caption">) {
-  return (
-    <caption
-      className={cn("pb-tight text-left font-medium text-body text-ink", className)}
-      {...props}
-    />
   );
 }
 

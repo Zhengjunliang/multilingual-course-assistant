@@ -93,9 +93,6 @@ describe("Chinese text", () => {
   it("is set in that stack wherever its language is, and other languages in theirs", () => {
     expect(RULES).toMatch(/\[lang\]:lang\(zh\)\s*\{\s*font-family:\s*var\(--font-sans-zh\);/);
     expect(RULES).toMatch(/\[lang\]:not\(:lang\(zh\)\)\s*\{\s*font-family:\s*var\(--font-sans\);/);
-    expect(RULES).toMatch(
-      /\.font-serif:lang\(zh\),\s*\.font-sans:lang\(zh\)\s*\{\s*font-family:\s*var\(--font-sans-zh\);/,
-    );
   });
 
   it("leaves Latin quotes to the Latin stack, whose first face draws them", () => {

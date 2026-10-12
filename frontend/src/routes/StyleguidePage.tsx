@@ -40,7 +40,6 @@ import { Toaster } from "@/components/ui/sonner";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -84,7 +83,7 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
       data-theme={theme}
       className="flex min-w-0 flex-1 flex-col gap-room rounded-card border border-line bg-ground p-gutter"
     >
-      <h2 className="font-semibold font-serif text-ink text-title">{theme}</h2>
+      <h2 className="font-semibold text-ink text-title">{theme}</h2>
 
       <Specimen
         name="Button"
@@ -132,12 +131,10 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
       <Specimen
         name="Type"
-        note="Fraunces for headings; Figtree for the answer, at the reading size, and for every control, its emphasis a true italic. Chinese is set in the system's Chinese faces, its punctuation full width, with Figtree for its Latin letters; text in another language keeps its own quotes, whichever language the page is in."
+        note="Figtree throughout: headings at 600, the display size closed by a fiftieth of an em; the answer at the reading size, its emphasis a true italic; every control. Chinese is set in the system's Chinese faces, its punctuation full width, with Figtree for its Latin letters; text in another language keeps its own quotes, whichever language the page is in."
       >
         <div className="flex max-w-prose flex-col gap-tight">
-          <p className="font-semibold font-serif text-ink text-title">
-            Il passo lungo il gradiente
-          </p>
+          <p className="font-semibold text-ink text-title">Il passo lungo il gradiente</p>
           <p lang="en" className="text-ink text-reading">
             The learning rate sets the size of each step along the negative gradient; a value too
             large makes the loss <em>oscillate</em>.
@@ -274,10 +271,9 @@ function Panel({ theme }: { theme: "light" | "dark" }) {
 
       <Specimen
         name="Table"
-        note="Native table markup named by its caption: TableCaption, TableHeader, TableBody, TableRow, TableHead, TableCell. It scrolls inside its own frame on a narrow screen; a row under the pointer wears --mark."
+        note="Native table markup, named by its label: TableHeader, TableBody, TableRow, TableHead, TableCell. It scrolls inside its own frame on a narrow screen; a row under the pointer wears --mark."
       >
-        <Table>
-          <TableCaption>Edizioni</TableCaption>
+        <Table aria-label="Edizioni">
           <TableHeader>
             <TableRow>
               <TableHead>Corso</TableHead>
@@ -374,7 +370,7 @@ export default function StyleguidePage() {
     <div className="min-h-full bg-ground p-gutter">
       <div className="mx-auto flex max-w-6xl flex-col gap-room">
         <header className="flex flex-col gap-hair">
-          <h1 className="font-semibold font-serif text-display text-ink">Component catalogue</h1>
+          <h1 className="font-semibold text-display text-ink">Component catalogue</h1>
           <p className="text-body text-muted">
             Every component of the layer, side by side in both themes. A primitive added and left
             out of this page fails its own test.

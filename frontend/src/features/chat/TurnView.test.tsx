@@ -168,7 +168,7 @@ describe("the answer's language", () => {
     // The page's sans, which `lang` turns into the Chinese stack: no family of
     // its own on the prose (DESIGN.md, Typography).
     expect(classes).toContain("text-reading");
-    expect(classes.some((name) => name.startsWith("font-serif"))).toBe(false);
+    expect(classes.filter((name) => /^font-(sans|mono)$/.test(name))).toEqual([]);
     // The process line is the interface's language and each source its own;
     // only the question and the answer say "zh".
     expect(question).toBe("zh");

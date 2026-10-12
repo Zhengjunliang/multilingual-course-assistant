@@ -16,7 +16,20 @@
 
 import process from "node:process";
 
-import { declarations, hex, PAIRS, parseOklch, STYLESHEET, srgb, THEMES } from "./palette.mjs";
+import {
+  declarations,
+  hex,
+  lightness,
+  over,
+  PAIRS,
+  parseOklch,
+  STYLESHEET,
+  srgb,
+  TEXT,
+  THEMES,
+  TINTS,
+  translucents,
+} from "./palette.mjs";
 
 /**
  * The palette has one hue, the accent's, and these hold it there.
@@ -37,7 +50,18 @@ const GREY_MAX_CHROMA = 0.02;
 const ACCENT_MIN_CHROMA = 0.08;
 
 /** The greys, and the ink that sits on the accent. `--accent-soft` is a tint, not a grey. */
-const GREYS = ["canvas", "surface", "sidebar", "ink", "muted", "line", "accent-ink", "mark"];
+const GREYS = [
+  "canvas",
+  "surface",
+  "sidebar",
+  "ink",
+  "muted",
+  "line",
+  "hairline",
+  "accent-ink",
+  "mark",
+  "tint",
+];
 
 /** Tokens with a hue of their own, exempt from the one-hue rule. */
 const OTHER_HUE = ["warn", "warn-line", "warn-ink"];
@@ -57,15 +81,19 @@ const STEP = 2;
 const LADDER = [
   { a: "mark", b: "sidebar", where: "ConversationSidebar.tsx and ManagementNav.tsx hover" },
   { a: "accent-soft", b: "sidebar", where: "ConversationSidebar.tsx open conversation" },
-  { a: "mark", b: "surface", where: "locale-switch.tsx:36 track, button.tsx:13 ghost hover" },
-  { a: "mark", b: "canvas", where: "AnswerStream.tsx:91 citation pill in the answer" },
+  {
+    a: "mark",
+    b: "surface",
+    where: "button.tsx ghost hover, dropdown-menu.tsx item under the pointer",
+  },
+  { a: "mark", b: "canvas", where: "AnswerMarkdown.tsx citation pill in the answer" },
 ];
 
-/** Relative luminance, WCAG 2.x, from the clamped channels (palette.mjs says why the clamp). */
-function luminance(colour) {
+/** Relative luminance, WCAG 2.x, from gamma-encoded channels, clamped (palette.mjs says why). */
+function luminance(channels) {
   const decode = (channel) =>
     channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-  const [r, g, b] = srgb(colour).map(decode);
+  const [r, g, b] = channels.map(decode);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
@@ -104,7 +132,7 @@ for (const theme of THEMES) {
   };
 
   for (const pair of PAIRS) {
-    const ratio = contrast(colour(pair.front), colour(pair.back));
+    const ratio = contrast(srgb(colour(pair.front)), srgb(colour(pair.back)));
     const label = `--${pair.front} on --${pair.back}`;
     record(label, `${ratio.toFixed(2)}:1 (needs ${pair.min})`, ratio / pair.min);
     if (ratio < pair.min) {
@@ -168,6 +196,32 @@ for (const theme of THEMES) {
       failures.push(
         `${theme.name}: --${name} converts to ${converted}, src/brand/fumetto.ts says ${written}; ` +
           "update it and run node scripts/brand.mjs",
+      );
+    }
+  }
+
+  const mixed = translucents(css, theme.selector);
+  for (const { tint, ground, fronts, where } of TINTS) {
+    const mix = mixed.get(tint);
+    if (mix === undefined) throw new Error(`--${tint} is missing from ${theme.selector}`);
+    const shown = over(colour(mix.of), mix.alpha, colour(ground));
+    for (const front of fronts) {
+      const ratio = contrast(srgb(colour(front)), shown);
+      const label = `--${front} on --${tint} over --${ground}`;
+      record(label, `${ratio.toFixed(2)}:1 (needs ${TEXT})`, ratio / TEXT);
+      if (ratio < TEXT) {
+        failures.push(
+          `${theme.name}: ${label} is ${ratio.toFixed(2)}:1, needs ${TEXT}:1 (${where})`,
+        );
+      }
+    }
+    // Whole points, as the ladder below counts them.
+    const delta = Math.abs(Math.round(lightness(shown) * 100) - Math.round(colour(ground).l * 100));
+    const label = `--${tint} over --${ground}`;
+    record(label, `${delta} points from the ground (needs ${STEP})`, delta / STEP);
+    if (delta < STEP) {
+      failures.push(
+        `${theme.name}: ${label} is ${delta} point(s) off it, needs ${STEP} (${where})`,
       );
     }
   }
