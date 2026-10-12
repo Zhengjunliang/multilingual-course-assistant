@@ -1,11 +1,15 @@
 /**
- * Revoking a role, after one question that names who loses what.
+ * Revoking a role, after one question that names who loses what: the
+ * person, and the course and year or the programme, each a chip (DESIGN.md,
+ * the alert dialog), as GitHub's dialog for removing a collaborator names
+ * the person and the repository.
  *
  * In the alert dialog with its confirming button in the `destructive`
- * variant, as deleting a conversation is: losing a role is undone only by
- * someone who may assign it again, so the confirmation wears the hue kept for
- * what cannot be taken back, a deliberate departure from the prototype's
- * plain button: an accent-filled "Revoca" would look like the safe choice.
+ * variant, its icon repeated on it, as deleting a conversation is: losing a
+ * role is undone only by someone who may assign it again, so the
+ * confirmation wears the hue kept for what cannot be taken back: an
+ * accent-filled "Revoca" would look like the safe choice. A refusal leaves
+ * the button on, and pressing it again asks again.
  * A 404 is a member already gone — revoked from another tab, the outcome
  * asked for — or a scope the reader lost meanwhile; the page reads again to
  * tell them apart, and only the first gets the toast that says it was done
@@ -13,7 +17,7 @@
  */
 
 import { UserMinus } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -26,10 +30,12 @@ import { Forbidden } from "./Refusal";
 export interface Revoking {
   scope: MemberScope;
   username: string;
+  /** The person as the page shows them: their name, or their username. */
+  shown: string;
   /** What the role is held on, as the toast names it. */
   object: string;
-  /** The question's body: who stops being what, and where. */
-  sentence: string;
+  /** The question's body: who stops being what, and where, its objects as chips. */
+  sentence: ReactNode;
 }
 
 interface RevokeDialogProps {
@@ -54,6 +60,7 @@ export function RevokeDialog({
 
   const confirm = async () => {
     if (revoking === null) return false;
+    setForbidden(false);
     setRefusal(null);
     const done = (description: string) => {
       toast.success(t("staff.revoke.done"), { description });
@@ -64,14 +71,14 @@ export function RevokeDialog({
     } catch (error) {
       if (isNotFound(error)) {
         if (!(await onChanged())) return true;
-        return done(t("staff.revoke.gone", { username: revoking.username }));
+        return done(t("staff.revoke.gone", { username: revoking.shown }));
       }
       if (isForbidden(error)) setForbidden(true);
       else setRefusal(fail(error));
       return false;
     }
     await onChanged();
-    return done(`${revoking.username} · ${revoking.object}`);
+    return done(`${revoking.shown} · ${revoking.object}`);
   };
 
   return (
@@ -90,7 +97,6 @@ export function RevokeDialog({
       confirmLabel={t("staff.revoke.action")}
       onConfirm={confirm}
       destructive
-      confirmDisabled={forbidden}
       onCloseAutoFocus={onCloseAutoFocus}
     >
       {forbidden && revoking !== null && <Forbidden permission={grantPermission(revoking.scope)} />}

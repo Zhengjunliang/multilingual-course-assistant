@@ -13,7 +13,7 @@
 
 import { ArrowLeft, Lock } from "lucide-react";
 import { useCallback } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { listEditions, readEdition } from "@/api/catalog";
@@ -26,7 +26,7 @@ import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine } from "@/features/staff/crumbs";
 import { isNotFound } from "@/features/staff/errors";
 import { Code, PageHead } from "@/features/staff/page";
-import { StaffList } from "@/features/staff/people";
+import { StaffList, shownName } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { useCrumbs, useShell } from "./shell";
 
@@ -52,12 +52,17 @@ export default function EditionPage() {
     object,
     description: object,
     canManage: assigns,
-    sentence: (username) =>
-      t("staff.revoke.teacher", {
-        username,
-        course: data?.course.name ?? "",
-        year: data?.academic_year ?? "",
-      }),
+    sentence: (person) => (
+      <Trans
+        i18nKey="staff.revoke.teacher"
+        values={{
+          username: shownName(person),
+          course: data?.course.name ?? "",
+          year: data?.academic_year ?? "",
+        }}
+        components={{ person: <Chip />, course: <Chip />, year: <Chip tone="accent" /> }}
+      />
+    ),
     reload: edition.reload,
   });
   const switching = useSetCurrent({ editions: edition.data?.[1] ?? [], reload: edition.reload });

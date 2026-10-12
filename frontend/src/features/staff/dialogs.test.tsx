@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Account } from "@/api/account";
 import type { Edition, MemberScope } from "@/api/catalog";
 import { SessionContext } from "@/auth/SessionProvider";
+import { Chip } from "@/components/ui/chip";
 import { Toaster } from "@/components/ui/sonner";
 import { mount } from "@/test/mount";
 import { AssignDialog } from "./AssignDialog";
@@ -44,6 +45,8 @@ function edition(id: number, year: string, current: boolean): Edition {
 
 /** What the server answers the write. */
 let answer: () => Response = () => new Response(null, { status: 204 });
+/** How many writes reached the server. */
+let sent = 0;
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -128,7 +131,11 @@ beforeEach(() => {
   changed = 0;
   closed = 0;
   readable = true;
-  vi.stubGlobal("fetch", async () => answer());
+  sent = 0;
+  vi.stubGlobal("fetch", async () => {
+    sent += 1;
+    return answer();
+  });
 });
 
 afterEach(() => {
@@ -148,8 +155,9 @@ describe("assigning a member", () => {
     scope: MemberScope,
     refusal: (() => Response) | null,
     press: "button" | "enter" = "button",
+    name = "mrossi",
   ) {
-    answer = refusal ?? (() => json({ id: 7, username: "mrossi", name: "" }, 201));
+    answer = refusal ?? (() => json({ id: 7, username: "mrossi", name: "Mario Rossi" }, 201));
     const { unmount } = open(
       <AssignDialog
         scope={scope}
@@ -161,7 +169,7 @@ describe("assigning a member", () => {
     );
     const input = document.body.querySelector<HTMLInputElement>('[role="dialog"] input');
     const focusedOnOpen = document.activeElement === input;
-    if (input) type(input, "mrossi");
+    if (input && name !== "") type(input, name);
     act(() => {
       if (press === "enter") {
         // What Enter in the field does: submit the form it is in.
@@ -180,6 +188,7 @@ describe("assigning a member", () => {
       invalid: input?.getAttribute("aria-invalid") ?? null,
       focusedAfter: document.activeElement === input,
       submitOff: button("Assegna")?.disabled ?? null,
+      sent,
       text: body(),
     };
     unmount();
@@ -194,7 +203,21 @@ describe("assigning a member", () => {
 
     expect([seen.focusedOnOpen, seen.closed, seen.changed]).toEqual([true, 1, 1]);
     expect(seen.text).toContain(title);
-    expect(seen.text).toContain("mrossi · PPM · 2025-2026");
+    // The toast names the person as the page shows them.
+    expect(seen.text).toContain("Mario Rossi · PPM · 2025-2026");
+  });
+
+  it("refuses an empty name under the field, its button on, asking the server nothing", async () => {
+    const seen = await assign(EDITION, null, "button", "");
+
+    expect([seen.closed, seen.sent, seen.submitOff, seen.invalid, seen.focusedAfter]).toEqual([
+      0,
+      0,
+      false,
+      "true",
+      true,
+    ]);
+    expect(seen.text).toContain("Inserisci un nome utente.");
   });
 
   it.each([
@@ -215,12 +238,12 @@ describe("assigning a member", () => {
       "Solo l'amministratore assegna la segreteria didattica.",
     ],
   ])(
-    "names the missing permission and keeps the button off",
+    "names the missing permission under the field and leaves the button on",
     async (scope, permission, sentence) => {
       const seen = await assign(scope, REFUSED.forbidden);
 
-      // Focus back in the field, since the button it was on is off.
-      expect([seen.closed, seen.submitOff, seen.focusedAfter]).toEqual([0, true, true]);
+      // Focus back in the field, since the button was off while the request ran.
+      expect([seen.closed, seen.submitOff, seen.focusedAfter]).toEqual([0, false, true]);
       expect(seen.text).toContain(`Permesso mancante: ${permission}`);
       expect(seen.text).toContain(sentence);
     },
@@ -241,8 +264,14 @@ describe("revoking a role", () => {
         revoking={{
           scope: B047,
           username: "mrossi",
+          shown: "Mario Rossi",
           object: "B047",
-          sentence: "mrossi non farà più parte…",
+          sentence: (
+            <>
+              <Chip>Mario Rossi</Chip> non farà più parte della segreteria didattica di{" "}
+              <Chip>INGEGNERIA INFORMATICA</Chip>.
+            </>
+          ),
         }}
         onClose={onClose}
         onChanged={onChanged}
@@ -250,6 +279,9 @@ describe("revoking a role", () => {
     );
     const confirm = button("Revoca");
     const destructive = confirm?.classList.contains("text-warn-ink") ?? false;
+    const chips = [...(dialog()?.querySelectorAll("p span.rounded-chip") ?? [])].map(
+      (chip) => chip.textContent,
+    );
     act(() => {
       confirm?.focus();
       confirm?.click();
@@ -257,6 +289,7 @@ describe("revoking a role", () => {
     await settle();
     const seen = {
       destructive,
+      chips,
       closed,
       changed,
       confirmOff: button("Revoca")?.disabled ?? null,
@@ -271,8 +304,10 @@ describe("revoking a role", () => {
     const seen = await revoke(null);
 
     expect([seen.destructive, seen.closed, seen.changed]).toEqual([true, 1, 1]);
+    // Who loses what, each a chip in the question.
+    expect(seen.chips).toEqual(["Mario Rossi", "INGEGNERIA INFORMATICA"]);
     expect(seen.text).toContain("Ruolo revocato");
-    expect(seen.text).toContain("mrossi · B047");
+    expect(seen.text).toContain("Mario Rossi · B047");
   });
 
   it("takes a member gone elsewhere for the outcome asked for, and says so", async () => {
@@ -290,10 +325,10 @@ describe("revoking a role", () => {
     expect(seen.text).not.toContain("Ruolo revocato");
   });
 
-  it("names the missing permission, keeps the button off and hands focus to Cancel", async () => {
+  it("names the missing permission, leaves the button on and hands focus to Cancel", async () => {
     const seen = await revoke(REFUSED.forbidden);
 
-    expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, true, "Annulla"]);
+    expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, false, "Annulla"]);
     expect(seen.text).toContain("Permesso mancante: programme.assign_secretariat");
   });
 });
@@ -313,6 +348,7 @@ describe("making an edition current", () => {
       />,
     );
     const question = dialog()?.textContent ?? "";
+    const preview = [...(dialog()?.querySelectorAll("li") ?? [])].map((row) => row.textContent);
     act(() => {
       button("Imposta come corrente")?.focus();
       button("Imposta come corrente")?.click();
@@ -320,6 +356,7 @@ describe("making an edition current", () => {
     await settle();
     const seen = {
       question,
+      preview,
       closed,
       changed,
       confirmOff: button("Imposta come corrente")?.disabled ?? null,
@@ -331,16 +368,25 @@ describe("making an edition current", () => {
   }
 
   it.each([
-    ["no current edition", null, "La 2025-2026 diventa l'edizione corrente."],
-    ["the current one it replaces", current, "L'edizione corrente passa da 2024-2025 a 2025-2026."],
-  ])("names %s, switches and says so", async (_, replaced, sentence) => {
-    const seen = await switching(replaced, null);
+    ["no current edition", null, ["2025-2026Non correntediventaCorrente"]],
+    [
+      "the current one it replaces",
+      current,
+      ["2025-2026Non correntediventaCorrente", "2024-2025CorrentediventaNon corrente"],
+    ],
+  ])(
+    "previews each year's state before and after with %s, switches and says so",
+    async (_, replaced, rows) => {
+      const seen = await switching(replaced, null);
 
-    expect(seen.question).toContain(sentence);
-    expect([seen.closed, seen.changed]).toEqual([1, 1]);
-    expect(seen.text).toContain("Edizione corrente aggiornata");
-    expect(seen.text).toContain("PPM · 2025-2026");
-  });
+      expect(seen.preview).toEqual(rows);
+      expect(seen.question).toContain("PPM · B028451");
+      expect(seen.question).toContain("Un insegnamento ha al massimo un'edizione corrente.");
+      expect([seen.closed, seen.changed]).toEqual([1, 1]);
+      expect(seen.text).toContain("Edizione corrente aggiornata");
+      expect(seen.text).toContain("PPM · 2025-2026");
+    },
+  );
 
   it.each([
     [
@@ -349,10 +395,10 @@ describe("making an edition current", () => {
       "Serve il permesso anche sull'edizione corrente: chiedi alla segreteria didattica.",
     ],
     ["a missing permission", REFUSED.forbidden, "Permesso mancante: edition.set_current"],
-  ])("keeps %s in the dialog with the button off", async (_, refusal, sentence) => {
+  ])("keeps %s in the dialog, its button on to ask again", async (_, refusal, sentence) => {
     const seen = await switching(current, refusal);
 
-    expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, true, "Annulla"]);
+    expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, false, "Annulla"]);
     expect(seen.text).toContain(sentence);
   });
 

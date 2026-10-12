@@ -148,8 +148,8 @@
       "title": "设为当前版本？",
       "done": "当前版本已更新",
       "action": "设为当前",
-      "becomes": "<b>{{year}}</b> 成为当前版本。",
-      "switch": "当前版本从 <b>{{old}}</b> 换成 <b>{{new}}</b>。",
+      "to": "变为",
+      "preview": "改动",
       "caption": "一门课程最多有一个当前版本。"
     },
     "programmes": {
@@ -262,8 +262,8 @@
       "action": "撤销",
       "actionLabel": "撤销 {{username}}",
       "title": "撤销该角色？",
-      "teacher": "{{username}} 将不再是 {{course}} {{year}} 版本的教师。",
-      "secretariat": "{{username}} 将不再属于 {{programme}} 的教学秘书处。",
+      "teacher": "<person>{{username}}</person> 将不再是 <course>{{course}}</course> <year>{{year}}</year> 版本的教师。",
+      "secretariat": "<person>{{username}}</person> 将不再属于 <programme>{{programme}}</programme> 的教学秘书处。",
       "done": "已撤销角色",
       "gone": "{{username}} 已不再拥有此角色：它已在别处被撤销。"
     },

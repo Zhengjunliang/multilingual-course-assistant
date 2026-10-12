@@ -148,8 +148,8 @@
       "title": "Impostare come corrente?",
       "done": "Edizione corrente aggiornata",
       "action": "Imposta come corrente",
-      "becomes": "La <b>{{year}}</b> diventa l'edizione corrente.",
-      "switch": "L'edizione corrente passa da <b>{{old}}</b> a <b>{{new}}</b>.",
+      "to": "diventa",
+      "preview": "Cosa cambia",
       "caption": "Un insegnamento ha al massimo un'edizione corrente."
     },
     "programmes": {
@@ -262,8 +262,8 @@
       "action": "Revoca",
       "actionLabel": "Revoca {{username}}",
       "title": "Revocare il ruolo?",
-      "teacher": "{{username}} non sarà più docente di {{course}}, edizione {{year}}.",
-      "secretariat": "{{username}} non farà più parte della segreteria didattica di {{programme}}.",
+      "teacher": "<person>{{username}}</person> non sarà più docente di <course>{{course}}</course>, edizione <year>{{year}}</year>.",
+      "secretariat": "<person>{{username}}</person> non farà più parte della segreteria didattica di <programme>{{programme}}</programme>.",
       "done": "Ruolo revocato",
       "gone": "{{username}} non aveva più questo ruolo: era già stato revocato altrove."
     },
