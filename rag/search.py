@@ -52,6 +52,12 @@ DEFAULT_RERANK_MODEL = "Qwen/Qwen3-Reranker-0.6B"
 # Fusion sees this many candidates per branch; the reranker sees the fused pool.
 PREFETCH_LIMIT = 20
 
+# The reranker's score is P("yes"), the model's own judgement that a passage
+# answers the query, so 0.5 is where it says yes rather than no; Dify cuts a
+# reranked list at 0.5 by default as well (outside the repository). Fusion
+# scores are ranks, not judgements, so nothing cuts a list without a reranker.
+RELEVANCE_CUTOFF = 0.5
+
 # Qdrant's own RRF constant (`DEFAULT_RRF_K` in reciprocal_rank_fusion.rs, and
 # qdrant-client's `hybrid/fusion.py`): a point at rank r, counted from 0,
 # scores 1 / (r + RRF_K) in each branch that holds it.
@@ -310,6 +316,7 @@ def search(
     *,
     scope: Sequence[EditionKey] | None,
     limit: int = 5,
+    min_score: float | None = None,
     locale: str | None = None,
     collections: Sequence[str] = (COLLECTION,),
     ingest_source: str | None = None,
@@ -320,6 +327,12 @@ def search(
     fusion order interleaves round-robin (the M3 no-rerank baseline). Either
     way the copies of a passage collapse before the cut to `limit`
     (`rag.passages`), so a copy never takes the place of another passage.
+
+    `min_score` makes `limit` a cap rather than a count: a reranked hit below
+    it is left out, the best one always stays, so a question one passage
+    answers gets one source and a question with no good passage still gets
+    the best there is. It applies only with a reranker (`RELEVANCE_CUTOFF`).
+
     The web-source conditions apply only to the
     `unifi_web` branch (the eval-isolation rule, docs/architecture.md): slides prefetches never
     carry them, so slides retrieval semantics cannot drift with web features.
@@ -345,7 +358,10 @@ def search(
     if reranker is None:
         return round_robin([collapse(pool) for pool in pools], limit)
     merged = [hit for pool in pools for hit in pool]
-    return collapse(rerank_hits(query, merged, reranker))[:limit]
+    ranked = collapse(rerank_hits(query, merged, reranker))
+    if min_score is not None:
+        ranked = ranked[:1] + [hit for hit in ranked[1:] if hit.score >= min_score]
+    return ranked[:limit]
 
 
 def main(argv: list[str] | None = None) -> None:

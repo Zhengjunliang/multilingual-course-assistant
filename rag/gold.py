@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -162,6 +163,13 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("gold_file", type=Path)
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument(
+        "--min-score",
+        type=float,
+        default=None,
+        help="leave out reranked hits below this score, keeping the best one, as the "
+        "product does at RELEVANCE_CUTOFF; off by default, so hit@k scores the first k",
+    )
     parser.add_argument("--no-rerank", action="store_true")
     add_qdrant_argument(parser)
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
@@ -205,7 +213,15 @@ def main(argv: list[str] | None = None) -> None:
 
         overridden = [
             name
-            for name in ("top_k", "no_rerank", "qdrant", "dense_model", "rerank_model", "live")
+            for name in (
+                "top_k",
+                "min_score",
+                "no_rerank",
+                "qdrant",
+                "dense_model",
+                "rerank_model",
+                "live",
+            )
             if getattr(args, name) != parser.get_default(name)
         ]
         if overridden:
@@ -268,6 +284,7 @@ def main(argv: list[str] | None = None) -> None:
 
     scored = 0
     per_locale: dict[str, list[bool]] = {}
+    sources: Counter[int] = Counter()
     for question in questions:
         # `target` names the collection to score against (gold/README.md):
         # slides questions stay single-collection slides, campus questions
@@ -281,6 +298,7 @@ def main(argv: list[str] | None = None) -> None:
             reranker,
             scope=EVAL_SCOPE,
             limit=args.top_k,
+            min_score=args.min_score,
             collections=(question.target,),
             # Single passthrough, no per-collection branching: `search()` drops
             # both web-source conditions on every non-web prefetch branch.
@@ -289,6 +307,7 @@ def main(argv: list[str] | None = None) -> None:
         )
         hit = is_hit(question, hits)
         scored += hit
+        sources[len(hits)] += 1
         per_locale.setdefault(question.locale, []).append(hit)
         top = hits[0].chunk if hits else None
         want = ", ".join(question.urls) or f"{question.source_file} p.{question.page}"
@@ -304,6 +323,9 @@ def main(argv: list[str] | None = None) -> None:
     total = len(questions)
     rate = scored / total if total else 0.0
     print(f"hit@{args.top_k}: {scored}/{total} ({rate:.0%})")
+    if args.min_score is not None:
+        spread = ", ".join(f"{count}: {asked}" for count, asked in sorted(sources.items()))
+        print(f"questions by number of sources, min score {args.min_score}: {spread}")
     # Per-locale rates carry the campus gate (EN/IT thresholded, ZH reported
     # without one — gold/README.md); printed only when locales mix.
     if len(per_locale) > 1:
