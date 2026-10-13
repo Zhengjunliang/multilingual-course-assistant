@@ -237,6 +237,22 @@ class CourseEdition(models.Model):
         course = getattr(self, "course", None)
         return f"{course.code if course else '?'}:{self.academic_year}"
 
+    def clean(self) -> None:
+        """Teaching starts in one of the edition's two years.
+
+        A day typed in another year would make the edition current a year
+        early or late, and nothing else says which edition is current. Checked
+        where a person types it, the admin form and `full_clean`, as the
+        consecutive years are (`validate_academic_year`).
+        """
+        match = _ACADEMIC_YEAR.fullmatch(self.academic_year)
+        if self.teaching_starts is None or match is None:
+            return
+        if self.teaching_starts.year not in (int(match[1]), int(match[2])):
+            raise ValidationError(
+                {"teaching_starts": _("Teaching starts in one of the edition's two years.")}
+            )
+
 
 class CurriculumEntry(models.Model):
     """A programme offers a course in one curriculum, in one year of study.

@@ -479,9 +479,27 @@ def test_a_refused_run_changes_nothing(
     assert snapshot() == empty
 
 
+def test_a_catalogue_of_its_own_gets_no_shipped_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The shipped syllabi name the shipped catalogue's editions: a catalogue given alone
+    gets no content, rather than a refusal over editions it does not hold."""
+    monkeypatch.setattr(env, "demo_password", None)
+    data = tmp_path / "demo.json"
+    data.write_text(json.dumps(DEMO), encoding="utf-8")
+
+    call_command("populate_demo", data=data, stdout=StringIO())
+
+    assert (
+        CourseEdition.objects.exists(),
+        Syllabus.objects.exists(),
+        ReadingItem.objects.exists(),
+    ) == (True, False, False)
+
+
 def test_the_demo_data_file_keeps_the_catalogue_rules() -> None:
     """The shipped file, read without a database: codes, code sources, entries, one course
-    per AD code, and editions of the kept years, each with one start day."""
+    per AD code, and editions of the kept years, each with one start day in its years."""
     demo = json.loads(DATA.read_text(encoding="utf-8"))
     editions = [(c["code"], e) for c in demo["courses"] for e in c["editions"]]
     named = [f"{code}:{e['academic_year']}" for code, e in editions]
@@ -500,7 +518,12 @@ def test_the_demo_data_file_keeps_the_catalogue_rules() -> None:
     assert {e["academic_year"] for _, e in editions} == {"2025-2026", "2026-2027"}
     assert len(named) == len(set(named))
     assert [e for _, e in editions if set(e) != {"academic_year", "teaching_starts"}] == []
-    assert all(date.fromisoformat(e["teaching_starts"]) for _, e in editions)
+    # A day, in one of the edition's two years, as `CourseEdition.clean()` asks.
+    assert [
+        e
+        for _, e in editions
+        if str(date.fromisoformat(e["teaching_starts"]).year) not in e["academic_year"].split("-")
+    ] == []
     teacher = next(a for a in demo["accounts"] if a["username"] == "demo-teacher")
     assert [role["edition"] for role in teacher["roles"]] == [
         "B003725:2026-2027",

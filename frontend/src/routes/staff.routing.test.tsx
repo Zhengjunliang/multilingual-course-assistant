@@ -732,6 +732,8 @@ describe("a course, an edition, and a teacher's own courses", () => {
     await settle();
     const seen = () => ({
       path: path(),
+      // The note on switching the current edition went with the switch.
+      note: (container.querySelector("main")?.textContent ?? "").includes("al massimo"),
       chips: [...container.querySelectorAll("main header .flex-wrap > span")].map(text),
       views: [...container.querySelectorAll('main nav[aria-label="Edizioni mostrate"] a')].map(
         (a) => [text(a), a.getAttribute("href"), a.getAttribute("aria-current")],
@@ -769,6 +771,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
       // The year before the current one is a year nobody teaches it: on Tutte only.
       current: {
         path: "/staff/mine",
+        note: false,
         chips: ["1 insegnamento"],
         views: [
           ["Correnti2", "/staff/mine", "page"], // spellchecker:disable-line
@@ -779,6 +782,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
       },
       all: {
         path: "/staff/mine?show=all",
+        note: false,
         chips: ["1 insegnamento"],
         views: [
           ["Correnti2", "/staff/mine", null], // spellchecker:disable-line

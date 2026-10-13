@@ -12,7 +12,7 @@ import { Eraser, Pencil } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { type SyllabusSectionKey, writeSyllabus } from "@/api/catalog";
+import { type SyllabusSection, type SyllabusSectionKey, writeSyllabus } from "@/api/catalog";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { TextArea } from "@/components/ui/field";
@@ -30,8 +30,8 @@ interface SectionTextProps {
   /** Its text; empty when the section has none. */
   text: string;
   editable: boolean;
-  /** Reads the syllabus again, then says `message`. */
-  onSaved: (message: string) => Promise<void>;
+  /** Shows the section as the write answered it, its text empty once cleared, and says `message`. */
+  onSaved: (row: SyllabusSection, message: string) => void;
   reloadPage: () => Promise<boolean>;
 }
 
@@ -79,9 +79,13 @@ export function SectionText({
     setForbidden(false);
     setRefusal(null);
     try {
-      await writeSyllabus(edition, locale, section, value);
-      const key = value.trim() === "" ? "staff.syllabus.cleared" : "staff.syllabus.saved";
-      await onSaved(t(key, { section: name }));
+      const row = (await writeSyllabus(edition, locale, section, value)) ?? {
+        locale,
+        section,
+        text: "",
+      };
+      const key = row.text === "" ? "staff.syllabus.cleared" : "staff.syllabus.saved";
+      onSaved(row, t(key, { section: name }));
       close();
       return true;
     } catch (error) {
@@ -160,7 +164,8 @@ export function SectionText({
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Escape" && !running) close();
+              // An Escape that ends a word an input method is composing is the method's.
+              if (event.key === "Escape" && !event.nativeEvent.isComposing && !running) close();
             }}
           />
           {!clearing && refused}

@@ -22,7 +22,9 @@ on one holding rows of its own:
   (apps/catalog/editions.py).
 - Content: an edition gets the content file's syllabus in a language only when
   it holds no section in that language, and its books in a language only when
-  it holds no book in it, so a run never overwrites what a teacher wrote.
+  it holds no book in it, so a run never overwrites what a teacher wrote. The
+  shipped content names the shipped catalogue's editions, so a catalogue file
+  given without a content file gets none.
 - Accounts: `demo-` ones only, and the file may name no other. A declared
   account's name, superuser flag and role rows are made the file's, rows it does not
   declare removed; a `demo-` account the file does not name keeps the account
@@ -85,13 +87,17 @@ class Command(BaseCommand):
         parser.add_argument(
             "--content",
             type=Path,
-            default=CONTENT,
-            help="the editions' syllabi and books (default: %(default)s)",
+            default=None,
+            help=f"the editions' syllabi and books (default: {CONTENT}, with the shipped --data)",
         )
 
-    def handle(self, *args: object, data: Path, content: Path, **options: object) -> None:
+    def handle(self, *args: object, data: Path, content: Path | None, **options: object) -> None:
         demo = json.loads(data.read_text(encoding="utf-8"))
-        texts = json.loads(content.read_text(encoding="utf-8"))
+        if content is None and data == DATA:
+            content = CONTENT
+        texts = (
+            {"editions": []} if content is None else json.loads(content.read_text(encoding="utf-8"))
+        )
         secret = env.demo_password.get_secret_value() if env.demo_password is not None else ""
         password = secret or None
         strangers = [

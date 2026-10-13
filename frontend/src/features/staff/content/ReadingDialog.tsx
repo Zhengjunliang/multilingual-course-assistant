@@ -7,8 +7,10 @@
  * first of them takes the focus; a title the list already holds in that
  * language is one of them. The dialog stays open while the request runs and
  * after a refusal, as the assign dialog does (features/staff/AssignDialog.tsx).
- * A 404 means the book, or the edition, went away since the page was read:
- * the dialog closes, and what is left is read again.
+ * A change sends only the fields the reader edited, so a field someone else
+ * changed meanwhile keeps their value. A 404 means the book, or the edition,
+ * went away since the page was read: the dialog closes, and what is left is
+ * read again.
  */
 
 import { BookPlus, PenLine } from "lucide-react";
@@ -74,6 +76,17 @@ function sent(draft: Draft): ReadingDraft {
   return { ...draft, year: year === "" ? null : year };
 }
 
+/** The fields of `draft` that differ from `book`. */
+function changes(book: ReadingItem, draft: Draft): Partial<ReadingDraft> {
+  const before = sent(draftOf(book));
+  const after = sent(draft);
+  return Object.fromEntries(
+    (Object.keys(after) as (keyof ReadingDraft)[])
+      .filter((field) => after[field] !== before[field])
+      .map((field) => [field, after[field]]),
+  );
+}
+
 interface ReadingDialogProps {
   edition: number;
   /** The book to change, `"new"` for one to add; null while the dialog is closed. */
@@ -123,15 +136,20 @@ export function ReadingDialog({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (book === null || running) return;
+    const changed = book === "new" ? null : changes(book, draft);
+    if (changed !== null && Object.keys(changed).length === 0) {
+      onClose();
+      return;
+    }
     setRunning(true);
     setErrors({});
     setForbidden(false);
     setRefusal(null);
     try {
       const saved =
-        book === "new"
+        book === "new" || changed === null
           ? await addReading(edition, sent(draft))
-          : await changeReading(edition, book.id, sent(draft));
+          : await changeReading(edition, book.id, changed);
       await onChanged();
       toast.success(t(book === "new" ? "staff.readings.added" : "staff.readings.changed"), {
         description: saved.title,

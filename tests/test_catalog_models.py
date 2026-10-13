@@ -12,6 +12,7 @@ constraint. The rows are shaped on PPM as UniFi lists it (docs/decisions.md,
 
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING
 
 import psycopg
@@ -139,6 +140,31 @@ def test_academic_year_validator_refuses_what_is_not_two_consecutive_years(
 
 def test_academic_year_validator_accepts_two_consecutive_years(course: Course) -> None:
     CourseEdition(course=course, academic_year="2025-2026").full_clean()
+
+
+@pytest.mark.parametrize(
+    ("starts", "refused"),
+    [
+        pytest.param(date(2025, 9, 15), ["teaching_starts"], id="the-year-before"),
+        pytest.param(date(2026, 9, 14), [], id="its-first-year"),
+        pytest.param(date(2027, 2, 22), [], id="its-second-year"),
+        pytest.param(date(2028, 2, 21), ["teaching_starts"], id="the-year-after"),
+    ],
+)
+def test_teaching_starts_within_its_academic_year(
+    course: Course, starts: date, refused: list[str]
+) -> None:
+    """A start day typed in another year would make the edition current a year early or
+    late, and nothing else says which edition is current."""
+    edition = CourseEdition(course=course, academic_year="2026-2027", teaching_starts=starts)
+    fields: list[str] = []
+
+    try:
+        edition.full_clean()
+    except ValidationError as error:
+        fields = list(error.error_dict)
+
+    assert fields == refused
 
 
 def test_a_course_with_editions_cannot_be_deleted(course: Course) -> None:
