@@ -173,6 +173,25 @@ def test_teaching_starts_within_its_academic_year(
     assert fields == refused
 
 
+@pytest.mark.parametrize("academic_year", ["2026-0000", "0000-0001"])
+def test_a_start_day_beside_a_year_zero_is_left_to_the_years_own_check(
+    course: Course, academic_year: str
+) -> None:
+    """Year 0 is no `date`: the start day's check stands aside rather than raise
+    `ValueError`, which an admin form would show as a server error."""
+    edition = CourseEdition(
+        course=course, academic_year=academic_year, teaching_starts=date(2026, 9, 14)
+    )
+    fields: list[str] = []
+
+    try:
+        edition.full_clean()
+    except ValidationError as error:
+        fields = list(error.error_dict)
+
+    assert "teaching_starts" not in fields
+
+
 def test_a_course_with_editions_cannot_be_deleted(course: Course) -> None:
     """An edition will own material indexed outside PostgreSQL, which no cascade reaches."""
     CourseEdition.objects.create(course=course, academic_year="2025-2026")
