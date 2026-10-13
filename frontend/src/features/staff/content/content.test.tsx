@@ -30,6 +30,8 @@ const BASE = "/api/catalog/editions/5";
 
 let syllabus: SyllabusSection[] = [];
 let books: ReadingItem[] = [];
+/** Whether reading the syllabus fails, as a dropped connection would. */
+let unreadable = false;
 /** Every write that reached the server, as `METHOD path body`. */
 const writes: string[] = [];
 
@@ -44,7 +46,10 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   const path = String(input);
   const method = init.method ?? "GET";
   if (method !== "GET") writes.push(`${method} ${path} ${init.body ?? ""}`.trim());
-  if (path === `${BASE}/syllabus`) return json(syllabus);
+  if (path === `${BASE}/syllabus`) {
+    if (unreadable) return json({ detail: { message: "Server error.", code: "error" } }, 500);
+    return json(syllabus);
+  }
   if (path === `${BASE}/readings` && method === "GET") return json(books);
   const section = path.match(/\/syllabus\/([^/]+)\/([^/]+)$/);
   if (section !== null && method === "PUT") {
@@ -66,6 +71,11 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return json(added, 201);
   }
   const one = path.match(/\/readings\/(\d+)$/);
+  if (one !== null && method === "PATCH") {
+    const changes = JSON.parse(String(init.body)) as Partial<ReadingItem>;
+    books = books.map((book) => (book.id === Number(one[1]) ? { ...book, ...changes } : book));
+    return json(books.find((book) => book.id === Number(one[1])));
+  }
   if (one !== null && method === "DELETE") {
     books = books.filter((book) => book.id !== Number(one[1]));
     return new Response(null, { status: 204 });
@@ -166,6 +176,7 @@ const FISICA: ReadingItem = {
 beforeEach(() => {
   syllabus = [{ locale: "it", section: "prerequisiti", text: "Fisica I." }];
   books = [FISICA];
+  unreadable = false;
   writes.length = 0;
   vi.stubGlobal("fetch", fakeApi);
 });
@@ -235,6 +246,44 @@ describe("a syllabus section", () => {
     expect(seen).toEqual([0, "Fisica I."]);
   });
 
+  it("keeps a section half written while another is saved, whatever a later read gives", async () => {
+    const { unmount } = open(true);
+    await settle();
+    await press("Scrivi · Contenuti");
+    type(section("Contenuti")?.querySelector("textarea"), "Campo elettrico.");
+    await press("Modifica · Prerequisiti");
+    type(section("Prerequisiti")?.querySelector("textarea"), "Fisica I e Analisi I.");
+    unreadable = true;
+    await press("Salva");
+    const seen = [
+      section("Contenuti")?.querySelector("textarea")?.value,
+      text(section("Prerequisiti")?.querySelector("p")),
+    ];
+    unmount();
+
+    expect(seen).toEqual(["Campo elettrico.", "Fisica I e Analisi I."]);
+  });
+
+  it("keeps its box open on an Escape that ends a word being composed", async () => {
+    const { unmount } = open(true);
+    await settle();
+    await press("Modifica · Prerequisiti");
+    const area = section("Prerequisiti")?.querySelector("textarea");
+    act(() => {
+      area?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", isComposing: true, bubbles: true }),
+      );
+    });
+    const composing = section("Prerequisiti")?.querySelector("textarea") !== null;
+    act(() => {
+      area?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    const seen = [composing, section("Prerequisiti")?.querySelector("textarea") ?? null];
+    unmount();
+
+    expect(seen).toEqual([true, null]);
+  });
+
   it("offers an empty section to be written", async () => {
     const { unmount } = open(true);
     await settle();
@@ -265,6 +314,18 @@ describe("the reading list", () => {
       ],
       2,
     ]);
+  });
+
+  it("changes a book by the fields edited alone, so another's change to the rest stands", async () => {
+    const { unmount } = open(true);
+    await settle();
+    await press("Modifica · Fisica II");
+    type(field("Anno (facoltativo)"), "2022");
+    await press("Salva");
+    const seen = [[...writes], text(document.body.querySelector("tbody tr td:nth-child(3)"))];
+    unmount();
+
+    expect(seen).toEqual([[`PATCH ${BASE}/readings/21 {"year":"2022"}`], "2022"]);
   });
 
   it("shows a title the list already holds under its field, the dialog kept open", async () => {

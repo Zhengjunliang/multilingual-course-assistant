@@ -8,7 +8,10 @@ URL does, and the view resolves it before reading a field.
 
 from __future__ import annotations
 
+from typing import Any
+
 from rest_framework import serializers
+from rest_framework.exceptions import NotFound
 
 from apps.catalog.models import ReadingItem, Syllabus
 
@@ -41,3 +44,16 @@ class ReadingItemSerializer(serializers.ModelSerializer[ReadingItem]):
         model = ReadingItem
         fields = ("id", "locale", "title", "authors", "year", "isbn", "url", "importance")
         read_only_fields = ("id",)
+
+    def update(self, instance: ReadingItem, validated_data: dict[str, Any]) -> ReadingItem:
+        """Writes the fields the request names in one UPDATE; a book gone meanwhile is a 404.
+
+        `Model.save()` inserts the row its UPDATE did not find, so a book
+        removed between this request's lookup and its write would be written
+        back.
+        """
+        if not ReadingItem.objects.filter(pk=instance.pk).update(**validated_data):
+            raise NotFound
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        return instance

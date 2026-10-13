@@ -8,9 +8,11 @@
  * look at another. A section with no text says so.
  *
  * Whoever holds `edition.edit_content` edits each section in place
- * (SectionText.tsx). Once one is saved, the syllabus is read again and a
- * standing status line says what was saved, since the box closing is all a
- * screen reader would otherwise miss.
+ * (SectionText.tsx). A saved section shows what the server answered, and the
+ * syllabus is not read again: a read that failed would take every other
+ * section's box away, with what was half written in it. A standing status
+ * line says what was saved, since the box closing is all a screen reader
+ * would otherwise miss.
  */
 
 import { useCallback, useState } from "react";
@@ -37,6 +39,9 @@ const SECTION_NAME: Record<SyllabusSectionKey, `staff.syllabus.section.${Syllabu
 
 const SECTIONS = Object.keys(SECTION_NAME) as SyllabusSectionKey[];
 
+const same = (a: SyllabusSection, b: SyllabusSection) =>
+  a.locale === b.locale && a.section === b.section;
+
 /** A section's text in a language; empty when the syllabus has no row for it. */
 function textOf(
   rows: readonly SyllabusSection[],
@@ -59,10 +64,18 @@ export function SyllabusPanel({ edition, editable, reloadPage }: SyllabusPanelPr
   const load = useCallback(() => listSyllabus(edition), [edition]);
   const syllabus = useLoad(load);
   const [status, setStatus] = useState("");
-  const rows = syllabus.data;
+  /** Each section as its last write answered, an empty text for one cleared. */
+  const [written, setWritten] = useState<readonly SyllabusSection[]>([]);
+  const rows =
+    syllabus.data === null
+      ? null
+      : [
+          ...syllabus.data.filter((row) => !written.some((write) => same(write, row))),
+          ...written.filter((write) => write.text !== ""),
+        ];
 
-  const saved = async (message: string) => {
-    await syllabus.reload();
+  const saved = (row: SyllabusSection, message: string) => {
+    setWritten((shown) => [...shown.filter((write) => !same(write, row)), row]);
     setStatus(message);
   };
 

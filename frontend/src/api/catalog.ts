@@ -264,15 +264,15 @@ export function addReading(edition: number, book: ReadingDraft): Promise<Reading
   });
 }
 
-/** Writes every field of the form; 404 when the book was removed elsewhere first. */
+/** Writes the fields `changes` names and answers with the whole book; 404 when it was removed elsewhere first. */
 export function changeReading(
   edition: number,
   id: number,
-  book: ReadingDraft,
+  changes: Partial<ReadingDraft>,
 ): Promise<ReadingItem> {
   return request<ReadingItem>(`${CATALOG}/editions/${edition}/readings/${id}`, {
     method: "PATCH",
-    body: JSON.stringify(book),
+    body: JSON.stringify(changes),
   });
 }
 

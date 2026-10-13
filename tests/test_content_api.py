@@ -15,6 +15,7 @@ import pytest
 from test_catalog_api import as_user, code_of, rolled_back
 from test_roles import world
 
+from apps.catalog.content_views import EditionReadingView
 from apps.catalog.models import ReadingItem, Syllabus
 
 if TYPE_CHECKING:
@@ -231,6 +232,29 @@ def test_a_title_is_listed_once_per_language_and_edition() -> None:
         "the same title on another edition": 201,
         "a book renamed to a title listed": (400, {"title": ["unique"]}),
     }
+
+
+def test_a_book_removed_while_it_is_changed_stays_removed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A delete committed between the change's lookup and its write: `Model.save()` would
+    insert the row its update did not find, writing the book back."""
+    w = world()
+    book = ReadingItem.objects.create(edition=w.ppm_old, **BOOK)
+    lookup = EditionReadingView.book
+
+    def raced(view: EditionReadingView, item: int) -> ReadingItem:
+        found = lookup(view, item)
+        ReadingItem.objects.filter(pk=found.pk).delete()
+        return found
+
+    monkeypatch.setattr(EditionReadingView, "book", raced)
+    changed = answer(
+        as_user(w.newcomer).patch(f"{books(w.ppm_old)}/{book.pk}", {"year": 2011}, format="json")
+    )
+
+    assert (changed, ReadingItem.objects.filter(pk=book.pk).exists()) == (
+        (404, "not_found"),
+        False,
+    )
 
 
 def test_a_book_is_reached_through_its_own_edition_only() -> None:
