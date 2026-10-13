@@ -9,7 +9,7 @@ import { useState } from "react";
 import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
 import { Field, FieldError, SearchField } from "@/components/ui/field";
-import { Tabs } from "@/components/ui/tabs";
+import { TabLinks, Tabs } from "@/components/ui/tabs";
 import { ToggleGroup } from "@/components/ui/toggle-group";
 import { Specimen, type Theme } from "./Specimen";
 
@@ -109,6 +109,19 @@ export function Fields({ theme }: { theme: Theme }) {
               label: "Edizioni",
               content: <p className="text-body text-muted">Nessuna edizione.</p>,
             },
+          ]}
+        />
+      </Specimen>
+
+      <Specimen
+        name="TabLinks"
+        note="Views of a list that are each an address, its filter in the query: the same underline over links in a nav, the one shown aria-current, so Back and a link passed on reopen it."
+      >
+        <TabLinks
+          label="Edizioni mostrate"
+          links={[
+            { to: "/styleguide", label: "Correnti", count: 5, current: true }, // spellchecker:disable-line
+            { to: "/styleguide?show=all", label: "Tutte", count: 6, current: false },
           ]}
         />
       </Specimen>

@@ -256,16 +256,16 @@
     },
     "edition": {
       "teachers": "Docenti dell'edizione",
-      "empty": "Nessun docente assegnato a questa edizione.",
-      "onlyStaff": "Solo la segreteria didattica e l'amministratore assegnano i docenti."
+      "starts": "Lezioni dal {{date}}",
+      "empty": "Nessun docente assegnato a questa edizione."
     },
     "mine": {
       "title": "I miei insegnamenti",
-      "count_one": "{{count}} edizione",
-      "count_other": "{{count}} edizioni",
-      "sub": "Le edizioni a cui sei assegnato come docente.",
-      "empty": "Nessun insegnamento assegnato.",
-      "note": "Un insegnamento ha al massimo un'edizione corrente; cambiarla richiede il permesso su entrambe le edizioni."
+      "sub": "Gli insegnamenti di cui sei docente, con tutte le loro edizioni: puoi modificarle tutte.",
+      "show": "Edizioni mostrate",
+      "current": "Correnti",
+      "all": "Tutte",
+      "empty": "Nessun insegnamento assegnato."
     },
     "assign": {
       "teacher": "Assegna docente",
