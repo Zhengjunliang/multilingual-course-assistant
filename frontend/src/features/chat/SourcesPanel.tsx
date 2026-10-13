@@ -209,7 +209,13 @@ export function SourcesPanel({
           <ToggleGroup
             label={t("sources.filter")}
             value={kind}
-            onValueChange={setKind}
+            onValueChange={(next) => {
+              // A row the filter takes away goes from under the pointer
+              // without the pointer leaving it, so nothing says it was left.
+              at.current.pointer = null;
+              onHighlight(at.current.focus);
+              setKind(next);
+            }}
             className="mx-tight mb-tight self-start"
             options={[
               { value: "all", label: t("sources.filterAll"), count: sources.length },

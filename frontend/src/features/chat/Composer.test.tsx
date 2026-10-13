@@ -122,6 +122,33 @@ describe("the composer", () => {
     });
   });
 
+  it("lets go of what is missing when the conversation changes under it", () => {
+    // The key for a new conversation changes the page without leaving the field.
+    let switchTo: (conversation: number | null) => void = () => {};
+    function Switching() {
+      const [conversation, setConversation] = useState<number | null>(7);
+      switchTo = setConversation;
+      return (
+        <Composer
+          waiting={{ phase: "idle" }}
+          onSubmit={() => {}}
+          onStop={() => {}}
+          conversation={conversation}
+        />
+      );
+    }
+    const { container, unmount } = mount(<Switching />);
+    const said = () => container.querySelector('[role="status"]')?.textContent;
+
+    act(() => send(container)?.click());
+    const pressed = said();
+    act(() => switchTo(null));
+    const moved = said();
+    unmount();
+
+    expect({ pressed, moved }).toEqual({ pressed: "Scrivi prima la domanda.", moved: "" });
+  });
+
   it("puts a stop button with its word in its place while an answer is written, and it stops", () => {
     let stopped = 0;
     const { container, unmount } = composer(

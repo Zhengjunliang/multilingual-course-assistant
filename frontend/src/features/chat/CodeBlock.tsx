@@ -41,9 +41,7 @@ export function CodeBlock({ children }: ComponentProps<"pre">) {
           type="button"
           variant="ghost"
           size="sm"
-          // Without the newline Markdown ends every block with, which pasting
-          // would carry as an empty line.
-          onClick={() => copy((block.current?.textContent ?? "").replace(/\n$/, ""))}
+          onClick={() => copy(block.current?.textContent ?? "")}
         >
           {copied ? (
             <Check aria-hidden className="size-icon" />

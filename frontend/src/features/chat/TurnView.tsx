@@ -30,6 +30,7 @@ import { citedMarkers } from "@/lib/markers";
 import { AnswerActions } from "./AnswerActions";
 import { AnswerStream } from "./AnswerStream";
 import { HighlightContext } from "./CitationPill";
+import { failureText, type Retry, retryText } from "./notice";
 import { ProcessLine } from "./ProcessLine";
 import { LanguageChip } from "./SourceParts";
 import { MAX_BUSY_RETRIES, type Turn } from "./useAsk";
@@ -49,14 +50,10 @@ interface TurnViewProps {
    * `seconds`, for the `attempt`th time; `null` otherwise. The cat keeps
    * thinking, but nothing is being searched: the process line waits, and
    * counts afresh from the next request, as the server's seconds do. A banner
-   * says what is happening instead.
+   * says what is happening instead; the page says it to a screen reader
+   * (notice.ts).
    */
-  retry: { seconds: number; attempt: number } | null;
-  /**
-   * The turn's failure happened just now, rather than being read back with a
-   * stored conversation: only then is it announced.
-   */
-  failedNow: boolean;
+  retry: Retry | null;
   /**
    * Nobody is signed in. A question routed to the slides then finds nothing,
    * because the slides are for an account, and the answer says only that no
@@ -79,7 +76,6 @@ export const TurnView = memo(function TurnView({
   live,
   thinking,
   retry,
-  failedNow,
   visitor,
 }: TurnViewProps) {
   const { t } = useTranslation();
@@ -94,23 +90,7 @@ export const TurnView = memo(function TurnView({
   const working = thinking || live;
   const waiting = working && turn.answer === "";
 
-  const retrying =
-    retry === null ? null : t("status.retrying", { ...retry, total: MAX_BUSY_RETRIES });
-  const failed =
-    turn.failure === null
-      ? null
-      : {
-          heading: turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete"),
-          kept: !visitor && turn.answer !== "" ? t("answer.kept") : undefined,
-        };
-  // What the banners show, said once as it happens. Through a region that is
-  // on the page before its words change, rather than through the banners'
-  // own role: a live region inserted with its words already in it is not
-  // reliably announced (MDN, ARIA live regions). A failure read back with a
-  // stored conversation says nothing.
-  let said = "";
-  if (retrying !== null) said = `${t("status.busy")} ${retrying}`;
-  else if (failed !== null && failedNow) said = [failed.heading, failed.kept].join(" ").trim();
+  const failed = failureText(turn, visitor, t);
 
   return (
     <article className="flex flex-col gap-gutter">
@@ -179,7 +159,7 @@ export const TurnView = memo(function TurnView({
 
           {retry !== null && (
             <Banner icon={Spinner} heading={t("status.busy")}>
-              {retrying}
+              {retryText(retry, t)}
               <span
                 aria-hidden
                 className="mt-hair block h-hair overflow-hidden rounded-full bg-accent-line"
@@ -200,10 +180,6 @@ export const TurnView = memo(function TurnView({
               {failed.kept}
             </Banner>
           )}
-
-          <p role="status" className="sr-only">
-            {said}
-          </p>
         </div>
       </div>
     </article>

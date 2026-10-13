@@ -188,9 +188,13 @@ const COMPONENTS = {
       {children}
     </blockquote>
   ),
+  // A block's code arrives ending in the newline Markdown closes it with
+  // (mdast-util-to-hast), which a `pre` would draw as an empty last line: the
+  // caret written after the code (index.css, `caret-after`) would stand alone
+  // under it, and a copy would paste the empty line.
   code: ({ children, className }) => (
     <code className={cn("rounded-chip bg-mark px-hair font-mono text-caption", className)}>
-      {children}
+      {typeof children === "string" ? children.replace(/\n$/, "") : children}
     </code>
   ),
   pre: CodeBlock,

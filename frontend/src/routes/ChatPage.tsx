@@ -34,6 +34,7 @@ import { isRefusal } from "@/api/client";
 import { readConversation } from "@/api/conversations";
 import { useSession } from "@/auth/useSession";
 import { Composer } from "@/features/chat/Composer";
+import { spokenNotice } from "@/features/chat/notice";
 import { TurnView } from "@/features/chat/TurnView";
 import { useAsk } from "@/features/chat/useAsk";
 import { EntryScreen } from "@/features/entry/EntryScreen";
@@ -163,6 +164,18 @@ export default function ChatPage() {
   const empty = turns.length === 0 && !unreadable;
   const entry = empty || leaving;
 
+  const last = turns.at(-1);
+  const said =
+    last === undefined
+      ? ""
+      : spokenNotice(
+          last,
+          waiting.phase === "retrying" ? waiting : null,
+          waiting.phase === "stopped",
+          visitor,
+          t,
+        );
+
   useEffect(() => {
     if (!entry) setLanded(false);
   }, [entry]);
@@ -172,6 +185,7 @@ export default function ChatPage() {
       waiting={waiting}
       onSubmit={onSubmit}
       onStop={stop}
+      conversation={ask.conversationId}
       placement={entry ? "hero" : "foot"}
       travelFrom={travelFrom}
       rise={landed}
@@ -228,7 +242,6 @@ export default function ChatPage() {
                   live={current && waiting.phase === "streaming"}
                   thinking={current && (waiting.phase === "queued" || waiting.phase === "retrying")}
                   retry={current && waiting.phase === "retrying" ? waiting : null}
-                  failedNow={current && waiting.phase === "stopped"}
                   visitor={visitor}
                 />
               );
@@ -237,6 +250,11 @@ export default function ChatPage() {
           </div>
         )}
       </main>
+      {/* What happens to the question being answered, said once as it
+          happens, from a region that is here before it does (notice.ts). */}
+      <p role="status" className="sr-only">
+        {said}
+      </p>
       {/* No composer under "not available": a question here would start a
           conversation the URL does not name. The sidebar offers a new one. */}
       {!unreadable && composer}

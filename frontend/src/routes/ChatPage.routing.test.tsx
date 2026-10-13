@@ -66,6 +66,8 @@ let deleteFails = false;
 let listFails = false;
 /** How many `PATCH`es fail before one goes through, as a server error would. */
 let pinFailures = 0;
+/** Whether `POST /api/ask` is refused, as a server error would. */
+let askFails = false;
 /** Every request made, as `METHOD path`. */
 let requested: string[] = [];
 /** How many times the page asked the session provider who is signed in. */
@@ -126,6 +128,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return json({ ...row, pinned });
   }
   if (method === "POST" && path === "/api/ask") {
+    if (askFails) return json({ detail: "Server error." }, 500);
     const { question, history } = JSON.parse(String(init.body)) as {
       question: string;
       history?: unknown;
@@ -474,6 +477,7 @@ describe("a visitor's addresses", () => {
     conversations = [];
     requested = [];
     rechecked = 0;
+    askFails = false;
     vi.stubGlobal("fetch", fakeApi);
   });
 
@@ -528,6 +532,32 @@ describe("a visitor's addresses", () => {
       receding: { recede: true, cat: true },
       after: { recede: false, cat: false },
       requested: ["POST /api/ask"],
+    });
+  });
+
+  it("says a first question refused while the entry recedes, in a region that was there before", async () => {
+    // A screen reader hears a live region change, and not reliably one that
+    // is inserted with its words already in it (MDN, ARIA live regions); the
+    // thread, and every turn in it, mounts only once the entry has gone.
+    askFails = true;
+    const { container, unmount } = page("/", null);
+    await settle();
+    const region = container.querySelector('p[role="status"]');
+
+    const before = region?.textContent;
+    askFromTheFrontDoor(container);
+    await settle();
+    const receding = container.querySelector(".recede") !== null;
+    const said = region?.textContent;
+    finishReceding(container);
+    const kept = container.querySelector('p[role="status"]') === region;
+    unmount();
+
+    expect({ before, receding, said, kept }).toEqual({
+      before: "",
+      receding: true,
+      said: "Server error.",
+      kept: true,
     });
   });
 
