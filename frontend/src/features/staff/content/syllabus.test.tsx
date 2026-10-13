@@ -164,6 +164,100 @@ describe("a syllabus section", () => {
   });
 });
 
+describe("a section not saved", () => {
+  const caption = (name: string) => text(tab(name)?.querySelector("[id]"));
+
+  /** Whether the browser would ask before the tab is closed. */
+  function unload() {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+
+  async function leave(router: ReturnType<typeof open>["router"]) {
+    await act(async () => {
+      await router.navigate("/away");
+    });
+    await settle();
+  }
+
+  it("says so in its tab while its box differs from its text, a look at another between", async () => {
+    const { unmount } = open(true);
+    await settle();
+    await show("Contenuti");
+    await openEditor("Contenuti", "Scrivi");
+    const opened = caption("Contenuti");
+    write("Contenuti", "Campo elettrico.");
+    await show("Prerequisiti");
+    const elsewhere = caption("Contenuti");
+    await show("Contenuti");
+    await press("Salva");
+    const seen = [opened, elsewhere, caption("Contenuti")];
+    unmount();
+
+    expect(seen).toEqual(["Vuota", "Non salvata", "Compilata"]);
+  });
+
+  it("lets the page go while every box holds the text it opened on", async () => {
+    const { router, unmount } = open(true);
+    await settle();
+    await show("Prerequisiti");
+    await openEditor("Prerequisiti", "Modifica");
+    const asked = unload();
+    await leave(router);
+    const seen = [
+      asked,
+      router.state.location.pathname,
+      document.body.querySelector('[role="alertdialog"]'),
+    ];
+    unmount();
+
+    expect(seen).toEqual([false, "/away", null]);
+  });
+
+  it("asks before the page is left, and stays or leaves as answered", async () => {
+    const { router, unmount } = open(true);
+    await settle();
+    await show("Prerequisiti");
+    await openEditor("Prerequisiti", "Modifica");
+    write("Prerequisiti", "Fisica I e Analisi I.");
+    const asked = unload();
+    await leave(router);
+    const question = text(document.body.querySelector('[role="alertdialog"] p'));
+    const blocked = router.state.location.pathname;
+    await press("Resta");
+    const prerequisiti = editorIn("Prerequisiti");
+    const stayed = [
+      router.state.location.pathname,
+      document.body.querySelector('[role="alertdialog"]'),
+      prerequisiti === undefined ? null : markdownOf(prerequisiti),
+    ];
+    await leave(router);
+    await press("Esci");
+    const seen = {
+      asked,
+      question,
+      blocked,
+      stayed,
+      left: router.state.location.pathname,
+      // The page is gone, and its question on closing the tab with it.
+      after: unload(),
+      writes: server.writes.length,
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      asked: true,
+      question: "Una sezione ha modifiche non salvate, che uscendo andranno perse.",
+      blocked: "/",
+      stayed: ["/", null, "Fisica I e Analisi I."],
+      left: "/away",
+      after: false,
+      writes: 0,
+    });
+  });
+});
+
 describe("the editor", () => {
   it("names its tools, says which apply where the cursor is, and writes bold as Markdown", async () => {
     server.syllabus.sections = [

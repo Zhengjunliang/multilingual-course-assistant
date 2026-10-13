@@ -7,6 +7,10 @@
  * box closes and the focus goes back to «Modifica»; a refusal keeps the box
  * open, with what was written, and the focus in the text. An edition gone
  * from the reader's reach reads the page again.
+ *
+ * The box is unsaved once what it holds differs from the section's text, by
+ * more than the blank at its ends that saving ignores: a box opened and left
+ * as it was is not.
  */
 
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
@@ -28,6 +32,8 @@ interface SectionDraftOptions {
   /** The text the box opens on. */
   text: string;
   onSaved: (row: SyllabusSection, message: string) => void;
+  /** Told whenever the box turns unsaved, or saved again. */
+  onUnsaved: (section: SyllabusSectionKey, unsaved: boolean) => void;
   reloadPage: () => Promise<boolean>;
 }
 
@@ -37,6 +43,7 @@ export function useSectionDraft({
   name,
   text,
   onSaved,
+  onUnsaved,
   reloadPage,
 }: SectionDraftOptions) {
   const { t } = useTranslation();
@@ -50,6 +57,9 @@ export function useSectionDraft({
   const [forbidden, setForbidden] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   const refocus = useRef(false);
+  const unsaved = draft !== null && draft.trim() !== text.trim();
+
+  useEffect(() => onUnsaved(section, unsaved), [onUnsaved, section, unsaved]);
 
   // Once the box is gone and «Modifica» is back: focus left in a removed box
   // would drop to the page.
@@ -96,7 +106,7 @@ export function useSectionDraft({
 
   const send = () => {
     if (draft === null || running) return;
-    if (draft.trim() === text.trim()) close();
+    if (!unsaved) close();
     else if (draft.trim() === "") setClearing(true);
     else void write(draft);
   };

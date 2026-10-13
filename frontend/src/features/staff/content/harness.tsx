@@ -3,10 +3,12 @@
  * the reading list read as EditionPage reads them, and a server faked at
  * `fetch` that answers as apps/catalog/content_views.py does, so the bodies
  * and codes travel through `api/http.ts` as they would in the application.
+ * They are a route of a data router, as the page is, with another to leave for.
  */
 
 import type { Editor } from "@tiptap/react";
 import { act, useCallback } from "react";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { vi } from "vitest";
 
 import type { Account } from "@/api/account";
@@ -150,7 +152,11 @@ function Content({ editable }: { editable: boolean }) {
 }
 
 export function open(editable: boolean) {
-  return mount(
+  const router = createMemoryRouter([
+    { path: "/", element: <Content editable={editable} /> },
+    { path: "/away", element: <main>Altrove</main> },
+  ]);
+  const mounted = mount(
     <SessionContext
       value={{
         account: READER,
@@ -162,10 +168,11 @@ export function open(editable: boolean) {
         recheck: async () => {},
       }}
     >
-      <Content editable={editable} />
+      <RouterProvider router={router} />
       <Toaster />
     </SessionContext>,
   );
+  return { ...mounted, router };
 }
 
 export async function settle() {

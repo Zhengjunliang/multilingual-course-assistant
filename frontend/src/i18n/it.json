@@ -278,6 +278,7 @@
       "next": "Sezione successiva",
       "written": "Compilata",
       "blank": "Vuota",
+      "unsaved": "Non salvata",
       "empty": {
         "title": "Sezione vuota",
         "write": "Scrivi il testo con «Scrivi», qui sopra.",
@@ -299,6 +300,13 @@
         "title": "Svuotare la sezione?",
         "body": "«{{section}}» resterà senza testo, e il testo non è salvato altrove.",
         "action": "Svuota"
+      },
+      "leave": {
+        "title": "Uscire senza salvare?",
+        "body_one": "Una sezione ha modifiche non salvate, che uscendo andranno perse.",
+        "body_other": "{{count}} sezioni hanno modifiche non salvate, che uscendo andranno perse.",
+        "stay": "Resta",
+        "action": "Esci"
       },
       "editor": {
         "toolbar": "Formattazione",

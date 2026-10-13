@@ -278,6 +278,7 @@
       "next": "下一部分",
       "written": "已填写",
       "blank": "未填写",
+      "unsaved": "未保存",
       "empty": {
         "title": "这一部分没有内容",
         "write": "点上方的「撰写」写下内容。",
@@ -299,6 +300,13 @@
         "title": "清空这一部分？",
         "body": "「{{section}}」将没有内容，原文不会另外保存。",
         "action": "清空"
+      },
+      "leave": {
+        "title": "不保存就离开？",
+        "body_one": "有 {{count}} 个部分的修改尚未保存，离开后将会丢失。",
+        "body_other": "有 {{count}} 个部分的修改尚未保存，离开后将会丢失。",
+        "stay": "留在此页",
+        "action": "离开"
       },
       "editor": {
         "toolbar": "格式",
