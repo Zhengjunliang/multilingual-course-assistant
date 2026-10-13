@@ -24,9 +24,15 @@
  * text written in place under the heading that names it (`aria-labelledby`),
  * a section of a syllabus: it grows with its text (`field-sizing-content`)
  * from six lines to most of the screen, where it scrolls.
+ *
+ * `Select` is one of a list, as `Field` lays it out: the browser's own
+ * `select` in the field's box, as GitHub's Primer draws its Select (outside
+ * the repository: Primer, "Select"), so a phone opens its own picker and the
+ * keyboard does what every select does. An option may say its language
+ * (`lang`), for a list of languages each named in its own.
  */
 
-import { CircleAlert, type LucideIcon, Search } from "lucide-react";
+import { ChevronDown, CircleAlert, type LucideIcon, Search } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
 import { Kbd, type Shortcut } from "@/components/ui/kbd";
@@ -159,6 +165,63 @@ export function TextArea({ className, ...area }: ComponentProps<"textarea">) {
         {...area}
         className={cn(INPUT, "field-sizing-content max-h-[60vh] min-h-[6lh] resize-y")}
       />
+    </div>
+  );
+}
+
+interface SelectOption {
+  value: string;
+  label: string;
+  /** The language the label is written in, when it is not the page's. */
+  lang?: string;
+}
+
+interface SelectProps extends Omit<ComponentProps<"select">, "id" | "children"> {
+  id: string;
+  label: string;
+  options: readonly SelectOption[];
+  hint?: string;
+  /** What was refused and how to put it right. */
+  error?: string;
+}
+
+export function Select({ id, label, options, hint, error, className, ...select }: SelectProps) {
+  const errorId = `${id}-error`;
+  const hintId = `${id}-hint`;
+  const describedBy = [
+    error === undefined ? undefined : errorId,
+    hint === undefined ? undefined : hintId,
+  ]
+    .filter((part) => part !== undefined)
+    .join(" ");
+
+  return (
+    <div className={cn("flex flex-col gap-hair", className)}>
+      <label htmlFor={id} className="font-semibold text-body text-ink">
+        {label}
+      </label>
+      <div className={cn(BOX, "relative h-control", error === undefined ? CALM : REFUSED)}>
+        <select
+          {...select}
+          id={id}
+          aria-invalid={error === undefined ? undefined : true}
+          aria-describedby={describedBy === "" ? undefined : describedBy}
+          className={cn(INPUT, "cursor-pointer appearance-none pr-control pl-snug")}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value} lang={option.lang}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown aria-hidden className="pointer-events-none absolute right-snug size-icon" />
+      </div>
+      {error !== undefined && <FieldError id={errorId}>{error}</FieldError>}
+      {hint !== undefined && (
+        <p id={hintId} className="text-caption text-muted">
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

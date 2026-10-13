@@ -112,7 +112,7 @@ function edition(id: number, year: string, current: boolean, teachers: string[])
 }
 
 /** PPM's editions, the newer first as the server lists them; the teacher teaches both. */
-const EDITIONS = [
+const EDITIONS: Edition[] = [
   {
     ...edition(5, "2025-2026", false, ["demo-colleague", "demo-teacher"]),
     teaching_starts: "2026-02-23",
@@ -265,7 +265,10 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return json({ detail: { message: "Not found.", code: "not_found" } }, 404);
   }
   // Every edition's syllabus and books are empty: the pages around them are what this file asks.
-  if (/^\/api\/catalog\/editions\/\d+\/(syllabus|readings)$/.test(path)) return json([]);
+  if (/^\/api\/catalog\/editions\/\d+\/syllabus$/.test(path)) {
+    return json({ locale: "it", sections: [] });
+  }
+  if (/^\/api\/catalog\/editions\/\d+\/readings$/.test(path)) return json([]);
   const one = EDITIONS.find((e) => path === `/api/catalog/editions/${e.id}`);
   if (one !== undefined) {
     await held;

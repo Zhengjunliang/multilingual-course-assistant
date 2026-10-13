@@ -247,6 +247,7 @@ for (const colorScheme of ["light", "dark"] as const) {
       expect(await violations(page), "assigning").toEqual([]);
       await page.keyboard.press("Escape");
 
+      await tab(page, it.staff.edition.teachers).click();
       const revoke = it.staff.revoke.actionLabel.replace("{{username}}", "Giulia Neri");
       await page.getByRole("button", { name: revoke }).click();
       await expect(page.getByRole("alertdialog", { name: it.staff.revoke.title })).toBeVisible();
@@ -259,10 +260,12 @@ for (const colorScheme of ["light", "dark"] as const) {
     }) => {
       await visit(page, api, screen("/staff/editions/12", "staff"));
       const section = it.staff.syllabus.section.prerequisiti;
+      await tab(page, section).click();
       await page.getByRole("button", { name: `${it.staff.edit} · ${section}` }).click();
       await expect(page.getByRole("textbox", { name: section })).toBeFocused();
       expect(await violations(page), "a section in its box").toEqual([]);
 
+      await tab(page, it.staff.readings.title).click();
       await page.getByRole("button", { name: it.staff.readings.add }).click();
       await expect(page.getByRole("dialog", { name: it.staff.readings.addTitle })).toBeVisible();
       expect(await violations(page), "adding a book").toEqual([]);

@@ -25,7 +25,7 @@ export function useFailure(): (error: unknown) => string {
   );
 }
 
-interface Loaded<T> {
+export interface Loaded<T> {
   data: T | null;
   error: unknown;
   /**

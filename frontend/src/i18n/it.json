@@ -196,7 +196,7 @@
       "invalid_choice": "Scegli una delle opzioni proposte.",
       "min_value": "Il numero è troppo piccolo.",
       "max_value": "Il numero è troppo grande.",
-      "unique": "Questo titolo è già nell'elenco in questa lingua.",
+      "unique": "Questo titolo è già nell'elenco.",
       "unknown": "Qualcosa è andato storto. Riprova."
     },
     "source": "Piano di studi dal catalogo dei corsi Cineca.",
@@ -263,15 +263,26 @@
       "status": "Stato"
     },
     "edition": {
-      "teachers": "Docenti dell'edizione",
+      "views": "Viste dell'edizione",
+      "teachers": "Docenti",
       "starts": "Lezioni dal {{date}}",
       "empty": "Nessun docente assegnato a questa edizione."
     },
     "syllabus": {
       "title": "Syllabus",
-      "sub": "Le sezioni del catalogo dei corsi Cineca, in ciascuna lingua del sito.",
-      "languages": "Lingua del syllabus",
-      "empty": "Nessun testo in questa lingua.",
+      "sections": "Sezioni del syllabus",
+      "language": "Lingua del syllabus",
+      "relabelled": "Lingua del syllabus: {{language}}.",
+      "position": "{{position}} di {{total}}",
+      "previous": "Sezione precedente",
+      "next": "Sezione successiva",
+      "written": "Compilata",
+      "blank": "Vuota",
+      "empty": {
+        "title": "Sezione vuota",
+        "write": "Scrivi il testo con «Scrivi», qui sopra.",
+        "read": "Il syllabus non ha testo per questa sezione."
+      },
       "write": "Scrivi",
       "saved": "Sezione «{{section}}» salvata.",
       "cleared": "Sezione «{{section}}» svuotata.",
@@ -286,7 +297,7 @@
       },
       "clear": {
         "title": "Svuotare la sezione?",
-        "body": "«{{section}}» in {{language}} resterà senza testo, e il testo non è salvato altrove.",
+        "body": "«{{section}}» resterà senza testo, e il testo non è salvato altrove.",
         "action": "Svuota"
       }
     },

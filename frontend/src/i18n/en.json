@@ -196,7 +196,7 @@
       "invalid_choice": "Choose one of the options offered.",
       "min_value": "The number is too small.",
       "max_value": "The number is too large.",
-      "unique": "This title is already on the list in this language.",
+      "unique": "This title is already on the list.",
       "unknown": "Something went wrong. Try again."
     },
     "source": "Study plan from the Cineca course catalogue.",
@@ -263,15 +263,26 @@
       "status": "Status"
     },
     "edition": {
-      "teachers": "The edition's teachers",
+      "views": "Views of the edition",
+      "teachers": "Teachers",
       "starts": "Teaching from {{date}}",
       "empty": "No teacher is assigned to this edition."
     },
     "syllabus": {
       "title": "Syllabus",
-      "sub": "The sections of the Cineca course catalogue, in each of the site's languages.",
-      "languages": "Syllabus language",
-      "empty": "No text in this language.",
+      "sections": "Syllabus sections",
+      "language": "Syllabus language",
+      "relabelled": "Syllabus language: {{language}}.",
+      "position": "{{position}} of {{total}}",
+      "previous": "Previous section",
+      "next": "Next section",
+      "written": "Written",
+      "blank": "Empty",
+      "empty": {
+        "title": "Empty section",
+        "write": "Write its text with “Write”, above.",
+        "read": "The syllabus has no text for this section."
+      },
       "write": "Write",
       "saved": "Section \"{{section}}\" saved.",
       "cleared": "Section \"{{section}}\" cleared.",
@@ -286,7 +297,7 @@
       },
       "clear": {
         "title": "Clear the section?",
-        "body": "\"{{section}}\" in {{language}} will have no text, and the text is not kept anywhere else.",
+        "body": "\"{{section}}\" will have no text, and the text is not kept anywhere else.",
         "action": "Clear"
       }
     },
