@@ -336,3 +336,135 @@ class CurriculumEntry(models.Model):
             raise ValidationError({"ad_code": _("This AD code is already used by another course.")})
         if Course.objects.filter(code=self.ad_code).exclude(pk=course.pk).exists():
             raise ValidationError({"ad_code": _("This AD code is already another course's code.")})
+
+
+class SyllabusSection(models.TextChoices):
+    """The text sections of a UniFi syllabus, in the order the course catalogue shows them.
+
+    The catalogue's Testi is not one: a book is a `ReadingItem`. Neither is
+    its Lingua insegnamento, a fact about the edition rather than text
+    (docs/decisions.md, 2026-09-25, *The data model is decided on paper before
+    roles are built on it*, point 4). The labels are the catalogue's own names;
+    a page shows them through its own catalogue.
+    """
+
+    OBIETTIVI_FORMATIVI = "obiettivi_formativi", "Obiettivi formativi"
+    PREREQUISITI = "prerequisiti", "Prerequisiti"
+    CONTENUTI = "contenuti", "Contenuti"
+    PROGRAMMA_ESTESO = "programma_esteso", "Programma esteso"
+    METODI_DIDATTICI = "metodi_didattici", "Metodi didattici"
+    VERIFICA_APPRENDIMENTO = "verifica_apprendimento", "Verifica dell'apprendimento"
+    ALTRO = "altro", "Altro"
+
+
+class Syllabus(models.Model):
+    """One section of an edition's syllabus, in one language.
+
+    A section is stored once per edition and language, and a row always has
+    text: an empty section is no row. Deleted with its edition, which a
+    database cascade can do because the text lives here alone.
+    """
+
+    edition = models.ForeignKey(
+        CourseEdition,
+        on_delete=models.CASCADE,
+        related_name="syllabus",
+        verbose_name=_("course edition"),
+    )
+    locale = models.CharField(
+        max_length=16,
+        choices=settings.LANGUAGES,
+        default=settings.LANGUAGE_CODE,
+        verbose_name=_("language"),
+        help_text=_("Language the text is written in."),
+    )
+    section = models.CharField(
+        max_length=32, choices=SyllabusSection.choices, verbose_name=_("section")
+    )
+    text = models.TextField(verbose_name=_("text"))
+
+    class Meta:
+        ordering = ("edition", "locale", "pk")
+        verbose_name = _("syllabus section")
+        verbose_name_plural = _("syllabus sections")
+        constraints = (
+            models.UniqueConstraint(
+                fields=("edition", "locale", "section"),
+                name="catalog_syllabus_unique_section",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(section__in=SyllabusSection.values),
+                name="catalog_syllabus_section_known",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(text=""),
+                name="catalog_syllabus_text_not_empty",
+            ),
+        )
+
+    def __str__(self) -> str:
+        edition = getattr(self, "edition", None)
+        return f"{edition or '?'} {self.locale} {self.section}"
+
+
+class Importance(models.TextChoices):
+    """How a reading list holds a book, as Talis Aspire's importance levels do (outside the
+    repository: its documentation)."""
+
+    REQUIRED = "required", _("required")
+    RECOMMENDED = "recommended", _("recommended")
+
+
+class ReadingItem(models.Model):
+    """A book on an edition's reading list, in the language its entry is written in.
+
+    The reading list's one owner: the catalogue's Testi section is these
+    rows, never syllabus text. A title is listed once per edition and
+    language. Optional fields are empty, never NULL, as `curriculum` is,
+    except the year, which is a number.
+    """
+
+    edition = models.ForeignKey(
+        CourseEdition,
+        on_delete=models.CASCADE,
+        related_name="reading_items",
+        verbose_name=_("course edition"),
+    )
+    locale = models.CharField(
+        max_length=16,
+        choices=settings.LANGUAGES,
+        default=settings.LANGUAGE_CODE,
+        verbose_name=_("language"),
+        help_text=_("Language the entry is written in."),
+    )
+    title = models.CharField(max_length=300, verbose_name=_("title"))
+    authors = models.CharField(
+        max_length=300,
+        verbose_name=_("authors"),
+        help_text=_("As the syllabus prints them, such as Mazzoldi, Nigro, Voci."),
+    )
+    year = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name=_("year"))
+    isbn = models.CharField(max_length=17, blank=True, default="", verbose_name=_("ISBN"))
+    url = models.URLField(blank=True, default="", verbose_name=_("link"))
+    importance = models.CharField(
+        max_length=16, choices=Importance.choices, verbose_name=_("importance")
+    )
+
+    class Meta:
+        ordering = ("edition", "locale", "title")
+        verbose_name = _("reading item")
+        verbose_name_plural = _("reading items")
+        constraints = (
+            models.UniqueConstraint(
+                fields=("edition", "locale", "title"),
+                name="catalog_reading_unique_title",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(importance__in=Importance.values),
+                name="catalog_reading_importance_known",
+            ),
+        )
+
+    def __str__(self) -> str:
+        edition = getattr(self, "edition", None)
+        return f"{edition or '?'} {self.locale} {self.title}"
