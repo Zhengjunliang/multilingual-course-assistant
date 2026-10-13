@@ -15,7 +15,7 @@
  * can differ from the stored text in form alone.
  */
 
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type SyllabusSection, type SyllabusSectionKey, writeSyllabus } from "@/api/catalog";
@@ -62,6 +62,12 @@ export function useSectionDraft({
   const [refusal, setRefusal] = useState<string | null>(null);
   const refocus = useRef(false);
   const unsaved = draft !== null && draft.trim() !== (read ?? text).trim();
+
+  /** Takes the text as the editor writes it back once read: what the box holds until a change. */
+  const readBack = useCallback((markdown: string) => {
+    setRead(markdown);
+    setDraft(markdown);
+  }, []);
 
   useEffect(() => onUnsaved(section, unsaved), [onUnsaved, section, unsaved]);
 
@@ -138,11 +144,7 @@ export function useSectionDraft({
     setDraft,
     /** Whether the box is the editor, which alone writes the text back once read. */
     rich: read !== null,
-    /** Takes the text as the editor writes it back once read: what the box holds until a change. */
-    readBack: (markdown: string) => {
-      setRead(markdown);
-      setDraft(markdown);
-    },
+    readBack,
     running,
     clearing,
     forbidden,

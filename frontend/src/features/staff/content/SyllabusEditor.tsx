@@ -23,14 +23,14 @@
 
 import { type Editor, EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { Bold, Italic, Link2, List, ListOrdered, type LucideIcon } from "lucide-react";
-import { Fragment, type KeyboardEvent, useRef, useState } from "react";
+import { Fragment, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import type { Shortcut } from "@/components/ui/kbd";
 import { Tooltip } from "@/components/ui/tooltip";
 import { onApple } from "@/features/chat/shortcuts";
-import { holds, markdownOf, syllabusKit } from "./editorKit";
+import { markdownOf, syllabusKit, written } from "./editorKit";
 import { LinkDialog } from "./LinkDialog";
 import { MarkdownArea } from "./MarkdownArea";
 
@@ -69,11 +69,17 @@ const TEXT =
 
 export default function SyllabusEditor(props: EditorProps) {
   // Read once, before an editor that would empty the text could take it.
-  const [kept] = useState(() => holds(props.markdown));
-  return kept ? <RichEditor {...props} /> : <MarkdownArea {...props} />;
+  const [read] = useState(() => written(props.markdown));
+  const { onRead } = props;
+  // Once mounted, before the reader can type: Tiptap's own `create` comes a
+  // task later, after a test or a fast hand may have written.
+  useEffect(() => {
+    if (read !== null) onRead?.(read);
+  }, [read, onRead]);
+  return read !== null ? <RichEditor {...props} /> : <MarkdownArea {...props} />;
 }
 
-function RichEditor({ markdown, onChange, onRead, labelledBy, lang }: EditorProps) {
+function RichEditor({ markdown, onChange, labelledBy, lang }: EditorProps) {
   const { t } = useTranslation();
   const apple = onApple();
   /** The link the dialog edits, empty for a new one; null while it is closed. */
@@ -111,7 +117,6 @@ function RichEditor({ markdown, onChange, onRead, labelledBy, lang }: EditorProp
         return false;
       },
     },
-    onCreate: ({ editor: made }) => onRead?.(markdownOf(made)),
     onUpdate: ({ editor: changed }) => onChange(markdownOf(changed)),
   });
 

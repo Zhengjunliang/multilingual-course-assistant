@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { Editor } from "@tiptap/react";
 import { describe, expect, it } from "vitest";
 
-import { holds, markdownOf, syllabusKit } from "./editorKit";
+import { markdownOf, syllabusKit, written } from "./editorKit";
 
 interface Seed {
   editions: { edition: string; syllabus: { sections: Record<string, string> } }[];
@@ -63,17 +63,14 @@ describe("the syllabus editor", () => {
     ["a quote", "> Dal regolamento."],
     ["raw HTML", "<b>Orale</b> e scritto."],
   ])("knows it would lose %s", (_, text) => {
-    expect(holds(text)).toBe(false);
+    expect(written(text)).toBeNull();
   });
 
-  it("holds every seeded section, and a list written with `*`, which it writes with `-`", () => {
-    const list = "* Analisi\n* Algebra";
-
-    expect([sections.every(([, text]) => holds(text ?? "")), holds(list), reread(list)]).toEqual([
-      true,
-      true,
-      "- Analisi\n- Algebra",
-    ]);
+  it("takes every seeded section as it is, and a list written with `*` with `-`", () => {
+    expect([
+      sections.every(([, text]) => written(text ?? "") === text),
+      written("* Analisi\n* Algebra"),
+    ]).toEqual([true, "- Analisi\n- Algebra"]);
   });
 
   it("leaves a link live in the editor only when it is an absolute http(s) URL", () => {
