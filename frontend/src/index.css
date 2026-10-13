@@ -840,6 +840,18 @@ body,
   height: 100%;
 }
 
+/*
+ * The browser's own parts, a select's list and the scrollbars among them,
+ * drawn in the theme shown rather than in the light they default to.
+ */
+html {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   @apply bg-ground;
