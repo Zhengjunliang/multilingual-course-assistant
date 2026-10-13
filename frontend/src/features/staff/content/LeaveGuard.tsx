@@ -5,10 +5,13 @@
  * repository: MDN, "Window: beforeunload event"); a move to another page of
  * the site asks here, and the reader stays or leaves without saving. A move
  * that keeps the page, a query changed, is let through: the boxes stay.
+ * Staying gives the focus back to what had it when the move was held, the
+ * link the reader followed: Radix gives it back to a dialog's trigger, and
+ * this one has none.
  */
 
 import { LogOut } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useBlocker } from "react-router-dom";
 
@@ -17,10 +20,12 @@ import { AlertDialog } from "@/components/ui/alert-dialog";
 export function LeaveGuard({ unsaved }: { unsaved: number }) {
   const { t } = useTranslation();
   const asking = unsaved > 0;
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      asking && currentLocation.pathname !== nextLocation.pathname,
-  );
+  const opener = useRef<HTMLElement | null>(null);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (!asking || currentLocation.pathname === nextLocation.pathname) return false;
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return true;
+  });
 
   useEffect(() => {
     if (!asking) return;
@@ -51,6 +56,10 @@ export function LeaveGuard({ unsaved }: { unsaved: number }) {
         return true;
       }}
       destructive
+      onCloseAutoFocus={(event) => {
+        event.preventDefault();
+        opener.current?.focus();
+      }}
     />
   );
 }
