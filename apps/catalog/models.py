@@ -27,6 +27,7 @@ and years are written in ASCII*.
 from __future__ import annotations
 
 import re
+from datetime import date
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -238,19 +239,27 @@ class CourseEdition(models.Model):
         return f"{course.code if course else '?'}:{self.academic_year}"
 
     def clean(self) -> None:
-        """Teaching starts in one of the edition's two years.
+        """Teaching starts within the academic year, from 1 September to 31 August.
 
-        A day typed in another year would make the edition current a year
-        early or late, and nothing else says which edition is current. Checked
-        where a person types it, the admin form and `full_clean`, as the
-        consecutive years are (`validate_academic_year`).
+        A day typed a year off would make the edition current a year early or
+        late, and nothing else says which edition is current: a second
+        semester typed in February of the first year, or a first semester in
+        September of the second, is still in one of the edition's two calendar
+        years. 1 September is the day an undated edition counts from
+        (apps/catalog/editions.py). Checked where a person types it, the admin
+        form and `full_clean`, as the consecutive years are
+        (`validate_academic_year`).
         """
         match = _ACADEMIC_YEAR.fullmatch(self.academic_year)
         if self.teaching_starts is None or match is None:
             return
-        if self.teaching_starts.year not in (int(match[1]), int(match[2])):
+        if not date(int(match[1]), 9, 1) <= self.teaching_starts <= date(int(match[2]), 8, 31):
             raise ValidationError(
-                {"teaching_starts": _("Teaching starts in one of the edition's two years.")}
+                {
+                    "teaching_starts": _(
+                        "Teaching starts within the academic year, from 1 September to 31 August."
+                    )
+                }
             )
 
 

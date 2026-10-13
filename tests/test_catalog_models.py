@@ -146,8 +146,14 @@ def test_academic_year_validator_accepts_two_consecutive_years(course: Course) -
     ("starts", "refused"),
     [
         pytest.param(date(2025, 9, 15), ["teaching_starts"], id="the-year-before"),
-        pytest.param(date(2026, 9, 14), [], id="its-first-year"),
-        pytest.param(date(2027, 2, 22), [], id="its-second-year"),
+        # A second semester typed a year early, a first semester a year late: both in
+        # one of the edition's calendar years, neither in its academic year.
+        pytest.param(date(2026, 2, 23), ["teaching_starts"], id="a-second-semester-early"),
+        pytest.param(date(2027, 9, 14), ["teaching_starts"], id="a-first-semester-late"),
+        pytest.param(date(2026, 9, 1), [], id="its-first-day"),
+        pytest.param(date(2026, 9, 14), [], id="its-first-semester"),
+        pytest.param(date(2027, 2, 22), [], id="its-second-semester"),
+        pytest.param(date(2027, 8, 31), [], id="its-last-day"),
         pytest.param(date(2028, 2, 21), ["teaching_starts"], id="the-year-after"),
     ],
 )

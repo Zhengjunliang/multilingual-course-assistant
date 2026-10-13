@@ -274,6 +274,12 @@ describe("a syllabus section", () => {
         new KeyboardEvent("keydown", { key: "Escape", isComposing: true, bubbles: true }),
       );
     });
+    // Safari, which ends the composition before the key and marks the key 229.
+    const ended = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
+    Object.defineProperty(ended, "keyCode", { value: 229 });
+    act(() => {
+      area?.dispatchEvent(ended);
+    });
     const composing = section("Prerequisiti")?.querySelector("textarea") !== null;
     act(() => {
       area?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));

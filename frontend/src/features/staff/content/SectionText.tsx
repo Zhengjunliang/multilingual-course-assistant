@@ -164,8 +164,10 @@ export function SectionText({
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              // An Escape that ends a word an input method is composing is the method's.
-              if (event.key === "Escape" && !event.nativeEvent.isComposing && !running) close();
+              // An Escape that ends a word an input method is composing is the
+              // method's: Safari ends the composition first and marks the key 229.
+              const composing = event.nativeEvent.isComposing || event.keyCode === 229;
+              if (event.key === "Escape" && !composing && !running) close();
             }}
           />
           {!clearing && refused}

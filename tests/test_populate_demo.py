@@ -479,6 +479,22 @@ def test_a_refused_run_changes_nothing(
     assert snapshot() == empty
 
 
+def test_an_edition_held_undated_is_dated_by_the_models_rules(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A start day outside the academic year stops the run on an edition the database
+    holds as on one it creates, and leaves the edition undated."""
+    ppm = Course.objects.create(code="B028451", name="PPM")
+    CourseEdition.objects.create(course=ppm, academic_year="2025-2026")
+    early = {"academic_year": "2025-2026", "teaching_starts": "2025-02-23"}
+    courses = [{**DEMO["courses"][0], "editions": [early]}, *DEMO["courses"][1:]]
+
+    with pytest.raises(CommandError, match="Teaching starts"):
+        run(tmp_path, monkeypatch, None, _with(courses=courses))
+
+    assert CourseEdition.objects.get(course=ppm).teaching_starts is None
+
+
 def test_a_catalogue_of_its_own_gets_no_shipped_content(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -499,7 +515,7 @@ def test_a_catalogue_of_its_own_gets_no_shipped_content(
 
 def test_the_demo_data_file_keeps_the_catalogue_rules() -> None:
     """The shipped file, read without a database: codes, code sources, entries, one course
-    per AD code, and editions of the kept years, each with one start day in its years."""
+    per AD code, and editions of the kept years, each with one start day in its year."""
     demo = json.loads(DATA.read_text(encoding="utf-8"))
     editions = [(c["code"], e) for c in demo["courses"] for e in c["editions"]]
     named = [f"{code}:{e['academic_year']}" for code, e in editions]
@@ -518,17 +534,25 @@ def test_the_demo_data_file_keeps_the_catalogue_rules() -> None:
     assert {e["academic_year"] for _, e in editions} == {"2025-2026", "2026-2027"}
     assert len(named) == len(set(named))
     assert [e for _, e in editions if set(e) != {"academic_year", "teaching_starts"}] == []
-    # A day, in one of the edition's two years, as `CourseEdition.clean()` asks.
+    # A day within the academic year, as `CourseEdition.clean()` asks.
     assert [
         e
         for _, e in editions
-        if str(date.fromisoformat(e["teaching_starts"]).year) not in e["academic_year"].split("-")
+        if not date(int(e["academic_year"][:4]), 9, 1)
+        <= date.fromisoformat(e["teaching_starts"])
+        <= date(int(e["academic_year"][5:]), 8, 31)
     ] == []
-    teacher = next(a for a in demo["accounts"] if a["username"] == "demo-teacher")
+    accounts = {a["username"]: a for a in demo["accounts"]}
+    teacher = accounts["demo-teacher"]
+    assert (teacher["first_name"], teacher["last_name"]) == ("Demo", "Teacher")
     assert [role["edition"] for role in teacher["roles"]] == [
         "B003725:2026-2027",
         "B024251:2026-2027",
         "B028451:2026-2027",
+    ]
+    assert [role["programme"] for role in accounts["demo-secretariat"]["roles"]] == [
+        "B047",
+        "B308",
     ]
     assert {role["edition"] for role in teacher["roles"]} <= set(named)
 

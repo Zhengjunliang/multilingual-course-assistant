@@ -93,7 +93,7 @@ class Command(BaseCommand):
 
     def handle(self, *args: object, data: Path, content: Path | None, **options: object) -> None:
         demo = json.loads(data.read_text(encoding="utf-8"))
-        if content is None and data == DATA:
+        if content is None and data.resolve() == DATA.resolve():
             content = CONTENT
         texts = (
             {"editions": []} if content is None else json.loads(content.read_text(encoding="utf-8"))
@@ -131,14 +131,18 @@ class Command(BaseCommand):
 
     def _create[M: Model](self, row: M) -> M:
         """`row`, checked by its model's rules, saved and counted."""
-        try:
-            row.full_clean()
-        except ValidationError as exc:
-            raise CommandError(f"{row._meta.verbose_name} {row}: {exc.messages}") from None
+        self._check(row)
         row.save()
         name = str(row._meta.verbose_name_plural)
         self.created[name] = self.created.get(name, 0) + 1
         return row
+
+    def _check(self, row: Model) -> None:
+        """`row` held to its model's rules; one it breaks stops the run."""
+        try:
+            row.full_clean()
+        except ValidationError as exc:
+            raise CommandError(f"{row._meta.verbose_name} {row}: {exc.messages}") from None
 
     def _catalogue(self, demo: dict[str, Any]) -> None:
         programmes = {
@@ -176,6 +180,7 @@ class Command(BaseCommand):
                 )
                 if edition.teaching_starts is None:
                     edition.teaching_starts = starts
+                    self._check(edition)
                     edition.save(update_fields=["teaching_starts"])
                     self.dated += 1
 
