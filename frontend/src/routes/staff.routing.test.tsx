@@ -104,6 +104,7 @@ function edition(id: number, year: string, current: boolean, teachers: string[])
     course: PPM,
     academic_year: year,
     teaching_starts: null,
+    period: "",
     is_current: current,
     teachers: teachers.map((username, index) => ({ id: index + 10, username, name: "" })),
     permissions: ["edition.view"],
@@ -115,6 +116,7 @@ const EDITIONS = [
   {
     ...edition(5, "2025-2026", false, ["demo-colleague", "demo-teacher"]),
     teaching_starts: "2026-02-23",
+    period: "second_semester",
   },
   edition(4, "2024-2025", true, ["demo-teacher"]),
 ];
@@ -679,6 +681,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
         tr.querySelector("a")?.getAttribute("href"),
         text(tr.cells[1]),
         text(tr.cells[2]),
+        text(tr.cells[3]),
       ]),
       crumbs: crumbs(container),
       // The Gestione item the course is under, not the page itself.
@@ -695,8 +698,14 @@ describe("a course, an edition, and a teacher's own courses", () => {
       // Behind its tab, kept mounted.
       tabs: ["Edizioni2", `${i18n.t("staff.course.inPlan")}1`],
       editions: [
-        ["/staff/editions/5?programme=B047", "Non corrente", "demo-colleague, demo-teacher"],
-        ["/staff/editions/4?programme=B047", "Corrente", "demo-teacher"],
+        [
+          "/staff/editions/5?programme=B047",
+          "2° semestre", // spellchecker:disable-line
+          "Non corrente",
+          "demo-colleague, demo-teacher",
+        ],
+        // An edition nobody gave a period shows a dash.
+        ["/staff/editions/4?programme=B047", "—", "Corrente", "demo-teacher"],
       ],
       crumbs: [
         "Corso di laurea",
@@ -759,12 +768,12 @@ describe("a course, an edition, and a teacher's own courses", () => {
       [
         "/staff/editions/5",
         "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026",
-        ["2025-2026", "Non corrente", "demo-colleague, demo-teacher", ""],
+        ["2025-2026", "2° semestre", "Non corrente", "demo-colleague, demo-teacher", ""], // spellchecker:disable-line
       ],
       [
         "/staff/editions/4",
         "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2024-2025",
-        ["2024-2025", "Corrente", "demo-teacher", ""],
+        ["2024-2025", "—", "Corrente", "demo-teacher", ""],
       ],
     ];
     expect({ current, all, returned }).toEqual({
@@ -793,7 +802,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
           [
             "/staff/editions/3",
             "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2023-2024",
-            ["2023-2024", "Non corrente", "", ""],
+            ["2023-2024", "—", "Non corrente", "", ""],
           ],
         ],
       },
@@ -848,8 +857,14 @@ describe("a course, an edition, and a teacher's own courses", () => {
     unmount();
 
     expect(seen).toEqual({
-      // The day its teaching starts, which is what makes an edition current.
-      chips: ["2025-2026", "Non corrente", "Lezioni dal 23 febbraio 2026", "B028451"],
+      // Its semester, and the day its teaching starts, which is what makes an edition current.
+      chips: [
+        "2025-2026",
+        "Non corrente",
+        "2° semestre", // spellchecker:disable-line
+        "Lezioni dal 23 febbraio 2026",
+        "B028451",
+      ],
       // The reader is marked as themselves; whoever may assign gets a "Revoca" per row.
       people:
         who === TEACHER

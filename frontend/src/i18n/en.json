@@ -246,6 +246,11 @@
     "open": "Open",
     "current": "Current",
     "past": "Not current",
+    "period": {
+      "label": "Period",
+      "first_semester": "1st semester",
+      "second_semester": "2nd semester"
+    },
     "course": {
       "inPlan": "In the study plan of",
       "twoCodesBoth": "Two codes, one course: each edition counts for both curricula.",

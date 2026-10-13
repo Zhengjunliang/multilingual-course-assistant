@@ -246,6 +246,11 @@
     "open": "打开",
     "current": "当前",
     "past": "非当前",
+    "period": {
+      "label": "学期",
+      "first_semester": "第一学期",
+      "second_semester": "第二学期"
+    },
     "course": {
       "inPlan": "所在学习计划",
       "twoCodesBoth": "两个代码，同一门课：每个版本对两个方向都有效。",

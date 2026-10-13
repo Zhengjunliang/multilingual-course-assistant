@@ -21,6 +21,7 @@ function edition(
     course: course(code),
     academic_year: year,
     teaching_starts: null,
+    period: "",
     is_current: current,
     teachers: teachers.map((username, index) => ({ id: index, username, name: "" })),
     permissions: ["edition.view"],

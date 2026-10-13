@@ -35,6 +35,7 @@ import { notOver, ownCourses, shown } from "@/features/staff/mine";
 import { useOpenedRow } from "@/features/staff/openedRow";
 import { PageHead } from "@/features/staff/page";
 import { PeopleInline } from "@/features/staff/people";
+import { periodName } from "@/features/staff/period";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { useCrumbs, useShell } from "./shell";
 
@@ -93,6 +94,7 @@ export default function MinePage() {
               <TableRow>
                 <TableHead>{t("staff.plan.course")}</TableHead>
                 <TableHead>{t("staff.course.year")}</TableHead>
+                <TableHead>{t("staff.period.label")}</TableHead>
                 <TableHead>{t("staff.course.status")}</TableHead>
                 <TableHead>{t("staff.plan.teachers")}</TableHead>
                 <TableHead>
@@ -125,6 +127,9 @@ export default function MinePage() {
                     className="whitespace-nowrap tabular-nums"
                   >
                     {edition.academic_year}
+                  </TableCell>
+                  <TableCell label={t("staff.period.label")} className="whitespace-nowrap">
+                    {periodName(edition.period, t) ?? <span className="text-muted">—</span>}
                   </TableCell>
                   <TableCell label={t("staff.course.status")}>
                     <StatusDot on={edition.is_current}>

@@ -28,6 +28,7 @@ import { contextProgramme, programmeLine } from "@/features/staff/crumbs";
 import { isNotFound } from "@/features/staff/errors";
 import { Code, PageHead, Section } from "@/features/staff/page";
 import { StaffList, shownName } from "@/features/staff/people";
+import { periodName } from "@/features/staff/period";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { useCrumbs, useShell } from "./shell";
 
@@ -77,6 +78,7 @@ export default function EditionPage() {
     return <LoadFailure error={edition.error} back={back} onRetry={() => void edition.reload()} />;
   if (data === null) return null;
   const { course, academic_year: year } = data;
+  const period = periodName(data.period, t);
   // A calendar day, read and printed in UTC so no time zone moves it.
   const starts =
     data.teaching_starts === null
@@ -96,6 +98,7 @@ export default function EditionPage() {
             <Chip tone={data.is_current ? "accent" : "neutral"}>
               {data.is_current ? t("staff.current") : t("staff.past")}
             </Chip>
+            {period !== null && <Chip>{period}</Chip>}
             {starts !== null && (
               <Chip className="tabular-nums">{t("staff.edition.starts", { date: starts })}</Chip>
             )}
