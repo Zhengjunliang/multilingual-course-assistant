@@ -12,17 +12,17 @@ on one holding rows of its own:
 
 - A programme by code, a course by code, a curriculum entry by programme,
   curriculum and course, an edition by course and year: created when missing,
-  never changed when present, but for an edition with no teaching start, which
-  gets the file's. Each new row passes `full_clean()` first, so the models' own
+  never changed when present, but for an edition with no teaching start or no
+  period, which gets the file's. Each new row passes `full_clean()` first, so the models' own
   rules — an AD code belongs to one course (apps/catalog/models.py) — stop a
   bad data file at the row that breaks them. A course the file marks
   `code_source: cineca-only` is created so; one with no mark, as from its
   Moodle course. A row the file does not name is kept, an edition included.
 - No edition is made current: which one is follows its teaching start
   (apps/catalog/editions.py).
-- Content: an edition gets the content file's syllabus in a language only when
-  it holds no section in that language, and its books in a language only when
-  it holds no book in it, so a run never overwrites what a teacher wrote. The
+- Content: an edition gets the content file's syllabus, and its language, only
+  when it holds no section, and its books only when it holds no book, so a run
+  never overwrites what a teacher wrote. The
   shipped content names the shipped catalogue's editions, so a catalogue file
   given without a content file gets none.
 - Accounts: `demo-` ones only, and the file may name no other. A declared
@@ -176,12 +176,18 @@ class Command(BaseCommand):
                 edition = self._merge(
                     CourseEdition,
                     {"course": course, "academic_year": e["academic_year"]},
-                    {"teaching_starts": starts},
+                    {"teaching_starts": starts, "period": e["period"]},
                 )
-                if edition.teaching_starts is None:
-                    edition.teaching_starts = starts
+                missing = {
+                    field: value
+                    for field, value in (("teaching_starts", starts), ("period", e["period"]))
+                    if not getattr(edition, field)
+                }
+                if missing:
+                    for field, value in missing.items():
+                        setattr(edition, field, value)
                     self._check(edition)
-                    edition.save(update_fields=["teaching_starts"])
+                    edition.save(update_fields=list(missing))
                     self.dated += 1
 
     def _content(self, texts: dict[str, Any]) -> None:
@@ -190,16 +196,16 @@ class Command(BaseCommand):
             edition = CourseEdition.objects.filter(course__code=code, academic_year=year).first()
             if edition is None:
                 raise CommandError(f"no edition {e['edition']} to hold its content")
-            for locale, sections in e["syllabus"].items():
-                if not Syllabus.objects.filter(edition=edition, locale=locale).exists():
-                    for section, text in sections.items():
-                        self._create(
-                            Syllabus(edition=edition, locale=locale, section=section, text=text)
-                        )
-            for locale, books in e["readings"].items():
-                if not ReadingItem.objects.filter(edition=edition, locale=locale).exists():
-                    for book in books:
-                        self._create(ReadingItem(edition=edition, locale=locale, **book))
+            syllabus = e["syllabus"]
+            if not Syllabus.objects.filter(edition=edition).exists():
+                edition.syllabus_locale = syllabus["locale"]
+                self._check(edition)
+                edition.save(update_fields=["syllabus_locale"])
+                for section, text in syllabus["sections"].items():
+                    self._create(Syllabus(edition=edition, section=section, text=text))
+            if not ReadingItem.objects.filter(edition=edition).exists():
+                for book in e["readings"]:
+                    self._create(ReadingItem(edition=edition, **book))
 
     def _account(self, account: dict[str, Any], password: str | None) -> None:
         # Checked here, inside the transaction, and not before the run: a name
