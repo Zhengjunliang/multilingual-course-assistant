@@ -19,6 +19,12 @@ const SENTENCE: Record<StaffErrorCode, `staff.error.${StaffErrorCode}`> = {
   not_authenticated: "staff.error.not_authenticated",
   permission_denied: "staff.error.permission_denied",
   not_found: "staff.error.not_found",
+  max_length: "staff.error.max_length",
+  invalid: "staff.error.invalid",
+  invalid_choice: "staff.error.invalid_choice",
+  min_value: "staff.error.min_value",
+  max_value: "staff.error.max_value",
+  unique: "staff.error.unique",
 };
 
 export const UNKNOWN = "staff.error.unknown";

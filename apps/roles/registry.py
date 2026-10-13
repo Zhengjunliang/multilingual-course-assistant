@@ -34,20 +34,25 @@ class Permission(StrEnum):
     PROGRAMME_ASSIGN_SECRETARIAT = "programme.assign_secretariat"
     EDITION_VIEW = "edition.view"
     EDITION_ASSIGN_TEACHER = "edition.assign_teacher"
+    EDITION_EDIT_CONTENT = "edition.edit_content"
 
 
 PROGRAMME_PERMISSIONS = frozenset(p for p in Permission if p.startswith("programme."))
 EDITION_PERMISSIONS = frozenset(p for p in Permission if p.startswith("edition."))
 
 # No role holds PROGRAMME_ASSIGN_SECRETARIAT: only the superuser assigns secretariat staff.
+# An edition's content — its syllabus and reading list — is edited by its teacher or the
+# secretariat (docs/decisions.md, 2026-09-25, *The data model is decided on paper before
+# roles are built on it*, point 4).
 ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = MappingProxyType(
     {
-        Role.TEACHER: frozenset({Permission.EDITION_VIEW}),
+        Role.TEACHER: frozenset({Permission.EDITION_VIEW, Permission.EDITION_EDIT_CONTENT}),
         Role.SECRETARIAT: frozenset(
             {
                 Permission.PROGRAMME_VIEW,
                 Permission.EDITION_VIEW,
                 Permission.EDITION_ASSIGN_TEACHER,
+                Permission.EDITION_EDIT_CONTENT,
             }
         ),
     }

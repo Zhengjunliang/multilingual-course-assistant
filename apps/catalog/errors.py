@@ -17,8 +17,23 @@ class StaffError(StrEnum):
     ALREADY_HELD = "already_held"
 
 
-# A missing or empty username, a lost session, a refused permission, a scope
-# outside the caller's reach.
+# A missing or empty field, a lost session, a refused permission, a scope
+# outside the caller's reach; and what a book's fields refuse
+# (apps/catalog/content_serializers.py): a text too long, a link or a year that
+# is not one, an importance or a language outside its choices, a year outside
+# what the column holds, a title the list holds already (apps/catalog/content_views.py).
 DRF_CODES_SHOWN = frozenset(
-    {"required", "blank", "not_authenticated", "permission_denied", "not_found"}
+    {
+        "required",
+        "blank",
+        "not_authenticated",
+        "permission_denied",
+        "not_found",
+        "max_length",
+        "invalid",
+        "invalid_choice",
+        "min_value",
+        "max_value",
+        "unique",
+    }
 )

@@ -75,7 +75,7 @@ def world() -> World:
     since the newer one's teaching starts in a month; IA is offered by L031
     alone; the shared course is offered by both. Start days count from today,
     so the world is the same whatever day the tests run. The
-    users: a teacher of both PPM years, a teacher of the new year only, the
+    users: a teacher of both PPM years, a teacher assigned to the new year only, the
     secretariat of each programme, a teacher of IA who is also B047's
     secretariat, a student with no role, the superuser, and a B047 secretariat
     member whose account is disabled.
@@ -225,8 +225,8 @@ def test_deleting_a_scope_or_a_user_deletes_its_role_rows() -> None:
     ]
 
 
-TEACHES = {"edition.view"}
-RUNS_EDITION = {"edition.view", "edition.assign_teacher"}
+TEACHES = {"edition.view", "edition.edit_content"}
+RUNS_EDITION = {"edition.view", "edition.assign_teacher", "edition.edit_content"}
 RUNS_PROGRAMME = {"programme.view"}
 
 
@@ -247,6 +247,8 @@ def test_who_holds_what_where() -> None:
     expected |= {
         ("continuing", ppm_old): TEACHES,
         ("continuing", ppm_new): TEACHES,
+        # A teacher covers every edition of their course, the year before their own included.
+        ("newcomer", ppm_old): TEACHES,
         ("newcomer", ppm_new): TEACHES,
         # A programme's secretariat covers every edition of every course it
         # offers, the shared course included, and nothing of another programme.

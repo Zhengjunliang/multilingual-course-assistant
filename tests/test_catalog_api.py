@@ -39,8 +39,8 @@ PROGRAMMES_URL = "/api/catalog/programmes"
 COURSES_URL = "/api/catalog/courses"
 OLD, NEW = "B028451:2024-2025", "B028451:2025-2026"  # PPM's editions; the old one is current
 
-TEACHES = ["edition.view"]
-RUNS_EDITION = ["edition.assign_teacher", "edition.view"]
+TEACHES = ["edition.edit_content", "edition.view"]
+RUNS_EDITION = ["edition.assign_teacher", "edition.edit_content", "edition.view"]
 
 
 def as_user(user: User | None) -> APIClient:
@@ -132,7 +132,8 @@ def test_each_caller_lists_their_own_scope() -> None:
     views, assigns = ["programme.view"], ["programme.assign_secretariat", "programme.view"]
     assert seen == {
         "continuing": (marked(TEACHES, ppm_old, ppm_new), {}),
-        "newcomer": (marked(TEACHES, ppm_new), {}),
+        # Assigned to the new year, a teacher holds the same on the old one.
+        "newcomer": (marked(TEACHES, ppm_old, ppm_new), {}),
         "secretariat": (
             marked(RUNS_EDITION, ppm_old, ppm_new, shared),
             {"B047": (views, *b047)},
@@ -267,7 +268,7 @@ def test_the_edition_list_narrows_to_a_course() -> None:
         "secretariat, a course of another programme": (w.secretariat, "B003725"),
         "superuser, an unknown code": (w.root, "X999"),
         "superuser, a NUL byte": (w.root, "B028451\x00"),
-        # A teacher gets the editions they teach, and no other of the course.
+        # A teacher gets every edition of the course, not only the one they are assigned to.
         "teacher of the new year": (w.newcomer, "B028451"),
     }
 
@@ -281,7 +282,7 @@ def test_the_edition_list_narrows_to_a_course() -> None:
         "secretariat, a course of another programme": [],
         "superuser, an unknown code": [],
         "superuser, a NUL byte": [],
-        "teacher of the new year": [NEW],
+        "teacher of the new year": [NEW, OLD],
     }
 
 
@@ -306,18 +307,22 @@ def test_a_write_without_the_csrf_token_is_refused() -> None:
 
 
 @pytest.mark.parametrize(
-    ("url", "rows"),
+    ("url", "caller", "rows"),
     [
-        pytest.param(EDITIONS_URL, (3, 6), id="editions"),
-        pytest.param(PROGRAMMES_URL, (1, 2), id="programmes"),
-        pytest.param(f"{PROGRAMMES_URL}/B047/courses", (2, 3), id="study-plan"),
+        pytest.param(EDITIONS_URL, "secretariat", (3, 6), id="editions"),
+        # A teacher's editions are found through the course, not through their rows alone.
+        pytest.param(EDITIONS_URL, "newcomer", (2, 4), id="editions-teacher"),
+        pytest.param(PROGRAMMES_URL, "secretariat", (1, 2), id="programmes"),
+        pytest.param(f"{PROGRAMMES_URL}/B047/courses", "secretariat", (2, 3), id="study-plan"),
         # A course's rows are its entries.
-        pytest.param(f"{COURSES_URL}/B000001", (2, 3), id="course"),
+        pytest.param(f"{COURSES_URL}/B000001", "secretariat", (2, 3), id="course"),
     ],
 )
-def test_each_read_costs_the_same_for_more_rows(url: str, rows: tuple[int, int]) -> None:
+def test_each_read_costs_the_same_for_more_rows(
+    url: str, caller: str, rows: tuple[int, int]
+) -> None:
     w = world()
-    client = as_user(w.secretariat)
+    client = as_user(getattr(w, caller))
 
     def queries() -> tuple[int, int]:
         with CaptureQueriesContext(connection) as captured:

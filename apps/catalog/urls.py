@@ -1,7 +1,17 @@
 """URL map for the catalogue API; config/urls.py mounts it under `/api/catalog/`."""
 
+import re
+
+from django.conf import settings
 from django.urls import path, register_converter
 
+from apps.catalog.content_views import (
+    EditionReadingsView,
+    EditionReadingView,
+    EditionSyllabusSectionView,
+    EditionSyllabusView,
+)
+from apps.catalog.models import SyllabusSection
 from apps.catalog.staff_views import (
     EditionTeachersView,
     EditionTeacherView,
@@ -32,7 +42,33 @@ class _Key:
         return value
 
 
+class _OneOf:
+    """One value of a closed set, so a value outside it matches no route and is a 404."""
+
+    regex: str
+
+    def to_python(self, value: str) -> str:
+        return value
+
+    def to_url(self, value: str) -> str:
+        return value
+
+
+class _Locale(_OneOf):
+    """A language the site serves, as `settings.LANGUAGES` spells it."""
+
+    regex = "|".join(re.escape(code) for code, _name in settings.LANGUAGES)
+
+
+class _Section(_OneOf):
+    """A section of a UniFi syllabus (apps/catalog/models.py)."""
+
+    regex = "|".join(re.escape(section) for section in SyllabusSection.values)
+
+
 register_converter(_Key, "key")
+register_converter(_Locale, "locale")
+register_converter(_Section, "section")
 
 app_name = "catalog"
 
@@ -59,5 +95,17 @@ urlpatterns = [
         "editions/<int:pk>/teachers/<key:username>",
         EditionTeacherView.as_view(),
         name="edition-teacher",
+    ),
+    path("editions/<int:pk>/syllabus", EditionSyllabusView.as_view(), name="edition-syllabus"),
+    path(
+        "editions/<int:pk>/syllabus/<locale:locale>/<section:section>",
+        EditionSyllabusSectionView.as_view(),
+        name="edition-syllabus-section",
+    ),
+    path("editions/<int:pk>/readings", EditionReadingsView.as_view(), name="edition-readings"),
+    path(
+        "editions/<int:pk>/readings/<int:item>",
+        EditionReadingView.as_view(),
+        name="edition-reading",
     ),
 ]
