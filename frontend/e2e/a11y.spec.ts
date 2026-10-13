@@ -273,15 +273,20 @@ for (const colorScheme of ["light", "dark"] as const) {
   });
 }
 
-test("every staff page and second tab fits 375 px without scrolling sideways", async ({
+test("every staff page and second tab fits 375 px without scrolling sideways, its main the one scroller", async ({
   page,
   api,
 }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
+  // Shorter than an edition's page, so that its main scrolls: a document taller
+  // than the window would then scroll beside it, two scrollbars, as it did while
+  // a screen-reader-only text was placed against the page (StaffLayout.tsx).
+  await page.setViewportSize({ width: 375, height: 360 });
   const width = () => page.evaluate(() => document.documentElement.scrollWidth);
+  const height = () => page.evaluate(() => document.scrollingElement?.scrollHeight ?? 0);
   for (const each of SCREENS.filter((candidate) => candidate.as === "staff")) {
     await visit(page, api, each);
     expect(await width(), each.path).toBeLessThanOrEqual(375);
+    expect(await height(), `${each.path}'s document`).toBeLessThanOrEqual(360);
   }
   await visit(page, api, screen(`/staff/programmes/${PROGRAMME.code}`, "staff"));
   await tab(page, it.staff.secretariat.title).click();
@@ -289,6 +294,47 @@ test("every staff page and second tab fits 375 px without scrolling sideways", a
   await visit(page, api, screen(`/staff/courses/${COURSE.code}`, "staff"));
   await tab(page, it.staff.course.inPlan).click();
   expect(await width(), "the study plans tab").toBeLessThanOrEqual(375);
+  await visit(page, api, screen("/staff/editions/12", "staff"));
+  await tab(page, it.staff.readings.title).click();
+  await expect(page.getByRole("button", { name: it.staff.readings.add })).toBeVisible();
+  expect(await width(), "the reading list tab").toBeLessThanOrEqual(375);
+});
+
+test("a section half written survives a look at another tab, and leaving the page asks first", async ({
+  page,
+  api,
+}) => {
+  await visit(page, api, screen("/staff/editions/12", "staff"));
+  const section = it.staff.syllabus.section.prerequisiti;
+  await tab(page, section).click();
+  await page.getByRole("button", { name: `${it.staff.edit} · ${section}` }).click();
+  const box = page.getByRole("textbox", { name: section });
+  await box.pressSequentially("Bozza ");
+  await tab(page, it.staff.readings.title).click();
+  await tab(page, it.staff.syllabus.title).click();
+  await expect(box).toContainText("Bozza");
+  await expect(tab(page, section)).toContainText(it.staff.syllabus.unsaved);
+
+  const mine = page
+    .getByRole("navigation", { name: it.staff.nav.management })
+    .getByRole("link", { name: new RegExp(`^${it.staff.mine.title}`) });
+  await mine.click();
+  await expect(
+    page.getByRole("alertdialog", { name: it.staff.syllabus.leave.title }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: it.staff.syllabus.leave.stay }).click();
+  await expect(box).toContainText("Bozza");
+  await expect(mine).toBeFocused();
+
+  // Closing the tab: the browser's own question, which a dismissal answers by staying.
+  const asked = new Promise<string>((resolve) => {
+    page.once("dialog", (dialog) => {
+      resolve(dialog.type());
+      void dialog.dismiss();
+    });
+  });
+  await page.close({ runBeforeUnload: true });
+  expect(await asked).toBe("beforeunload");
 });
 
 test("/ puts the focus in the study plan's filter and types nothing into it", async ({
