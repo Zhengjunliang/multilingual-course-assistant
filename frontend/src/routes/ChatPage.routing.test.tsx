@@ -377,6 +377,22 @@ describe("the chat page's address", () => {
       opened: { thread: false, at: "/" },
     });
   });
+
+  it("stands the entry back at once when a new conversation is opened while it recedes", async () => {
+    // Otherwise the entry would fade out to its end and jump back.
+    askFails = true;
+    const { container, unmount } = page("/");
+    await settle();
+    askFromTheFrontDoor(container);
+    const receding = container.querySelector(".recede") !== null;
+
+    openNewConversation(container);
+    await settle();
+    const after = container.querySelector(".recede") !== null;
+    unmount();
+
+    expect({ receding, after }).toEqual({ receding: true, after: false });
+  });
 });
 
 describe("pinning from the sidebar", () => {
