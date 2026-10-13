@@ -316,6 +316,7 @@
         "orderedList": "Elenco numerato",
         "link": "Collegamento",
         "hint": "Scrivi come in un documento: grassetto, elenchi e collegamenti restano.",
+        "markdown": "Testo in Markdown, come viene salvato: **grassetto**, *corsivo*, - elenco, [testo](indirizzo).",
         "linkTitle": "Inserisci un collegamento",
         "linkField": "Indirizzo",
         "linkHint": "Un indirizzo web, ad esempio {{example}}.",

@@ -8,9 +8,11 @@
  * open, with what was written, and the focus in the text. An edition gone
  * from the reader's reach reads the page again.
  *
- * The box is unsaved once what it holds differs from the section's text, by
+ * The box is unsaved once what it holds differs from what it opened on, by
  * more than the blank at its ends that saving ignores: a box opened and left
- * as it was is not.
+ * as it was is not, and saving it sends nothing. What it opened on is the
+ * section's text as the editor writes it back once read (`readBack`), which
+ * can differ from the stored text in form alone.
  */
 
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
@@ -52,12 +54,14 @@ export function useSectionDraft({
   const box = useRef<HTMLDivElement>(null);
   /** What the box holds, as Markdown; null while the section is read, not edited. */
   const [draft, setDraft] = useState<string | null>(null);
+  /** The text as the editor wrote it back once read; null until then, or in the plain box. */
+  const [read, setRead] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   const refocus = useRef(false);
-  const unsaved = draft !== null && draft.trim() !== text.trim();
+  const unsaved = draft !== null && draft.trim() !== (read ?? text).trim();
 
   useEffect(() => onUnsaved(section, unsaved), [onUnsaved, section, unsaved]);
 
@@ -71,6 +75,7 @@ export function useSectionDraft({
 
   const close = () => {
     setDraft(null);
+    setRead(null);
     setForbidden(false);
     setRefusal(null);
     refocus.current = true;
@@ -131,6 +136,13 @@ export function useSectionDraft({
     draft,
     /** Opens the box on the section's text, or hands it what was written. */
     setDraft,
+    /** Whether the box is the editor, which alone writes the text back once read. */
+    rich: read !== null,
+    /** Takes the text as the editor writes it back once read: what the box holds until a change. */
+    readBack: (markdown: string) => {
+      setRead(markdown);
+      setDraft(markdown);
+    },
     running,
     clearing,
     forbidden,

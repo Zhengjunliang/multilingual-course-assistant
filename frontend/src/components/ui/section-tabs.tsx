@@ -116,7 +116,9 @@ export function SectionTabs<T extends string>({
                 <span className="whitespace-nowrap font-medium group-data-[state=active]:font-semibold">
                   {section.label}
                 </span>
-                <span id={`${captionId}-${index}`} className="text-caption text-muted">
+                {/* The tab's description, not part of its name, nor of its panel's,
+                    which the name labels: a description is read from hidden text. */}
+                <span id={`${captionId}-${index}`} aria-hidden className="text-caption text-muted">
                   {section.caption}
                 </span>
               </span>

@@ -15,12 +15,11 @@
  * question when it was the clearing that was refused.
  *
  * Should the editor's chunk not load, a stale page after a deploy, the text
- * is written as the Markdown it is in a plain box, as an answer whose
- * typesetting did not load is shown without it (features/chat/AnswerStream.tsx).
+ * is written as the Markdown it is in a plain box (MarkdownArea.tsx).
  */
 
 import { Eraser, FileText, Pencil } from "lucide-react";
-import { type FormEvent, lazy, Suspense, useEffect, useId, useRef } from "react";
+import { type FormEvent, lazy, Suspense, useId } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SyllabusSection, SyllabusSectionKey } from "@/api/catalog";
@@ -31,26 +30,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { onApple } from "@/features/chat/shortcuts";
 import type { UiLocale } from "@/i18n";
 import { Forbidden } from "../Refusal";
-import type { EditorProps } from "./SyllabusEditor";
+import { MarkdownArea } from "./MarkdownArea";
 import { SyllabusMarkdown } from "./SyllabusMarkdown";
 import { useSectionDraft, WRITING } from "./sectionDraft";
-
-/** The text as the Markdown it is, in a plain box, where the editor did not load. */
-function MarkdownArea({ markdown, onChange, labelledBy, lang }: EditorProps) {
-  const area = useRef<HTMLTextAreaElement>(null);
-  // The reader pressed «Modifica» to write here.
-  useEffect(() => area.current?.focus(), []);
-  return (
-    <textarea
-      ref={area}
-      aria-labelledby={labelledBy}
-      lang={lang}
-      defaultValue={markdown}
-      onChange={(event) => onChange(event.target.value)}
-      className="field-sizing-content max-h-[60vh] min-h-40 resize-y bg-transparent px-gutter py-snug text-ink text-reading outline-none"
-    />
-  );
-}
 
 const SyllabusEditor = lazy(() =>
   import("./SyllabusEditor").catch(() => ({ default: MarkdownArea })),
@@ -96,6 +78,8 @@ export function SectionText({
     box,
     draft,
     setDraft,
+    readBack,
+    rich,
     running,
     clearing,
     forbidden,
@@ -177,13 +161,15 @@ export function SectionText({
                 <SyllabusEditor
                   markdown={text}
                   onChange={setDraft}
+                  onRead={readBack}
                   labelledBy={headingId}
                   lang={locale}
                 />
               </Suspense>
               <div className="flex flex-wrap items-center gap-tight border-hairline border-t bg-tint px-snug py-tight">
+                {/* The plain box says what it takes above itself. */}
                 <p className="min-w-0 flex-1 text-caption text-muted">
-                  {t("staff.syllabus.editor.hint")}
+                  {rich && t("staff.syllabus.editor.hint")}
                 </p>
                 <Button type="button" variant="ghost" size="sm" onClick={close} disabled={running}>
                   {t("staff.cancel")}

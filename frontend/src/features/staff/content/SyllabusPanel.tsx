@@ -18,7 +18,7 @@
  * the box closing is all a screen reader would otherwise miss.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type SyllabusSectionKey, setSyllabusLocale } from "@/api/catalog";
@@ -48,6 +48,9 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
   const [status, setStatus] = useState("");
   /** The language being sent, shown in the select until the server answers. */
   const [choosing, setChoosing] = useState<UiLocale | null>(null);
+  /** The latest language chosen, and the queue its request waits in. */
+  const chosen = useRef<UiLocale | null>(null);
+  const sending = useRef(Promise.resolve());
   const [refusal, setRefusal] = useState<string | null>(null);
   /** The sections whose box holds text not saved. */
   const [unsaved, setUnsaved] = useState<ReadonlySet<SyllabusSectionKey>>(() => new Set());
@@ -65,20 +68,28 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
   if (syllabus.error !== null) return <PartFailure onRetry={() => void syllabus.reload()} />;
   if (locale === null) return null;
 
-  const choose = async (next: UiLocale) => {
+  // One choice at a time, in the order made, and only the last is shown and
+  // said: the arrows on a closed select change it at every press.
+  const choose = (next: UiLocale) => {
+    chosen.current = next;
     setChoosing(next);
     setRefusal(null);
-    try {
-      const answered = await setSyllabusLocale(edition, next);
-      syllabus.relabelled(answered.locale);
-      setStatus(t("staff.syllabus.relabelled", { language: endonym(answered.locale) }));
-    } catch (error) {
-      // The edition left the reader's reach: the page reads again, and says so.
-      if (isNotFound(error)) await reloadPage();
-      else setRefusal(fail(error));
-    } finally {
-      setChoosing(null);
-    }
+    sending.current = sending.current.then(async () => {
+      if (chosen.current !== next) return;
+      try {
+        const answered = await setSyllabusLocale(edition, next);
+        if (chosen.current !== next) return;
+        syllabus.relabelled(answered.locale);
+        setStatus(t("staff.syllabus.relabelled", { language: endonym(answered.locale) }));
+      } catch (error) {
+        if (chosen.current !== next) return;
+        // The edition left the reader's reach: the page reads again, and says so.
+        if (isNotFound(error)) await reloadPage();
+        else setRefusal(fail(error));
+      } finally {
+        if (chosen.current === next) setChoosing(null);
+      }
+    });
   };
 
   const language = editable ? (
@@ -87,7 +98,7 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
       label={t("staff.syllabus.language")}
       value={choosing ?? locale}
       onChange={(event) => {
-        if (isUiLocale(event.target.value)) void choose(event.target.value);
+        if (isUiLocale(event.target.value)) choose(event.target.value);
       }}
       error={refusal ?? undefined}
       options={UI_LOCALES.map((option) => ({

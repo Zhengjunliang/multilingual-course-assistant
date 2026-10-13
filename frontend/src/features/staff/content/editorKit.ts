@@ -17,10 +17,18 @@
  * A link is live only when it is an absolute http(s) URL, the same rule the
  * rendered text follows (`safeUrl`): a pasted `javascript:` link stays text,
  * and one the stored text holds is drawn with no address.
+ *
+ * A section can still hold what the editor cannot write, through the plain
+ * box, the API or the admin: a heading, a table, code, raw HTML. The parser
+ * drops such a block, or, for a node the schema lacks, empties the whole
+ * document, and the next save would store what is left. `holds` looks at a
+ * text before the editor is offered: one with a block or a mark the editor
+ * does not write, or that loses a word read in and written back, is written
+ * as the Markdown it is instead.
  */
 
 import { Markdown } from "@tiptap/markdown";
-import type { Editor, Extensions } from "@tiptap/react";
+import { Editor, type Extensions } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
 import { safeUrl } from "@/features/chat/AnswerMarkdown";
@@ -49,4 +57,54 @@ export function syllabusKit(): Extensions {
 /** The editor's text as Markdown, as it is stored. */
 export function markdownOf(editor: Editor): string {
   return editor.getMarkdown().replace(/\s+$/, "");
+}
+
+/** What the editor writes, by the names marked gives its tokens. */
+const WRITES = new Set([
+  "space",
+  "paragraph",
+  "text",
+  "escape",
+  "strong",
+  "em",
+  "link",
+  "br",
+  "list",
+  "list_item",
+]);
+
+interface Token {
+  type: string;
+  tokens?: Token[];
+  items?: Token[];
+}
+
+function writable(tokens: readonly Token[]): boolean {
+  return tokens.every(
+    (token) =>
+      WRITES.has(token.type) && writable(token.tokens ?? []) && writable(token.items ?? []),
+  );
+}
+
+/** A text's words, its runs of letters and digits in order, whatever marks them up. */
+function words(text: string): string {
+  return text.match(/[\p{L}\p{N}]+/gu)?.join(" ") ?? "";
+}
+
+/**
+ * Whether the editor keeps `markdown` whole: every block and mark in it is one
+ * the editor writes, read by the parser the editor reads with, and read in and
+ * written back it keeps every word.
+ */
+export function holds(markdown: string): boolean {
+  const editor = new Editor({
+    extensions: syllabusKit(),
+    content: markdown,
+    contentType: "markdown",
+  });
+  const tokens: readonly Token[] | undefined = editor.markdown?.instance.lexer(markdown);
+  const kept =
+    tokens !== undefined && writable(tokens) && words(markdownOf(editor)) === words(markdown);
+  editor.destroy();
+  return kept;
 }

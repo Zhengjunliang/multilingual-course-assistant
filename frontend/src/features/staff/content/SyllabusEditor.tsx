@@ -15,7 +15,10 @@
  * What the editor writes is editorKit.ts's: the text is read from Markdown and
  * each change is handed back as Markdown. Saving and cancelling are the
  * section's (Ctrl Enter, Escape): Ctrl Enter adds no line break here, where
- * StarterKit's would.
+ * StarterKit's would. A text the editor would not keep whole is written as
+ * the Markdown it is (MarkdownArea.tsx). Once read, the editor hands back the
+ * text as it writes it, a `-` where the text had `*`: that, not the stored
+ * text, is what a box left unchanged holds.
  */
 
 import { type Editor, EditorContent, useEditor, useEditorState } from "@tiptap/react";
@@ -27,14 +30,17 @@ import { Button } from "@/components/ui/button";
 import type { Shortcut } from "@/components/ui/kbd";
 import { Tooltip } from "@/components/ui/tooltip";
 import { onApple } from "@/features/chat/shortcuts";
-import { markdownOf, syllabusKit } from "./editorKit";
+import { holds, markdownOf, syllabusKit } from "./editorKit";
 import { LinkDialog } from "./LinkDialog";
+import { MarkdownArea } from "./MarkdownArea";
 
 export interface EditorProps {
   /** The text it opens on, in Markdown. */
   markdown: string;
   /** Each change, as the Markdown it would save. */
   onChange: (markdown: string) => void;
+  /** The text as the editor writes it back once read, where it rewrites the Markdown it reads. */
+  onRead?: (markdown: string) => void;
   /** The id of the heading that names the text. */
   labelledBy: string;
   /** The language the text is written in. */
@@ -61,7 +67,13 @@ const TOOLS = GROUPS.flat();
 const TEXT =
   "min-h-40 px-gutter py-snug text-ink text-reading outline-none [&>*+*]:mt-snug [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-room [&_ol]:pl-room [&_li]:marker:text-muted [&_li+li]:mt-hair [&_a]:underline [&_a]:decoration-muted [&_a]:underline-offset-2";
 
-export default function SyllabusEditor({ markdown, onChange, labelledBy, lang }: EditorProps) {
+export default function SyllabusEditor(props: EditorProps) {
+  // Read once, before an editor that would empty the text could take it.
+  const [kept] = useState(() => holds(props.markdown));
+  return kept ? <RichEditor {...props} /> : <MarkdownArea {...props} />;
+}
+
+function RichEditor({ markdown, onChange, onRead, labelledBy, lang }: EditorProps) {
   const { t } = useTranslation();
   const apple = onApple();
   /** The link the dialog edits, empty for a new one; null while it is closed. */
@@ -99,6 +111,7 @@ export default function SyllabusEditor({ markdown, onChange, labelledBy, lang }:
         return false;
       },
     },
+    onCreate: ({ editor: made }) => onRead?.(markdownOf(made)),
     onUpdate: ({ editor: changed }) => onChange(markdownOf(changed)),
   });
 
