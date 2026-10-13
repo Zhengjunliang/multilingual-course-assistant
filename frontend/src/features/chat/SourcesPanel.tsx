@@ -27,7 +27,7 @@
  */
 
 import { FileText, Globe } from "lucide-react";
-import { type ReactElement, useState } from "react";
+import { type ReactElement, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Citation } from "@/api/contract";
@@ -40,25 +40,26 @@ import { distinctions, excerptOf, hostOf, sourceLink, sourcesOf, titleOf } from 
 
 type Kind = "all" | Citation["kind"];
 
+/** What a row reports: the pointer or the focus came onto it (its marker) or left it (`null`). */
+type Report = (by: "pointer" | "focus", marker: string | null) => void;
+
 interface RowProps {
   citation: Citation;
   distinction: string | undefined;
-  onHighlight: (marker: string | null) => void;
+  report: Report;
 }
 
-function Row({ citation, distinction, onHighlight }: RowProps) {
+function Row({ citation, distinction, report }: RowProps) {
   const { t } = useTranslation();
   const href = sourceLink(citation);
   const title = titleOf(citation);
-  const enter = () => onHighlight(citation.marker);
-  const leave = () => onHighlight(null);
   return (
     <li
       className="relative flex gap-tight rounded-control p-tight text-body transition-colors hover:bg-hover"
-      onPointerEnter={enter}
-      onPointerLeave={leave}
-      onFocus={enter}
-      onBlur={leave}
+      onPointerEnter={() => report("pointer", citation.marker)}
+      onPointerLeave={() => report("pointer", null)}
+      onFocus={() => report("focus", citation.marker)}
+      onBlur={() => report("focus", null)}
     >
       <span className="grid size-control-xs shrink-0 place-items-center rounded-control bg-accent-soft text-accent">
         <SourceIcon citation={citation} />
@@ -82,7 +83,10 @@ function Row({ citation, distinction, onHighlight }: RowProps) {
           )}
           <LanguageChip locale={citation.locale} />
         </span>
-        <span className="flex min-w-0 items-center gap-tight text-caption text-muted">
+        {/* Wrapping rather than squeezing: a file's name next to a course's
+            code and edition would otherwise be cut to its first letters, so
+            the edition goes under it when both do not fit. */}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-tight text-caption text-muted">
           {citation.kind === "web" && citation.url !== null ? (
             <span className="truncate">
               {distinction ? `${hostOf(citation.url)} · ${distinction}` : hostOf(citation.url)}
@@ -90,7 +94,7 @@ function Row({ citation, distinction, onHighlight }: RowProps) {
           ) : (
             <>
               <Chip size="sm">{t("sources.slide", { page: citation.page })}</Chip>
-              <span className="min-w-0 truncate font-mono">{citation.source_file}</span>
+              <span className="min-w-0 max-w-full truncate font-mono">{citation.source_file}</span>
               {citation.academic_year != null && (
                 <span className="shrink-0 font-mono">
                   {citation.course} · {citation.academic_year}
@@ -127,7 +131,10 @@ interface SourcesPanelProps {
   citations: readonly Citation[];
   /** The markers the finished answer used; `null` while it is unfinished, when all are listed as one. */
   cited: ReadonlySet<string> | null;
-  /** A row is under the pointer or the focus, or, with `null`, none is. */
+  /**
+   * The source whose pills the answer marks: the row under the pointer, else
+   * the row holding the focus; `null` when neither is, and once the panel closes.
+   */
   onHighlight: (marker: string | null) => void;
   /** The button under the answer that opens it, where focus returns on closing. */
   trigger: ReactElement;
@@ -143,6 +150,26 @@ export function SourcesPanel({
 }: SourcesPanelProps) {
   const { t } = useTranslation();
   const [kind, setKind] = useState<Kind>("all");
+  // The row under the pointer and the row holding the focus, each kept: the
+  // pointer's wins while it is on a row, and leaving gives the highlight back
+  // to the focused one rather than to none.
+  const at = useRef<{ pointer: string | null; focus: string | null }>({
+    pointer: null,
+    focus: null,
+  });
+  const report: Report = (by, marker) => {
+    at.current[by] = marker;
+    onHighlight(at.current.pointer ?? at.current.focus);
+  };
+  // Closing the panel unmounts the row under the pointer or the focus before
+  // it can say it was left, so the highlight goes with the panel.
+  const openChange = (next: boolean) => {
+    if (!next) {
+      at.current = { pointer: null, focus: null };
+      onHighlight(null);
+    }
+    onOpenChange(next);
+  };
   const sources = sourcesOf(citations);
   const told = distinctions(sources);
   const of = (wanted: Citation["kind"]) => sources.filter((source) => source.kind === wanted);
@@ -161,7 +188,7 @@ export function SourcesPanel({
           key={source.marker}
           citation={source}
           distinction={told.get(source.marker)}
-          onHighlight={onHighlight}
+          report={report}
         />
       ))}
     </ol>
@@ -170,7 +197,7 @@ export function SourcesPanel({
   return (
     <Sheet
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={openChange}
       heading={t("sources.title")}
       count={sources.length}
       closeLabel={t("sources.close")}

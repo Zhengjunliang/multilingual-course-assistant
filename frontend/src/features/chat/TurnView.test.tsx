@@ -13,7 +13,7 @@
  * that by naming the tag; a mounted turn answers it with `closest`.
  */
 
-import { act } from "react";
+import { act, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -447,6 +447,16 @@ describe("a pill in the answer", () => {
     ]);
   });
 
+  it("speaks the interface's language inside an answer in another", () => {
+    const { container, unmount } = mounted(turn({ locale: "en" }));
+    const pill = container.querySelector("a[data-pill]");
+    const spoken = pill?.closest("[lang]")?.getAttribute("lang");
+    const answer = pill?.parentElement?.closest("[lang]")?.getAttribute("lang");
+    unmount();
+
+    expect({ spoken, answer }).toEqual({ spoken: "it", answer: "en" });
+  });
+
   it("closes its card on Escape", () => {
     vi.useFakeTimers();
     const { container, unmount } = mounted(turn());
@@ -621,6 +631,35 @@ describe("the row under the answer", () => {
     expect({ marked, closed, left }).toEqual({ marked: true, closed: true, left: false });
   });
 
+  it("keeps the focused row's pills marked while the pointer passes over another row", () => {
+    const { container, unmount } = mounted(turn({ answer: "Prima [Excerpt 1]. Poi [Excerpt 2]." }));
+    const marked = () =>
+      [...container.querySelectorAll("a[data-pill]")].map((pill) =>
+        pill.hasAttribute("data-highlighted"),
+      );
+    act(() => sourcesButton(container)?.click());
+    const [first, second] = document.body.querySelectorAll<HTMLLIElement>('[role="dialog"] li');
+
+    act(() => first?.querySelector("a")?.focus());
+    const focused = marked();
+    // React derives enter and leave from `pointerover` and `pointerout`.
+    act(() => {
+      second?.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
+    });
+    const pointed = marked();
+    act(() => {
+      second?.dispatchEvent(new MouseEvent("pointerout", { bubbles: true }));
+    });
+    const left = marked();
+    unmount();
+
+    expect({ focused, pointed, left }).toEqual({
+      focused: [true, false],
+      pointed: [false, true],
+      left: [true, false],
+    });
+  });
+
   it("gives focus back to the sources button when the panel closes", async () => {
     const { container, unmount } = mounted(turn());
     const open = sourcesButton(container);
@@ -657,6 +696,7 @@ describe("the row under the answer", () => {
 describe("a turn that did not get all the way", () => {
   const cut = turn({ answer: "La scadenza è", complete: false, failure: { kind: "incomplete" } });
 
+  /** What the warning banner shows, and what the turn's live region says. */
   function banner(of: Turn, { visitor = false, failedNow = true } = {}) {
     const { container, unmount } = mount(
       <MemoryRouter>
@@ -670,16 +710,18 @@ describe("a turn that did not get all the way", () => {
         />
       </MemoryRouter>,
     );
-    const shown = container.querySelector(".bg-warn");
-    const seen = { role: shown?.getAttribute("role") ?? null, text: shown?.textContent ?? null };
+    const seen = {
+      text: container.querySelector(".bg-warn")?.textContent ?? null,
+      said: container.querySelector('p[role="status"]')?.textContent ?? null,
+    };
     unmount();
     return seen;
   }
 
   it("says in a warning banner that the answer stopped, and that what was written is kept", () => {
     expect(banner(cut)).toEqual({
-      role: "status",
       text: "La risposta si è interrotta prima della fine.Quello che vedi è stato salvato così com'è.",
+      said: "La risposta si è interrotta prima della fine. Quello che vedi è stato salvato così com'è.",
     });
   });
 
@@ -691,7 +733,7 @@ describe("a turn that did not get all the way", () => {
   });
 
   it("is announced only when it happened just now, not when a stored conversation is read back", () => {
-    expect(banner(cut, { failedNow: false }).role).toBeNull();
+    expect(banner(cut, { failedNow: false }).said).toBe("");
   });
 
   it("says, while a busy server is waited out, how long until the next try and which it is", () => {
@@ -705,7 +747,44 @@ describe("a turn that did not get all the way", () => {
 
     expect(html).toContain("C&#x27;è un&#x27;altra domanda in corso.");
     expect(html).toContain("Riprovo tra 5 secondi (1 di 2).");
-    expect(html).toContain('role="status"');
+  });
+
+  it("says each in a live region that was on the page before it happened", () => {
+    // A screen reader hears a live region change, and not reliably one that
+    // is inserted with its words already in it (MDN, ARIA live regions).
+    let happen: (props: { turn?: Turn; retry?: typeof RETRY | null; failedNow?: boolean }) => void =
+      () => {};
+    function Live() {
+      const [props, setProps] = useState({
+        turn: turn({ answer: "La scadenza è", complete: false }),
+        retry: null as typeof RETRY | null,
+        failedNow: false,
+      });
+      happen = (next) => setProps((now) => ({ ...now, ...next }));
+      return (
+        <MemoryRouter>
+          <TurnView {...props} live={false} thinking={false} visitor={false} />
+        </MemoryRouter>
+      );
+    }
+    const { container, unmount } = mount(<Live />);
+    const region = container.querySelector('p[role="status"]');
+
+    const before = region?.textContent;
+    act(() => happen({ retry: RETRY }));
+    const retrying = region?.textContent;
+    act(() => happen({ retry: null, turn: cut, failedNow: true }));
+    const failed = region?.textContent;
+    const same = container.querySelector('p[role="status"]') === region;
+    unmount();
+
+    expect({ before, retrying, failed, same }).toEqual({
+      before: "",
+      retrying: "C'è un'altra domanda in corso. Riprovo tra 5 secondi (1 di 2).",
+      failed:
+        "La risposta si è interrotta prima della fine. Quello che vedi è stato salvato così com'è.",
+      same: true,
+    });
   });
 });
 

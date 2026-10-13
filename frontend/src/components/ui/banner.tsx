@@ -7,9 +7,11 @@
  * it says why or what follows, in muted (#190, rule 1). Its icon is the
  * tone's ink, and the words carry the meaning without it.
  *
- * `role` is the caller's: a notice that appears after something happened is
- * a `status` a screen reader hears; one that is part of the page as it opens
- * is read with the page and needs none.
+ * `role` is the caller's: a notice that must interrupt is an `alert`, which a
+ * screen reader announces as it appears. One that only informs is said through
+ * a `status` region already on the page (features/chat/TurnView.tsx): a status
+ * inserted with its words in it is not reliably announced. One that is part of
+ * the page as it opens is read with the page and needs neither.
  */
 
 import type { ComponentType, ReactNode } from "react";
@@ -24,7 +26,7 @@ interface BannerProps {
   children?: ReactNode;
   /** A button or a link at the end. */
   action?: ReactNode;
-  role?: "status" | "alert";
+  role?: "alert";
   className?: string;
 }
 

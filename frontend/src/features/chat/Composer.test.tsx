@@ -101,6 +101,27 @@ describe("the composer", () => {
     },
   );
 
+  it("lets go of what is missing once the field is left, so the next press says it again", () => {
+    // A live region is heard when its words change: pressed twice with no
+    // change between, the second press would say nothing.
+    const { container, unmount } = composer();
+    const said = () => container.querySelector('[role="status"]')?.textContent;
+
+    act(() => send(container)?.click());
+    const first = said();
+    act(() => container.querySelector("textarea")?.blur());
+    const left = said();
+    act(() => send(container)?.click());
+    const again = said();
+    unmount();
+
+    expect({ first, left, again }).toEqual({
+      first: "Scrivi prima la domanda.",
+      left: "",
+      again: "Scrivi prima la domanda.",
+    });
+  });
+
   it("puts a stop button with its word in its place while an answer is written, and it stops", () => {
     let stopped = 0;
     const { container, unmount } = composer(

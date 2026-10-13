@@ -61,13 +61,6 @@ export function AnswerActions({
   const shown = sources.filter((source) => cited?.has(source.marker) ?? true);
   const stacked = (shown.length > 0 ? shown : sources).slice(0, STACKED);
 
-  // Closing the panel unmounts the row under the pointer or the focus before
-  // it can say it was left, so the highlight goes with the panel.
-  const openChange = (next: boolean) => {
-    setOpen(next);
-    if (!next) onHighlight(null);
-  };
-
   if (!complete && sources.length === 0) return null;
 
   return (
@@ -93,7 +86,7 @@ export function AnswerActions({
       {sources.length > 0 && (
         <SourcesPanel
           open={open}
-          onOpenChange={openChange}
+          onOpenChange={setOpen}
           citations={citations}
           cited={cited}
           onHighlight={onHighlight}
