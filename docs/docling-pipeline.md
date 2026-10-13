@@ -4,29 +4,7 @@ How the ingest and query pipelines work: what each step does, why it is needed a
 
 ## 1. The big picture: RAG is two pipelines, not one
 
-"The RAG pipeline" names two different things, which run at different times, fail in different ways and are evaluated differently:
-
-```mermaid
-flowchart LR
-    subgraph Offline["Offline · ingest (once, when material arrives)"]
-        A[Course PDF] --> A0[Probe · choose a parse configuration]
-        A0 --> B[Docling parse]
-        B --> C[Chunking and contextualize]
-        C --> E[(Embed and index in Qdrant<br/>dense + sparse)]
-    end
-    subgraph Online["Online · query (every question)"]
-        Q[Question] --> RT[Router: course, campus or both]
-        RT --> R[Hybrid retrieval top-k]
-        E -.reads.-> R
-        R --> RR[Reranker top-n]
-        RR --> DL{Campus: enough to answer?}
-        DL -- no --> F[Deepening loop, rag.agent only: fetch a linked page]
-        F --> R
-        DL -- yes --> P[Build the prompt]
-        P --> L[Qwen3 generation]
-        L --> ANS[Answer + sources]
-    end
-```
+"The RAG pipeline" names two different things, which run at different times, fail in different ways and are evaluated differently. The diagram of both, as the web API runs them, is in [README.md](../README.md), section "How it works"; the deepening loop below is not in it, since only the command-line agent runs it.
 
 Three principles:
 
