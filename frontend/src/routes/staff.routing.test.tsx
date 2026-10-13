@@ -112,7 +112,10 @@ function edition(id: number, year: string, current: boolean, teachers: string[])
 
 /** PPM's editions, the newer first as the server lists them; the teacher teaches both. */
 const EDITIONS = [
-  edition(5, "2025-2026", false, ["demo-colleague", "demo-teacher"]),
+  {
+    ...edition(5, "2025-2026", false, ["demo-colleague", "demo-teacher"]),
+    teaching_starts: "2026-02-23",
+  },
   edition(4, "2024-2025", true, ["demo-teacher"]),
 ];
 
@@ -170,6 +173,8 @@ let failures = 0;
 let held: Promise<void> | null = null;
 /** Whether edition 5 has left the reader's scope since the page read it: every request about it is a 404. */
 let lost = false;
+/** PPM's editions older than EDITIONS, which a case adds to the list. */
+let earlier: Edition[] = [];
 
 /** An edition as the server would answer it now. */
 function served(e: Edition): Edition {
@@ -246,7 +251,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   // A teacher views no programme, so no course.
   const course = [PPM, SHARED].find((c) => path === `/api/catalog/courses/${c.code}`);
   if (course !== undefined && scope.length > 0) return json(course);
-  if (path === "/api/catalog/editions") return json(EDITIONS.map(served));
+  if (path === "/api/catalog/editions") return json([...EDITIONS, ...earlier].map(served));
   if (path.startsWith("/api/catalog/editions?course=")) {
     return json(EDITIONS.filter((e) => path.endsWith(`=${e.course.code}`)).map(served));
   }
@@ -389,6 +394,7 @@ beforeEach(() => {
   failures = 0;
   held = null;
   lost = false;
+  earlier = [];
   // Each test is a tab of its own: no row noted by another (features/staff/openedRow.ts).
   sessionStorage.clear();
   vi.stubGlobal("fetch", fakeApi);
@@ -717,37 +723,75 @@ describe("a course, an edition, and a teacher's own courses", () => {
     });
   });
 
-  it("lists a teacher's own courses, newest year first", async () => {
+  it("lists a teacher's courses from the current edition on, every year on Tutte, and keeps the view on Back", async () => {
     reader = TEACHER;
-    const { container, unmount, path } = page("/staff");
+    earlier = [edition(3, "2023-2024", false, [])];
+    const { container, unmount, path, back } = page("/staff");
     await settle();
-    const seen = {
+    const seen = () => ({
       path: path(),
       chips: [...container.querySelectorAll("main header .flex-wrap > span")].map(text),
+      views: [...container.querySelectorAll('main nav[aria-label="Edizioni mostrate"] a')].map(
+        (a) => [text(a), a.getAttribute("href"), a.getAttribute("aria-current")],
+      ),
       rows: [...container.querySelectorAll<HTMLTableRowElement>("main tbody tr")].map((tr) => [
         tr.querySelector("a")?.getAttribute("href"),
         text(tr.querySelector("a")),
         [...tr.cells].slice(1).map(text),
       ]),
-    };
+    });
+    const current = seen();
+    click(container.querySelector<HTMLAnchorElement>('main nav a[href="/staff/mine?show=all"]'));
+    await settle();
+    const all = seen();
+    click(container.querySelector<HTMLAnchorElement>('main a[href="/staff/editions/3"]'));
+    await settle();
+    await act(() => back());
+    await settle();
+    const returned = [path(), container.querySelectorAll("main tbody tr").length];
     unmount();
 
-    expect(seen).toEqual({
-      path: "/staff/mine",
-      chips: ["2 edizioni"],
-      // The link names the year, since both rows are the same course.
-      rows: [
-        [
-          "/staff/editions/5",
-          "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026",
-          ["2025-2026", "Non corrente", "demo-colleague, demo-teacher", ""],
-        ],
-        [
-          "/staff/editions/4",
-          "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2024-2025",
-          ["2024-2025", "Corrente", "demo-teacher", ""],
-        ],
+    const rows = [
+      [
+        "/staff/editions/5",
+        "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026",
+        ["2025-2026", "Non corrente", "demo-colleague, demo-teacher", ""],
       ],
+      [
+        "/staff/editions/4",
+        "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2024-2025",
+        ["2024-2025", "Corrente", "demo-teacher", ""],
+      ],
+    ];
+    expect({ current, all, returned }).toEqual({
+      // The year before the current one is a year nobody teaches it: on Tutte only.
+      current: {
+        path: "/staff/mine",
+        chips: ["1 insegnamento"],
+        views: [
+          ["Correnti2", "/staff/mine", "page"], // spellchecker:disable-line
+          ["Tutte3", "/staff/mine?show=all", null],
+        ],
+        // The link names the year, since both rows are the same course.
+        rows,
+      },
+      all: {
+        path: "/staff/mine?show=all",
+        chips: ["1 insegnamento"],
+        views: [
+          ["Correnti2", "/staff/mine", null], // spellchecker:disable-line
+          ["Tutte3", "/staff/mine?show=all", "page"],
+        ],
+        rows: [
+          ...rows,
+          [
+            "/staff/editions/3",
+            "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2023-2024",
+            ["2023-2024", "Non corrente", "", ""],
+          ],
+        ],
+      },
+      returned: ["/staff/mine?show=all", 3],
     });
   });
 
@@ -770,7 +814,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
       TEACHER,
       "/staff/editions/5",
       ["I miei insegnamenti →", "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026 (current)"],
-      true,
+      false,
     ],
     [
       "secretariat staff, who may assign, through their programme",
@@ -782,36 +826,33 @@ describe("a course, an edition, and a teacher's own courses", () => {
         "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE →",
         "2025-2026 (current)",
       ],
-      false,
+      true,
     ],
-  ])("shows an edition's teachers to %s", async (_, who, path, trail, footnote) => {
+  ])("shows an edition's teachers to %s", async (_, who, path, trail, assigns) => {
     reader = who;
     const { container, unmount } = page(path);
     await settle();
-    const banner = [...container.querySelectorAll("main p")].find(
-      (p) => p.textContent === "Puoi vedere questa edizione, ma non assegnare docenti.",
-    );
-    const way = banner?.parentElement?.parentElement?.querySelector("a");
     const seen = {
       chips: [...container.querySelectorAll("main header .flex-wrap > span")].map(text),
       people: [...container.querySelectorAll("main ul li")].map(text),
       crumbs: crumbs(container),
-      banner: banner === undefined ? null : [text(way), way?.getAttribute("href")],
+      refusal: (container.querySelector("main")?.textContent ?? "").includes("non assegnare"),
       assign: text(container.querySelector("main header [data-assign]")),
     };
     unmount();
 
     expect(seen).toEqual({
-      chips: ["2025-2026", "Non corrente", "B028451"],
+      // The day its teaching starts, which is what makes an edition current.
+      chips: ["2025-2026", "Non corrente", "Lezioni dal 23 febbraio 2026", "B028451"],
       // The reader is marked as themselves; whoever may assign gets a "Revoca" per row.
       people:
         who === TEACHER
           ? ["demo-colleagueDocente", "demo-teachertuDocente"]
           : ["demo-colleagueDocenteRevoca", "demo-teacherDocenteRevoca"],
       crumbs: trail,
-      // The banner and its way back where the button would be, or the button.
-      banner: footnote ? ["Torna ai miei insegnamenti", "/staff/mine"] : null,
-      assign: footnote ? null : "Assegna docente",
+      // The button for whoever may assign, and nothing in its place for anyone else.
+      refusal: false,
+      assign: assigns ? "Assegna docente" : null,
     });
   });
 

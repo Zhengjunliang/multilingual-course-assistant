@@ -2,22 +2,20 @@
  * `/staff/editions/:id`: one academic year of a course, and who teaches it.
  *
  * An edition outside the caller's scope is a 404, and the page says "not
- * found". Who may assign a teacher here is the edition's `permissions`: the
- * button is in the page's head beside the switch, and anyone else reads, in a
- * banner where it would be, why they cannot, with the way back to their own
- * start. The path it was reached through is `?programme=`,
- * or the teacher's own courses when no programme the reader may view lists
- * it (features/staff/crumbs.ts).
+ * found". Its head names the year, whether it is current and, where it was
+ * entered, the day its teaching starts, which is what makes it current
+ * (apps/catalog/editions.py). Who may assign a teacher here is the edition's
+ * `permissions`: the button is in the page's head, and nobody else is offered
+ * it. The path it was reached through is `?programme=`, or the teacher's own
+ * courses when no programme the reader may view lists it
+ * (features/staff/crumbs.ts).
  */
 
-import { ArrowLeft, Lock } from "lucide-react";
 import { useCallback } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import { readEdition } from "@/api/catalog";
-import { Banner } from "@/components/ui/banner";
-import { buttonVariants } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Count } from "@/components/ui/count";
 import { useMembers } from "@/features/staff/actions";
@@ -74,6 +72,13 @@ export default function EditionPage() {
     return <LoadFailure error={edition.error} back={back} onRetry={() => void edition.reload()} />;
   if (data === null) return null;
   const { course, academic_year: year } = data;
+  // A calendar day, read and printed in UTC so no time zone moves it.
+  const starts =
+    data.teaching_starts === null
+      ? null
+      : new Intl.DateTimeFormat(i18n.language, { dateStyle: "long", timeZone: "UTC" }).format(
+          new Date(data.teaching_starts),
+        );
 
   return (
     <>
@@ -86,26 +91,15 @@ export default function EditionPage() {
             <Chip tone={data.is_current ? "accent" : "neutral"}>
               {data.is_current ? t("staff.current") : t("staff.past")}
             </Chip>
+            {starts !== null && (
+              <Chip className="tabular-nums">{t("staff.edition.starts", { date: starts })}</Chip>
+            )}
             <Code>{course.code}</Code>
           </>
         }
         sub={programmeLine(course.entries, i18n.language)}
         actions={members.assign}
       />
-      {!assigns && (
-        <Banner
-          icon={Lock}
-          heading={t("staff.refusal.cannot.assignTeacher")}
-          action={
-            <Link to={back.to} className={buttonVariants({ variant: "outline", size: "sm" })}>
-              <ArrowLeft aria-hidden className="size-icon" />
-              {back.label}
-            </Link>
-          }
-        >
-          {t("staff.edition.onlyStaff")}
-        </Banner>
-      )}
       <section className="flex flex-col gap-snug">
         <div className="flex items-center gap-tight">
           <h2 className="font-semibold text-ink text-title">{t("staff.edition.teachers")}</h2>

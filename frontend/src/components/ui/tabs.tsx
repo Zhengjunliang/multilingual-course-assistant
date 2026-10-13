@@ -12,13 +12,23 @@
  * Every panel stays mounted and the ones not shown are hidden (`forceMount`),
  * where Radix would unmount them: a filter typed into one tab is still there
  * when the reader comes back to it from another.
+ *
+ * `TabLinks` draws the same underline over views that are each an address,
+ * a list's filter kept in its query: links in a `nav`, the one shown
+ * `aria-current="page"`, as GitHub's issue list switches between open and
+ * closed. Back and a link passed on both reopen the view.
  */
 
 import * as RadixTabs from "@radix-ui/react-tabs";
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { Count } from "@/components/ui/count";
 import { cn } from "@/lib/utils";
+
+const LIST = "flex gap-hair overflow-x-auto shadow-[inset_0_-1px_var(--line)]";
+const TAB =
+  "group inline-flex h-control items-center gap-tight whitespace-nowrap border-transparent border-b-2 px-tight font-medium text-body text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-2";
 
 interface Tab<T extends string> {
   value: T;
@@ -42,15 +52,12 @@ export function Tabs<T extends string>({ label, tabs, defaultValue, className }:
       defaultValue={defaultValue}
       className={cn("flex flex-col gap-gutter", className)}
     >
-      <RadixTabs.List
-        aria-label={label}
-        className="flex gap-hair overflow-x-auto shadow-[inset_0_-1px_var(--line)]"
-      >
+      <RadixTabs.List aria-label={label} className={LIST}>
         {tabs.map((tab) => (
           <RadixTabs.Trigger
             key={tab.value}
             value={tab.value}
-            className="group inline-flex h-control items-center gap-tight whitespace-nowrap border-transparent border-b-2 px-tight font-medium text-body text-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:-outline-offset-2 data-[state=active]:border-accent data-[state=active]:text-ink"
+            className={cn(TAB, "data-[state=active]:border-accent data-[state=active]:text-ink")}
           >
             {tab.label}
             {tab.count !== undefined && (
@@ -73,5 +80,39 @@ export function Tabs<T extends string>({ label, tabs, defaultValue, className }:
         </RadixTabs.Content>
       ))}
     </RadixTabs.Root>
+  );
+}
+
+interface TabLink {
+  /** Where the view is: a path with its query. */
+  to: string;
+  label: string;
+  count?: number;
+  current: boolean;
+}
+
+interface TabLinksProps {
+  /** Names the navigation for a screen reader. */
+  label: string;
+  links: readonly TabLink[];
+}
+
+export function TabLinks({ label, links }: TabLinksProps) {
+  return (
+    <nav aria-label={label} className={LIST}>
+      {links.map((link) => (
+        <Link
+          key={link.to}
+          to={link.to}
+          aria-current={link.current ? "page" : undefined}
+          className={cn(TAB, "aria-[current=page]:border-accent aria-[current=page]:text-ink")}
+        >
+          {link.label}
+          {link.count !== undefined && (
+            <Count value={link.count} tone={link.current ? "accent" : "neutral"} />
+          )}
+        </Link>
+      ))}
+    </nav>
   );
 }

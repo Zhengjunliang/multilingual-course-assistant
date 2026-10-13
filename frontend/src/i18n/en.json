@@ -256,16 +256,16 @@
     },
     "edition": {
       "teachers": "The edition's teachers",
-      "empty": "No teacher is assigned to this edition.",
-      "onlyStaff": "Only the teaching secretariat and the administrator assign teachers."
+      "starts": "Teaching from {{date}}",
+      "empty": "No teacher is assigned to this edition."
     },
     "mine": {
       "title": "My courses",
-      "count_one": "{{count}} edition",
-      "count_other": "{{count}} editions",
-      "sub": "The editions you are assigned to as a teacher.",
-      "empty": "No course assigned.",
-      "note": "A course has at most one current edition; changing it takes the permission on both editions."
+      "sub": "The courses you teach, with all their editions: you can edit every one.",
+      "show": "Editions shown",
+      "current": "Current",
+      "all": "All",
+      "empty": "No course assigned."
     },
     "assign": {
       "teacher": "Assign teacher",
