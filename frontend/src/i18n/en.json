@@ -188,6 +188,12 @@
       "not_authenticated": "Your session has ended. Sign in again.",
       "permission_denied": "You are not allowed to do this.",
       "not_found": "This is no longer there.",
+      "max_length": "The text is too long.",
+      "invalid": "This value is not valid.",
+      "invalid_choice": "Choose one of the options offered.",
+      "min_value": "The number is too small.",
+      "max_value": "The number is too large.",
+      "unique": "This title is already on the list in this language.",
       "unknown": "Something went wrong. Try again."
     },
     "source": "Study plan from the Cineca course catalogue.",

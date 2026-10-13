@@ -40,6 +40,7 @@ from test_roles import World, everyone, world
 from test_route_permissions import DELEGATED, routes, served
 from test_sources_api import PDF, SHA, write_sidecar
 
+from apps.catalog.models import Importance, ReadingItem
 from apps.qa import sources
 from apps.qa.models import Conversation, Message
 
@@ -56,12 +57,14 @@ ANONYMOUS = "anonymous"
 type Row = tuple[str, str]  # (route name, method)
 
 
-def targets(w: World, conversation: Conversation) -> dict[str, dict[str, object]]:
+def targets(
+    w: World, conversation: Conversation, book: ReadingItem
+) -> dict[str, dict[str, object]]:
     """The object each route with parameters is asked about.
 
-    PPM's current edition, which its teacher of both years and B047's
-    secretariat may act on; B047; a conversation of the student's; the deck of
-    the `deck` fixture.
+    PPM's current edition, which its teachers and B047's secretariat may act
+    on, with one section of its syllabus and a book of its reading list; B047;
+    a conversation of the student's; the deck of the `deck` fixture.
     """
     edition = {"pk": w.ppm_old.pk}
     programme = {"code": w.b047.code}
@@ -74,6 +77,10 @@ def targets(w: World, conversation: Conversation) -> dict[str, dict[str, object]
         "catalog:edition": edition,
         "catalog:edition-teachers": edition,
         "catalog:edition-teacher": {**edition, "username": w.continuing.username},
+        "catalog:edition-syllabus": edition,
+        "catalog:edition-syllabus-section": {**edition, "locale": "it", "section": "prerequisiti"},
+        "catalog:edition-readings": edition,
+        "catalog:edition-reading": {**edition, "item": book.pk},
         "qa:conversation": {"pk": conversation.pk},
         "qa:source": {"sha256": SHA},
     }
@@ -163,7 +170,10 @@ def test_who_may_call_each_route() -> None:
     Message.objects.create(
         conversation=conversation, role=Message.Role.USER, text="Quando?", locale="it"
     )
-    target = targets(w, conversation)
+    book = ReadingItem.objects.create(
+        edition=w.ppm_old, title="Fondamenti", authors="Rossi", importance=Importance.RECOMMENDED
+    )
+    target = targets(w, conversation, book)
     callers: dict[str, User | None] = {user.username: user for user in everyone(w)}
     callers[ANONYMOUS] = None
 

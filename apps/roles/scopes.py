@@ -1,8 +1,11 @@
 """Who covers which scope, written once.
 
-A teacher covers the edition their row names. Secretariat staff cover their
-programme and every edition of every course the programme offers, a course
-shared with another programme included. That rule is the two role-to-annotation
+A teacher covers every edition of the course their row names an edition of:
+the years before it and after it, whoever taught them, as the supervisor asked
+(docs/architecture.md). The row names one edition, so who taught which
+year stays recorded. Secretariat staff cover their programme and every edition
+of every course the programme offers, a course shared with another programme
+included. That rule is the two role-to-annotation
 maps and the `Exists` subqueries below, and nothing else restates it: the
 backend behind `user.has_perm` (apps/roles/backends.py), the catalogue lists
 and each item's `permissions` all read it, so the three cannot disagree.
@@ -71,7 +74,7 @@ def with_edition_roles(editions: QuerySet[CourseEdition], user: User) -> QuerySe
     return editions.annotate(
         **{
             _EDITION_FLAGS[Role.TEACHER]: Exists(
-                rows.filter(role=Role.TEACHER, edition=OuterRef("pk"))
+                rows.filter(role=Role.TEACHER, edition__course=OuterRef("course"))
             ),
             _EDITION_FLAGS[Role.SECRETARIAT]: Exists(
                 rows.filter(

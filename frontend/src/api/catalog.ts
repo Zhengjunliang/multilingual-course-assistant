@@ -11,6 +11,7 @@
  * worked out from a role name here.
  */
 
+import type { UiLocale } from "@/i18n";
 import { request } from "./http";
 
 /** A permission of apps/roles/registry.py, `<scope>.<action>`. */
@@ -18,7 +19,8 @@ export type Permission =
   | "programme.view"
   | "programme.assign_secretariat"
   | "edition.view"
-  | "edition.assign_teacher";
+  | "edition.assign_teacher"
+  | "edition.edit_content";
 
 /**
  * Where a course's `code` was read from (apps/catalog/models.py): its Moodle
@@ -102,6 +104,41 @@ export interface StudyPlanCourse {
   current_edition: EditionSummary | null;
 }
 
+/** A section of a UniFi syllabus, in the order the Cineca course catalogue shows them. */
+export type SyllabusSectionKey =
+  | "obiettivi_formativi"
+  | "prerequisiti"
+  | "contenuti"
+  | "programma_esteso"
+  | "metodi_didattici"
+  | "verifica_apprendimento"
+  | "altro";
+
+/** One section of an edition's syllabus in one language; a section with no text has no row. */
+export interface SyllabusSection {
+  locale: UiLocale;
+  section: SyllabusSectionKey;
+  text: string;
+}
+
+/** How a reading list holds a book. */
+export type Importance = "required" | "recommended";
+
+/** A book on an edition's reading list, in the language its entry is written in. */
+export interface ReadingItem {
+  id: number;
+  locale: UiLocale;
+  title: string;
+  /** As the syllabus prints them. */
+  authors: string;
+  year: number | null;
+  /** Empty when the list gives none. */
+  isbn: string;
+  /** Empty when the list gives none. */
+  url: string;
+  importance: Importance;
+}
+
 /**
  * The codes a staff page has words for (apps/catalog/errors.py): this
  * project's own, a closed set, and the few of DRF's the pages name. DRF's codes
@@ -114,7 +151,13 @@ export type StaffErrorCode =
   | "blank"
   | "not_authenticated"
   | "permission_denied"
-  | "not_found";
+  | "not_found"
+  | "max_length"
+  | "invalid"
+  | "invalid_choice"
+  | "min_value"
+  | "max_value"
+  | "unique";
 
 /** Where staff members belong: an edition's teachers, or a programme's secretariat. */
 export type MemberScope = { kind: "edition"; id: number } | { kind: "programme"; code: string };

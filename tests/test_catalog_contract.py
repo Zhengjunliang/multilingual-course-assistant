@@ -1,13 +1,14 @@
 """The SPA's copy of the catalogue API's shapes must not drift from the serializers.
 
-`apps/catalog/serializers.py` is the single source and
+`apps/catalog/serializers.py` and `apps/catalog/content_serializers.py` are the single source and
 `frontend/src/api/catalog.ts` its shadow on the client, read as text the way
 tests/test_qa_contract.py reads the answer stream's mirror: the fields a
 serializer declares and the field names of the interface of the same name are
 one set, so neither side can add a field the other lacks. The permission
-names, the code sources and the error codes are compared both ways, since the
-SPA matches them as strings: a misspelt permission would hide a button, a
-misspelt code show the general sentence, without any type error.
+names, the code sources, the syllabus sections, the importances and the error
+codes are compared both ways, since the SPA matches them as strings: a misspelt
+permission would hide a button, a misspelt code show the general sentence,
+without any type error.
 """
 
 from __future__ import annotations
@@ -18,8 +19,9 @@ from pathlib import Path
 import pytest
 from test_qa_contract import declaration, fields
 
+from apps.catalog.content_serializers import ReadingItemSerializer, SyllabusSectionSerializer
 from apps.catalog.errors import DRF_CODES_SHOWN, StaffError
-from apps.catalog.models import CodeSource
+from apps.catalog.models import CodeSource, Importance, SyllabusSection
 from apps.catalog.serializers import (
     CourseSerializer,
     CurriculumEntrySerializer,
@@ -44,6 +46,8 @@ MIRRORED = {
     "Edition": EditionSerializer,
     "EditionSummary": EditionSummarySerializer,
     "StudyPlanCourse": StudyPlanCourseSerializer,
+    "SyllabusSection": SyllabusSectionSerializer,
+    "ReadingItem": ReadingItemSerializer,
 }
 
 
@@ -67,9 +71,17 @@ def test_the_mirror_declares_exactly_the_serializers_fields(mirror: str) -> None
     assert declared == {name: set(serializer().fields) for name, serializer in MIRRORED.items()}
 
 
-def test_the_mirror_names_every_permission_code_source_and_error_code(mirror: str) -> None:
+def test_the_mirror_names_every_closed_set(mirror: str) -> None:
     assert (
         union(mirror, "Permission"),
         union(mirror, "CodeSource"),
+        union(mirror, "SyllabusSectionKey"),
+        union(mirror, "Importance"),
         union(mirror, "StaffErrorCode"),
-    ) == (set(Permission), set(CodeSource.values), set(StaffError) | DRF_CODES_SHOWN)
+    ) == (
+        set(Permission),
+        set(CodeSource.values),
+        set(SyllabusSection.values),
+        set(Importance.values),
+        set(StaffError) | DRF_CODES_SHOWN,
+    )
