@@ -103,10 +103,10 @@ function edition(id: number, year: string, current: boolean, teachers: string[])
     id,
     course: PPM,
     academic_year: year,
+    teaching_starts: null,
     is_current: current,
     teachers: teachers.map((username, index) => ({ id: index + 10, username, name: "" })),
-    permissions: ["edition.set_current", "edition.view"],
-    can_set_current: true,
+    permissions: ["edition.view"],
   };
 }
 
@@ -166,8 +166,6 @@ let lateList: { body: ConversationSummary[]; gate: Promise<void> } | null = null
 const revoked = new Set<string>();
 /** Reads of the programme list that fail before one succeeds, as a server error would. */
 let failures = 0;
-/** Whether a switch by the reader would pass, as `can_set_current` says per edition. */
-let switchable = true;
 /** Holds every read of one edition until it settles, as a slow server would. */
 let held: Promise<void> | null = null;
 /** Whether edition 5 has left the reader's scope since the page read it: every request about it is a 404. */
@@ -177,7 +175,6 @@ let lost = false;
 function served(e: Edition): Edition {
   return {
     ...e,
-    can_set_current: e.can_set_current && switchable,
     teachers: e.teachers.filter((t) => !revoked.has(t.username)),
   };
 }
@@ -390,7 +387,6 @@ beforeEach(() => {
   lateList = null;
   revoked.clear();
   failures = 0;
-  switchable = true;
   held = null;
   lost = false;
   // Each test is a tab of its own: no row noted by another (features/staff/openedRow.ts).
@@ -744,7 +740,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
         [
           "/staff/editions/5",
           "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026",
-          ["2025-2026", "Non corrente", "demo-colleague, demo-teacher", "Imposta come corrente"],
+          ["2025-2026", "Non corrente", "demo-colleague, demo-teacher", ""],
         ],
         [
           "/staff/editions/4",
@@ -753,17 +749,6 @@ describe("a course, an edition, and a teacher's own courses", () => {
         ],
       ],
     });
-  });
-
-  it("offers no switch the server would refuse", async () => {
-    reader = TEACHER;
-    switchable = false;
-    const { container, unmount } = page("/staff/mine");
-    await settle();
-    const offered = (container.textContent ?? "").includes("Imposta come corrente");
-    unmount();
-
-    expect(offered).toBe(false);
   });
 
   it("says so when the teacher teaches nothing", async () => {

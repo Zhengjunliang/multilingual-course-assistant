@@ -12,7 +12,6 @@ from apps.catalog.views import (
     CourseDetailView,
     EditionDetailView,
     EditionListView,
-    EditionSetCurrentView,
     ProgrammeCoursesView,
     ProgrammeDetailView,
     ProgrammeListView,
@@ -55,7 +54,6 @@ urlpatterns = [
     path("courses/<key:code>", CourseDetailView.as_view(), name="course"),
     path("editions", EditionListView.as_view(), name="editions"),
     path("editions/<int:pk>", EditionDetailView.as_view(), name="edition"),
-    path("editions/<int:pk>/set-current", EditionSetCurrentView.as_view(), name="set-current"),
     path("editions/<int:pk>/teachers", EditionTeachersView.as_view(), name="edition-teachers"),
     path(
         "editions/<int:pk>/teachers/<key:username>",

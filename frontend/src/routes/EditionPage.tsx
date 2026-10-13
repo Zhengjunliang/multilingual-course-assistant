@@ -5,8 +5,7 @@
  * found". Who may assign a teacher here is the edition's `permissions`: the
  * button is in the page's head beside the switch, and anyone else reads, in a
  * banner where it would be, why they cannot, with the way back to their own
- * start. The course's other editions are read too, for the one a switch to
- * this edition replaces. The path it was reached through is `?programme=`,
+ * start. The path it was reached through is `?programme=`,
  * or the teacher's own courses when no programme the reader may view lists
  * it (features/staff/crumbs.ts).
  */
@@ -16,12 +15,12 @@ import { useCallback } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { listEditions, readEdition } from "@/api/catalog";
+import { readEdition } from "@/api/catalog";
 import { Banner } from "@/components/ui/banner";
 import { buttonVariants } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Count } from "@/components/ui/count";
-import { useMembers, useSetCurrent } from "@/features/staff/actions";
+import { useMembers } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine } from "@/features/staff/crumbs";
 import { isNotFound } from "@/features/staff/errors";
@@ -35,15 +34,9 @@ export default function EditionPage() {
   const { id } = useParams();
   const [search] = useSearchParams();
   const { back, programmes } = useShell();
-  const load = useCallback(
-    () =>
-      readEdition(Number(id)).then(
-        async (read) => [read, await listEditions({ course: read.course.code })] as const,
-      ),
-    [id],
-  );
+  const load = useCallback(() => readEdition(Number(id)), [id]);
   const edition = useLoad(load);
-  const data = edition.data?.[0] ?? null;
+  const data = edition.data;
   const assigns = data?.permissions.includes("edition.assign_teacher") ?? false;
   const object = data === null ? "" : `${data.course.name} · ${data.academic_year}`;
   const members = useMembers({
@@ -65,7 +58,6 @@ export default function EditionPage() {
     ),
     reload: edition.reload,
   });
-  const switching = useSetCurrent({ editions: edition.data?.[1] ?? [], reload: edition.reload });
   const through =
     data === null
       ? null
@@ -98,12 +90,7 @@ export default function EditionPage() {
           </>
         }
         sub={programmeLine(course.entries, i18n.language)}
-        actions={
-          <>
-            {switching.button(data)}
-            {members.assign}
-          </>
-        }
+        actions={members.assign}
       />
       {!assigns && (
         <Banner
@@ -132,7 +119,6 @@ export default function EditionPage() {
         />
       </section>
       {members.dialogs}
-      {switching.dialog}
     </>
   );
 }

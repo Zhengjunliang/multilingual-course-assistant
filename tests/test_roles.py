@@ -14,12 +14,14 @@ created without a password, so none of them costs a password hash.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import TYPE_CHECKING, NamedTuple
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError, transaction
 from django.urls import reverse
+from django.utils import timezone
 from test_catalog_models import violation
 
 from apps.accounts.models import User
@@ -69,8 +71,10 @@ class World(NamedTuple):
 def world() -> World:
     """Two programmes, three courses, four editions, and one user per way of holding a role.
 
-    PPM is offered by B047 alone and runs in two years, the older one current;
-    IA is offered by L031 alone; the shared course is offered by both. The
+    PPM is offered by B047 alone and runs in two years, the older one current,
+    since the newer one's teaching starts in a month; IA is offered by L031
+    alone; the shared course is offered by both. Start days count from today,
+    so the world is the same whatever day the tests run. The
     users: a teacher of both PPM years, a teacher of the new year only, the
     secretariat of each programme, a teacher of IA who is also B047's
     secretariat, a student with no role, the superuser, and a B047 secretariat
@@ -89,11 +93,19 @@ def world() -> World:
             CurriculumEntry(programme=l031, course=shared, year_of_study=1, ad_code="B000001"),
         ]
     )
-    ppm_old = CourseEdition.objects.create(course=ppm, academic_year="2024-2025", is_current=True)
-    ppm_new = CourseEdition.objects.create(course=ppm, academic_year="2025-2026")
-    ia_edition = CourseEdition.objects.create(course=ia, academic_year="2025-2026", is_current=True)
+    today = timezone.localdate()
+    started, starting = today - timedelta(days=365), today + timedelta(days=30)
+    ppm_old = CourseEdition.objects.create(
+        course=ppm, academic_year="2024-2025", teaching_starts=started
+    )
+    ppm_new = CourseEdition.objects.create(
+        course=ppm, academic_year="2025-2026", teaching_starts=starting
+    )
+    ia_edition = CourseEdition.objects.create(
+        course=ia, academic_year="2025-2026", teaching_starts=started
+    )
     shared_edition = CourseEdition.objects.create(
-        course=shared, academic_year="2025-2026", is_current=True
+        course=shared, academic_year="2025-2026", teaching_starts=started
     )
 
     users = {
@@ -213,8 +225,8 @@ def test_deleting_a_scope_or_a_user_deletes_its_role_rows() -> None:
     ]
 
 
-TEACHES = {"edition.view", "edition.set_current"}
-RUNS_EDITION = {"edition.view", "edition.set_current", "edition.assign_teacher"}
+TEACHES = {"edition.view"}
+RUNS_EDITION = {"edition.view", "edition.assign_teacher"}
 RUNS_PROGRAMME = {"programme.view"}
 
 

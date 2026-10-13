@@ -15,8 +15,6 @@ class StaffError(StrEnum):
     NO_SUCH_USER = "no_such_user"
     # A role the user holds on that scope already.
     ALREADY_HELD = "already_held"
-    # A switch refused on the edition it would replace (apps/catalog/editions.py).
-    SWITCH_NEEDS_BOTH = "switch_needs_both"
 
 
 # A missing or empty username, a lost session, a refused permission, a scope

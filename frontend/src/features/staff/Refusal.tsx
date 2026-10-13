@@ -106,7 +106,6 @@ export function LoadFailure({ error, back, onRetry }: LoadFailureProps) {
 const CANNOT: Partial<Record<Permission, string>> = {
   "edition.assign_teacher": "staff.refusal.cannot.assignTeacher",
   "programme.assign_secretariat": "staff.refusal.cannot.assignSecretariat",
-  "edition.set_current": "staff.refusal.cannot.setCurrent",
 };
 
 export function Forbidden({ permission }: { permission: Permission }) {

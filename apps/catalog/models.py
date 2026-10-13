@@ -183,13 +183,11 @@ class Course(models.Model):
 class CourseEdition(models.Model):
     """One academic year of a course.
 
-    At most one edition per course is current, and that is a database
-    constraint, not a convention: the current edition is the default scope of
-    a student's search (`#36`), so two current ones would make that default
-    depend on which row the planner returned first. The constraint
-    cannot be deferred, which fixes the order of a switch — clear the old flag,
-    then set the new one, inside one transaction (docs/data-model.md,
-    invariant 2).
+    Which edition is current is not stored: it is the newest one whose
+    teaching has started, worked out from `teaching_starts` by
+    `with_current()` (apps/catalog/editions.py; docs/data-model.md,
+    invariant 2), so it cannot go stale and two editions of a course are never
+    current together.
     """
 
     # PROTECT, not CASCADE: an edition will own material whose points live in
@@ -206,7 +204,15 @@ class CourseEdition(models.Model):
         verbose_name=_("academic year"),
         help_text=_("Two consecutive years, such as 2025-2026."),
     )
-    is_current = models.BooleanField(default=False, verbose_name=_("current"))
+    teaching_starts = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_("teaching starts"),
+        help_text=_(
+            "First day of the teaching period, from the Cineca catalogue's Periodo didattico. "
+            "Left empty, the edition counts from 1 September of its first year."
+        ),
+    )
 
     class Meta:
         ordering = ("course", "-academic_year")
@@ -221,11 +227,6 @@ class CourseEdition(models.Model):
                 condition=models.Q(academic_year__regex=r"^[0-9]{4}-[0-9]{4}$"),
                 name="catalog_edition_academic_year_format",
                 violation_error_message=_ACADEMIC_YEAR_MESSAGE,
-            ),
-            models.UniqueConstraint(
-                fields=("course",),
-                condition=models.Q(is_current=True),
-                name="catalog_edition_one_current_per_course",
             ),
         )
 

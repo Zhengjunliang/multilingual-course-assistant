@@ -16,9 +16,8 @@ on one holding rows of its own:
   — stop a bad data file at the row that breaks them. A course the file marks
   `code_source: cineca-only` is created so; one with no mark, as from its
   Moodle course.
-- A new edition is not current. A course with no current edition gets the data
-  file's first year through `set_current()`, the one way to change it
-  (docs/data-model.md, invariant 2); a course with one keeps it.
+- No edition is made current: which one is follows its teaching start
+  (apps/catalog/editions.py).
 - Accounts: `demo-` ones only, and the file may name no other. A declared
   account's name, superuser flag and role rows are made the file's, rows it does not
   declare removed; a `demo-` account the file does not name keeps the account
@@ -48,7 +47,6 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from apps.accounts.models import User
-from apps.catalog.editions import set_current
 from apps.catalog.models import (
     CodeSource,
     Course,
@@ -142,12 +140,8 @@ class Command(BaseCommand):
                     },
                     {"year_of_study": e["year_of_study"], "ad_code": e["ad_code"]},
                 )
-            editions = [
+            for year in demo["academic_years"]:
                 self._merge(CourseEdition, {"course": course, "academic_year": year}, {})
-                for year in demo["academic_years"]
-            ]
-            if not CourseEdition.objects.filter(course=course, is_current=True).exists():
-                set_current(editions[0])
 
     def _account(self, account: dict[str, Any], password: str | None) -> None:
         # Checked here, inside the transaction, and not before the run: a name

@@ -14,7 +14,6 @@ import { ApiError } from "@/api/http";
 const SENTENCE: Record<StaffErrorCode, `staff.error.${StaffErrorCode}`> = {
   no_such_user: "staff.error.no_such_user",
   already_held: "staff.error.already_held",
-  switch_needs_both: "staff.error.switch_needs_both",
   required: "staff.error.required",
   blank: "staff.error.blank",
   not_authenticated: "staff.error.not_authenticated",
@@ -59,7 +58,7 @@ export function isNotFound(error: unknown): boolean {
 /**
  * Whether the caller sees the scope but lacks the permission the write needs,
  * a 403 the page offered the action for: its permissions were read before a
- * role changed. Not a lost session, and not the switch's own refusal.
+ * role changed. Not a lost session.
  */
 export function isForbidden(error: unknown): boolean {
   return error instanceof ApiError && error.status === 403 && error.code === "permission_denied";

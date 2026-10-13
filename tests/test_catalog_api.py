@@ -39,8 +39,8 @@ PROGRAMMES_URL = "/api/catalog/programmes"
 COURSES_URL = "/api/catalog/courses"
 OLD, NEW = "B028451:2024-2025", "B028451:2025-2026"  # PPM's editions; the old one is current
 
-TEACHES = ["edition.set_current", "edition.view"]
-RUNS_EDITION = ["edition.assign_teacher", "edition.set_current", "edition.view"]
+TEACHES = ["edition.view"]
+RUNS_EDITION = ["edition.assign_teacher", "edition.view"]
 
 
 def as_user(user: User | None) -> APIClient:
@@ -55,10 +55,6 @@ def code_of(response: HttpResponseBase) -> str | None:
     if not response["Content-Type"].startswith("application/json"):
         return None
     return response.json()["detail"]["code"]  # pyright: ignore[reportAttributeAccessIssue]
-
-
-def switch_url(edition: CourseEdition) -> str:
-    return f"/api/catalog/editions/{edition.pk}/set-current"
 
 
 def row_label(row: dict[str, Any]) -> str:
@@ -110,7 +106,7 @@ def test_each_caller_lists_their_own_scope() -> None:
                 tuple(t["username"] for t in e["teachers"])
             )
         seen[name] = (
-            {row_label(e): (e["permissions"], e["can_set_current"]) for e in editions.json()},
+            {row_label(e): (e["permissions"], e["is_current"]) for e in editions.json()},
             {
                 p["code"]: (
                     p["permissions"],
@@ -123,32 +119,35 @@ def test_each_caller_lists_their_own_scope() -> None:
         )
 
     ppm_old, ppm_new, ia, shared = OLD, NEW, "B003725:2025-2026", "B000001:2025-2026"
-    teaches, runs = (TEACHES, True), (RUNS_EDITION, True)
+    # PPM's new edition has not started yet; every other course has one edition, started.
+    current = {ppm_old: True, ppm_new: False, ia: True, shared: True}
+
+    def marked(permissions: list[str], *editions: str) -> dict[str, tuple[list[str], bool]]:
+        return {edition: (permissions, current[edition]) for edition in editions}
+
     # Curricula, course count, secretariat: an empty curriculum is no name, and
     # a disabled account still holds its row until someone revokes it.
     b047 = (["TECNICO SCIENTIFICO"], 2, ["dual", "inactive", "secretariat"])
     l031 = ([], 2, ["other_secretariat"])
     views, assigns = ["programme.view"], ["programme.assign_secretariat", "programme.view"]
     assert seen == {
-        "continuing": ({ppm_old: teaches, ppm_new: teaches}, {}),
-        # The switch to the new year would replace last year's edition, which
-        # this teacher does not teach (test_switching_the_current_edition).
-        "newcomer": ({ppm_new: (TEACHES, False)}, {}),
+        "continuing": (marked(TEACHES, ppm_old, ppm_new), {}),
+        "newcomer": (marked(TEACHES, ppm_new), {}),
         "secretariat": (
-            {ppm_old: runs, ppm_new: runs, shared: runs},
+            marked(RUNS_EDITION, ppm_old, ppm_new, shared),
             {"B047": (views, *b047)},
         ),
         "other_secretariat": (
-            {ia: runs, shared: runs},
+            marked(RUNS_EDITION, ia, shared),
             {"L031": (views, *l031)},
         ),
         "dual": (
-            {ia: teaches, ppm_old: runs, ppm_new: runs, shared: runs},
+            marked(TEACHES, ia) | marked(RUNS_EDITION, ppm_old, ppm_new, shared),
             {"B047": (views, *b047)},
         ),
         "student": ({}, {}),
         "root": (
-            {ppm_old: runs, ppm_new: runs, ia: runs, shared: runs},
+            marked(RUNS_EDITION, ppm_old, ppm_new, ia, shared),
             {"B047": (assigns, *b047), "L031": (assigns, *l031)},
         ),
         # A disabled account has no session, whatever it held.
@@ -294,95 +293,16 @@ def rolled_back[T](call: Callable[[], T]) -> T:
     return result
 
 
-def test_switching_the_current_edition() -> None:
-    w = world()
-
-    def switch(user: User | None, method: str) -> tuple[int, str, str | None]:
-        response = getattr(as_user(user), method)(switch_url(w.ppm_new))
-        if response.status_code == 200:
-            body = response.json()
-            now = body["id"] == w.ppm_new.pk and body["is_current"]
-            said = "the edition, now current" if now else None
-        else:
-            said = code_of(response)
-        current = CourseEdition.objects.get(course__code="B028451", is_current=True)
-        return response.status_code, label(current), said
-
-    cases = {
-        "teacher of both years": (w.continuing, "post"),
-        "first-year teacher": (w.newcomer, "post"),
-        "secretariat": (w.secretariat, "post"),
-        "other programme's secretariat": (w.other_secretariat, "post"),
-        "student": (w.student, "post"),
-        "anonymous": (None, "post"),
-        "GET": (w.continuing, "get"),
-    }
-    seen = {
-        case: rolled_back(lambda user=user, method=method: switch(user, method))
-        for case, (user, method) in cases.items()
-    }
-
-    assert seen == {
-        # The teacher of both years may replace last year's edition.
-        "teacher of both years": (200, NEW, "the edition, now current"),
-        # A first-year teacher may not replace last year's edition, and the
-        # refusal says so: the secretariat switches it for them.
-        "first-year teacher": (403, OLD, "switch_needs_both"),
-        "secretariat": (200, NEW, "the edition, now current"),
-        "other programme's secretariat": (404, OLD, "not_found"),
-        "student": (404, OLD, "not_found"),
-        "anonymous": (403, OLD, "not_authenticated"),
-        "GET": (405, OLD, "method_not_allowed"),
-    }
-
-    # The flag every listed row carries is the switch's own answer: each row is
-    # posted for real, in a transaction rolled back, once as the world is and
-    # once with PPM's current edition cleared, where a switch replaces nothing.
-    # A row a caller does not list is a 404 to them, pinned above.
-    def flags_and_answers() -> dict[tuple[str, str], tuple[bool, int]]:
-        cells: dict[tuple[str, str], tuple[bool, int]] = {}
-        for user in everyone(w):
-            if not user.is_active:
-                continue
-            client = as_user(user)
-            for row in client.get(EDITIONS_URL).json():
-                answer = rolled_back(
-                    lambda client=client, row=row: (
-                        client.post(f"{EDITIONS_URL}/{row['id']}/set-current").status_code
-                    )
-                )
-                cells[(user.username, row_label(row))] = (row["can_set_current"], answer)
-        return cells
-
-    def without_a_current_ppm_edition() -> dict[tuple[str, str], tuple[bool, int]]:
-        # Not through set_current(), which only ever moves the flag.
-        CourseEdition.objects.filter(pk=w.ppm_old.pk).update(is_current=False)
-        return flags_and_answers()
-
-    variants = {
-        "as the world is": flags_and_answers(),
-        "no current PPM edition": rolled_back(without_a_current_ppm_edition),
-    }
-    cells = {
-        (variant, *cell): pair
-        for variant, found in variants.items()
-        for cell, pair in found.items()
-    }
-    assert {cell: pair for cell, pair in cells.items() if pair[0] != (pair[1] == 200)} == {}
-    assert {cell for cell, (flag, _) in cells.items() if not flag} == {
-        ("as the world is", "newcomer", NEW)
-    }
-
-
 def test_a_write_without_the_csrf_token_is_refused() -> None:
     w = world()
     client = APIClient(enforce_csrf_checks=True)
-    client.force_login(w.continuing)
+    # The secretariat may assign here, so a 403 is the missing token's.
+    client.force_login(w.secretariat)
 
-    response = client.post(switch_url(w.ppm_new))
+    response = client.post(teachers(w.ppm_new), {"username": "student"})
 
-    assert response.status_code == 403
-    assert CourseEdition.objects.get(pk=w.ppm_old.pk).is_current
+    assert (response.status_code, code_of(response)) == (403, "permission_denied")
+    assert not RoleAssignment.objects.filter(user=w.student).exists()
 
 
 @pytest.mark.parametrize(
@@ -437,9 +357,7 @@ def test_each_read_costs_the_same_for_more_rows(url: str, rows: tuple[int, int])
             ),
         ]
     )
-    current = CourseEdition.objects.create(
-        course=physics, academic_year="2025-2026", is_current=True
-    )
+    current = CourseEdition.objects.create(course=physics, academic_year="2025-2026")
     RoleAssignment.objects.bulk_create(
         [
             RoleAssignment(user=w.secretariat, role=Role.SECRETARIAT, programme=b046),

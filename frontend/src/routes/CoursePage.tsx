@@ -28,7 +28,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
-import { useSetCurrent } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine, programmesOf } from "@/features/staff/crumbs";
 import { isNotFound } from "@/features/staff/errors";
@@ -51,7 +50,6 @@ export default function CoursePage() {
   );
   const page = useLoad(load);
   const course = page.data?.[0] ?? null;
-  const switching = useSetCurrent({ editions: page.data?.[1] ?? [], reload: page.reload });
   const { opened, open } = useOpenedRow(page.data !== null);
   const through =
     course === null
@@ -114,7 +112,6 @@ export default function CoursePage() {
             </TableCell>
             <TableCell>
               <span className="flex items-center justify-end gap-snug text-muted">
-                {switching.button(edition)}
                 <ChevronRight aria-hidden className="size-icon max-sm:hidden" />
               </span>
             </TableCell>
@@ -181,7 +178,6 @@ export default function CoursePage() {
           },
         ]}
       />
-      {switching.dialog}
     </>
   );
 }

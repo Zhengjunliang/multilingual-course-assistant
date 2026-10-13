@@ -33,7 +33,6 @@ class Permission(StrEnum):
     PROGRAMME_VIEW = "programme.view"
     PROGRAMME_ASSIGN_SECRETARIAT = "programme.assign_secretariat"
     EDITION_VIEW = "edition.view"
-    EDITION_SET_CURRENT = "edition.set_current"
     EDITION_ASSIGN_TEACHER = "edition.assign_teacher"
 
 
@@ -43,12 +42,11 @@ EDITION_PERMISSIONS = frozenset(p for p in Permission if p.startswith("edition."
 # No role holds PROGRAMME_ASSIGN_SECRETARIAT: only the superuser assigns secretariat staff.
 ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = MappingProxyType(
     {
-        Role.TEACHER: frozenset({Permission.EDITION_VIEW, Permission.EDITION_SET_CURRENT}),
+        Role.TEACHER: frozenset({Permission.EDITION_VIEW}),
         Role.SECRETARIAT: frozenset(
             {
                 Permission.PROGRAMME_VIEW,
                 Permission.EDITION_VIEW,
-                Permission.EDITION_SET_CURRENT,
                 Permission.EDITION_ASSIGN_TEACHER,
             }
         ),

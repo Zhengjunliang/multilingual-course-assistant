@@ -13,8 +13,8 @@ describe("a staff refusal", () => {
   it.each([
     [
       "a code of the contract",
-      new ApiError(403, "…", {}, "switch_needs_both"),
-      "staff.error.switch_needs_both",
+      new ApiError(400, "…", {}, "already_held"),
+      "staff.error.already_held",
     ],
     [
       "a code of DRF's the pages name",

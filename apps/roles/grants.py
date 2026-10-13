@@ -1,7 +1,7 @@
 """Granting and revoking a staff role: the writes, and the log line each leaves.
 
-Like `set_current()`, these do not decide who may call them: the views check
-the assign table first (apps/catalog/staff_views.py). Each grant and each
+These do not decide who may call them: the views check the assign table
+first (apps/catalog/staff_views.py). Each grant and each
 revocation made here is logged once its transaction commits, so a write that
 is rolled back leaves no line, the way Moodle's `role_assign()` fires its
 `role_assigned` event; a grant the user already holds changes nothing and logs

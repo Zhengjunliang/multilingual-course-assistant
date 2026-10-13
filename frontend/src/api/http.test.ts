@@ -44,8 +44,8 @@ describe("a refused request", () => {
     [
       "a coded refusal of the whole request",
       403,
-      { detail: { message: "Needs both.", code: "switch_needs_both" } },
-      { detail: "Needs both.", code: "switch_needs_both", fields: {}, fieldCodes: {} },
+      { detail: { message: "No access.", code: "permission_denied" } },
+      { detail: "No access.", code: "permission_denied", fields: {}, fieldCodes: {} },
     ],
     [
       "coded refusals of fields",
