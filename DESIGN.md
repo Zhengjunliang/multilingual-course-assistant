@@ -21,6 +21,7 @@ colors:
   hover-over-canvas: '#EBF1F6'
   hover-over-surface: '#F0F4F7'
   hover-over-tint: '#E8EEF4'
+  selected-over-tint: '#DBE6ED'
   selected-over-canvas: '#DFE9F0'
   selected-over-surface: '#E3EBF1'
   canvas-dark: '#07090C'
@@ -40,6 +41,7 @@ colors:
   hover-over-canvas-dark: '#0F171F'
   hover-over-surface-dark: '#161F28'
   hover-over-tint-dark: '#121B24'
+  selected-over-tint-dark: '#192734'
   selected-over-canvas-dark: '#162430'
   selected-over-surface-dark: '#1C2B38'
 typography:
@@ -178,6 +180,18 @@ components:
   ink-on-hover-over-tint:
     backgroundColor: '{colors.hover-over-tint}'
     textColor: '{colors.ink}'
+  muted-on-hover-over-tint:
+    backgroundColor: '{colors.hover-over-tint}'
+    textColor: '{colors.muted}'
+  ink-on-selected-over-tint:
+    backgroundColor: '{colors.selected-over-tint}'
+    textColor: '{colors.ink}'
+  muted-on-selected-over-tint:
+    backgroundColor: '{colors.selected-over-tint}'
+    textColor: '{colors.muted}'
+  accent-on-selected-over-tint:
+    backgroundColor: '{colors.selected-over-tint}'
+    textColor: '{colors.accent}'
   accent-on-selected-over-canvas:
     backgroundColor: '{colors.selected-over-canvas}'
     textColor: '{colors.accent}'
@@ -277,6 +291,18 @@ components:
   ink-on-hover-over-tint-dark:
     backgroundColor: '{colors.hover-over-tint-dark}'
     textColor: '{colors.ink-dark}'
+  muted-on-hover-over-tint-dark:
+    backgroundColor: '{colors.hover-over-tint-dark}'
+    textColor: '{colors.muted-dark}'
+  ink-on-selected-over-tint-dark:
+    backgroundColor: '{colors.selected-over-tint-dark}'
+    textColor: '{colors.ink-dark}'
+  muted-on-selected-over-tint-dark:
+    backgroundColor: '{colors.selected-over-tint-dark}'
+    textColor: '{colors.muted-dark}'
+  accent-on-selected-over-tint-dark:
+    backgroundColor: '{colors.selected-over-tint-dark}'
+    textColor: '{colors.accent-dark}'
   accent-on-selected-over-canvas-dark:
     backgroundColor: '{colors.selected-over-canvas-dark}'
     textColor: '{colors.accent-dark}'
@@ -382,7 +408,7 @@ The account is a row at the sidebar's foot: the avatar, the name and the account
 
 Folded, the sidebar is a rail of icons, `w-rail` wide and remembered in the browser: the mark, which unfolds it; a new conversation; the search, which unfolds the sidebar and puts the focus in its field; one icon per Gestione page, the current one in `selected`; and the avatar, whose menu opens at its right. Each icon's hint repeats its name and gives its key. Below `lg` the same panel is a drawer from the left, its close button where the fold button was, and its menu opens the languages in place. Four keys work from any signed-in page: Ctrl ⇧ O starts a conversation; Ctrl K puts the focus in the search, unfolding the sidebar or opening the drawer first; Ctrl , opens the settings; `?`, outside a field, opens the list of keys. On Apple's keyboards the key is ⌘ rather than Ctrl, which stays the text field's own there. The keys wait while another dialog is open, wherever the focus is, so nothing acts behind it. Escape closes a submenu, then its menu, then the drawer, and the focus goes back to what opened each.
 
-The staff pages (`features/staff/`, #194) share one frame. The breadcrumb in the header leads with its area's icon in a tinted disc, a cap for the programmes and a book for the teacher's own courses, the page itself at 600. A page's head is «Gestione» in `text-caption` capitals over its title, then its facts as chips: a code, the curricula, a count, an edition's year, its state and the day its teaching starts. A table is a panel: its head on `tint`, 36 px tall, rows of at least 54 px with a `hairline` between them, a name over its code in one cell, a state as a `StatusDot`; the whole row opens its page through the one link it holds, and coming back to it with Back marks the row the reader opened in `selected`, its bar along the first cell, and gives that link the focus again. The views of one object are tabs with their counts, a programme's study plan and secretariat, a course's editions and the plans that list it, every panel kept mounted so a filter survives a look at another tab; a list's views that are each an address, a teacher's current editions and all of them, are `TabLinks`, the same underline over links, the one shown `aria-current="page"`. The study plan narrows to a year of study and a curriculum with `ToggleGroup`s whose options carry the rows they show, beside a search that `/` reaches from anywhere on the page. People are the rows of a panel: the avatar in the tone of their role, the name over the username or the username alone, the role on a chip. An edition's syllabus is its seven sections in the catalogue's order, a tab per language, and each section is edited where it is read, its text turning into a `TextArea` with «Annulla» and «Salva», as GitHub edits a comment; its books are a table whose rows open a form dialog, and removing one or clearing a section asks first. Where a row's permissions do not allow an action, a `Banner` in the accent's tint stands where its button would be, saying why, with the way back to the reader's own start where that is another page.
+The staff pages (`features/staff/`, #194) share one frame. The breadcrumb in the header leads with its area's icon in a tinted disc, a cap for the programmes and a book for the teacher's own courses, the page itself at 600. A page's head is «Gestione» in `text-caption` capitals over its title, then its facts as chips: a code, the curricula, a count, an edition's year, its state, its semester and the day its teaching starts. A table is a panel: its head on `tint`, 36 px tall, rows of at least 54 px with a `hairline` between them, a name over its code in one cell, a state as a `StatusDot`; the whole row opens its page through the one link it holds, and coming back to it with Back marks the row the reader opened in `selected`, its bar along the first cell, and gives that link the focus again. The views of one object are tabs with their counts, a programme's study plan and secretariat, a course's editions and the plans that list it, every panel kept mounted so a filter survives a look at another tab; a list's views that are each an address, a teacher's current editions and all of them, are `TabLinks`, the same underline over links, the one shown `aria-current="page"`. The study plan narrows to a year of study and a curriculum with `ToggleGroup`s whose options carry the rows they show, beside a search that `/` reaches from anywhere on the page. People are the rows of a panel: the avatar in the tone of their role, the name over the username or the username alone, the role on a chip. An edition's page is three tabs, its syllabus, its books and its teachers, each counting what it holds. The syllabus is written once, in the language chosen under its sections, and its seven sections in the catalogue's order are `SectionTabs`: numbered tabs down the side of the panel from `xl` and across its top below, each with a caption for its state (written, empty, not saved), the section shown saying its place among the seven and leading to the ones either side. A section's text is Markdown, rendered as such, and it is edited where it is read, as GitHub edits a comment: «Modifica» turns it into a rich-text editor whose toolbar holds bold, italic, the two lists and a link, with «Annulla» and «Salva», Ctrl Enter saving. A section half written stays while another is shown, its tab says it is not saved, and leaving the page asks first. The books are a panel whose head holds «Aggiungi testo», over a table of title over authors, year, importance and the book's language named in the interface's, the last two as chips; a row opens a form dialog, and removing a book or clearing a section asks first. Where a row's permissions do not allow an action, a `Banner` in the accent's tint stands where its button would be, saying why, with the way back to the reader's own start where that is another page.
 
 An answer is drawn in one order (`features/chat/TurnView.tsx`), after ChatGPT and Open WebUI, with Perplexity's process line (read 11 October 2026):
 
