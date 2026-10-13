@@ -69,15 +69,19 @@ export function changes(book: ReadingItem, draft: Draft): Partial<ReadingDraft> 
 }
 
 /**
- * The languages a book may be written in, each named in the interface's
- * language `ui` as the start of an entry ("Inglese", "Tedesco"), in that
- * language's alphabetical order: a reader looks a book's language up by its
- * name, and a hundred endonyms would sort by scripts the reader cannot read.
+ * A book's language named in the interface's language `ui`, as a label on its
+ * own begins ("Inglese", "Tedesco"): a reader knows a language by its name in
+ * their own, and a hundred endonyms would be in scripts the reader cannot read.
  */
+export function bookLanguage(locale: string, ui: string): string {
+  const name = languageName(locale, ui);
+  return name.charAt(0).toLocaleUpperCase(ui) + name.slice(1);
+}
+
+/** The languages a book may be written in, named as `bookLanguage` names them, in `ui`'s alphabetical order. */
 export function bookLanguages(ui: string): { value: string; label: string }[] {
   const order = new Intl.Collator(ui);
-  return BOOK_LANGUAGES.map((value) => {
-    const name = languageName(value, ui);
-    return { value, label: name.charAt(0).toLocaleUpperCase(ui) + name.slice(1) };
-  }).sort((a, b) => order.compare(a.label, b.label));
+  return BOOK_LANGUAGES.map((value) => ({ value, label: bookLanguage(value, ui) })).sort((a, b) =>
+    order.compare(a.label, b.label),
+  );
 }

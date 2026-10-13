@@ -1,18 +1,20 @@
 /**
- * An edition's reading list on its page: one row per book, its title over its
- * ISBN (DESIGN.md, rule 1), its authors and year, whether it is required, and
- * the language its entry is written in. The list is not narrowed to the
- * interface's language: a title reads the same on every language's page of
- * the catalogue, which lists each book once.
+ * An edition's reading list, a tab of its page: a panel whose head on the
+ * tint names the list, counts it and holds «Aggiungi testo», over a table
+ * with one row per book, its title over its authors, its year, whether it is
+ * required, and the language the book is written in, named in the
+ * interface's. The catalogue lists each book once, in its own language,
+ * whatever the interface's. Where the rows stack into cards (table.tsx), the
+ * panel lets its frame go, the cards being frames of their own.
  *
- * Whoever holds `edition.edit_content` adds a book from the section's head
+ * Whoever holds `edition.edit_content` adds a book from the panel's head
  * and changes or removes one from its row: the form is a dialog
  * (ReadingDialog.tsx), and removing asks first. Focus goes back to the button
- * that opened either, or, when its row is gone, to «Aggiungi».
+ * that opened either, or, when its row is gone, to «Aggiungi testo».
  */
 
 import { BookMinus, ExternalLink, PenLine, Plus } from "lucide-react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -20,6 +22,7 @@ import { type ReadingItem, removeReading } from "@/api/catalog";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { Count } from "@/components/ui/count";
 import {
   Table,
   TableBody,
@@ -28,12 +31,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { endonym } from "@/i18n";
 import { type Loaded, useFailure } from "../context";
 import { isForbidden, isNotFound } from "../errors";
-import { Section } from "../page";
 import { Forbidden, PartFailure } from "../Refusal";
 import { ReadingDialog } from "./ReadingDialog";
+import { bookLanguage } from "./readingDraft";
 
 interface ReadingListProps {
   edition: number;
@@ -48,8 +50,9 @@ interface ReadingListProps {
 }
 
 export function ReadingList({ edition, books, language, editable, reloadPage }: ReadingListProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const fail = useFailure();
+  const headingId = useId();
   const [editing, setEditing] = useState<ReadingItem | "new" | null>(null);
   const [removing, setRemoving] = useState<ReadingItem | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -95,11 +98,17 @@ export function ReadingList({ edition, books, language, editable, reloadPage }: 
 
   const rows = books.data;
   return (
-    <Section
-      heading={t("staff.readings.title")}
-      count={rows?.length}
-      right={
-        editable && (
+    <section
+      aria-labelledby={headingId}
+      className="flex flex-col gap-snug sm:gap-0 sm:overflow-hidden sm:rounded-card sm:border sm:border-line sm:bg-surface sm:shadow-raised"
+    >
+      <div className="flex flex-wrap items-center gap-snug sm:border-hairline sm:border-b sm:bg-tint sm:px-snug sm:py-tight">
+        <h2 id={headingId} className="font-semibold text-ink text-title">
+          {t("staff.readings.title")}
+        </h2>
+        {rows !== null && <Count value={rows.length} />}
+        <span className="flex-1" />
+        {editable && (
           <Button
             ref={add}
             type="button"
@@ -109,21 +118,22 @@ export function ReadingList({ edition, books, language, editable, reloadPage }: 
             <Plus aria-hidden className="size-icon" />
             {t("staff.readings.add")}
           </Button>
-        )
-      }
-    >
+        )}
+      </div>
       {books.error !== null ? (
-        <PartFailure onRetry={() => void books.reload()} />
+        <div className="sm:p-snug">
+          <PartFailure onRetry={() => void books.reload()} />
+        </div>
       ) : rows === null ? null : rows.length === 0 ? (
-        <p className="rounded-card border border-line bg-surface px-snug py-gutter text-body text-muted">
+        <p className="px-snug py-gutter text-body text-muted max-sm:rounded-card max-sm:border max-sm:border-line max-sm:bg-surface">
           {t("staff.readings.empty")}
         </p>
       ) : (
-        <Table>
-          <TableHeader>
+        // The panel is the frame, its head above the table's.
+        <Table frameClassName="rounded-none border-0">
+          <TableHeader className="[&>tr>th:first-child]:rounded-none [&>tr>th:last-child]:rounded-none">
             <TableRow>
               <TableHead>{t("staff.readings.field.title")}</TableHead>
-              <TableHead>{t("staff.readings.field.authors")}</TableHead>
               <TableHead>{t("staff.readings.year")}</TableHead>
               <TableHead>{t("staff.readings.field.importance")}</TableHead>
               <TableHead>{t("staff.readings.field.locale")}</TableHead>
@@ -152,11 +162,8 @@ export function ReadingList({ edition, books, language, editable, reloadPage }: 
                       </a>
                     )}
                   </span>
-                  {book.isbn !== "" && (
-                    <span className="block font-mono text-caption text-muted">{book.isbn}</span>
-                  )}
+                  <span className="mt-hair block text-caption text-muted">{book.authors}</span>
                 </TableCell>
-                <TableCell label={t("staff.readings.field.authors")}>{book.authors}</TableCell>
                 <TableCell label={t("staff.readings.year")} className="tabular-nums">
                   {book.year ?? "—"}
                 </TableCell>
@@ -166,7 +173,7 @@ export function ReadingList({ edition, books, language, editable, reloadPage }: 
                   </Chip>
                 </TableCell>
                 <TableCell label={t("staff.readings.field.locale")}>
-                  {endonym(book.locale)}
+                  <Chip>{bookLanguage(book.locale, i18n.language)}</Chip>
                 </TableCell>
                 {editable && (
                   <TableCell>
@@ -232,6 +239,6 @@ export function ReadingList({ edition, books, language, editable, reloadPage }: 
           </p>
         )}
       </AlertDialog>
-    </Section>
+    </section>
   );
 }
