@@ -14,9 +14,24 @@ import pytest
 from django.urls import reverse
 
 from apps.accounts.models import User
-from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
+from apps.catalog.models import (
+    Course,
+    CourseEdition,
+    CurriculumEntry,
+    DegreeProgramme,
+    ReadingItem,
+    Syllabus,
+)
 
 pytestmark = pytest.mark.django_db
+
+# An edition's form carries its syllabus and reading list inlines, which the
+# admin refuses to save without their management forms; none of them filled.
+NO_INLINES = {
+    f"{prefix}-{field}": "0"
+    for prefix in ("syllabus", "reading_items")
+    for field in ("TOTAL_FORMS", "INITIAL_FORMS")
+}
 
 
 @pytest.fixture
@@ -100,13 +115,44 @@ def test_saved_keys_are_read_only_in_the_admin(
     }[case]
 
     response = admin_client.post(
-        reverse("admin:catalog_courseedition_change", args=[edition.pk]), new_value
+        reverse("admin:catalog_courseedition_change", args=[edition.pk]),
+        {**new_value, **NO_INLINES},
     )
 
     assert response.status_code == 302
     edition.refresh_from_db()
     assert edition.course == course
     assert edition.academic_year == "2024-2025"
+
+
+def test_an_edition_is_entered_with_its_syllabus_and_reading_list(
+    admin_client, course: Course
+) -> None:
+    edition = CourseEdition.objects.create(course=course, academic_year="2026-2027")
+    url = reverse("admin:catalog_courseedition_change", args=[edition.pk])
+    inlines = {
+        **NO_INLINES,
+        "syllabus-TOTAL_FORMS": "1",
+        "syllabus-0-locale": "it",
+        "syllabus-0-section": "prerequisiti",
+        "syllabus-0-text": "Fisica I, Analisi matematica I",
+        "reading_items-TOTAL_FORMS": "1",
+        "reading_items-0-locale": "it",
+        "reading_items-0-title": "Elementi di Fisica",
+        "reading_items-0-authors": "Mazzoldi, Nigro, Voci",
+        "reading_items-0-url": "www.example.org/fisica",
+        "reading_items-0-importance": "recommended",
+    }
+
+    response = admin_client.post(url, inlines)
+
+    assert response.status_code == 302
+    assert list(Syllabus.objects.filter(edition=edition).values_list("section", "text")) == [
+        ("prerequisiti", "Fisica I, Analisi matematica I")
+    ]
+    assert list(ReadingItem.objects.filter(edition=edition).values_list("title", "url")) == [
+        ("Elementi di Fisica", "https://www.example.org/fisica")
+    ]
 
 
 def test_ppm_rows_can_be_entered_through_the_admin(admin_client) -> None:
@@ -131,7 +177,12 @@ def test_ppm_rows_can_be_entered_through_the_admin(admin_client) -> None:
     responses.append(
         admin_client.post(
             reverse("admin:catalog_courseedition_add"),
-            {"course": course.pk, "academic_year": "2025-2026", "teaching_starts": "2026-02-23"},
+            {
+                "course": course.pk,
+                "academic_year": "2025-2026",
+                "teaching_starts": "2026-02-23",
+                **NO_INLINES,
+            },
         )
     )
     edition = CourseEdition.objects.get(course=course, academic_year="2025-2026")
