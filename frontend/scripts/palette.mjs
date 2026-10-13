@@ -212,8 +212,9 @@ export const TINTS = [
   {
     tint: "selected",
     ground: "tint",
-    fronts: ["ink", "muted"],
-    where: "section-tabs.tsx the section shown, its name and its caption",
+    fronts: ["ink", "muted", "accent"],
+    where:
+      "section-tabs.tsx the section shown, its name and its caption; SyllabusEditor.tsx a pressed button of the toolbar",
   },
   {
     tint: "selected",

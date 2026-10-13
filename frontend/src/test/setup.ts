@@ -1,5 +1,5 @@
 /**
- * The three browser APIs jsdom does not have, and this repository does call.
+ * The browser APIs jsdom does not have, and this repository does call.
  *
  * jsdom implements the DOM, not the browser around it. Layout, media queries
  * and scrolling are all outside its scope, and code already written here walks
@@ -9,7 +9,8 @@
  *   initialiser, so it throws before a component can render at all;
  * - `routes/ChatPage.tsx` calls `scrollIntoView` to follow an answer as it
  *   is written;
- * - Radix positions a dropdown with a `ResizeObserver`.
+ * - Radix positions a dropdown with a `ResizeObserver`;
+ * - ProseMirror measures a `Range` to keep the syllabus editor's caret in view.
  *
  * These stubs are deliberately dumb, and the first one has a consequence worth
  * stating: a media query that always answers `false` means the "system" theme
@@ -75,5 +76,12 @@ if (typeof window !== "undefined") {
 
   if (typeof Element.prototype.scrollIntoView !== "function") {
     Element.prototype.scrollIntoView = () => {};
+  }
+
+  // ProseMirror, the syllabus editor's, measures a range to scroll the caret
+  // into view, and jsdom lays nothing out: a range measures as nothing.
+  if (typeof Range.prototype.getClientRects !== "function") {
+    Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+    Range.prototype.getBoundingClientRect = () => new DOMRect();
   }
 }

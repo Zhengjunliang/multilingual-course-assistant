@@ -299,6 +299,21 @@
         "title": "清空这一部分？",
         "body": "「{{section}}」将没有内容，原文不会另外保存。",
         "action": "清空"
+      },
+      "editor": {
+        "toolbar": "格式",
+        "bold": "粗体",
+        "italic": "斜体",
+        "bulletList": "项目符号列表",
+        "orderedList": "编号列表",
+        "link": "链接",
+        "hint": "像写文档一样书写：粗体、列表和链接都会保留。",
+        "linkTitle": "插入链接",
+        "linkField": "网址",
+        "linkHint": "一个网址，例如 {{example}}。",
+        "linkInvalid": "这不是网址：请写成 {{example}} 这样的形式。",
+        "linkApply": "应用",
+        "linkRemove": "移除链接"
       }
     },
     "readings": {

@@ -5,10 +5,12 @@
  * stylesheets, its scripts and the fonts it uses, each read from the build and
  * compressed with brotli at quality 11, the way a server would send it. The
  * count starts once the screen is drawn and its fonts are in, so nothing it
- * needs is still on its way. A chunk an answer loads only when it needs it
- * (`MathMarkdown`, which brings KaTeX) must not be among them: it is not left
- * out of the sum, it is required to be absent, since leaving it out would hide
- * the very regression of it reaching the first screen.
+ * needs is still on its way. A chunk loaded only when it is needed
+ * (`MathMarkdown`, which brings KaTeX to an answer; `SyllabusEditor`, which
+ * brings Tiptap to a syllabus section opened for editing) must not be among
+ * them: it is not left out of the sum, it is required to be absent, since
+ * leaving it out would hide the very regression of it reaching the first
+ * screen.
  *
  * Two limits. The critical path may not grow by more than a tenth over what it
  * weighed on 12 October 2026: a ratchet against drift, not a target. It was
@@ -30,7 +32,7 @@ import { SCREENS, visit } from "./screens";
 
 const BUILD = fileURLToPath(new URL("../dist-e2e/", import.meta.url));
 const COUNTED = new Set(["document", "stylesheet", "script", "font"]);
-const LAZY = /\/assets\/MathMarkdown-/;
+const LAZY = /\/assets\/(MathMarkdown|SyllabusEditor)-/;
 
 /** 12 October 2026, #190: page 385, stylesheet 9 294, script 239 264, fonts 20 085. */
 const MEASURED_CRITICAL_PATH = 269_028;

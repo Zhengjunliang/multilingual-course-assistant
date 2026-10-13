@@ -5,6 +5,7 @@
  * and codes travel through `api/http.ts` as they would in the application.
  */
 
+import type { Editor } from "@tiptap/react";
 import { act, useCallback } from "react";
 import { vi } from "vitest";
 
@@ -247,3 +248,33 @@ export function panel(name: string) {
 }
 
 export const status = () => text(document.body.querySelector('[role="status"]'));
+
+/** The editor a section's box holds, once its chunk has loaded. */
+export function editorIn(name: string): Editor | undefined {
+  const text = panel(name)?.querySelector<HTMLElement & { editor?: Editor }>(
+    '[contenteditable="true"]',
+  );
+  return text?.editor;
+}
+
+/** Opens a section's box with `label` and waits for the editor's chunk. */
+export async function openEditor(name: string, label: string) {
+  await press(`${label} · ${name}`);
+  for (let turn = 0; turn < 50 && editorIn(name) === undefined; turn += 1) await settle();
+}
+
+/** Replaces a section's text in its editor, as typing it would. */
+export function write(name: string, markdown: string) {
+  act(() => {
+    editorIn(name)?.commands.setContent(markdown, { contentType: "markdown", emitUpdate: true });
+  });
+}
+
+/** A key pressed in a section's text. */
+export function key(name: string, init: KeyboardEventInit, keyCode?: number) {
+  const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
+  if (keyCode !== undefined) Object.defineProperty(event, "keyCode", { value: keyCode });
+  act(() => {
+    panel(name)?.querySelector('[contenteditable="true"]')?.dispatchEvent(event);
+  });
+}

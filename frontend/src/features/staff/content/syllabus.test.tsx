@@ -9,10 +9,14 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { markdownOf } from "./editorKit";
 import {
   BASE,
   button,
+  editorIn,
+  key,
   open,
+  openEditor,
   panel,
   press,
   serve,
@@ -24,12 +28,12 @@ import {
   text,
   type,
   unserve,
+  write,
 } from "./harness";
 
 beforeEach(serve);
 afterEach(unserve);
 
-const area = (name: string) => panel(name)?.querySelector("textarea");
 const shown = () =>
   text(document.body.querySelector('[role="tab"][aria-selected="true"] span > span'));
 
@@ -38,8 +42,8 @@ describe("a syllabus section", () => {
     const { unmount } = open(true);
     await settle();
     await show("Prerequisiti");
-    await press("Modifica · Prerequisiti");
-    type(area("Prerequisiti"), "Fisica I e **Analisi I**.");
+    await openEditor("Prerequisiti", "Modifica");
+    write("Prerequisiti", "Fisica I e **Analisi I**.");
     await press("Salva");
     const seen = {
       writes: [...server.writes],
@@ -61,8 +65,8 @@ describe("a syllabus section", () => {
     const { unmount } = open(true);
     await settle();
     await show("Prerequisiti");
-    await press("Modifica · Prerequisiti");
-    type(area("Prerequisiti"), "  ");
+    await openEditor("Prerequisiti", "Modifica");
+    write("Prerequisiti", "");
     await press("Salva");
     const asked = [
       server.writes.length,
@@ -92,8 +96,8 @@ describe("a syllabus section", () => {
     const { unmount } = open(true);
     await settle();
     await show("Prerequisiti");
-    await press("Modifica · Prerequisiti");
-    type(area("Prerequisiti"), "Altro testo.");
+    await openEditor("Prerequisiti", "Modifica");
+    write("Prerequisiti", "Altro testo.");
     await press("Annulla");
     const seen = [server.writes.length, text(panel("Prerequisiti")?.querySelector("p"))];
     unmount();
@@ -105,15 +109,19 @@ describe("a syllabus section", () => {
     const { unmount } = open(true);
     await settle();
     await show("Contenuti");
-    await press("Scrivi · Contenuti");
-    type(area("Contenuti"), "Campo elettrico.");
+    await openEditor("Contenuti", "Scrivi");
+    write("Contenuti", "Campo elettrico.");
     await show("Prerequisiti");
-    await press("Modifica · Prerequisiti");
-    type(area("Prerequisiti"), "Fisica I e Analisi I.");
+    await openEditor("Prerequisiti", "Modifica");
+    write("Prerequisiti", "Fisica I e Analisi I.");
     server.unreadable = true;
     await press("Salva");
     await show("Contenuti");
-    const seen = [area("Contenuti")?.value, text(panel("Prerequisiti")?.querySelector("p"))];
+    const contenuti = editorIn("Contenuti");
+    const seen = [
+      contenuti === undefined ? null : markdownOf(contenuti),
+      text(panel("Prerequisiti")?.querySelector("p")),
+    ];
     unmount();
 
     expect(seen).toEqual(["Campo elettrico.", "Fisica I e Analisi I."]);
@@ -123,27 +131,16 @@ describe("a syllabus section", () => {
     const { unmount } = open(true);
     await settle();
     await show("Prerequisiti");
-    await press("Modifica · Prerequisiti");
-    const box = area("Prerequisiti");
-    act(() => {
-      box?.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Escape", isComposing: true, bubbles: true }),
-      );
-    });
+    await openEditor("Prerequisiti", "Modifica");
+    key("Prerequisiti", { key: "Escape", isComposing: true });
     // Safari, which ends the composition before the key and marks the key 229.
-    const ended = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
-    Object.defineProperty(ended, "keyCode", { value: 229 });
-    act(() => {
-      box?.dispatchEvent(ended);
-    });
-    const composing = area("Prerequisiti") !== null;
-    act(() => {
-      box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    });
-    const seen = [composing, area("Prerequisiti") ?? null];
+    key("Prerequisiti", { key: "Escape" }, 229);
+    const composing = editorIn("Prerequisiti") !== undefined;
+    key("Prerequisiti", { key: "Escape" });
+    const seen = [composing, editorIn("Prerequisiti") ?? null, server.writes.length];
     unmount();
 
-    expect(seen).toEqual([true, null]);
+    expect(seen).toEqual([true, null, 0]);
   });
 
   it("offers an empty section to be written, and says so in its tab", async () => {
@@ -163,6 +160,99 @@ describe("a syllabus section", () => {
       write: true,
       captions: ["Compilata", "Vuota"],
       where: "3 di 7",
+    });
+  });
+});
+
+describe("the editor", () => {
+  it("names its tools, says which apply where the cursor is, and writes bold as Markdown", async () => {
+    server.syllabus.sections = [
+      { section: "obiettivi_formativi", text: "**Conoscenze** e metodi" },
+    ];
+    const { unmount } = open(true);
+    await settle();
+    await openEditor("Obiettivi formativi", "Modifica");
+    const editor = editorIn("Obiettivi formativi");
+    const tools = () =>
+      [...(panel("Obiettivi formativi")?.querySelectorAll('[role="toolbar"] button') ?? [])].map(
+        (tool) => `${tool.getAttribute("aria-label")} ${tool.getAttribute("aria-pressed")}`,
+      );
+    act(() => {
+      editor?.commands.setTextSelection(3);
+    });
+    const inBold = tools();
+    act(() => {
+      editor?.commands.setTextSelection({ from: 14, to: 20 });
+    });
+    act(() => {
+      panel("Obiettivi formativi")
+        ?.querySelector<HTMLButtonElement>('[aria-label="Grassetto"]')
+        ?.click();
+    });
+    await press("Salva");
+    unmount();
+
+    expect(inBold).toEqual([
+      "Grassetto true",
+      "Corsivo false",
+      "Elenco puntato false",
+      "Elenco numerato false",
+      "Collegamento false",
+    ]);
+    expect(server.writes).toEqual([
+      `PUT ${BASE}/syllabus/obiettivi_formativi {"text":"**Conoscenze** e **metodi**"}`,
+    ]);
+  });
+
+  it("saves on Ctrl Enter without breaking the line", async () => {
+    const { unmount } = open(true);
+    await settle();
+    await show("Prerequisiti");
+    await openEditor("Prerequisiti", "Modifica");
+    write("Prerequisiti", "Fisica I.\n\nAnalisi I.");
+    key("Prerequisiti", { key: "Enter", ctrlKey: true });
+    await settle();
+    unmount();
+
+    expect(server.writes).toEqual([
+      `PUT ${BASE}/syllabus/prerequisiti ${JSON.stringify({ text: "Fisica I.\n\nAnalisi I." })}`,
+    ]);
+  });
+
+  it("asks for a link on Ctrl K, which the page's search never hears, and refuses a script", async () => {
+    const heard: string[] = [];
+    const listen = (event: KeyboardEvent) => heard.push(event.key);
+    window.addEventListener("keydown", listen);
+    const { unmount } = open(true);
+    await settle();
+    await show("Prerequisiti");
+    await openEditor("Prerequisiti", "Modifica");
+    act(() => {
+      editorIn("Prerequisiti")?.commands.setTextSelection(1);
+    });
+    key("Prerequisiti", { key: "k", ctrlKey: true });
+    await settle();
+    const address = document.body.querySelector<HTMLInputElement>('[role="dialog"] input');
+    type(address, "javascript:alert(1)");
+    await press("Applica");
+    const refused = text(document.getElementById(`${address?.id}-error`));
+    type(address, "www.unifi.it");
+    await press("Applica");
+    const prerequisiti = editorIn("Prerequisiti");
+    const seen = {
+      heard,
+      refused,
+      open: document.body.querySelector('[role="dialog"]') !== null,
+      text: prerequisiti === undefined ? null : markdownOf(prerequisiti),
+    };
+    window.removeEventListener("keydown", listen);
+    unmount();
+
+    expect(seen).toEqual({
+      heard: [],
+      refused: "Non è un indirizzo web: scrivilo come https://www.unifi.it.",
+      open: false,
+      text: "[https://www.unifi.it/](https://www.unifi.it/)Fisica I.",
     });
   });
 });
