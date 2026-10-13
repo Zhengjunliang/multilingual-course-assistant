@@ -245,6 +245,7 @@ describe("the chat page's address", () => {
   beforeEach(() => {
     conversations = [STORED_ROW, OTHER];
     deleteFails = false;
+    askFails = false;
     vi.stubGlobal("fetch", fakeApi);
   });
 
@@ -353,6 +354,28 @@ describe("the chat page's address", () => {
     // ever does.
     expect(saidFailed).toBe(failing === true);
     expect(unwanted).toBe(false);
+  });
+
+  it("clears a first question refused before it named a conversation, when a new one is opened", async () => {
+    // Refused before `start`, the question was filed under no conversation,
+    // so the address stayed `/`; a new conversation is `/` again.
+    askFails = true;
+    const { container, path, unmount } = page("/");
+    await settle();
+    askFromTheFrontDoor(container);
+    await settle();
+    finishReceding(container);
+    const refused = { thread: container.querySelector("article") !== null, at: path() };
+
+    openNewConversation(container);
+    await settle();
+    const opened = { thread: container.querySelector("article") !== null, at: path() };
+    unmount();
+
+    expect({ refused, opened }).toEqual({
+      refused: { thread: true, at: "/" },
+      opened: { thread: false, at: "/" },
+    });
   });
 });
 
