@@ -16,7 +16,7 @@
     "One course per teaching; a teaching listed in two curricula, or shared by two programmes under one AD code, is one course with an entry in each.",
     "Course code: the AD code of the Moodle course that holds the material (docs/decisions.md, 2026-09-25, PPM read from Moodle and Cineca, point 1), read from the course summaries Moodle shows without a login; where no single Moodle course holds the material, as for an integrated course (C.I.), the course says code_source cineca-only and takes the code its curricula list (the same entry, point 6).",
     "Entry AD code: the one the curriculum lists; of two, the one listed only in that curriculum (the same entry, point 2). A course already in the database keeps its row.",
-    "Editions: one for each academic year, 2025-2026 and 2026-2027, in which the offer lists (corso-offerta, which list B308 with B047 and B406 with B222) offer the course under any of its AD codes, in any programme. Its teaching_starts is the first day of the earliest Periodo didattico among those offers, so the edition is current from the day the first programme teaches it (apps/catalog/editions.py). A course offered in neither year has no edition."
+    "Editions: one for each academic year, 2025-2026 and 2026-2027, in which the offer lists (corso-offerta, which list B308 with B047 and B406 with B222) offer the course under any of its AD codes, in any programme. Its teaching_starts is the first day of the earliest Periodo didattico among those offers, so the edition is current from the day the first programme teaches it (apps/catalog/editions.py). A course offered in neither year has no edition. Its period is that Periodo didattico's: Primo Semestre, which began on 2025-09-15 and 2026-09-14, is first_semester, and Secondo Semestre, which began on 2026-02-23 and 2027-02-22, is second_semester; every teaching_starts is one of those four days."
   ],
   "programmes": [
     {
@@ -89,11 +89,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -124,11 +126,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -159,11 +163,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -194,7 +200,8 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         }
       ]
     },
@@ -243,11 +250,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -278,11 +287,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -313,11 +324,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -354,11 +367,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -396,11 +411,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -437,11 +454,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -466,11 +485,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -495,11 +516,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -524,11 +547,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -565,11 +590,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -606,11 +633,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -647,11 +676,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -688,11 +719,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -729,11 +762,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -770,11 +805,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -805,11 +842,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -834,11 +873,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -863,11 +904,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -892,11 +935,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -933,11 +978,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -975,11 +1022,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1017,11 +1066,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1058,11 +1109,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -1099,11 +1152,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -1141,11 +1196,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1170,11 +1227,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1211,11 +1270,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -1246,11 +1307,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1281,11 +1344,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1310,11 +1375,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1339,11 +1406,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1374,11 +1443,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1409,11 +1480,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -1444,11 +1517,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -1473,11 +1548,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -1502,11 +1579,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1543,11 +1622,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1572,11 +1653,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1601,11 +1684,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -1642,11 +1727,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -1677,11 +1764,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1713,11 +1802,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1742,11 +1833,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     },
@@ -1777,11 +1870,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2026-02-23"
+          "teaching_starts": "2026-02-23",
+          "period": "second_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2027-02-22"
+          "teaching_starts": "2027-02-22",
+          "period": "second_semester"
         }
       ]
     },
@@ -1818,11 +1913,13 @@
       "editions": [
         {
           "academic_year": "2025-2026",
-          "teaching_starts": "2025-09-15"
+          "teaching_starts": "2025-09-15",
+          "period": "first_semester"
         },
         {
           "academic_year": "2026-2027",
-          "teaching_starts": "2026-09-14"
+          "teaching_starts": "2026-09-14",
+          "period": "first_semester"
         }
       ]
     }

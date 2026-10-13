@@ -16,6 +16,7 @@ from io import StringIO
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from django.conf import global_settings
 from django.conf import settings as django_settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -33,6 +34,7 @@ from apps.catalog.models import (
     ReadingItem,
     Syllabus,
     SyllabusSection,
+    TeachingPeriod,
 )
 from apps.roles.management.commands.populate_demo import CONTENT, DATA, Command
 from apps.roles.models import RoleAssignment
@@ -75,8 +77,16 @@ DEMO: dict[str, Any] = {
                 },
             ],
             "editions": [
-                {"academic_year": "2024-2025", "teaching_starts": "2025-02-24"},
-                {"academic_year": "2025-2026", "teaching_starts": "2026-02-23"},
+                {
+                    "academic_year": "2024-2025",
+                    "teaching_starts": "2025-02-24",
+                    "period": "second_semester",
+                },
+                {
+                    "academic_year": "2025-2026",
+                    "teaching_starts": "2026-02-23",
+                    "period": "second_semester",
+                },
             ],
         },
         {
@@ -87,7 +97,13 @@ DEMO: dict[str, Any] = {
                 {"programme": "B047", "curriculum": "", "year_of_study": 1, "ad_code": "B000001"},
                 {"programme": "B046", "curriculum": "", "year_of_study": 1, "ad_code": "B000001"},
             ],
-            "editions": [{"academic_year": "2025-2026", "teaching_starts": "2025-09-15"}],
+            "editions": [
+                {
+                    "academic_year": "2025-2026",
+                    "teaching_starts": "2025-09-15",
+                    "period": "first_semester",
+                }
+            ],
         },
         {
             "code": "B000002",
@@ -151,7 +167,8 @@ def snapshot() -> dict[str, list[Any]]:
         "courses": sorted(Course.objects.values_list("code", "name", "code_source")),
         "entries": sorted(str(e) for e in CurriculumEntry.objects.select_related("programme")),
         "editions": sorted(
-            (str(e), e.teaching_starts) for e in CourseEdition.objects.select_related("course")
+            (str(e), e.teaching_starts, e.period)
+            for e in CourseEdition.objects.select_related("course")
         ),
         "roles": sorted(
             str(r) for r in RoleAssignment.objects.select_related("user", "programme", "edition")
@@ -197,9 +214,9 @@ def test_an_empty_database_gets_the_demo_and_a_second_run_changes_nothing(
             "B028451 (B047) TECNICO APPLICATIVO",
         ],
         "editions": [
-            ("B000001:2025-2026", date(2025, 9, 15)),
-            ("B028451:2024-2025", date(2025, 2, 24)),
-            ("B028451:2025-2026", date(2026, 2, 23)),
+            ("B000001:2025-2026", date(2025, 9, 15), "first_semester"),
+            ("B028451:2024-2025", date(2025, 2, 24), "second_semester"),
+            ("B028451:2025-2026", date(2026, 2, 23), "second_semester"),
         ],
         "roles": DEMO_ROLES,
         "accounts": DEMO_ACCOUNTS,
@@ -215,7 +232,8 @@ def test_rows_of_its_own_are_kept_and_demo_accounts_made_the_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ppm = Course.objects.create(code="B028451", name="PPM")
-    # One edition the file dates, one it does not name, and one it would date otherwise.
+    # One edition the file dates, one it does not name, and one it gives only a period:
+    # its own start day is kept.
     CourseEdition.objects.create(course=ppm, academic_year="2025-2026")
     CourseEdition.objects.create(course=ppm, academic_year="2023-2024")
     CourseEdition.objects.create(
@@ -238,11 +256,11 @@ def test_rows_of_its_own_are_kept_and_demo_accounts_made_the_files(
     assert (snapshot(), again.splitlines()) == (seen, ["created nothing"])
     assert ("B028451", "PPM", "moodle") in seen["courses"]
     assert [e for e in seen["editions"] if e[0].startswith("B028451")] == [
-        ("B028451:2023-2024", None),
-        ("B028451:2024-2025", date(2024, 10, 1)),
-        ("B028451:2025-2026", date(2026, 2, 23)),
+        ("B028451:2023-2024", None, ""),
+        ("B028451:2024-2025", date(2024, 10, 1), "second_semester"),
+        ("B028451:2025-2026", date(2026, 2, 23), "second_semester"),
     ]
-    assert "dated 1 course editions" in out.splitlines()
+    assert "dated 2 course editions" in out.splitlines()
     assert (seen["roles"], seen["accounts"]) == (
         [*DEMO_ROLES, "mrossi · secretariat · B047"],
         sorted(
@@ -270,24 +288,24 @@ def test_the_shipped_files_load_and_give_the_demo_teacher_three_courses(
 
     filled = {
         str(edition): (
-            {
-                locale: Syllabus.objects.filter(edition=edition, locale=locale).count()
-                for locale in ("it", "en")
-            },
-            ReadingItem.objects.filter(edition=edition).count(),
+            edition.period,
+            edition.syllabus_locale,
+            Syllabus.objects.filter(edition=edition).count(),
+            sorted(ReadingItem.objects.filter(edition=edition).values_list("locale", flat=True)),
         )
         for edition in CourseEdition.objects.filter(
             role_assignments__user__username="demo-teacher"
         ).select_related("course")
     }
 
-    # Every section of the catalogue in both languages, but Fisica II's empty
-    # Altro and PPM's English Programma esteso, which is the Italian text.
+    # Every section of the catalogue in Italian, but Fisica II's empty Altro;
+    # the English textbooks marked as such.
     assert filled == {
-        "B003725:2026-2027": ({"it": 7, "en": 7}, 2),
-        "B024251:2026-2027": ({"it": 6, "en": 6}, 1),
-        "B028451:2026-2027": ({"it": 7, "en": 6}, 0),
+        "B003725:2026-2027": ("first_semester", "it", 7, ["en", "en"]),
+        "B024251:2026-2027": ("second_semester", "it", 6, ["it"]),
+        "B028451:2026-2027": ("second_semester", "it", 7, []),
     }
+    assert not Syllabus.objects.filter(text__contains="<b>").exists()
     assert DegreeProgramme.objects.count() == 3
 
 
@@ -323,58 +341,63 @@ CONTENT_FILE: dict[str, Any] = {
         {
             "edition": "B028451:2025-2026",
             "syllabus": {
-                "it": {"prerequisiti": "Programmazione.", "altro": "Materiale su Moodle."},
-                "en": {"prerequisiti": "Programming."},
+                "locale": "en",
+                "sections": {"prerequisiti": "Programming.", "altro": "Slides on **Moodle**."},
             },
-            "readings": {
-                "it": [
-                    {"title": "Multimedia", "authors": "Rossi", "importance": "recommended"},
-                    {
-                        "title": "Web",
-                        "authors": "Bianchi",
-                        "year": 2020,
-                        "importance": "recommended",
-                    },
-                ]
-            },
+            "readings": [
+                {
+                    "title": "Multimedia",
+                    "authors": "Rossi",
+                    "importance": "recommended",
+                    "locale": "en",
+                },
+                {
+                    "title": "Web",
+                    "authors": "Bianchi",
+                    "year": 2020,
+                    "importance": "recommended",
+                    "locale": "it",
+                },
+            ],
         }
     ]
 }
 
 
 def content_rows() -> dict[str, list[Any]]:
+    edition = CourseEdition.objects.filter(course__code="B028451", academic_year="2025-2026")
     return {
-        "syllabus": sorted(Syllabus.objects.values_list("locale", "section", "text")),
+        "language": list(edition.values_list("syllabus_locale", flat=True)),
+        "syllabus": sorted(Syllabus.objects.values_list("section", "text")),
         "books": sorted(ReadingItem.objects.values_list("locale", "title", "year")),
     }
 
 
-def test_content_fills_each_language_once_and_keeps_what_a_teacher_wrote(
+def test_content_fills_an_edition_once_and_keeps_what_a_teacher_wrote(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     first = run(tmp_path, monkeypatch, None, DEMO, CONTENT_FILE)
     seeded = content_rows()
     second = run(tmp_path, monkeypatch, None, DEMO, CONTENT_FILE)
-    # A teacher rewrites a section, clears another and removes a book; the
-    # languages still hold content, so the next run brings nothing back.
-    Syllabus.objects.filter(locale="it", section="prerequisiti").update(text="Python.")
-    Syllabus.objects.filter(locale="it", section="altro").delete()
+    # A teacher rewrites a section, clears another, removes a book and switches the
+    # language; the edition holds content, so the next run brings nothing back.
+    Syllabus.objects.filter(section="prerequisiti").update(text="Python.")
+    Syllabus.objects.filter(section="altro").delete()
     ReadingItem.objects.filter(title="Web").delete()
+    CourseEdition.objects.filter(syllabus__isnull=False).update(syllabus_locale="it")
     run(tmp_path, monkeypatch, None, DEMO, CONTENT_FILE)
 
     assert seeded == {
-        "syllabus": [
-            ("en", "prerequisiti", "Programming."),
-            ("it", "altro", "Materiale su Moodle."),
-            ("it", "prerequisiti", "Programmazione."),
-        ],
-        "books": [("it", "Multimedia", None), ("it", "Web", 2020)],
+        "language": ["en"],
+        "syllabus": [("altro", "Slides on **Moodle**."), ("prerequisiti", "Programming.")],
+        "books": [("en", "Multimedia", None), ("it", "Web", 2020)],
     }
-    assert first.splitlines()[-1].endswith("3 syllabus sections, 2 reading items")
+    assert first.splitlines()[-1].endswith("2 syllabus sections, 2 reading items")
     assert second.splitlines()[-1] == "created nothing"
     assert content_rows() == {
-        "syllabus": [("en", "prerequisiti", "Programming."), ("it", "prerequisiti", "Python.")],
-        "books": [("it", "Multimedia", None)],
+        "language": ["it"],
+        "syllabus": [("prerequisiti", "Python.")],
+        "books": [("en", "Multimedia", None)],
     }
 
 
@@ -486,7 +509,11 @@ def test_an_edition_held_undated_is_dated_by_the_models_rules(
     holds as on one it creates, and leaves the edition undated."""
     ppm = Course.objects.create(code="B028451", name="PPM")
     CourseEdition.objects.create(course=ppm, academic_year="2025-2026")
-    early = {"academic_year": "2025-2026", "teaching_starts": "2025-02-23"}
+    early = {
+        "academic_year": "2025-2026",
+        "teaching_starts": "2025-02-23",
+        "period": "second_semester",
+    }
     courses = [{**DEMO["courses"][0], "editions": [early]}, *DEMO["courses"][1:]]
 
     with pytest.raises(CommandError, match="Teaching starts"):
@@ -533,7 +560,9 @@ def test_the_demo_data_file_keeps_the_catalogue_rules() -> None:
     assert all(account["username"].startswith("demo-") for account in demo["accounts"])
     assert {e["academic_year"] for _, e in editions} == {"2025-2026", "2026-2027"}
     assert len(named) == len(set(named))
-    assert [e for _, e in editions if set(e) != {"academic_year", "teaching_starts"}] == []
+    keys = {"academic_year", "teaching_starts", "period"}
+    assert [e for _, e in editions if set(e) != keys] == []
+    assert {e["period"] for _, e in editions} == set(TeachingPeriod.values)
     # A day within the academic year, as `CourseEdition.clean()` asks.
     assert [
         e
@@ -566,13 +595,15 @@ def test_the_demo_content_file_fits_the_catalogue_and_names_no_teacher() -> None
     named = {f"{c['code']}:{e['academic_year']}" for c in demo["courses"] for e in c["editions"]}
     filled = content["editions"]
     languages = {code for code, _ in django_settings.LANGUAGES}
-    books = [book for e in filled for shelf in e["readings"].values() for book in shelf]
+    books = [book for e in filled for book in e["readings"]]
+    texts = [text for e in filled for text in e["syllabus"]["sections"].values()]
     teachers = re.compile("frasconi|del zanna|bertini", re.IGNORECASE)
 
     assert {e["edition"] for e in filled} <= named
-    assert {loc for e in filled for loc in (*e["syllabus"], *e["readings"])} <= languages
-    assert {s for e in filled for texts in e["syllabus"].values() for s in texts} <= set(
-        SyllabusSection.values
-    )
+    assert {e["syllabus"]["locale"] for e in filled} <= languages
+    assert {book["locale"] for book in books} <= {code for code, _ in global_settings.LANGUAGES}
+    assert {s for e in filled for s in e["syllabus"]["sections"]} <= set(SyllabusSection.values)
+    # Markdown, as the edition page's editor writes it: no U-GOV HTML left.
+    assert [text for text in texts if "<b>" in text or "</b>" in text] == []
     assert {book["importance"] for book in books} == {Importance.RECOMMENDED}
     assert teachers.search(DATA.read_text(encoding="utf-8") + json.dumps(content)) is None
