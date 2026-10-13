@@ -253,7 +253,11 @@ class CourseEdition(models.Model):
         match = _ACADEMIC_YEAR.fullmatch(self.academic_year)
         if self.teaching_starts is None or match is None:
             return
-        if not date(int(match[1]), 9, 1) <= self.teaching_starts <= date(int(match[2]), 8, 31):
+        first, second = int(match[1]), int(match[2])
+        # Years the academic year's own check refuses, and year 0, which no `date` holds.
+        if first < 1 or second != first + 1:
+            return
+        if not date(first, 9, 1) <= self.teaching_starts <= date(second, 8, 31):
             raise ValidationError(
                 {
                     "teaching_starts": _(
