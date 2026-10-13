@@ -19,9 +19,13 @@ from pathlib import Path
 import pytest
 from test_qa_contract import declaration, fields
 
-from apps.catalog.content_serializers import ReadingItemSerializer, SyllabusSectionSerializer
+from apps.catalog.content_serializers import (
+    ReadingItemSerializer,
+    SyllabusSectionSerializer,
+    SyllabusSerializer,
+)
 from apps.catalog.errors import DRF_CODES_SHOWN, StaffError
-from apps.catalog.models import CodeSource, Importance, SyllabusSection
+from apps.catalog.models import CodeSource, Importance, SyllabusSection, TeachingPeriod
 from apps.catalog.serializers import (
     CourseSerializer,
     CurriculumEntrySerializer,
@@ -47,6 +51,7 @@ MIRRORED = {
     "EditionSummary": EditionSummarySerializer,
     "StudyPlanCourse": StudyPlanCourseSerializer,
     "SyllabusSection": SyllabusSectionSerializer,
+    "Syllabus": SyllabusSerializer,
     "ReadingItem": ReadingItemSerializer,
 }
 
@@ -76,12 +81,14 @@ def test_the_mirror_names_every_closed_set(mirror: str) -> None:
         union(mirror, "Permission"),
         union(mirror, "CodeSource"),
         union(mirror, "SyllabusSectionKey"),
+        union(mirror, "TeachingPeriod"),
         union(mirror, "Importance"),
         union(mirror, "StaffErrorCode"),
     ) == (
         set(Permission),
         set(CodeSource.values),
         set(SyllabusSection.values),
+        set(TeachingPeriod.values),
         set(Importance.values),
         set(StaffError) | DRF_CODES_SHOWN,
     )

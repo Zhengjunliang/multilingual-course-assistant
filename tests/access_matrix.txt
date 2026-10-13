@@ -11,6 +11,7 @@ PATCH catalog:edition-reading               allow      allow    allow       hide
 GET catalog:edition-readings                allow      allow    allow       hide              allow hide    allow deny     deny
 POST catalog:edition-readings               allow      allow    allow       hide              allow hide    allow deny     deny
 GET catalog:edition-syllabus                allow      allow    allow       hide              allow hide    allow deny     deny
+PATCH catalog:edition-syllabus              allow      allow    allow       hide              allow hide    allow deny     deny
 PUT catalog:edition-syllabus-section        allow      allow    allow       hide              allow hide    allow deny     deny
 DELETE catalog:edition-teacher              deny       deny     allow       hide              allow hide    allow deny     deny
 POST catalog:edition-teachers               deny       deny     allow       hide              allow hide    allow deny     deny

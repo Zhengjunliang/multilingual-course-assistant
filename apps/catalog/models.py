@@ -29,7 +29,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
-from django.conf import settings
+from django.conf import global_settings, settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
@@ -181,6 +181,19 @@ class Course(models.Model):
             raise ValidationError({"code": _("This code is already another course's AD code.")})
 
 
+class TeachingPeriod(models.TextChoices):
+    """When in the academic year an edition is taught: the Cineca catalogue's Periodo didattico.
+
+    Only the values the catalogue has been seen to use for the demo's courses,
+    its two semesters (outside the repository: unifi.coursecatalogue.cineca.it,
+    read 2026-10-13); another is added when a course is seen to need it. A page
+    shows them through its own catalogue.
+    """
+
+    FIRST_SEMESTER = "first_semester", _("first semester")
+    SECOND_SEMESTER = "second_semester", _("second semester")
+
+
 class CourseEdition(models.Model):
     """One academic year of a course.
 
@@ -189,6 +202,11 @@ class CourseEdition(models.Model):
     `with_current()` (apps/catalog/editions.py; docs/data-model.md,
     invariant 2), so it cannot go stale and two editions of a course are never
     current together.
+
+    The syllabus has one language, held here rather than on its sections:
+    a syllabus with no section keeps the language its teacher chose
+    (docs/decisions.md, 2026-09-25, *The data model is decided on paper before
+    roles are built on it*, point 6).
     """
 
     # PROTECT, not CASCADE: an edition will own material whose points live in
@@ -214,6 +232,22 @@ class CourseEdition(models.Model):
             "Left empty, the edition counts from 1 September of its first year."
         ),
     )
+    # Empty, never NULL, when unknown, as `CurriculumEntry.curriculum` is.
+    period = models.CharField(
+        max_length=16,
+        choices=TeachingPeriod.choices,
+        blank=True,
+        default="",
+        verbose_name=_("teaching period"),
+        help_text=_("The Cineca catalogue's Periodo didattico; empty when not entered."),
+    )
+    syllabus_locale = models.CharField(
+        max_length=16,
+        choices=settings.LANGUAGES,
+        default=settings.LANGUAGE_CODE,
+        verbose_name=_("syllabus language"),
+        help_text=_("Language the syllabus is written in, every section of it."),
+    )
 
     class Meta:
         ordering = ("course", "-academic_year")
@@ -228,6 +262,10 @@ class CourseEdition(models.Model):
                 condition=models.Q(academic_year__regex=r"^[0-9]{4}-[0-9]{4}$"),
                 name="catalog_edition_academic_year_format",
                 violation_error_message=_ACADEMIC_YEAR_MESSAGE,
+            ),
+            models.CheckConstraint(
+                condition=models.Q(period__in=[*TeachingPeriod.values, ""]),
+                name="catalog_edition_period_known",
             ),
         )
 
@@ -387,11 +425,14 @@ class SyllabusSection(models.TextChoices):
 
 
 class Syllabus(models.Model):
-    """One section of an edition's syllabus, in one language.
+    """One section of an edition's syllabus, its text in Markdown.
 
-    A section is stored once per edition and language, and a row always has
-    text: an empty section is no row. Deleted with its edition, which a
-    database cascade can do because the text lives here alone.
+    A section is stored once per edition, in the edition's `syllabus_locale`,
+    and a row always has text: an empty section is no row. The text is
+    CommonMark with GitHub's extensions, what the page's editor writes and what
+    retrieval will split (docs/decisions.md, 2026-09-25, *The data model is
+    decided on paper before roles are built on it*, point 4). Deleted with its
+    edition, which a database cascade can do because the text lives here alone.
     """
 
     edition = models.ForeignKey(
@@ -400,25 +441,18 @@ class Syllabus(models.Model):
         related_name="syllabus",
         verbose_name=_("course edition"),
     )
-    locale = models.CharField(
-        max_length=16,
-        choices=settings.LANGUAGES,
-        default=settings.LANGUAGE_CODE,
-        verbose_name=_("language"),
-        help_text=_("Language the text is written in."),
-    )
     section = models.CharField(
         max_length=32, choices=SyllabusSection.choices, verbose_name=_("section")
     )
-    text = models.TextField(verbose_name=_("text"))
+    text = models.TextField(verbose_name=_("text"), help_text=_("Markdown."))
 
     class Meta:
-        ordering = ("edition", "locale", "pk")
+        ordering = ("edition", "pk")
         verbose_name = _("syllabus section")
         verbose_name_plural = _("syllabus sections")
         constraints = (
             models.UniqueConstraint(
-                fields=("edition", "locale", "section"),
+                fields=("edition", "section"),
                 name="catalog_syllabus_unique_section",
             ),
             models.CheckConstraint(
@@ -433,7 +467,7 @@ class Syllabus(models.Model):
 
     def __str__(self) -> str:
         edition = getattr(self, "edition", None)
-        return f"{edition or '?'} {self.locale} {self.section}"
+        return f"{edition or '?'} {self.section}"
 
 
 class Importance(models.TextChoices):
@@ -444,13 +478,29 @@ class Importance(models.TextChoices):
     RECOMMENDED = "recommended", _("recommended")
 
 
+_BOOK_LANGUAGES = frozenset(code for code, _name in global_settings.LANGUAGES)
+
+
+def validate_book_language(value: str) -> None:
+    """A language Django knows by its tag.
+
+    A validator rather than `choices`: choices are copied into the migration,
+    so every Django release that adds a language would leave a migration
+    pending, where the validator is named in it by its path alone.
+    """
+    if value not in _BOOK_LANGUAGES:
+        raise ValidationError(_("Not a language tag."), code="invalid_choice")
+
+
 class ReadingItem(models.Model):
-    """A book on an edition's reading list, in the language its entry is written in.
+    """A book on an edition's reading list, and the language the book is written in.
 
     The reading list's one owner: the catalogue's Testi section is these
-    rows, never syllabus text. A title is listed once per edition and
-    language. Optional fields are empty, never NULL, as `curriculum` is,
-    except the year, which is a number.
+    rows, never syllabus text. An edition has one list, whatever language its
+    syllabus is in, and lists a title once. A book's language is a BCP 47 tag
+    from Django's own list, wider than the site's three, as Dublin Core's
+    `language` recommends (outside the repository). Optional fields are empty,
+    never NULL, as `curriculum` is, except the year, which is a number.
     """
 
     edition = models.ForeignKey(
@@ -461,10 +511,10 @@ class ReadingItem(models.Model):
     )
     locale = models.CharField(
         max_length=16,
-        choices=settings.LANGUAGES,
+        validators=(validate_book_language,),
         default=settings.LANGUAGE_CODE,
         verbose_name=_("language"),
-        help_text=_("Language the entry is written in."),
+        help_text=_("Language the book is written in, as a tag such as en or de."),
     )
     title = models.CharField(max_length=300, verbose_name=_("title"))
     authors = models.CharField(
@@ -480,12 +530,12 @@ class ReadingItem(models.Model):
     )
 
     class Meta:
-        ordering = ("edition", "locale", "title")
+        ordering = ("edition", "title")
         verbose_name = _("reading item")
         verbose_name_plural = _("reading items")
         constraints = (
             models.UniqueConstraint(
-                fields=("edition", "locale", "title"),
+                fields=("edition", "title"),
                 name="catalog_reading_unique_title",
             ),
             models.CheckConstraint(

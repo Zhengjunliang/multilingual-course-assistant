@@ -157,6 +157,7 @@ class EditionSerializer(serializers.ModelSerializer[CourseEdition]):
             "course",
             "academic_year",
             "teaching_starts",
+            "period",
             "is_current",
             "teachers",
             "permissions",

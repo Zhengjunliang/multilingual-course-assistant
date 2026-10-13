@@ -115,6 +115,16 @@ def test_edition_academic_year_must_match_the_format(course: Course, academic_ye
     assert violation(excinfo.value).constraint_name == "catalog_edition_academic_year_format"
 
 
+def test_an_edition_period_is_one_the_catalogue_uses_or_none(course: Course) -> None:
+    CourseEdition.objects.create(course=course, academic_year="2025-2026")
+    CourseEdition.objects.create(course=course, academic_year="2026-2027", period="first_semester")
+
+    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+        CourseEdition.objects.create(course=course, academic_year="2027-2028", period="annual")
+
+    assert violation(excinfo.value).constraint_name == "catalog_edition_period_known"
+
+
 @pytest.mark.parametrize(
     "academic_year",
     [

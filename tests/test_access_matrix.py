@@ -78,7 +78,7 @@ def targets(
         "catalog:edition-teachers": edition,
         "catalog:edition-teacher": {**edition, "username": w.continuing.username},
         "catalog:edition-syllabus": edition,
-        "catalog:edition-syllabus-section": {**edition, "locale": "it", "section": "prerequisiti"},
+        "catalog:edition-syllabus-section": {**edition, "section": "prerequisiti"},
         "catalog:edition-readings": edition,
         "catalog:edition-reading": {**edition, "item": book.pk},
         "qa:conversation": {"pk": conversation.pk},
