@@ -28,7 +28,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { isRefusal } from "@/api/client";
 import { readConversation } from "@/api/conversations";
@@ -47,6 +47,7 @@ import { useShell } from "./shell";
 export default function ChatPage() {
   const { t } = useTranslation();
   const { conversationId } = useParams();
+  const { key: visit } = useLocation();
   const navigate = useNavigate();
   const { account, forget, recheck } = useSession();
   const { refreshConversations, setBusy } = useShell();
@@ -65,6 +66,8 @@ export default function ChatPage() {
   const ask = useAsk(visitor);
   const { turns, waiting, submit, adopt, reset, stop } = ask;
   const loaded = useRef<string | null>(null);
+  // The navigation that last opened what the page holds.
+  const visited = useRef(visit);
   const previousId = useRef<number | null>(null);
   const bottom = useRef<HTMLDivElement | null>(null);
 
@@ -79,10 +82,16 @@ export default function ChatPage() {
   );
 
   // Open whatever the URL names, and only when it changes to something this
-  // component is not already holding.
+  // component is not already holding. `/` asked for again is a new
+  // conversation all the same: a first question refused before `start` was
+  // filed under none, so its thread stays on `/`, and «Nuova conversazione»
+  // must still clear it. Every navigation has a key of its own, a repeated one
+  // included, which is how it is told from a redraw.
   useEffect(() => {
     const wanted = conversationId ?? null;
-    if (loaded.current === wanted) return;
+    const again = wanted === null && visited.current !== visit;
+    visited.current = visit;
+    if (loaded.current === wanted && !again) return;
     loaded.current = wanted;
     setUnreadable(false);
 
@@ -104,7 +113,7 @@ export default function ChatPage() {
         reset();
         setUnreadable(true);
       });
-  }, [conversationId, adopt, reset, refused]);
+  }, [conversationId, visit, adopt, reset, refused]);
 
   // A new conversation becomes a place as soon as it has an id. `replace` so
   // that the back button leaves the chat rather than stepping through one
