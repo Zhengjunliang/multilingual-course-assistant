@@ -97,6 +97,9 @@ export default function ChatPage() {
 
     if (wanted === null) {
       reset();
+      // An entry still receding from the question just dropped stands again
+      // at once, rather than fading to its end and jumping back.
+      setLeaving(false);
       return;
     }
     // A reply is used only while the URL still names it: a reader who moved on
