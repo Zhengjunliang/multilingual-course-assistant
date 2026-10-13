@@ -12,11 +12,11 @@
  */
 
 import { BookMinus, ExternalLink, PenLine, Plus } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import { listReadings, type ReadingItem, removeReading } from "@/api/catalog";
+import { type ReadingItem, removeReading } from "@/api/catalog";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { endonym } from "@/i18n";
-import { useFailure, useLoad } from "../context";
+import { type Loaded, useFailure } from "../context";
 import { isForbidden, isNotFound } from "../errors";
 import { Section } from "../page";
 import { Forbidden, PartFailure } from "../Refusal";
@@ -37,17 +37,19 @@ import { ReadingDialog } from "./ReadingDialog";
 
 interface ReadingListProps {
   edition: number;
+  /** The list, as the page read it: the page's tab counts its books. */
+  books: Loaded<ReadingItem[]>;
+  /** The language a new book starts in: the syllabus's. */
+  language: string;
   /** Whether the reader holds `edition.edit_content`. */
   editable: boolean;
   /** Reads the page again, after a write found the edition or a book gone. */
   reloadPage: () => Promise<boolean>;
 }
 
-export function ReadingList({ edition, editable, reloadPage }: ReadingListProps) {
+export function ReadingList({ edition, books, language, editable, reloadPage }: ReadingListProps) {
   const { t } = useTranslation();
   const fail = useFailure();
-  const load = useCallback(() => listReadings(edition), [edition]);
-  const books = useLoad(load);
   const [editing, setEditing] = useState<ReadingItem | "new" | null>(null);
   const [removing, setRemoving] = useState<ReadingItem | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -200,6 +202,7 @@ export function ReadingList({ edition, editable, reloadPage }: ReadingListProps)
       <ReadingDialog
         edition={edition}
         book={editing}
+        language={language}
         onClose={() => setEditing(null)}
         onChanged={books.reload}
         onGone={gone}

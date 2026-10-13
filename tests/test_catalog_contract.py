@@ -8,7 +8,9 @@ one set, so neither side can add a field the other lacks. The permission
 names, the code sources, the syllabus sections, the importances and the error
 codes are compared both ways, since the SPA matches them as strings: a misspelt
 permission would hide a button, a misspelt code show the general sentence,
-without any type error.
+without any type error. The languages a book may be written in are held one
+way only, inside Django's table: a Django that adds a language leaves the
+form a language short, never offering one the server refuses.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ import re
 from pathlib import Path
 
 import pytest
+from django.conf import global_settings
 from test_qa_contract import declaration, fields
 
 from apps.catalog.content_serializers import (
@@ -92,3 +95,11 @@ def test_the_mirror_names_every_closed_set(mirror: str) -> None:
         set(Importance.values),
         set(StaffError) | DRF_CODES_SHOWN,
     )
+
+
+def test_the_mirror_offers_only_languages_the_server_accepts_for_a_book(mirror: str) -> None:
+    start = mirror.index("export const BOOK_LANGUAGES = [")
+    offered = re.findall(r'"([^"]*)"', mirror[start : mirror.index("]", start)])
+
+    assert offered
+    assert set(offered) <= {code for code, _ in global_settings.LANGUAGES}

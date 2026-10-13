@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
-import { Field, FieldError, SearchField, TextArea } from "@/components/ui/field";
+import { Field, FieldError, SearchField, Select, TextArea } from "@/components/ui/field";
 import { TabLinks, Tabs } from "@/components/ui/tabs";
 import { ToggleGroup } from "@/components/ui/toggle-group";
 import { Specimen, type Theme } from "./Specimen";
@@ -147,6 +147,23 @@ export function Fields({ theme }: { theme: Theme }) {
           />
           <CounterSpecimen id={`styleguide-${theme}-counter`} />
         </div>
+      </Specimen>
+
+      <Specimen
+        name="Select"
+        note="One of a list, laid out as a Field: the browser's own select in the field's box, a chevron at its end; a list of languages names each in its own."
+      >
+        <Select
+          id={`styleguide-${theme}-select`}
+          label="Lingua del syllabus"
+          defaultValue="it"
+          className="w-full max-w-xs"
+          options={[
+            { value: "it", label: "Italiano", lang: "it" },
+            { value: "en", label: "English", lang: "en" },
+            { value: "zh-hans", label: "简体中文", lang: "zh-hans" },
+          ]}
+        />
       </Specimen>
 
       <Specimen

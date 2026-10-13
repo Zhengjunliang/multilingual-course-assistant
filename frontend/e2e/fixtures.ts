@@ -14,7 +14,7 @@ import type {
   ReadingItem,
   StaffMember,
   StudyPlanCourse,
-  SyllabusSection,
+  Syllabus,
 } from "@/api/catalog";
 import type { AnswerEvent, Citation, RouteDecision } from "@/api/contract";
 import type { ConversationDetail } from "@/api/conversations";
@@ -200,6 +200,7 @@ export const EDITION: Edition = {
   course: COURSE,
   academic_year: "2025-2026",
   teaching_starts: "2025-09-15",
+  period: "first_semester",
   is_current: true,
   teachers: [STAFF_MEMBER],
   permissions: ["edition.view", "edition.assign_teacher", "edition.edit_content"],
@@ -211,17 +212,23 @@ export const EDITION_READ: Edition = {
   course: COURSE,
   academic_year: "2024-2025",
   teaching_starts: "2024-09-16",
+  period: "first_semester",
   is_current: false,
   teachers: [STAFF_MEMBER],
   permissions: ["edition.view", "edition.edit_content"],
 };
 
-/** Two sections in Italian, one in English; the rest of either language is empty. */
-export const SYLLABUS: SyllabusSection[] = [
-  { locale: "it", section: "obiettivi_formativi", text: "Progettare un sistema multimediale." },
-  { locale: "it", section: "prerequisiti", text: "Programmazione." },
-  { locale: "en", section: "prerequisiti", text: "Programming." },
-];
+/** Two sections written, in Italian, one with a bold phrase and a list; the other five are empty. */
+export const SYLLABUS: Syllabus = {
+  locale: "it",
+  sections: [
+    {
+      section: "obiettivi_formativi",
+      text: "Progettare un **sistema multimediale**:\n\n- la codifica;\n- la trasmissione.",
+    },
+    { section: "prerequisiti", text: "Programmazione." },
+  ],
+};
 
 export const READINGS: ReadingItem[] = [
   {

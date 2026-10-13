@@ -4,93 +4,45 @@
  *
  * The server is the one that knows what it takes, so the form checks nothing
  * itself: each refused field says why under itself, by its code, and the
- * first of them takes the focus; a title the list already holds in that
- * language is one of them. The dialog stays open while the request runs and
+ * first of them takes the focus; a title the list already holds is one of
+ * them. The language is the book's own, chosen from every language the server
+ * knows, named in the interface's (readingDraft.ts); a new book starts in the
+ * syllabus's. The dialog stays open while the request runs and
  * after a refusal, as the assign dialog does (features/staff/AssignDialog.tsx).
- * A change sends only the fields the reader edited, so a field someone else
- * changed meanwhile keeps their value. A 404 means the book, or the edition,
+ * A change sends only the fields the reader edited (readingDraft.ts). A 404 means the book, or the edition,
  * went away since the page was read: the dialog closes, and what is left is
  * read again.
  */
 
 import { BookPlus, PenLine } from "lucide-react";
-import { type FormEvent, type ReactNode, useId, useState } from "react";
+import { type FormEvent, type ReactNode, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import {
-  addReading,
-  changeReading,
-  type Importance,
-  type ReadingDraft,
-  type ReadingItem,
-} from "@/api/catalog";
+import { addReading, changeReading, type ReadingItem } from "@/api/catalog";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Field, FieldError } from "@/components/ui/field";
+import { Field, FieldError, Select } from "@/components/ui/field";
 import { ToggleGroup } from "@/components/ui/toggle-group";
-import { DEFAULT_UI_LOCALE, endonym, UI_LOCALES, type UiLocale } from "@/i18n";
 import { useFailure } from "../context";
 import { fieldErrorKey, isForbidden, isNotFound } from "../errors";
 import { Forbidden } from "../Refusal";
-
-/** The fields the server may refuse, in the form's order. */
-const FIELDS = ["title", "authors", "year", "isbn", "url", "importance", "locale"] as const;
-type FieldName = (typeof FIELDS)[number];
-
-interface Draft {
-  title: string;
-  authors: string;
-  year: string;
-  isbn: string;
-  url: string;
-  importance: Importance;
-  locale: UiLocale;
-}
-
-function draftOf(book: ReadingItem | "new"): Draft {
-  if (book === "new") {
-    return {
-      title: "",
-      authors: "",
-      year: "",
-      isbn: "",
-      url: "",
-      importance: "required",
-      locale: DEFAULT_UI_LOCALE,
-    };
-  }
-  return {
-    title: book.title,
-    authors: book.authors,
-    year: book.year === null ? "" : String(book.year),
-    isbn: book.isbn,
-    url: book.url,
-    importance: book.importance,
-    locale: book.locale,
-  };
-}
-
-function sent(draft: Draft): ReadingDraft {
-  const year = draft.year.trim();
-  return { ...draft, year: year === "" ? null : year };
-}
-
-/** The fields of `draft` that differ from `book`. */
-function changes(book: ReadingItem, draft: Draft): Partial<ReadingDraft> {
-  const before = sent(draftOf(book));
-  const after = sent(draft);
-  return Object.fromEntries(
-    (Object.keys(after) as (keyof ReadingDraft)[])
-      .filter((field) => after[field] !== before[field])
-      .map((field) => [field, after[field]]),
-  );
-}
+import {
+  bookLanguages,
+  changes,
+  type Draft,
+  draftOf,
+  FIELDS,
+  type FieldName,
+  sent,
+} from "./readingDraft";
 
 interface ReadingDialogProps {
   edition: number;
   /** The book to change, `"new"` for one to add; null while the dialog is closed. */
   book: ReadingItem | "new" | null;
+  /** The language a new book starts in: the syllabus's. */
+  language: string;
   onClose: () => void;
   /** Reads the list again after a write. */
   onChanged: () => Promise<unknown>;
@@ -102,16 +54,18 @@ interface ReadingDialogProps {
 export function ReadingDialog({
   edition,
   book,
+  language,
   onClose,
   onChanged,
   onGone,
   onCloseAutoFocus,
 }: ReadingDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const fail = useFailure();
   const id = useId();
+  const languages = useMemo(() => bookLanguages(i18n.language), [i18n.language]);
   const [shownFor, setShownFor] = useState<ReadingItem | "new" | null>(null);
-  const [draft, setDraft] = useState<Draft>(() => draftOf("new"));
+  const [draft, setDraft] = useState<Draft>(() => draftOf("new", language));
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [running, setRunning] = useState(false);
   const [forbidden, setForbidden] = useState(false);
@@ -121,7 +75,7 @@ export function ReadingDialog({
   if (book !== shownFor) {
     setShownFor(book);
     if (book !== null) {
-      setDraft(draftOf(book));
+      setDraft(draftOf(book, language));
       setErrors({});
       setForbidden(false);
       setRefusal(null);
@@ -261,14 +215,14 @@ export function ReadingDialog({
           }))}
         />
       </Choice>
-      <Choice id={`${id}-locale`} label={t("staff.readings.field.locale")} error={errors.locale}>
-        <ToggleGroup
-          label={t("staff.readings.field.locale")}
-          value={draft.locale}
-          onValueChange={(value) => set("locale", value)}
-          options={UI_LOCALES.map((value) => ({ value, label: endonym(value) }))}
-        />
-      </Choice>
+      <Select
+        id={`${id}-locale`}
+        label={t("staff.readings.field.locale")}
+        value={draft.locale}
+        error={errors.locale}
+        onChange={(event) => set("locale", event.target.value)}
+        options={languages}
+      />
       {forbidden && <Forbidden permission="edition.edit_content" />}
       {refusal !== null && (
         <p role="alert" className="text-body text-warn-ink">

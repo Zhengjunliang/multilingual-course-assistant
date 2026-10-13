@@ -1,121 +1,134 @@
 /**
- * An edition's syllabus on its page: the seven sections of the Cineca course
- * catalogue, in its order, one language at a time.
+ * An edition's syllabus, the first tab of its page: the seven sections of the
+ * Cineca course catalogue as numbered tabs down the side, in its order, one
+ * shown at a time (components/ui/section-tabs.tsx). Each says under its name
+ * whether it has text; the one shown says where it stands among the seven,
+ * and leads to the ones either side.
  *
- * The languages are the site's three, as tabs, each counting the sections it
- * has text for; the interface's language is shown first. Every tab stays
- * mounted, so a section half written in one language is still there after a
- * look at another. A section with no text says so.
- *
- * Whoever holds `edition.edit_content` edits each section in place
- * (SectionText.tsx). A saved section shows what the server answered, and the
- * syllabus is not read again: a read that failed would take every other
- * section's box away, with what was half written in it. A standing status
- * line says what was saved, since the box closing is all a screen reader
- * would otherwise miss.
+ * The syllabus is written in one language, the edition's, whatever the
+ * interface's (docs/decisions.md,
+ * 2026-09-25, *The data model is decided on paper*, point 4): its text is
+ * shown as written and tagged with it.
+ * Whoever holds `edition.edit_content` chooses it under the sections, where
+ * the choice is sent on its own and changes no text; anyone else reads it
+ * there. Each section is edited in its own panel (SectionText.tsx), and
+ * every panel stays mounted, so a section half written is still there after
+ * a look at another. A standing status line says what was saved, since the
+ * box closing is all a screen reader would otherwise miss.
  */
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { listSyllabus, type SyllabusSection, type SyllabusSectionKey } from "@/api/catalog";
-import { Tabs } from "@/components/ui/tabs";
-import { DEFAULT_UI_LOCALE, endonym, isUiLocale, UI_LOCALES, type UiLocale } from "@/i18n";
-import { useLoad } from "../context";
-import { Section } from "../page";
+import { type SyllabusSectionKey, setSyllabusLocale } from "@/api/catalog";
+import { Select } from "@/components/ui/field";
+import { SectionTabs } from "@/components/ui/section-tabs";
+import { endonym, isUiLocale, UI_LOCALES, type UiLocale } from "@/i18n";
+import { useFailure } from "../context";
+import { isNotFound } from "../errors";
 import { PartFailure } from "../Refusal";
 import { SectionText } from "./SectionText";
-
-/** Each section's name, in the catalogue's order; a section added to the contract fails `tsc` here. */
-const SECTION_NAME: Record<SyllabusSectionKey, `staff.syllabus.section.${SyllabusSectionKey}`> = {
-  obiettivi_formativi: "staff.syllabus.section.obiettivi_formativi",
-  prerequisiti: "staff.syllabus.section.prerequisiti",
-  contenuti: "staff.syllabus.section.contenuti",
-  programma_esteso: "staff.syllabus.section.programma_esteso",
-  metodi_didattici: "staff.syllabus.section.metodi_didattici",
-  verifica_apprendimento: "staff.syllabus.section.verifica_apprendimento",
-  altro: "staff.syllabus.section.altro",
-};
-
-const SECTIONS = Object.keys(SECTION_NAME) as SyllabusSectionKey[];
-
-const same = (a: SyllabusSection, b: SyllabusSection) =>
-  a.locale === b.locale && a.section === b.section;
-
-/** A section's text in a language; empty when the syllabus has no row for it. */
-function textOf(
-  rows: readonly SyllabusSection[],
-  locale: UiLocale,
-  section: SyllabusSectionKey,
-): string {
-  return rows.find((row) => row.locale === locale && row.section === section)?.text ?? "";
-}
+import { type EditionSyllabus, SECTION_NAME, SECTIONS } from "./syllabus";
 
 interface SyllabusPanelProps {
   edition: number;
+  syllabus: EditionSyllabus;
   /** Whether the reader holds `edition.edit_content`. */
   editable: boolean;
   /** Reads the page again, after a write found the edition gone. */
   reloadPage: () => Promise<boolean>;
 }
 
-export function SyllabusPanel({ edition, editable, reloadPage }: SyllabusPanelProps) {
-  const { t, i18n } = useTranslation();
-  const load = useCallback(() => listSyllabus(edition), [edition]);
-  const syllabus = useLoad(load);
+export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: SyllabusPanelProps) {
+  const { t } = useTranslation();
+  const fail = useFailure();
+  const [shown, setShown] = useState<SyllabusSectionKey>(SECTIONS[0] ?? "obiettivi_formativi");
   const [status, setStatus] = useState("");
-  /** Each section as its last write answered, an empty text for one cleared. */
-  const [written, setWritten] = useState<readonly SyllabusSection[]>([]);
-  const rows =
-    syllabus.data === null
-      ? null
-      : [
-          ...syllabus.data.filter((row) => !written.some((write) => same(write, row))),
-          ...written.filter((write) => write.text !== ""),
-        ];
+  /** The language being sent, shown in the select until the server answers. */
+  const [choosing, setChoosing] = useState<UiLocale | null>(null);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const { locale } = syllabus;
 
-  const saved = (row: SyllabusSection, message: string) => {
-    setWritten((shown) => [...shown.filter((write) => !same(write, row)), row]);
-    setStatus(message);
+  if (syllabus.error !== null) return <PartFailure onRetry={() => void syllabus.reload()} />;
+  if (locale === null) return null;
+
+  const choose = async (next: UiLocale) => {
+    setChoosing(next);
+    setRefusal(null);
+    try {
+      const answered = await setSyllabusLocale(edition, next);
+      syllabus.relabelled(answered.locale);
+      setStatus(t("staff.syllabus.relabelled", { language: endonym(answered.locale) }));
+    } catch (error) {
+      // The edition left the reader's reach: the page reads again, and says so.
+      if (isNotFound(error)) await reloadPage();
+      else setRefusal(fail(error));
+    } finally {
+      setChoosing(null);
+    }
   };
 
+  const language = editable ? (
+    <Select
+      id={`syllabus-${edition}-locale`}
+      label={t("staff.syllabus.language")}
+      value={choosing ?? locale}
+      onChange={(event) => {
+        if (isUiLocale(event.target.value)) void choose(event.target.value);
+      }}
+      error={refusal ?? undefined}
+      options={UI_LOCALES.map((option) => ({
+        value: option,
+        label: endonym(option),
+        lang: option,
+      }))}
+    />
+  ) : (
+    <p className="flex flex-col gap-hair text-body">
+      <span className="font-semibold text-ink">{t("staff.syllabus.language")}</span>
+      <span lang={locale} className="text-muted">
+        {endonym(locale)}
+      </span>
+    </p>
+  );
+
   return (
-    <Section heading={t("staff.syllabus.title")} sub={t("staff.syllabus.sub")}>
+    <>
       <p role="status" className="sr-only">
         {status}
       </p>
-      {syllabus.error !== null ? (
-        <PartFailure onRetry={() => void syllabus.reload()} />
-      ) : (
-        rows !== null && (
-          <Tabs
-            label={t("staff.syllabus.languages")}
-            defaultValue={isUiLocale(i18n.language) ? i18n.language : DEFAULT_UI_LOCALE}
-            tabs={UI_LOCALES.map((locale) => ({
-              value: locale,
-              label: endonym(locale),
-              count: rows.filter((row) => row.locale === locale).length,
-              content: (
-                <ol className="flex flex-col divide-y divide-hairline rounded-card border border-line bg-surface">
-                  {SECTIONS.map((section) => (
-                    <SectionText
-                      key={section}
-                      edition={edition}
-                      locale={locale}
-                      section={section}
-                      name={t(SECTION_NAME[section])}
-                      text={textOf(rows, locale, section)}
-                      editable={editable}
-                      onSaved={saved}
-                      reloadPage={reloadPage}
-                    />
-                  ))}
-                </ol>
-              ),
-            }))}
-          />
-        )
-      )}
-    </Section>
+      <SectionTabs
+        label={t("staff.syllabus.sections")}
+        value={shown}
+        onValueChange={setShown}
+        steps={{ previous: t("staff.syllabus.previous"), next: t("staff.syllabus.next") }}
+        foot={language}
+        sections={SECTIONS.map((section, at) => {
+          const text = syllabus.text(section);
+          return {
+            value: section,
+            label: t(SECTION_NAME[section]),
+            caption: t(text === "" ? "staff.syllabus.blank" : "staff.syllabus.written"),
+            content: (
+              <SectionText
+                edition={edition}
+                locale={locale}
+                section={section}
+                position={at + 1}
+                total={SECTIONS.length}
+                name={t(SECTION_NAME[section])}
+                text={text}
+                editable={editable}
+                onSaved={(row, message) => {
+                  syllabus.saved(row);
+                  setStatus(message);
+                }}
+                reloadPage={reloadPage}
+              />
+            ),
+          };
+        })}
+      />
+    </>
   );
 }

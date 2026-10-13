@@ -196,7 +196,7 @@
       "invalid_choice": "请从给出的选项中选择。",
       "min_value": "数字太小。",
       "max_value": "数字太大。",
-      "unique": "该语言的书目中已有这个书名。",
+      "unique": "书目中已有这个书名。",
       "unknown": "出错了，请重试。"
     },
     "source": "学习计划取自 Cineca 课程目录。",
@@ -263,15 +263,26 @@
       "status": "状态"
     },
     "edition": {
-      "teachers": "本版本的教师",
+      "views": "本版本的视图",
+      "teachers": "教师",
       "starts": "{{date}} 开课",
       "empty": "本版本没有指派教师。"
     },
     "syllabus": {
       "title": "教学大纲",
-      "sub": "Cineca 课程目录的各个部分，网站的每种语言各一份。",
-      "languages": "大纲语言",
-      "empty": "这种语言还没有内容。",
+      "sections": "大纲各部分",
+      "language": "大纲语言",
+      "relabelled": "大纲语言：{{language}}。",
+      "position": "{{position}} / {{total}}",
+      "previous": "上一部分",
+      "next": "下一部分",
+      "written": "已填写",
+      "blank": "未填写",
+      "empty": {
+        "title": "这一部分没有内容",
+        "write": "点上方的「撰写」写下内容。",
+        "read": "大纲的这一部分没有内容。"
+      },
       "write": "撰写",
       "saved": "已保存「{{section}}」。",
       "cleared": "已清空「{{section}}」。",
@@ -286,7 +297,7 @@
       },
       "clear": {
         "title": "清空这一部分？",
-        "body": "「{{section}}」的{{language}}版本将没有内容，原文不会另外保存。",
+        "body": "「{{section}}」将没有内容，原文不会另外保存。",
         "action": "清空"
       }
     },

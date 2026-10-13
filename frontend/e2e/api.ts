@@ -19,7 +19,7 @@ import type {
   Programme,
   ReadingItem,
   StudyPlanCourse,
-  SyllabusSection,
+  Syllabus,
 } from "@/api/catalog";
 import type { AskBody } from "@/api/client";
 import type { AnswerEvent } from "@/api/contract";
@@ -145,7 +145,7 @@ export class Api {
     this.json<Edition>(`/api/catalog/editions/${EDITION.id}`, EDITION);
     this.json<Edition>(`/api/catalog/editions/${EDITION_READ.id}`, EDITION_READ);
     for (const { id } of [EDITION, EDITION_READ]) {
-      this.json<SyllabusSection[]>(`/api/catalog/editions/${id}/syllabus`, SYLLABUS);
+      this.json<Syllabus>(`/api/catalog/editions/${id}/syllabus`, SYLLABUS);
       this.json<ReadingItem[]>(`/api/catalog/editions/${id}/readings`, READINGS);
     }
   }

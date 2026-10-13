@@ -1,30 +1,40 @@
 /**
- * One section of an edition's syllabus, in one language, read or edited in
- * place, as GitHub edits a comment: «Modifica» turns the text into a box with
- * «Annulla» and «Salva», and «Salva» sends that section alone; Escape cancels
- * too. Saving a section empty clears it, which asks first, since the text is
+ * One section of an edition's syllabus, the panel its vertical tab shows: a
+ * head on the tint with where the section stands among the seven («3 di 7»),
+ * its name and «Modifica», then its text rendered from Markdown
+ * (SyllabusMarkdown.tsx), or, when it has none, a panel saying so.
+ *
+ * It is read or edited in place, as GitHub edits a comment: «Modifica» turns
+ * the text into a box with «Annulla» and «Salva», and «Salva» sends that
+ * section alone; Escape cancels too. Saving a section empty clears it, which asks first, since the text is
  * kept nowhere else. Once saved the box closes on the new text and the focus
  * goes back to «Modifica». A refusal stays in the box, with what was written,
  * or in the question when it was the clearing that was refused.
  */
 
-import { Eraser, Pencil } from "lucide-react";
+import { Eraser, FileText, Pencil } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type SyllabusSection, type SyllabusSectionKey, writeSyllabus } from "@/api/catalog";
 import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Empty } from "@/components/ui/empty";
 import { TextArea } from "@/components/ui/field";
-import { languageName, type UiLocale } from "@/i18n";
+import type { UiLocale } from "@/i18n";
 import { useFailure } from "../context";
 import { isForbidden, isNotFound } from "../errors";
 import { Forbidden } from "../Refusal";
+import { SyllabusMarkdown } from "./SyllabusMarkdown";
 
 interface SectionTextProps {
   edition: number;
+  /** The language the syllabus is written in. */
   locale: UiLocale;
   section: SyllabusSectionKey;
+  /** Where it stands among the sections, from 1, and how many there are. */
+  position: number;
+  total: number;
   /** The section's name in the interface's language. */
   name: string;
   /** Its text; empty when the section has none. */
@@ -39,13 +49,15 @@ export function SectionText({
   edition,
   locale,
   section,
+  position,
+  total,
   name,
   text,
   editable,
   onSaved,
   reloadPage,
 }: SectionTextProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const fail = useFailure();
   const headingId = useId();
   const editButton = useRef<HTMLButtonElement>(null);
@@ -79,11 +91,7 @@ export function SectionText({
     setForbidden(false);
     setRefusal(null);
     try {
-      const row = (await writeSyllabus(edition, locale, section, value)) ?? {
-        locale,
-        section,
-        text: "",
-      };
+      const row = (await writeSyllabus(edition, section, value)) ?? { section, text: "" };
       const key = row.text === "" ? "staff.syllabus.cleared" : "staff.syllabus.saved";
       onSaved(row, t(key, { section: name }));
       close();
@@ -125,16 +133,19 @@ export function SectionText({
   );
 
   return (
-    <li className="flex flex-col gap-tight px-snug py-gutter">
-      <div className="flex min-h-control-xs items-center gap-snug">
-        <h3 id={headingId} className="flex-1 font-semibold text-body text-ink">
+    <>
+      <div className="flex flex-wrap items-center gap-x-snug gap-y-hair border-hairline border-b bg-tint py-snug pr-gutter pl-room">
+        <span className="text-caption text-muted tabular-nums">
+          {t("staff.syllabus.position", { position, total })}
+        </span>
+        <h2 id={headingId} className="flex-1 font-semibold text-ink text-title">
           {name}
-        </h3>
+        </h2>
         {editable && draft === null && (
           <Button
             ref={editButton}
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => setDraft(text)}
           >
@@ -144,43 +155,48 @@ export function SectionText({
           </Button>
         )}
       </div>
-      {draft === null ? (
-        text === "" ? (
-          <p className="text-body text-muted">{t("staff.syllabus.empty")}</p>
+      <div className="flex flex-col gap-snug px-room py-room">
+        {draft === null ? (
+          text === "" ? (
+            <Empty
+              visual={<FileText className="size-icon-lg" />}
+              heading={t("staff.syllabus.empty.title")}
+            >
+              {t(editable ? "staff.syllabus.empty.write" : "staff.syllabus.empty.read")}
+            </Empty>
+          ) : (
+            <SyllabusMarkdown text={text} lang={locale} />
+          )
         ) : (
-          <p lang={locale} className="whitespace-pre-line text-body text-ink">
-            {text}
-          </p>
-        )
-      ) : (
-        <form onSubmit={submit} className="flex flex-col gap-tight">
-          <TextArea
-            ref={area}
-            id={`${headingId}-text`}
-            aria-labelledby={headingId}
-            lang={locale}
-            // The reader pressed «Modifica» to write here.
-            autoFocus
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              // An Escape that ends a word an input method is composing is the
-              // method's: Safari ends the composition first and marks the key 229.
-              const composing = event.nativeEvent.isComposing || event.keyCode === 229;
-              if (event.key === "Escape" && !composing && !running) close();
-            }}
-          />
-          {!clearing && refused}
-          <div className="flex flex-wrap justify-end gap-tight">
-            <Button type="button" variant="outline" size="sm" onClick={close} disabled={running}>
-              {t("staff.cancel")}
-            </Button>
-            <Button type="submit" size="sm" pending={running}>
-              {running ? t("staff.saving") : t("staff.save")}
-            </Button>
-          </div>
-        </form>
-      )}
+          <form onSubmit={submit} className="flex flex-col gap-tight">
+            <TextArea
+              ref={area}
+              id={`${headingId}-text`}
+              aria-labelledby={headingId}
+              lang={locale}
+              // The reader pressed «Modifica» to write here.
+              autoFocus
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                // An Escape that ends a word an input method is composing is the
+                // method's: Safari ends the composition first and marks the key 229.
+                const composing = event.nativeEvent.isComposing || event.keyCode === 229;
+                if (event.key === "Escape" && !composing && !running) close();
+              }}
+            />
+            {!clearing && refused}
+            <div className="flex flex-wrap justify-end gap-tight">
+              <Button type="button" variant="outline" size="sm" onClick={close} disabled={running}>
+                {t("staff.cancel")}
+              </Button>
+              <Button type="submit" size="sm" pending={running}>
+                {running ? t("staff.saving") : t("staff.save")}
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
       <AlertDialog
         open={clearing}
         onOpenChange={(open) => {
@@ -191,10 +207,7 @@ export function SectionText({
         }}
         heading={t("staff.syllabus.clear.title")}
         icon={Eraser}
-        description={t("staff.syllabus.clear.body", {
-          section: name,
-          language: languageName(locale, i18n.language),
-        })}
+        description={t("staff.syllabus.clear.body", { section: name })}
         cancelLabel={t("staff.cancel")}
         confirmLabel={t("staff.syllabus.clear.action")}
         onConfirm={() => write("")}
@@ -206,6 +219,6 @@ export function SectionText({
       >
         {clearing && refused}
       </AlertDialog>
-    </li>
+    </>
   );
 }

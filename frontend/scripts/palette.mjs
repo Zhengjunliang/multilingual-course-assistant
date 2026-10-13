@@ -205,9 +205,15 @@ export const TINTS = [
   {
     tint: "hover",
     ground: "tint",
-    fronts: ["ink"],
+    fronts: ["ink", "muted"],
     where:
-      "toggle-group.tsx an option under the pointer, dialog.tsx an outlined button in the foot under the pointer, CodeBlock.tsx the copy button under the pointer",
+      "toggle-group.tsx an option under the pointer, dialog.tsx an outlined button in the foot under the pointer, CodeBlock.tsx the copy button under the pointer, section-tabs.tsx a section under the pointer, its name and its caption",
+  },
+  {
+    tint: "selected",
+    ground: "tint",
+    fronts: ["ink", "muted"],
+    where: "section-tabs.tsx the section shown, its name and its caption",
   },
   {
     tint: "selected",

@@ -4,6 +4,7 @@
  */
 
 import { ArrowRight, BookOpen, GraduationCap, Info, Lock, MessageSquare } from "lucide-react";
+import { useState } from "react";
 
 import { AvatarStack } from "@/components/ui/avatar-stack";
 import { Banner } from "@/components/ui/banner";
@@ -13,6 +14,7 @@ import { Card, CardFooter, CardHeader } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { Count } from "@/components/ui/count";
 import { Empty } from "@/components/ui/empty";
+import { SectionTabs } from "@/components/ui/section-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusDot } from "@/components/ui/status-dot";
 import {
@@ -24,6 +26,49 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Specimen } from "./Specimen";
+
+/** A section's panel: its name over its text. */
+const part = (name: string, text: string) => (
+  <div className="flex flex-col gap-tight p-gutter">
+    <h4 className="font-semibold text-ink text-title">{name}</h4>
+    <p className="text-body text-ink">{text}</p>
+  </div>
+);
+
+/** The sections keep which one is shown, so the specimen does too. */
+function SectionTabsSpecimen() {
+  const [shown, setShown] = useState("prerequisiti");
+  return (
+    <SectionTabs
+      label="Sezioni"
+      value={shown}
+      onValueChange={setShown}
+      steps={{ previous: "Sezione precedente", next: "Sezione successiva" }}
+      className="w-full"
+      sections={[
+        {
+          value: "obiettivi",
+          label: "Obiettivi formativi",
+          caption: "Scritta",
+          content: part("Obiettivi formativi", "Conoscenza dei metodi di base."),
+        },
+        {
+          value: "prerequisiti",
+          label: "Prerequisiti",
+          caption: "Scritta",
+          content: part("Prerequisiti", "Analisi matematica I e Fisica I."),
+        },
+        {
+          value: "altro",
+          label: "Altro",
+          caption: "Vuota",
+          content: part("Altro", "Nessun testo."),
+        },
+      ]}
+      foot={<p className="text-caption text-muted">Lingua del syllabus: Italiano</p>}
+    />
+  );
+}
 
 export function Surfaces() {
   return (
@@ -160,6 +205,13 @@ export function Surfaces() {
             { label: "B047 · INGEGNERIA INFORMATICA" },
           ]}
         />
+      </Specimen>
+
+      <Specimen
+        name="SectionTabs"
+        note="The numbered sections of one document, one at a time: one card, the sections down its side on the tint with a caption for each one's state, the shown one --selected with the accent's bar, what they share under them, and under the section the ones either side. Narrower than xl the list runs across the top and scrolls."
+      >
+        <SectionTabsSpecimen />
       </Specimen>
     </>
   );
