@@ -160,6 +160,9 @@
   },
   "staff": {
     "cancel": "Annulla",
+    "edit": "Modifica",
+    "save": "Salva",
+    "saving": "Salvataggio…",
     "breadcrumb": "Percorso",
     "nav": {
       "programmes": "Corsi di laurea",
@@ -183,8 +186,8 @@
     "error": {
       "no_such_user": "Nessun utente con questo nome.",
       "already_held": "Questo utente ha già questo ruolo qui.",
-      "required": "Inserisci un nome utente.",
-      "blank": "Inserisci un nome utente.",
+      "required": "Compila questo campo.",
+      "blank": "Compila questo campo.",
       "not_authenticated": "La sessione è scaduta. Accedi di nuovo.",
       "permission_denied": "Non hai il permesso di farlo.",
       "not_found": "Non esiste più.",
@@ -259,6 +262,60 @@
       "starts": "Lezioni dal {{date}}",
       "empty": "Nessun docente assegnato a questa edizione."
     },
+    "syllabus": {
+      "title": "Syllabus",
+      "sub": "Le sezioni del catalogo dei corsi Cineca, in ciascuna lingua del sito.",
+      "languages": "Lingua del syllabus",
+      "empty": "Nessun testo in questa lingua.",
+      "write": "Scrivi",
+      "saved": "Sezione «{{section}}» salvata.",
+      "cleared": "Sezione «{{section}}» svuotata.",
+      "section": {
+        "obiettivi_formativi": "Obiettivi formativi",
+        "prerequisiti": "Prerequisiti",
+        "contenuti": "Contenuti",
+        "programma_esteso": "Programma esteso",
+        "metodi_didattici": "Metodi didattici",
+        "verifica_apprendimento": "Verifica dell'apprendimento",
+        "altro": "Altro"
+      },
+      "clear": {
+        "title": "Svuotare la sezione?",
+        "body": "«{{section}}» in {{language}} resterà senza testo, e il testo non è salvato altrove.",
+        "action": "Svuota"
+      }
+    },
+    "readings": {
+      "title": "Testi di riferimento",
+      "add": "Aggiungi testo",
+      "empty": "Nessun testo di riferimento.",
+      "year": "Anno",
+      "actions": "Azioni",
+      "link": "Apri il link del testo",
+      "remove": "Rimuovi",
+      "removeTitle": "Rimuovere il testo?",
+      "removeBody": "«{{title}}» non sarà più tra i testi di riferimento di questa edizione.",
+      "removed": "Testo rimosso",
+      "added": "Testo aggiunto",
+      "changed": "Testo modificato",
+      "gone": "«{{title}}» non c'era più: era già stato rimosso altrove.",
+      "addTitle": "Aggiungi un testo",
+      "editTitle": "Modifica il testo",
+      "importance": {
+        "required": "Obbligatorio",
+        "recommended": "Consigliato"
+      },
+      "field": {
+        "title": "Titolo",
+        "authors": "Autori",
+        "authorsHint": "Come li riporta il syllabus, ad esempio Mazzoldi, Nigro, Voci.",
+        "year": "Anno (facoltativo)",
+        "isbn": "ISBN (facoltativo)",
+        "url": "Link (facoltativo)",
+        "importance": "Importanza",
+        "locale": "Lingua"
+      }
+    },
     "mine": {
       "title": "I miei insegnamenti",
       "sub": "Gli insegnamenti di cui sei docente, con tutte le loro edizioni: puoi modificarle tutte.",
@@ -271,6 +328,7 @@
       "teacher": "Assegna docente",
       "secretariat": "Assegna segreteria",
       "username": "Nome utente",
+      "empty": "Inserisci un nome utente.",
       "placeholder": "es. luca.verdi",
       "hint": "Il nome con cui la persona accede; l'account deve già esistere.",
       "submit": "Assegna",
@@ -290,7 +348,8 @@
     "retry": "Riprova",
     "failure": {
       "title": "Impossibile aprire questa pagina",
-      "body": "Il server non ha risposto come doveva. Riprova tra poco; se succede ancora, torna al tuo punto di partenza."
+      "body": "Il server non ha risposto come doveva. Riprova tra poco; se succede ancora, torna al tuo punto di partenza.",
+      "part": "Questa parte della pagina non si è caricata."
     }
   },
   "shortcuts": {

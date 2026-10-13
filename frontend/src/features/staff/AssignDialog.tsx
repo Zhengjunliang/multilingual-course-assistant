@@ -78,7 +78,7 @@ export function AssignDialog({
     const name = username.trim();
     if (scope === null || running) return;
     if (name === "") {
-      setFieldError(t("staff.error.required"));
+      setFieldError(t("staff.assign.empty"));
       input.current?.focus();
       return;
     }

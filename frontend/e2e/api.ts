@@ -13,11 +13,27 @@ import type { AddressInfo } from "node:net";
 import { test as base, expect, type Page, type Request } from "@playwright/test";
 
 import type { Account, Session } from "@/api/account";
-import type { Course, Edition, Programme, StudyPlanCourse } from "@/api/catalog";
+import type {
+  Course,
+  Edition,
+  Programme,
+  ReadingItem,
+  StudyPlanCourse,
+  SyllabusSection,
+} from "@/api/catalog";
 import type { AskBody } from "@/api/client";
 import type { AnswerEvent } from "@/api/contract";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
-import { COURSE, EDITION, EDITION_READ, PROGRAMME, STUDY_PLAN, VISITOR } from "./fixtures";
+import {
+  COURSE,
+  EDITION,
+  EDITION_READ,
+  PROGRAMME,
+  READINGS,
+  STUDY_PLAN,
+  SYLLABUS,
+  VISITOR,
+} from "./fixtures";
 
 /** `sse` is a whole stream; `open` is sent and then held open, mid-answer. */
 type Reply = { status?: number; json?: unknown; sse?: AnswerEvent[]; open?: AnswerEvent[] };
@@ -128,6 +144,10 @@ export class Api {
     this.json<Edition[]>("/api/catalog/editions", [EDITION, EDITION_READ]);
     this.json<Edition>(`/api/catalog/editions/${EDITION.id}`, EDITION);
     this.json<Edition>(`/api/catalog/editions/${EDITION_READ.id}`, EDITION_READ);
+    for (const { id } of [EDITION, EDITION_READ]) {
+      this.json<SyllabusSection[]>(`/api/catalog/editions/${id}/syllabus`, SYLLABUS);
+      this.json<ReadingItem[]>(`/api/catalog/editions/${id}/readings`, READINGS);
+    }
   }
 
   /** Every question gets this stream, whole. */

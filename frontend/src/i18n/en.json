@@ -160,6 +160,9 @@
   },
   "staff": {
     "cancel": "Cancel",
+    "edit": "Edit",
+    "save": "Save",
+    "saving": "Saving…",
     "breadcrumb": "Breadcrumb",
     "nav": {
       "programmes": "Degree programmes",
@@ -183,8 +186,8 @@
     "error": {
       "no_such_user": "No user has this name.",
       "already_held": "This user already holds this role here.",
-      "required": "Enter a username.",
-      "blank": "Enter a username.",
+      "required": "Fill in this field.",
+      "blank": "Fill in this field.",
       "not_authenticated": "Your session has ended. Sign in again.",
       "permission_denied": "You are not allowed to do this.",
       "not_found": "This is no longer there.",
@@ -259,6 +262,60 @@
       "starts": "Teaching from {{date}}",
       "empty": "No teacher is assigned to this edition."
     },
+    "syllabus": {
+      "title": "Syllabus",
+      "sub": "The sections of the Cineca course catalogue, in each of the site's languages.",
+      "languages": "Syllabus language",
+      "empty": "No text in this language.",
+      "write": "Write",
+      "saved": "Section \"{{section}}\" saved.",
+      "cleared": "Section \"{{section}}\" cleared.",
+      "section": {
+        "obiettivi_formativi": "Learning objectives",
+        "prerequisiti": "Prerequisites",
+        "contenuti": "Course content",
+        "programma_esteso": "Full programme",
+        "metodi_didattici": "Teaching methods",
+        "verifica_apprendimento": "Assessment",
+        "altro": "Other information"
+      },
+      "clear": {
+        "title": "Clear the section?",
+        "body": "\"{{section}}\" in {{language}} will have no text, and the text is not kept anywhere else.",
+        "action": "Clear"
+      }
+    },
+    "readings": {
+      "title": "Reading list",
+      "add": "Add a book",
+      "empty": "No books on the reading list.",
+      "year": "Year",
+      "actions": "Actions",
+      "link": "Open the book's link",
+      "remove": "Remove",
+      "removeTitle": "Remove the book?",
+      "removeBody": "\"{{title}}\" will no longer be on this edition's reading list.",
+      "removed": "Book removed",
+      "added": "Book added",
+      "changed": "Book updated",
+      "gone": "\"{{title}}\" was no longer there: it had been removed elsewhere.",
+      "addTitle": "Add a book",
+      "editTitle": "Edit the book",
+      "importance": {
+        "required": "Required",
+        "recommended": "Recommended"
+      },
+      "field": {
+        "title": "Title",
+        "authors": "Authors",
+        "authorsHint": "As the syllabus prints them, such as Mazzoldi, Nigro, Voci.",
+        "year": "Year (optional)",
+        "isbn": "ISBN (optional)",
+        "url": "Link (optional)",
+        "importance": "Importance",
+        "locale": "Language"
+      }
+    },
     "mine": {
       "title": "My courses",
       "sub": "The courses you teach, with all their editions: you can edit every one.",
@@ -271,6 +328,7 @@
       "teacher": "Assign teacher",
       "secretariat": "Assign secretariat",
       "username": "Username",
+      "empty": "Enter a username.",
       "placeholder": "e.g. luca.verdi",
       "hint": "The name the person signs in with; the account must exist.",
       "submit": "Assign",
@@ -290,7 +348,8 @@
     "retry": "Try again",
     "failure": {
       "title": "This page could not be opened",
-      "body": "The server did not answer as it should. Try again in a moment; if it happens again, go back to where you started."
+      "body": "The server did not answer as it should. Try again in a moment; if it happens again, go back to where you started.",
+      "part": "This part of the page did not load."
     }
   },
   "shortcuts": {

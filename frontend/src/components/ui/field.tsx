@@ -20,7 +20,10 @@
  *
  * `SearchField` is the box alone, for a filter: a magnifier, no visible label
  * (its name is `aria-label`, since the magnifier says what it is for) and the
- * key that reaches it.
+ * key that reaches it. `TextArea` is the box alone over several lines, for
+ * text written in place under the heading that names it (`aria-labelledby`),
+ * a section of a syllabus: it grows with its text (`field-sizing-content`)
+ * from six lines to most of the screen, where it scrolls.
  */
 
 import { CircleAlert, type LucideIcon, Search } from "lucide-react";
@@ -145,6 +148,17 @@ export function SearchField({ label, shortcut, className, ...input }: SearchFiel
         className={INPUT}
       />
       {shortcut !== undefined && <Kbd>{shortcut.label}</Kbd>}
+    </div>
+  );
+}
+
+export function TextArea({ className, ...area }: ComponentProps<"textarea">) {
+  return (
+    <div className={cn(BOX, CALM, "items-stretch px-snug py-tight", className)}>
+      <textarea
+        {...area}
+        className={cn(INPUT, "field-sizing-content max-h-[60vh] min-h-[6lh] resize-y")}
+      />
     </div>
   );
 }

@@ -7,7 +7,15 @@
  */
 
 import type { Account, Session } from "@/api/account";
-import type { Course, Edition, Programme, StaffMember, StudyPlanCourse } from "@/api/catalog";
+import type {
+  Course,
+  Edition,
+  Programme,
+  ReadingItem,
+  StaffMember,
+  StudyPlanCourse,
+  SyllabusSection,
+} from "@/api/catalog";
 import type { AnswerEvent, Citation, RouteDecision } from "@/api/contract";
 import type { ConversationDetail } from "@/api/conversations";
 
@@ -194,10 +202,10 @@ export const EDITION: Edition = {
   teaching_starts: "2025-09-15",
   is_current: true,
   teachers: [STAFF_MEMBER],
-  permissions: ["edition.view", "edition.assign_teacher"],
+  permissions: ["edition.view", "edition.assign_teacher", "edition.edit_content"],
 };
 
-/** An edition the staff account teaches but may not assign on: the read-only banner's page. */
+/** An edition the staff account teaches, and so edits, but may not assign teachers on. */
 export const EDITION_READ: Edition = {
   id: 12,
   course: COURSE,
@@ -205,8 +213,28 @@ export const EDITION_READ: Edition = {
   teaching_starts: "2024-09-16",
   is_current: false,
   teachers: [STAFF_MEMBER],
-  permissions: ["edition.view"],
+  permissions: ["edition.view", "edition.edit_content"],
 };
+
+/** Two sections in Italian, one in English; the rest of either language is empty. */
+export const SYLLABUS: SyllabusSection[] = [
+  { locale: "it", section: "obiettivi_formativi", text: "Progettare un sistema multimediale." },
+  { locale: "it", section: "prerequisiti", text: "Programmazione." },
+  { locale: "en", section: "prerequisiti", text: "Programming." },
+];
+
+export const READINGS: ReadingItem[] = [
+  {
+    id: 41,
+    locale: "it",
+    title: "Multimedia Systems",
+    authors: "Steinmetz, Nahrstedt",
+    year: 2004,
+    isbn: "978-3540408673",
+    url: "",
+    importance: "recommended",
+  },
+];
 
 export const STUDY_PLAN: StudyPlanCourse[] = [
   {

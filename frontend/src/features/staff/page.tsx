@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Chip } from "@/components/ui/chip";
+import { Count } from "@/components/ui/count";
 import { cn } from "@/lib/utils";
 
 interface PageHeadProps {
@@ -60,18 +61,23 @@ export function PageHead({ heading, caps, chips, sub, source, actions }: PageHea
 
 interface SectionProps {
   heading: string;
+  /** How many rows it holds, beside the heading. */
+  count?: number;
   sub?: ReactNode;
   /** Beside the heading: the section's one action. */
   right?: ReactNode;
   children: ReactNode;
 }
 
-export function Section({ heading, sub, right, children }: SectionProps) {
+export function Section({ heading, count, sub, right, children }: SectionProps) {
   return (
     <section className="flex flex-col gap-snug">
       <div className="flex flex-wrap items-end gap-snug">
         <div className="flex min-w-0 flex-1 flex-col gap-hair">
-          <h2 className="font-semibold text-ink text-title">{heading}</h2>
+          <div className="flex items-center gap-tight">
+            <h2 className="font-semibold text-ink text-title">{heading}</h2>
+            {count !== undefined && <Count value={count} />}
+          </div>
           {sub !== undefined && <p className="text-body text-muted">{sub}</p>}
         </div>
         {right}

@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
-import { Field, FieldError, SearchField } from "@/components/ui/field";
+import { Field, FieldError, SearchField, TextArea } from "@/components/ui/field";
 import { TabLinks, Tabs } from "@/components/ui/tabs";
 import { ToggleGroup } from "@/components/ui/toggle-group";
 import { Specimen, type Theme } from "./Specimen";
@@ -159,6 +159,21 @@ export function Fields({ theme }: { theme: Theme }) {
           shortcut={{ keys: "Control+K", label: "Ctrl K" }}
           className="w-full max-w-xs"
         />
+      </Specimen>
+
+      <Specimen
+        name="TextArea"
+        note="Text written in place under the heading that names it: the field's box over six lines, growing with the text."
+      >
+        <div className="flex w-full flex-col gap-hair">
+          <h4 id={`styleguide-${theme}-area`} className="font-semibold text-body text-ink">
+            Prerequisiti
+          </h4>
+          <TextArea
+            aria-labelledby={`styleguide-${theme}-area`}
+            defaultValue="Analisi matematica I e Fisica I."
+          />
+        </div>
       </Specimen>
 
       <Specimen
