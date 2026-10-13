@@ -7,8 +7,8 @@ its rows are entered in the admin.
 anything out from role names: it is `permissions_on()` (apps/roles/scopes.py)
 read from the marks the list query already put on each row, so a list costs
 the same number of queries however long it is. An edition also says whether
-the caller may make it current, `can_set_current()` read from the same kind of
-mark, and who teaches it, from rows the list query prefetched. A programme
+it is current, the mark `with_current()` (apps/catalog/editions.py) put on its
+row, and who teaches it, from rows the list query prefetched. A programme
 carries its curricula, its course count and its secretariat, and a course
 every curriculum entry of every programme, from prefetched rows too. The rows
 must come from the catalogue views' querysets (apps/catalog/views.py); a row
@@ -28,9 +28,10 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from apps.accounts.models import User
+from apps.catalog.editions import IS_CURRENT
 from apps.catalog.errors import StaffError
 from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
-from apps.roles.scopes import can_set_current, permissions_on
+from apps.roles.scopes import permissions_on
 
 if TYPE_CHECKING:
     from apps.roles.models import RoleAssignment
@@ -143,9 +144,11 @@ class StaffMemberSerializer(serializers.Serializer):
 
 class EditionSerializer(serializers.ModelSerializer[CourseEdition]):
     course = CourseSerializer(read_only=True)
+    # The mark, not a field of the row: read without `with_current()`, the
+    # serializer fails on it.
+    is_current = serializers.SerializerMethodField()
     teachers = serializers.SerializerMethodField()
     permissions = serializers.SerializerMethodField()
-    can_set_current = serializers.SerializerMethodField()
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = CourseEdition
@@ -153,21 +156,21 @@ class EditionSerializer(serializers.ModelSerializer[CourseEdition]):
             "id",
             "course",
             "academic_year",
+            "teaching_starts",
             "is_current",
             "teachers",
             "permissions",
-            "can_set_current",
         )
         read_only_fields = fields
+
+    def get_is_current(self, edition: CourseEdition) -> bool:
+        return getattr(edition, IS_CURRENT)
 
     def get_teachers(self, edition: CourseEdition) -> list[dict[str, Any]]:
         return _members(getattr(edition, TEACHER_ROWS))
 
     def get_permissions(self, edition: CourseEdition) -> list[str]:
         return sorted(permissions_on(self.context["request"].user, edition))
-
-    def get_can_set_current(self, edition: CourseEdition) -> bool:
-        return can_set_current(self.context["request"].user, edition)
 
 
 class EditionSummarySerializer(serializers.ModelSerializer[CourseEdition]):

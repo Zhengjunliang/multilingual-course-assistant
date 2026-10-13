@@ -28,7 +28,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useSetCurrent } from "@/features/staff/actions";
 import { useLoad } from "@/features/staff/context";
 import { isNotFound } from "@/features/staff/errors";
 import { useOpenedRow } from "@/features/staff/openedRow";
@@ -54,7 +53,6 @@ export default function MinePage() {
   const { account } = useSession();
   const { back } = useShell();
   const editions = useLoad(listEditions);
-  const switching = useSetCurrent({ editions: editions.data ?? [], reload: editions.reload });
   const { opened, open } = useOpenedRow(editions.data !== null);
   useCrumbs(isNotFound(editions.error) ? { kind: "notFound" } : { kind: "mine" });
 
@@ -125,7 +123,6 @@ export default function MinePage() {
                 </TableCell>
                 <TableCell>
                   <span className="flex items-center justify-end gap-snug text-muted">
-                    {switching.button(edition)}
                     <ChevronRight aria-hidden className="size-icon max-sm:hidden" />
                   </span>
                 </TableCell>
@@ -135,7 +132,6 @@ export default function MinePage() {
         </Table>
       )}
       <Note>{t("staff.mine.note")}</Note>
-      {switching.dialog}
     </>
   );
 }

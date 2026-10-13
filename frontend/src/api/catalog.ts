@@ -7,8 +7,8 @@
  * from the Python side. The test compares each interface's field names with the
  * serializer's, so an interface spells its own fields, never `extends` another,
  * and names a nested shape by its type rather than writing it inline.
- * What the caller may do is read from each row — `permissions` and
- * `can_set_current` — and never worked out from a role name here.
+ * What the caller may do is read from each row's `permissions`, and never
+ * worked out from a role name here.
  */
 
 import { request } from "./http";
@@ -18,7 +18,6 @@ export type Permission =
   | "programme.view"
   | "programme.assign_secretariat"
   | "edition.view"
-  | "edition.set_current"
   | "edition.assign_teacher";
 
 /**
@@ -77,16 +76,16 @@ export interface Edition {
   id: number;
   course: Course;
   academic_year: string;
+  /** The first day of its teaching, `YYYY-MM-DD`; null when nobody entered it. */
+  teaching_starts: string | null;
+  /**
+   * Whether it is its course's current edition today: the newest one whose
+   * teaching has started (apps/catalog/editions.py). Nobody sets it.
+   */
   is_current: boolean;
   /** By username. */
   teachers: StaffMember[];
   permissions: Permission[];
-  /**
-   * Whether a switch by the caller to this edition would pass, both checks
-   * included (apps/roles/scopes.py). True on the current edition too, where a
-   * switch changes nothing: whether to offer it there is the page's call.
-   */
-  can_set_current: boolean;
 }
 
 /** An edition as a study plan row shows it. */
@@ -111,7 +110,6 @@ export interface StudyPlanCourse {
 export type StaffErrorCode =
   | "no_such_user"
   | "already_held"
-  | "switch_needs_both"
   | "required"
   | "blank"
   | "not_authenticated"
@@ -150,11 +148,6 @@ export function listEditions(filter: { course?: string } = {}): Promise<Edition[
 
 export function readEdition(id: number): Promise<Edition> {
   return request<Edition>(`${CATALOG}/editions/${id}`);
-}
-
-/** Makes the edition its course's current one; the answer is the edition, now current. */
-export function setCurrent(id: number): Promise<Edition> {
-  return request<Edition>(`${CATALOG}/editions/${id}/set-current`, { method: "POST" });
 }
 
 /** Where a scope's members are added; they are read on the scope itself, `teachers` or `secretariat`. */

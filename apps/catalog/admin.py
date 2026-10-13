@@ -2,13 +2,9 @@
 
 The superuser's, as the whole admin is (config/admin.py): entering PPM's rows
 (docs/decisions.md, 2026-09-25, *PPM read from Moodle and Cineca*) goes
-through here, and so can a switch of a course's current edition, which staff
-make through `/api/catalog/` instead (apps/catalog/views.py). The
-admin never writes `is_current` itself: the flag is read-only on every form,
-and the only way to flip it is the `set_as_current` action, which calls
-`set_current()` (`apps/catalog/editions.py`) so the switch runs under the row
-lock that keeps the one-current-edition-per-course constraint from being hit
-mid-flight.
+through here. Which edition is current is nobody's to set: it follows each
+edition's `teaching_starts` (apps/catalog/editions.py), the one field here
+that decides it.
 
 `Course.code` and `CourseEdition.academic_year` are read-only once a row is
 saved: together they are the `(course.code, academic_year)` pair `rag/` and
@@ -20,14 +16,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.contrib import admin, messages
-from django.utils.translation import gettext_lazy as _
+from django.contrib import admin
 
-from apps.catalog.editions import set_current
 from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
 
 if TYPE_CHECKING:
-    from django.db.models import Model, QuerySet
+    from django.db.models import Model
     from django.http import HttpRequest
 
 
@@ -48,39 +42,14 @@ class CourseAdmin(admin.ModelAdmin):  # pyright: ignore[reportMissingTypeArgumen
 
 @admin.register(CourseEdition)
 class CourseEditionAdmin(admin.ModelAdmin):  # pyright: ignore[reportMissingTypeArgument]
-    list_display = ("__str__", "is_current")
-    list_filter = ("is_current",)
+    list_display = ("__str__", "teaching_starts")
     list_select_related = ("course",)
-    actions = ("set_as_current",)
 
     def get_readonly_fields(
         self, request: HttpRequest, obj: Model | None = None
     ) -> tuple[str, ...]:
-        # is_current is read-only on the add page too, so a new row cannot be
-        # entered current. course and academic_year join it on the change page:
-        # the pair is the search index's key (apps/catalog/models.py), fixed once saved.
-        if obj is not None:
-            return ("course", "academic_year", "is_current")
-        return ("is_current",)
-
-    # permissions: Django offers an action to every user who may see the
-    # changelist unless it names the permission it needs.
-    @admin.action(description=_("Set as current edition"), permissions=["change"])
-    def set_as_current(self, request: HttpRequest, queryset: QuerySet[CourseEdition]) -> None:
-        if queryset.count() != 1:
-            self.message_user(
-                request, _("Select exactly one edition to switch."), level=messages.ERROR
-            )
-            return
-        edition = queryset.get()
-        try:
-            set_current(edition)
-        except CourseEdition.DoesNotExist:
-            self.message_user(request, _("This edition no longer exists."), level=messages.ERROR)
-            return
-        self.message_user(
-            request, _("%(edition)s is now the current edition.") % {"edition": edition}
-        )
+        # The pair is the search index's key (apps/catalog/models.py), fixed once saved.
+        return ("course", "academic_year") if obj is not None else ()
 
 
 @admin.register(CurriculumEntry)

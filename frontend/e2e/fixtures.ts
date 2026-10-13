@@ -191,10 +191,10 @@ export const EDITION: Edition = {
   id: 11,
   course: COURSE,
   academic_year: "2025-2026",
+  teaching_starts: "2025-09-15",
   is_current: true,
   teachers: [STAFF_MEMBER],
-  permissions: ["edition.view", "edition.set_current", "edition.assign_teacher"],
-  can_set_current: true,
+  permissions: ["edition.view", "edition.assign_teacher"],
 };
 
 /** An edition the staff account teaches but may not assign on: the read-only banner's page. */
@@ -202,10 +202,10 @@ export const EDITION_READ: Edition = {
   id: 12,
   course: COURSE,
   academic_year: "2024-2025",
+  teaching_starts: "2024-09-16",
   is_current: false,
   teachers: [STAFF_MEMBER],
-  permissions: ["edition.view", "edition.set_current"],
-  can_set_current: true,
+  permissions: ["edition.view"],
 };
 
 export const STUDY_PLAN: StudyPlanCourse[] = [

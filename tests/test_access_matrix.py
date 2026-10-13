@@ -61,9 +61,7 @@ def targets(w: World, conversation: Conversation) -> dict[str, dict[str, object]
 
     PPM's current edition, which its teacher of both years and B047's
     secretariat may act on; B047; a conversation of the student's; the deck of
-    the `deck` fixture. Setting the current edition asks about the other one,
-    PPM's new edition: switching to it needs the permission on the edition it
-    replaces too, and switching to the current one would replace nothing.
+    the `deck` fixture.
     """
     edition = {"pk": w.ppm_old.pk}
     programme = {"code": w.b047.code}
@@ -74,7 +72,6 @@ def targets(w: World, conversation: Conversation) -> dict[str, dict[str, object]
         "catalog:programme-secretariat-member": {**programme, "username": w.secretariat.username},
         "catalog:course": {"code": w.ppm_old.course.code},
         "catalog:edition": edition,
-        "catalog:set-current": {"pk": w.ppm_new.pk},
         "catalog:edition-teachers": edition,
         "catalog:edition-teacher": {**edition, "username": w.continuing.username},
         "qa:conversation": {"pk": conversation.pk},

@@ -1,7 +1,6 @@
 /**
  * A question that interrupts, for an action that cannot be taken back without
- * another one: removing someone, deleting a conversation, switching a course's
- * current edition.
+ * another one: removing someone, deleting a conversation.
  *
  * Radix's alert dialog rather than `dialog.tsx`, because the WAI-ARIA pattern
  * differs where it matters (outside the repository: WAI-ARIA APG, "Alert and

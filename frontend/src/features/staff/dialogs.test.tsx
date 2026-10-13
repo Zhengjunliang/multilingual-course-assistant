@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * The three staff dialogs against each answer the server can give: the
+ * The two staff dialogs against each answer the server can give: the
  * write done, a refusal of the field, a missing permission, the object gone.
  * The network is faked at `fetch` with the server's own error envelope
  * (config/exceptions.py), so the codes travel through `api/http.ts` as they
@@ -12,14 +12,13 @@ import { act, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/api/account";
-import type { Edition, MemberScope } from "@/api/catalog";
+import type { MemberScope } from "@/api/catalog";
 import { SessionContext } from "@/auth/SessionProvider";
 import { Chip } from "@/components/ui/chip";
 import { Toaster } from "@/components/ui/sonner";
 import { mount } from "@/test/mount";
 import { AssignDialog } from "./AssignDialog";
 import { RevokeDialog } from "./RevokeDialog";
-import { SetCurrentDialog } from "./SetCurrentDialog";
 
 const READER: Account = {
   id: 1,
@@ -30,18 +29,6 @@ const READER: Account = {
 };
 const EDITION: MemberScope = { kind: "edition", id: 5 };
 const B047: MemberScope = { kind: "programme", code: "B047" };
-
-function edition(id: number, year: string, current: boolean): Edition {
-  return {
-    id,
-    course: { code: "B028451", name: "PPM", locale: "it", code_source: "moodle", entries: [] },
-    academic_year: year,
-    is_current: current,
-    teachers: [],
-    permissions: ["edition.set_current", "edition.view"],
-    can_set_current: true,
-  };
-}
 
 /** What the server answers the write. */
 let answer: () => Response = () => new Response(null, { status: 204 });
@@ -59,8 +46,6 @@ const REFUSED = {
   noSuchUser: () => json({ username: [{ message: "No such user.", code: "no_such_user" }] }, 400),
   alreadyHeld: () => json({ username: [{ message: "Already held.", code: "already_held" }] }, 400),
   forbidden: () => json({ detail: { message: "No permission.", code: "permission_denied" } }, 403),
-  switchNeedsBoth: () =>
-    json({ detail: { message: "Both ends.", code: "switch_needs_both" } }, 403),
   gone: () => json({ detail: { message: "Not found.", code: "not_found" } }, 404),
 };
 
@@ -330,81 +315,5 @@ describe("revoking a role", () => {
 
     expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, false, "Annulla"]);
     expect(seen.text).toContain("Permesso mancante: programme.assign_secretariat");
-  });
-});
-
-describe("making an edition current", () => {
-  const next = edition(5, "2025-2026", false);
-  const current = edition(4, "2024-2025", true);
-
-  async function switching(replaced: Edition | null, refusal: (() => Response) | null) {
-    answer = refusal ?? (() => json({ ...next, is_current: true }, 200));
-    const { unmount } = open(
-      <SetCurrentDialog
-        edition={next}
-        replaced={replaced}
-        onClose={onClose}
-        onChanged={onChanged}
-      />,
-    );
-    const question = dialog()?.textContent ?? "";
-    const preview = [...(dialog()?.querySelectorAll("li") ?? [])].map((row) => row.textContent);
-    act(() => {
-      button("Imposta come corrente")?.focus();
-      button("Imposta come corrente")?.click();
-    });
-    await settle();
-    const seen = {
-      question,
-      preview,
-      closed,
-      changed,
-      confirmOff: button("Imposta come corrente")?.disabled ?? null,
-      focused: focused(),
-      text: body(),
-    };
-    unmount();
-    return seen;
-  }
-
-  it.each([
-    ["no current edition", null, ["2025-2026Non correntediventaCorrente"]],
-    [
-      "the current one it replaces",
-      current,
-      ["2025-2026Non correntediventaCorrente", "2024-2025CorrentediventaNon corrente"],
-    ],
-  ])(
-    "previews each year's state before and after with %s, switches and says so",
-    async (_, replaced, rows) => {
-      const seen = await switching(replaced, null);
-
-      expect(seen.preview).toEqual(rows);
-      expect(seen.question).toContain("PPM · B028451");
-      expect(seen.question).toContain("Un insegnamento ha al massimo un'edizione corrente.");
-      expect([seen.closed, seen.changed]).toEqual([1, 1]);
-      expect(seen.text).toContain("Edizione corrente aggiornata");
-      expect(seen.text).toContain("PPM · 2025-2026");
-    },
-  );
-
-  it.each([
-    [
-      "the switch's own refusal",
-      REFUSED.switchNeedsBoth,
-      "Serve il permesso anche sull'edizione corrente: chiedi alla segreteria didattica.",
-    ],
-    ["a missing permission", REFUSED.forbidden, "Permesso mancante: edition.set_current"],
-  ])("keeps %s in the dialog, its button on to ask again", async (_, refusal, sentence) => {
-    const seen = await switching(current, refusal);
-
-    expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, false, "Annulla"]);
-    expect(seen.text).toContain(sentence);
-  });
-
-  it("closes and reads the page again when the edition is gone", async () => {
-    const seen = await switching(current, REFUSED.gone);
-
-    expect([seen.closed, seen.changed]).toEqual([1, 1]);
   });
 });

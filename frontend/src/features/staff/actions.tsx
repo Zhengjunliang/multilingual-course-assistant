@@ -1,6 +1,6 @@
 /**
  * The staff pages' writes, wired once for every page that offers them:
- * assigning and revoking a scope's members, and making an edition current.
+ * assigning and revoking a scope's members.
  * Each hook holds its dialog's state and returns the buttons that open it and
  * the dialog itself, for the page to place where the prototype puts them;
  * after a write the page reads again, since every row's flags may change.
@@ -9,7 +9,7 @@
  * Focus goes back to the button that opened the dialog. Radix returns it only
  * to its own `Trigger`, which a dialog opened from state does not have, so
  * each close puts it there itself. When that button is gone — its row
- * revoked, its edition made current — focus goes, in the prototype's order, to
+ * revoked — focus goes, in the prototype's order, to
  * the "Revoca" that took the row's place, then the one before it, then the
  * "Assegna…" button, else the page's heading.
  */
@@ -18,12 +18,11 @@ import { UserPlus } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { Edition, MemberScope, StaffMember } from "@/api/catalog";
+import type { MemberScope, StaffMember } from "@/api/catalog";
 import { Button } from "@/components/ui/button";
 import { AssignDialog } from "./AssignDialog";
 import { shownName } from "./people";
 import { RevokeDialog, type Revoking } from "./RevokeDialog";
-import { SetCurrentDialog } from "./SetCurrentDialog";
 
 /** The handler that puts focus somewhere real when the dialog that held it closes. */
 function returnFocus(
@@ -143,68 +142,4 @@ export function useMembers({
     </>
   );
   return { assign, action, dialogs };
-}
-
-interface SetCurrentOptions {
-  /** The editions the page shows, among which the one a switch replaces is found. */
-  editions: readonly Edition[];
-  reload: () => Promise<boolean>;
-}
-
-interface SetCurrent {
-  /** The edition's "Imposta come corrente", or null where the switch is not offered. */
-  button: (edition: Edition) => ReactNode;
-  dialog: ReactNode;
-}
-
-export function useSetCurrent({ editions, reload }: SetCurrentOptions): SetCurrent {
-  const { t } = useTranslation();
-  const [target, setTarget] = useState<Edition | null>(null);
-  const last = useRef<{ trigger?: HTMLElement; id?: number }>({});
-
-  // Offered on an edition that is not current and that the switch would let
-  // through, both ends included (`can_set_current`).
-  const button = (edition: Edition) =>
-    edition.is_current || !edition.can_set_current ? null : (
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        // Above the row's stretched link, so the button is what it presses.
-        className="relative z-lifted"
-        onClick={(event) => {
-          last.current = { trigger: event.currentTarget, id: edition.id };
-          setTarget(edition);
-        }}
-      >
-        {t("staff.setCurrent.action")}
-      </Button>
-    );
-
-  const replaced =
-    target === null
-      ? null
-      : (editions.find(
-          (edition) =>
-            edition.course.code === target.course.code &&
-            edition.is_current &&
-            edition.id !== target.id,
-        ) ?? null);
-
-  const dialog = (
-    <SetCurrentDialog
-      edition={target}
-      replaced={replaced}
-      onClose={() => setTarget(null)}
-      onChanged={reload}
-      onCloseAutoFocus={returnFocus(
-        () => last.current.trigger,
-        () => {
-          const path = `/staff/editions/${last.current.id}`;
-          return [document.querySelector(`main a[href="${path}"], main a[href^="${path}?"]`)];
-        },
-      )}
-    />
-  );
-  return { button, dialog };
 }

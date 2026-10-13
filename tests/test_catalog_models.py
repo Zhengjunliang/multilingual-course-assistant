@@ -141,31 +141,6 @@ def test_academic_year_validator_accepts_two_consecutive_years(course: Course) -
     CourseEdition(course=course, academic_year="2025-2026").full_clean()
 
 
-def test_second_current_edition_of_a_course_is_refused(course: Course) -> None:
-    CourseEdition.objects.create(course=course, academic_year="2024-2025", is_current=True)
-
-    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
-        CourseEdition.objects.create(course=course, academic_year="2025-2026", is_current=True)
-
-    assert violation(excinfo.value).constraint_name == "catalog_edition_one_current_per_course"
-
-
-def test_current_editions_of_two_courses_coexist(course: Course, other_course: Course) -> None:
-    """The constraint is one current edition per course, not one in the whole table."""
-    CourseEdition.objects.create(course=course, academic_year="2025-2026", is_current=True)
-    CourseEdition.objects.create(course=other_course, academic_year="2025-2026", is_current=True)
-
-    assert CourseEdition.objects.filter(is_current=True).count() == 2
-
-
-def test_past_editions_of_a_course_coexist_with_its_current_one(course: Course) -> None:
-    CourseEdition.objects.create(course=course, academic_year="2024-2025")
-    CourseEdition.objects.create(course=course, academic_year="2023-2024")
-    CourseEdition.objects.create(course=course, academic_year="2025-2026", is_current=True)
-
-    assert CourseEdition.objects.filter(course=course).count() == 3
-
-
 def test_a_course_with_editions_cannot_be_deleted(course: Course) -> None:
     """An edition will own material indexed outside PostgreSQL, which no cascade reaches."""
     CourseEdition.objects.create(course=course, academic_year="2025-2026")

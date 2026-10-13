@@ -167,14 +167,6 @@
       "programme": "Corso di laurea",
       "mine": "I miei insegnamenti"
     },
-    "setCurrent": {
-      "title": "Impostare come corrente?",
-      "done": "Edizione corrente aggiornata",
-      "action": "Imposta come corrente",
-      "to": "diventa",
-      "preview": "Cosa cambia",
-      "caption": "Un insegnamento ha al massimo un'edizione corrente."
-    },
     "programmes": {
       "title": "Corsi di laurea",
       "count_one": "{{count}} corso di laurea",
@@ -191,7 +183,6 @@
     "error": {
       "no_such_user": "Nessun utente con questo nome.",
       "already_held": "Questo utente ha già questo ruolo qui.",
-      "switch_needs_both": "Serve il permesso anche sull'edizione corrente: chiedi alla segreteria didattica.",
       "required": "Inserisci un nome utente.",
       "blank": "Inserisci un nome utente.",
       "not_authenticated": "La sessione è scaduta. Accedi di nuovo.",
@@ -240,8 +231,7 @@
       "forbidden": "Permesso mancante",
       "cannot": {
         "assignTeacher": "Puoi vedere questa edizione, ma non assegnare docenti.",
-        "assignSecretariat": "Solo l'amministratore assegna la segreteria didattica.",
-        "setCurrent": "Puoi vedere questa edizione, ma non impostarla come corrente."
+        "assignSecretariat": "Solo l'amministratore assegna la segreteria didattica."
       }
     },
     "open": "Apri",
@@ -254,7 +244,7 @@
       "sharedBoth": "Lo gestiscono le segreterie di entrambi i corsi di laurea.",
       "sharedAll": "Lo gestiscono le segreterie di tutti i {{count}} corsi di laurea.",
       "editions": "Edizioni",
-      "editionsSub": "Un insegnamento ha al massimo un'edizione corrente.",
+      "editionsSub": "L'edizione corrente è la più recente con le lezioni già iniziate.",
       "year": "Anno accademico",
       "status": "Stato"
     },

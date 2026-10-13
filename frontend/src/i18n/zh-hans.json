@@ -167,14 +167,6 @@
       "programme": "学位专业",
       "mine": "我的课程"
     },
-    "setCurrent": {
-      "title": "设为当前版本？",
-      "done": "当前版本已更新",
-      "action": "设为当前",
-      "to": "变为",
-      "preview": "改动",
-      "caption": "一门课程最多有一个当前版本。"
-    },
     "programmes": {
       "title": "专业",
       "count_one": "{{count}} 个专业",
@@ -191,7 +183,6 @@
     "error": {
       "no_such_user": "没有这个名字的用户。",
       "already_held": "该用户在这里已有此角色。",
-      "switch_needs_both": "还需要对当前版本的权限：请联系教学秘书。",
       "required": "请输入用户名。",
       "blank": "请输入用户名。",
       "not_authenticated": "会话已结束，请重新登录。",
@@ -240,8 +231,7 @@
       "forbidden": "缺少权限",
       "cannot": {
         "assignTeacher": "你能看到这个版本，但不能指派教师。",
-        "assignSecretariat": "只有管理员能指派教学秘书。",
-        "setCurrent": "你能看到这个版本，但不能把它设为当前版本。"
+        "assignSecretariat": "只有管理员能指派教学秘书。"
       }
     },
     "open": "打开",
@@ -254,7 +244,7 @@
       "sharedBoth": "两个学位专业的秘书处都管理这门课。",
       "sharedAll": "全部 {{count}} 个学位专业的秘书处都管理这门课。",
       "editions": "版本",
-      "editionsSub": "一门课程最多有一个当前版本。",
+      "editionsSub": "当前版本是已经开课的最新版本。",
       "year": "学年",
       "status": "状态"
     },

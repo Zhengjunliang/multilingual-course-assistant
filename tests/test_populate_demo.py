@@ -130,7 +130,7 @@ def snapshot() -> dict[str, list[Any]]:
         "courses": sorted(Course.objects.values_list("code", "name", "code_source")),
         "entries": sorted(str(e) for e in CurriculumEntry.objects.select_related("programme")),
         "editions": sorted(
-            (str(e), e.is_current) for e in CourseEdition.objects.select_related("course")
+            (str(e), e.teaching_starts) for e in CourseEdition.objects.select_related("course")
         ),
         "roles": sorted(
             str(r) for r in RoleAssignment.objects.select_related("user", "programme", "edition")
@@ -175,15 +175,15 @@ def test_an_empty_database_gets_the_demo_and_a_second_run_changes_nothing(
             "B003712 (B047) TECNICO SCIENTIFICO",
             "B028451 (B047) TECNICO APPLICATIVO",
         ],
-        # The first year is made current, as a teacher of the second alone
-        # would find it (tests/test_catalog_api.py, the first-year teacher).
+        # No start day in this file: which edition is current follows the
+        # 1 September of each year (apps/catalog/editions.py).
         "editions": [
-            ("B000001:2024-2025", True),
-            ("B000001:2025-2026", False),
-            ("B000002:2024-2025", True),
-            ("B000002:2025-2026", False),
-            ("B028451:2024-2025", True),
-            ("B028451:2025-2026", False),
+            ("B000001:2024-2025", None),
+            ("B000001:2025-2026", None),
+            ("B000002:2024-2025", None),
+            ("B000002:2025-2026", None),
+            ("B028451:2024-2025", None),
+            ("B028451:2025-2026", None),
         ],
         "roles": DEMO_ROLES,
         "accounts": DEMO_ACCOUNTS,
@@ -199,7 +199,7 @@ def test_rows_of_its_own_are_kept_and_demo_accounts_made_the_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ppm = Course.objects.create(code="B028451", name="PPM")
-    CourseEdition.objects.create(course=ppm, academic_year="2025-2026", is_current=True)
+    CourseEdition.objects.create(course=ppm, academic_year="2025-2026")
     b047 = DegreeProgramme.objects.create(code="B047", name="Ingegneria Informatica")
     # A demo account holding a role the file does not declare, a demo account the file
     # does not name, and one that is not a demo account.
@@ -215,8 +215,8 @@ def test_rows_of_its_own_are_kept_and_demo_accounts_made_the_files(
 
     assert ("B028451", "PPM", "moodle") in seen["courses"]
     assert [e for e in seen["editions"] if e[0].startswith("B028451")] == [
-        ("B028451:2024-2025", False),
-        ("B028451:2025-2026", True),
+        ("B028451:2024-2025", None),
+        ("B028451:2025-2026", None),
     ]
     assert (seen["roles"], seen["accounts"]) == (
         [*DEMO_ROLES, "mrossi · secretariat · B047"],

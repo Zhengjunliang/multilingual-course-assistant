@@ -167,14 +167,6 @@
       "programme": "Degree programme",
       "mine": "My courses"
     },
-    "setCurrent": {
-      "title": "Make it current?",
-      "done": "Current edition updated",
-      "action": "Make current",
-      "to": "becomes",
-      "preview": "What changes",
-      "caption": "A course has at most one current edition."
-    },
     "programmes": {
       "title": "Degree programmes",
       "count_one": "{{count}} degree programme",
@@ -191,7 +183,6 @@
     "error": {
       "no_such_user": "No user has this name.",
       "already_held": "This user already holds this role here.",
-      "switch_needs_both": "It takes the permission on the current edition too: ask the teaching secretariat.",
       "required": "Enter a username.",
       "blank": "Enter a username.",
       "not_authenticated": "Your session has ended. Sign in again.",
@@ -240,8 +231,7 @@
       "forbidden": "Missing permission",
       "cannot": {
         "assignTeacher": "You can see this edition, but not assign teachers.",
-        "assignSecretariat": "Only the administrator assigns the teaching secretariat.",
-        "setCurrent": "You can see this edition, but not make it current."
+        "assignSecretariat": "Only the administrator assigns the teaching secretariat."
       }
     },
     "open": "Open",
@@ -254,7 +244,7 @@
       "sharedBoth": "The secretariats of both degree programmes manage it.",
       "sharedAll": "The secretariats of all {{count}} degree programmes manage it.",
       "editions": "Editions",
-      "editionsSub": "A course has at most one current edition.",
+      "editionsSub": "The current edition is the newest one whose teaching has started.",
       "year": "Academic year",
       "status": "Status"
     },

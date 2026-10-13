@@ -231,14 +231,6 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.getByRole("button", { name: revoke }).click();
       await expect(page.getByRole("alertdialog", { name: it.staff.revoke.title })).toBeVisible();
       expect(await violations(page), "revoking").toEqual([]);
-      await page.keyboard.press("Escape");
-
-      await visit(page, api, screen("/staff/editions/12", "staff"));
-      await page.getByRole("button", { name: it.staff.setCurrent.action }).click();
-      await expect(
-        page.getByRole("alertdialog", { name: it.staff.setCurrent.title }),
-      ).toBeVisible();
-      expect(await violations(page), "switching").toEqual([]);
     });
   });
 }
