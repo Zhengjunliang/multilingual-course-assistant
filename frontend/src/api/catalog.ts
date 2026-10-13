@@ -74,12 +74,17 @@ export interface StaffMember {
   name: string;
 }
 
+/** When in the academic year an edition is taught: the Cineca catalogue's semesters. */
+export type TeachingPeriod = "first_semester" | "second_semester";
+
 export interface Edition {
   id: number;
   course: Course;
   academic_year: string;
   /** The first day of its teaching, `YYYY-MM-DD`; null when nobody entered it. */
   teaching_starts: string | null;
+  /** Empty when nobody entered it. */
+  period: TeachingPeriod | "";
   /**
    * Whether it is its course's current edition today: the newest one whose
    * teaching has started (apps/catalog/editions.py). Nobody sets it.
@@ -114,20 +119,28 @@ export type SyllabusSectionKey =
   | "verifica_apprendimento"
   | "altro";
 
-/** One section of an edition's syllabus in one language; a section with no text has no row. */
+/** One section of an edition's syllabus, its text in Markdown; a section with no text has no row. */
 export interface SyllabusSection {
-  locale: UiLocale;
   section: SyllabusSectionKey;
+  /** CommonMark with GitHub's extensions. */
   text: string;
+}
+
+/** An edition's syllabus: the one language every section is written in, and the sections. */
+export interface Syllabus {
+  locale: UiLocale;
+  /** In the catalogue's order; an empty section is not listed. */
+  sections: SyllabusSection[];
 }
 
 /** How a reading list holds a book. */
 export type Importance = "required" | "recommended";
 
-/** A book on an edition's reading list, in the language its entry is written in. */
+/** A book on an edition's reading list. */
 export interface ReadingItem {
   id: number;
-  locale: UiLocale;
+  /** The language the book is written in, a BCP 47 tag Django knows (`en`, `de`). */
+  locale: string;
   title: string;
   /** As the syllabus prints them. */
   authors: string;
@@ -144,7 +157,7 @@ export interface ReadingItem {
  * year as typed, which the server reads as a number or refuses with `invalid`.
  */
 export interface ReadingDraft {
-  locale: UiLocale;
+  locale: string;
   title: string;
   authors: string;
   year: string | null;
@@ -229,29 +242,36 @@ export function removeMember(scope: MemberScope, username: string): Promise<void
   });
 }
 
-/** The edition's syllabus, by language and in the catalogue's order of sections; an empty section is not listed. */
-export function listSyllabus(edition: number): Promise<SyllabusSection[]> {
-  return request<SyllabusSection[]>(`${CATALOG}/editions/${edition}/syllabus`);
+/** The edition's syllabus: its language and its sections, in the catalogue's order. */
+export function readSyllabus(edition: number): Promise<Syllabus> {
+  return request<Syllabus>(`${CATALOG}/editions/${edition}/syllabus`);
+}
+
+/** Sets the language the syllabus is written in; the text is not touched. Answers with the syllabus. */
+export function setSyllabusLocale(edition: number, locale: UiLocale): Promise<Syllabus> {
+  return request<Syllabus>(`${CATALOG}/editions/${edition}/syllabus`, {
+    method: "PATCH",
+    body: JSON.stringify({ locale }),
+  });
 }
 
 /**
- * Writes one section in one language and answers with it; a text blank once
+ * Writes one section's Markdown and answers with it; a text blank once
  * trimmed clears the section, which the server answers with 204, here `null`.
  */
 export async function writeSyllabus(
   edition: number,
-  locale: UiLocale,
   section: SyllabusSectionKey,
   text: string,
 ): Promise<SyllabusSection | null> {
   const written = await request<SyllabusSection | undefined>(
-    `${CATALOG}/editions/${edition}/syllabus/${locale}/${section}`,
+    `${CATALOG}/editions/${edition}/syllabus/${section}`,
     { method: "PUT", body: JSON.stringify({ text }) },
   );
   return written ?? null;
 }
 
-/** The edition's books, by language and title. */
+/** The edition's books, by title. */
 export function listReadings(edition: number): Promise<ReadingItem[]> {
   return request<ReadingItem[]>(`${CATALOG}/editions/${edition}/readings`);
 }

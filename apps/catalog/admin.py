@@ -66,7 +66,7 @@ class ReadingItemInline(admin.TabularInline):  # pyright: ignore[reportMissingTy
 
 @admin.register(CourseEdition)
 class CourseEditionAdmin(admin.ModelAdmin):  # pyright: ignore[reportMissingTypeArgument]
-    list_display = ("__str__", "teaching_starts")
+    list_display = ("__str__", "period", "teaching_starts")
     list_select_related = ("course",)
     inlines = (SyllabusInline, ReadingItemInline)
 

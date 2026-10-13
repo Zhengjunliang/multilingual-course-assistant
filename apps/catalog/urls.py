@@ -2,7 +2,6 @@
 
 import re
 
-from django.conf import settings
 from django.urls import path, register_converter
 
 from apps.catalog.content_views import (
@@ -54,12 +53,6 @@ class _OneOf:
         return value
 
 
-class _Locale(_OneOf):
-    """A language the site serves, as `settings.LANGUAGES` spells it."""
-
-    regex = "|".join(re.escape(code) for code, _name in settings.LANGUAGES)
-
-
 class _Section(_OneOf):
     """A section of a UniFi syllabus (apps/catalog/models.py)."""
 
@@ -67,7 +60,6 @@ class _Section(_OneOf):
 
 
 register_converter(_Key, "key")
-register_converter(_Locale, "locale")
 register_converter(_Section, "section")
 
 app_name = "catalog"
@@ -98,7 +90,7 @@ urlpatterns = [
     ),
     path("editions/<int:pk>/syllabus", EditionSyllabusView.as_view(), name="edition-syllabus"),
     path(
-        "editions/<int:pk>/syllabus/<locale:locale>/<section:section>",
+        "editions/<int:pk>/syllabus/<section:section>",
         EditionSyllabusSectionView.as_view(),
         name="edition-syllabus-section",
     ),

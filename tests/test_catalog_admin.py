@@ -116,7 +116,7 @@ def test_saved_keys_are_read_only_in_the_admin(
 
     response = admin_client.post(
         reverse("admin:catalog_courseedition_change", args=[edition.pk]),
-        {**new_value, **NO_INLINES},
+        {"syllabus_locale": "it", **new_value, **NO_INLINES},
     )
 
     assert response.status_code == 302
@@ -132,8 +132,8 @@ def test_an_edition_is_entered_with_its_syllabus_and_reading_list(
     url = reverse("admin:catalog_courseedition_change", args=[edition.pk])
     inlines = {
         **NO_INLINES,
+        "syllabus_locale": "it",
         "syllabus-TOTAL_FORMS": "1",
-        "syllabus-0-locale": "it",
         "syllabus-0-section": "prerequisiti",
         "syllabus-0-text": "Fisica I, Analisi matematica I",
         "reading_items-TOTAL_FORMS": "1",
@@ -181,6 +181,8 @@ def test_ppm_rows_can_be_entered_through_the_admin(admin_client) -> None:
                 "course": course.pk,
                 "academic_year": "2025-2026",
                 "teaching_starts": "2026-02-23",
+                "period": "second_semester",
+                "syllabus_locale": "it",
                 **NO_INLINES,
             },
         )

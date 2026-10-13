@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.conf import settings
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 
@@ -19,7 +20,7 @@ from apps.catalog.models import ReadingItem, Syllabus
 # `ModelSerializer[...]` for the reason apps/accounts/serializers.py gives, and
 # the same suppression on each `Meta`.
 class SyllabusSectionSerializer(serializers.ModelSerializer[Syllabus]):
-    """One section in one language; the URL names both, the body carries the text.
+    """One section; the URL names it, the body carries its Markdown.
 
     The text may be blank, unlike the row's: a section written empty is a
     section cleared, which deletes its row (apps/catalog/models.py).
@@ -29,14 +30,25 @@ class SyllabusSectionSerializer(serializers.ModelSerializer[Syllabus]):
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Syllabus
-        fields = ("locale", "section", "text")
-        read_only_fields = ("locale", "section")
+        fields = ("section", "text")
+        read_only_fields = ("section",)
+
+
+class SyllabusSerializer(serializers.Serializer):
+    """The whole syllabus: the edition's language for it, and its sections.
+
+    The language is the edition's `syllabus_locale`, written alone: changing it
+    relabels the text and translates nothing.
+    """
+
+    locale = serializers.ChoiceField(choices=settings.LANGUAGES)
+    sections = SyllabusSectionSerializer(many=True, read_only=True)
 
 
 class ReadingItemSerializer(serializers.ModelSerializer[ReadingItem]):
     """A book on the reading list, every field as the model declares it.
 
-    A title already listed in the same language is refused by the view, which
+    A second book of a title the edition lists is refused by the view, which
     holds the edition this serializer does not see.
     """
 

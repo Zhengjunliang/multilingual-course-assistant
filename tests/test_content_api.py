@@ -29,8 +29,12 @@ pytestmark = pytest.mark.django_db
 PREREQUISITES = "Analisi Matematica I."
 
 
-def section(edition: CourseEdition, locale: str = "it", name: str = "prerequisiti") -> str:
-    return f"/api/catalog/editions/{edition.pk}/syllabus/{locale}/{name}"
+def section(edition: CourseEdition, name: str = "prerequisiti") -> str:
+    return f"/api/catalog/editions/{edition.pk}/syllabus/{name}"
+
+
+def syllabus(edition: CourseEdition) -> str:
+    return f"/api/catalog/editions/{edition.pk}/syllabus"
 
 
 def books(edition: CourseEdition) -> str:
@@ -50,11 +54,9 @@ def answer(response: HttpResponseBase) -> tuple[int, Any]:
     return status, code_of(response)
 
 
-def sections(edition: CourseEdition) -> list[tuple[str, str, str]]:
+def sections(edition: CourseEdition) -> list[tuple[str, str]]:
     return list(
-        Syllabus.objects.filter(edition=edition)
-        .order_by("locale", "section")
-        .values_list("locale", "section", "text")
+        Syllabus.objects.filter(edition=edition).order_by("section").values_list("section", "text")
     )
 
 
@@ -79,8 +81,8 @@ def test_a_section_is_written_on_every_edition_of_a_course_one_teaches() -> None
 
     written = (
         200,
-        {"locale": "it", "section": "prerequisiti", "text": PREREQUISITES},
-        [("it", "prerequisiti", PREREQUISITES)],
+        {"section": "prerequisiti", "text": PREREQUISITES},
+        [("prerequisiti", PREREQUISITES)],
     )
     assert seen == {
         "teacher, the year before the one assigned": written,
@@ -96,60 +98,88 @@ def test_a_section_is_written_on_every_edition_of_a_course_one_teaches() -> None
 
 def test_a_section_is_replaced_and_cleared_in_place() -> None:
     w = world()
-    Syllabus.objects.create(edition=w.ppm_old, locale="it", section="prerequisiti", text="Nessuno.")
-    Syllabus.objects.create(edition=w.ppm_old, locale="en", section="prerequisiti", text="None.")
+    Syllabus.objects.create(edition=w.ppm_old, section="prerequisiti", text="Nessuno.")
+    Syllabus.objects.create(edition=w.ppm_old, section="contenuti", text="Lezioni.")
     client = as_user(w.continuing)
 
     replaced = answer(client.put(section(w.ppm_old), {"text": PREREQUISITES}, format="json"))
     after_replace = sections(w.ppm_old)
     # Blank after trimming, so cleared; and clearing a section with no text changes nothing.
-    cleared = answer(client.put(section(w.ppm_old, "en"), {"text": "  \n"}, format="json"))
-    cleared_again = answer(client.put(section(w.ppm_old, "en"), {"text": ""}, format="json"))
+    blank = {"text": "  \n"}
+    cleared = answer(client.put(section(w.ppm_old, "contenuti"), blank, format="json"))
+    cleared_again = answer(client.put(section(w.ppm_old, "contenuti"), {"text": ""}, format="json"))
     missing = answer(client.put(section(w.ppm_old), {}, format="json"))
 
-    assert replaced == (200, {"locale": "it", "section": "prerequisiti", "text": PREREQUISITES})
-    assert after_replace == [("en", "prerequisiti", "None."), ("it", "prerequisiti", PREREQUISITES)]
+    assert replaced == (200, {"section": "prerequisiti", "text": PREREQUISITES})
+    assert after_replace == [("contenuti", "Lezioni."), ("prerequisiti", PREREQUISITES)]
     assert (cleared, cleared_again) == ((204, None), (204, None))
     assert missing == (400, {"text": ["required"]})
-    assert sections(w.ppm_old) == [("it", "prerequisiti", PREREQUISITES)]
+    assert sections(w.ppm_old) == [("prerequisiti", PREREQUISITES)]
 
 
-def test_the_syllabus_reads_by_language_in_catalogue_order() -> None:
+def test_the_syllabus_reads_in_its_language_and_catalogue_order() -> None:
     w = world()
-    for locale, name in (("it", "altro"), ("it", "obiettivi_formativi"), ("en", "contenuti")):
-        Syllabus.objects.create(edition=w.ppm_old, locale=locale, section=name, text=name)
-    url = f"/api/catalog/editions/{w.ppm_old.pk}/syllabus"
+    for name in ("altro", "obiettivi_formativi", "contenuti"):
+        Syllabus.objects.create(edition=w.ppm_old, section=name, text=f"**{name}**")
 
     read = {
-        "teacher, the year before the one assigned": answer(as_user(w.newcomer).get(url)),
-        "student": answer(as_user(w.student).get(url)),
+        "teacher, the year before the one assigned": answer(
+            as_user(w.newcomer).get(syllabus(w.ppm_old))
+        ),
+        "student": answer(as_user(w.student).get(syllabus(w.ppm_old))),
     }
 
     assert read == {
         "teacher, the year before the one assigned": (
             200,
-            [
-                {"locale": "en", "section": "contenuti", "text": "contenuti"},
-                {"locale": "it", "section": "obiettivi_formativi", "text": "obiettivi_formativi"},
-                {"locale": "it", "section": "altro", "text": "altro"},
-            ],
+            {
+                "locale": "it",
+                "sections": [
+                    {"section": "obiettivi_formativi", "text": "**obiettivi_formativi**"},
+                    {"section": "contenuti", "text": "**contenuti**"},
+                    {"section": "altro", "text": "**altro**"},
+                ],
+            },
         ),
         "student": (404, "not_found"),
     }
 
 
-def test_a_language_or_section_outside_the_closed_sets_matches_no_route() -> None:
+def test_the_syllabus_language_is_set_alone() -> None:
+    """The language relabels the text; it neither translates nor touches a section."""
+    w = world()
+    Syllabus.objects.create(edition=w.ppm_old, section="altro", text="Nessuna nota.")
+    client = as_user(w.newcomer)
+
+    set_english = answer(client.patch(syllabus(w.ppm_old), {"locale": "en"}, format="json"))
+    unknown = answer(client.patch(syllabus(w.ppm_old), {"locale": "fr"}, format="json"))
+    w.ppm_old.refresh_from_db()
+
+    assert set_english == (
+        200,
+        {"locale": "en", "sections": [{"section": "altro", "text": "Nessuna nota."}]},
+    )
+    assert unknown == (400, {"locale": ["invalid_choice"]})
+    assert (w.ppm_old.syllabus_locale, sections(w.ppm_old)) == (
+        "en",
+        [("altro", "Nessuna nota.")],
+    )
+
+
+def test_a_section_outside_the_closed_set_matches_no_route() -> None:
     w = world()
     client = as_user(w.root)
 
     seen = {
-        locale_and_name: answer(
-            client.put(section(w.ppm_old, *locale_and_name), {"text": "x"}, format="json")
-        )[0]
-        for locale_and_name in (("fr", "prerequisiti"), ("it", "testi"), ("zh-hans", "altro"))
+        url: answer(client.put(url, {"text": "x"}, format="json"))[0]
+        for url in (
+            section(w.ppm_old, "testi"),
+            f"{syllabus(w.ppm_old)}/it/prerequisiti",
+            section(w.ppm_old, "altro"),
+        )
     }
 
-    assert seen == {("fr", "prerequisiti"): 404, ("it", "testi"): 404, ("zh-hans", "altro"): 200}
+    assert list(seen.values()) == [404, 404, 200]
 
 
 BOOK = {
@@ -195,7 +225,7 @@ def test_a_book_is_added_changed_and_removed_on_a_past_edition() -> None:
         pytest.param(
             {**BOOK, "importance": "essential"}, {"importance": ["invalid_choice"]}, id="importance"
         ),
-        pytest.param({**BOOK, "locale": "fr"}, {"locale": ["invalid_choice"]}, id="language"),
+        pytest.param({**BOOK, "locale": "xx"}, {"locale": ["invalid_choice"]}, id="language"),
         pytest.param({**BOOK, "authors": "Altri"}, {"title": ["unique"]}, id="title-listed"),
     ],
 )
@@ -209,26 +239,26 @@ def test_a_book_is_refused_field_by_field(body: dict[str, object], codes: object
     assert ReadingItem.objects.count() == 1
 
 
-def test_a_title_is_listed_once_per_language_and_edition() -> None:
+def test_a_title_is_listed_once_per_edition_whatever_its_language() -> None:
     w = world()
     ReadingItem.objects.create(edition=w.ppm_old, **BOOK)
     client = as_user(w.secretariat)
-    english = ReadingItem.objects.create(edition=w.ppm_old, **{**BOOK, "locale": "en"})
+    other = ReadingItem.objects.create(edition=w.ppm_old, **{**BOOK, "title": "Physics II"})
 
     seen = {
         "the same title in another language": answer(
-            client.post(books(w.ppm_old), {**BOOK, "locale": "zh-hans"}, format="json")
-        )[0],
+            client.post(books(w.ppm_old), {**BOOK, "locale": "en"}, format="json")
+        ),
         "the same title on another edition": answer(
             client.post(books(w.ppm_new), BOOK, format="json")
         )[0],
         "a book renamed to a title listed": answer(
-            client.patch(f"{books(w.ppm_old)}/{english.pk}", {"locale": "it"}, format="json")
+            client.patch(f"{books(w.ppm_old)}/{other.pk}", {"title": BOOK["title"]}, format="json")
         ),
     }
 
     assert seen == {
-        "the same title in another language": 201,
+        "the same title in another language": (400, {"title": ["unique"]}),
         "the same title on another edition": 201,
         "a book renamed to a title listed": (400, {"title": ["unique"]}),
     }
