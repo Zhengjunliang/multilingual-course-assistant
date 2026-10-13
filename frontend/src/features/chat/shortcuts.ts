@@ -22,12 +22,13 @@ import type { Shortcut } from "@/components/ui/kbd";
 
 export type ShortcutName = "newConversation" | "search" | "settings" | "help";
 
-function apple(): boolean {
+/** Whether the reader is on Apple's keyboards, where ⌘ does what Ctrl does elsewhere. */
+export function onApple(): boolean {
   return typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
 }
 
 /** Each shortcut's keys, as `aria-keyshortcuts` names them and its cap shows them. */
-export function shortcuts(isApple: boolean = apple()): Record<ShortcutName, Shortcut> {
+export function shortcuts(isApple: boolean = onApple()): Record<ShortcutName, Shortcut> {
   const [key, cap] = isApple ? ["Meta", "⌘"] : ["Control", "Ctrl"];
   return {
     newConversation: { keys: `${key}+Shift+O`, label: `${cap} ⇧ O` },
@@ -45,7 +46,10 @@ function typingIn(target: EventTarget | null): boolean {
 }
 
 /** Which shortcut a key press is, if any. */
-export function shortcutOf(event: KeyboardEvent, isApple: boolean = apple()): ShortcutName | null {
+export function shortcutOf(
+  event: KeyboardEvent,
+  isApple: boolean = onApple(),
+): ShortcutName | null {
   // A browser's autofill sends a keydown with no key at all.
   if (typeof event.key !== "string" || event.altKey) return null;
   const key = event.key.toLowerCase();
