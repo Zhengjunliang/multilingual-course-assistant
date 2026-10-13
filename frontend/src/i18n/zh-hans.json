@@ -316,6 +316,7 @@
         "orderedList": "编号列表",
         "link": "链接",
         "hint": "像写文档一样书写：粗体、列表和链接都会保留。",
+        "markdown": "以 Markdown 书写，即保存时的格式：**粗体**、*斜体*、- 列表、[文字](网址)。",
         "linkTitle": "插入链接",
         "linkField": "网址",
         "linkHint": "一个网址，例如 {{example}}。",

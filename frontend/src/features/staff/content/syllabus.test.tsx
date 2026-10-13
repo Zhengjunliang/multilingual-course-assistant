@@ -14,6 +14,7 @@ import {
   BASE,
   button,
   editorIn,
+  field,
   key,
   open,
   openEditor,
@@ -143,6 +144,31 @@ describe("a syllabus section", () => {
     expect(seen).toEqual([true, null, 0]);
   });
 
+  it("opens Markdown the editor cannot write as the Markdown it is, so a save keeps all of it", async () => {
+    const stored = "# Fisica I\n\nIl campo `E`.\n\n| Prova | Peso |\n| - | - |\n| Orale | 1 |";
+    server.syllabus = { locale: "it", sections: [{ section: "prerequisiti", text: stored }] };
+    const { unmount } = open(true);
+    await settle();
+    await show("Prerequisiti");
+    await press("Modifica · Prerequisiti");
+    const box = () => panel("Prerequisiti")?.querySelector("textarea, [contenteditable='true']");
+    for (let turn = 0; turn < 50 && !box(); turn += 1) await settle();
+    const area = box();
+    if (area instanceof HTMLTextAreaElement) type(area, `${area.value}\n\nNota.`);
+    else {
+      const editor = editorIn("Prerequisiti");
+      write("Prerequisiti", `${editor === undefined ? "" : markdownOf(editor)}\n\nNota.`);
+    }
+    await press("Salva");
+    const seen = [area?.tagName, server.writes];
+    unmount();
+
+    expect(seen).toEqual([
+      "TEXTAREA",
+      [`PUT ${BASE}/syllabus/prerequisiti ${JSON.stringify({ text: `${stored}\n\nNota.` })}`],
+    ]);
+  });
+
   it("offers an empty section to be written, and says so in its tab", async () => {
     const { unmount } = open(true);
     await settle();
@@ -151,6 +177,8 @@ describe("a syllabus section", () => {
       empty: [...(panel("Contenuti")?.querySelectorAll("p") ?? [])].map((p) => text(p)),
       write: button("Scrivi · Contenuti") !== undefined,
       captions: ["Prerequisiti", "Contenuti"].map((name) => text(tab(name)?.querySelector("[id]"))),
+      // The caption describes the tab, and is no part of its name.
+      named: text(tab("Contenuti")),
       where: text(panel("Contenuti")?.querySelector("span")),
     };
     unmount();
@@ -159,6 +187,7 @@ describe("a syllabus section", () => {
       empty: ["Sezione vuota", "Scrivi il testo con «Scrivi», qui sopra."],
       write: true,
       captions: ["Compilata", "Vuota"],
+      named: "Contenuti",
       where: "3 di 7",
     });
   });
@@ -196,6 +225,25 @@ describe("a section not saved", () => {
     unmount();
 
     expect(seen).toEqual(["Vuota", "Non salvata", "Compilata"]);
+  });
+
+  it("is not said of a box left as it opened on text the editor writes otherwise", async () => {
+    // `*` items, where the editor writes `-`, and a list last, after which it adds a paragraph.
+    server.syllabus = {
+      locale: "it",
+      sections: [{ section: "prerequisiti", text: "Fisica I:\n\n* Analisi\n* Algebra" }],
+    };
+    const { unmount } = open(true);
+    await settle();
+    await show("Prerequisiti");
+    await openEditor("Prerequisiti", "Modifica");
+    const opened = caption("Prerequisiti");
+    const asked = unload();
+    await press("Salva");
+    const seen = [opened, asked, server.writes.length];
+    unmount();
+
+    expect(seen).toEqual(["Compilata", false, 0]);
   });
 
   it("lets the page go while every box holds the text it opened on", async () => {
@@ -459,6 +507,50 @@ describe("the syllabus's language", () => {
       status: "Lingua del syllabus: English.",
       lang: "en",
     });
+  });
+});
+
+it("sends a language chosen while another is on its way after it, and shows and says the last alone", async () => {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const answer = globalThis.fetch;
+  const sent: string[] = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    if (init.method === "PATCH") {
+      sent.push(String(init.body));
+      // English is answered only once the next choice has been made.
+      if (String(init.body).includes('"en"')) await gate;
+    }
+    return answer(input, init);
+  });
+  const { unmount } = open(true);
+  await settle();
+  const select = field("Lingua del syllabus") as unknown as HTMLSelectElement | null;
+  // Two presses of an arrow: two tasks, the first one's request sent in between.
+  type(select, "en");
+  await settle();
+  type(select, "zh-hans");
+  await settle();
+  const waiting = [...sent];
+  release();
+  await settle();
+  const seen = {
+    waiting,
+    sent,
+    shown: select?.value,
+    said: status(),
+    stored: server.syllabus.locale,
+  };
+  unmount();
+
+  expect(seen).toEqual({
+    waiting: ['{"locale":"en"}'],
+    sent: ['{"locale":"en"}', '{"locale":"zh-hans"}'],
+    shown: "zh-hans",
+    said: "Lingua del syllabus: 简体中文.",
+    stored: "zh-hans",
   });
 });
 

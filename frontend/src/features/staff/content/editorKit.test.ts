@@ -5,7 +5,8 @@
  * for byte, for every section the demo seed writes
  * (apps/roles/management/commands/demo_content.json): the seed is read as the
  * test data it is, and a serialiser that rewrote any of it would have every
- * teacher's first save change text they never touched.
+ * teacher's first save change text they never touched. A text holding what
+ * the editor does not write is told apart before it reaches the editor.
  */
 
 import { readFileSync } from "node:fs";
@@ -14,7 +15,7 @@ import { join } from "node:path";
 import { Editor } from "@tiptap/react";
 import { describe, expect, it } from "vitest";
 
-import { markdownOf, syllabusKit } from "./editorKit";
+import { holds, markdownOf, syllabusKit } from "./editorKit";
 
 interface Seed {
   editions: { edition: string; syllabus: { sections: Record<string, string> } }[];
@@ -51,6 +52,28 @@ describe("the syllabus editor", () => {
 
   it.each(sections)("writes %s back as it read it", (_, text) => {
     expect(reread(text)).toBe(text);
+  });
+
+  it.each([
+    ["a heading", "# Fisica I\n\nTesto."],
+    ["a table", "| Prova | Peso |\n| - | - |\n| Orale | 1 |"],
+    ["inline code", "Il campo `E`."],
+    ["a code block", "```\nx = 1\n```"],
+    ["an image", "![Schema](https://www.unifi.it/schema.png)"],
+    ["a quote", "> Dal regolamento."],
+    ["raw HTML", "<b>Orale</b> e scritto."],
+  ])("knows it would lose %s", (_, text) => {
+    expect(holds(text)).toBe(false);
+  });
+
+  it("holds every seeded section, and a list written with `*`, which it writes with `-`", () => {
+    const list = "* Analisi\n* Algebra";
+
+    expect([sections.every(([, text]) => holds(text ?? "")), holds(list), reread(list)]).toEqual([
+      true,
+      true,
+      "- Analisi\n- Algebra",
+    ]);
   });
 
   it("leaves a link live in the editor only when it is an absolute http(s) URL", () => {

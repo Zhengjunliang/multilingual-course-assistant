@@ -316,6 +316,7 @@
         "orderedList": "Numbered list",
         "link": "Link",
         "hint": "Write as in a document: bold, lists and links are kept.",
+        "markdown": "Text in Markdown, as it is stored: **bold**, *italics*, - list, [text](address).",
         "linkTitle": "Insert a link",
         "linkField": "Address",
         "linkHint": "A web address, such as {{example}}.",
