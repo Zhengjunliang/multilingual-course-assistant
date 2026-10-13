@@ -83,7 +83,7 @@ const LADDER = [
     b: "surface",
     where: "dropdown-menu.tsx item under the pointer, count.tsx and skeleton.tsx on a card",
   },
-  { a: "mark", b: "canvas", where: "AnswerMarkdown.tsx citation pill in the answer" },
+  { a: "mark", b: "canvas", where: "CitationPill.tsx citation pill in the answer" },
   { a: "tint", b: "surface", where: "card.tsx CardFooter, toggle-group.tsx track" },
 ];
 
