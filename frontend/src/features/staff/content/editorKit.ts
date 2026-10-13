@@ -86,9 +86,20 @@ function writable(tokens: readonly Token[]): boolean {
   );
 }
 
-/** A text's words, its runs of letters and digits in order, whatever marks them up. */
+/**
+ * A text's words, its runs of letters and digits in order, whatever marks them
+ * up, and apart from what the editor writes in its own form: `&`, `<` and `>`
+ * as entities, a bare URL as a link to itself, a list's numbers counted afresh.
+ */
 function words(text: string): string {
-  return text.match(/[\p{L}\p{N}]+/gu)?.join(" ") ?? "";
+  return (
+    text
+      .replace(/&(?:amp|lt|gt);/g, " ")
+      .replace(/\[([^\]]+)\]\(\1\)/g, "$1")
+      .replace(/^[ \t]*\d+[.)][ \t]/gm, "")
+      .match(/[\p{L}\p{N}]+/gu)
+      ?.join(" ") ?? ""
+  );
 }
 
 /** `markdown` read into `editor` and written back, or null when that loses a word. */

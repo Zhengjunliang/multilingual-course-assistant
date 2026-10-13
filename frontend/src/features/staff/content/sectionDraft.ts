@@ -69,6 +69,15 @@ export function useSectionDraft({
     setDraft(markdown);
   }, []);
 
+  /**
+   * Takes what the box holds after a change, while it is open: Tiptap's start
+   * runs a task after the editor is made, and a box closed within that task
+   * would otherwise be opened again by the change the start makes.
+   */
+  const edit = useCallback((markdown: string) => {
+    setDraft((was) => (was === null ? null : markdown));
+  }, []);
+
   useEffect(() => onUnsaved(section, unsaved), [onUnsaved, section, unsaved]);
 
   // Once the box is gone and «Modifica» is back: focus left in a removed box
@@ -145,6 +154,7 @@ export function useSectionDraft({
     /** Whether the box is the editor, which alone writes the text back once read. */
     rich: read !== null,
     readBack,
+    edit,
     running,
     clearing,
     forbidden,
