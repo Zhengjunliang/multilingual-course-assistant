@@ -66,6 +66,15 @@ describe("the syllabus editor", () => {
     expect(written(text)).toBeNull();
   });
 
+  it.each([
+    ["an ampersand", "Esame scritto & orale."],
+    ["a greater-than sign", "Voto > 18."],
+    ["a bare URL", "Materiale: https://e-l.unifi.it"],
+    ["a list numbered 1, 1", "1. Logica\n1. Insiemi"],
+  ])("takes a text with %s, which it writes in its own form", (_, text) => {
+    expect(written(text)).not.toBeNull();
+  });
+
   it("takes every seeded section as it is, and a list written with `*` with `-`", () => {
     expect([
       sections.every(([, text]) => written(text ?? "") === text),

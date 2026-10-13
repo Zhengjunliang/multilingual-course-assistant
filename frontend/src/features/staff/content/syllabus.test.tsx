@@ -246,6 +246,33 @@ describe("a section not saved", () => {
     expect(seen).toEqual(["Compilata", false, 0]);
   });
 
+  it("is not said of a box cancelled before the editor's own start has run", async () => {
+    // A list last: Tiptap's start focuses the end, and a paragraph follows the list.
+    server.syllabus = {
+      locale: "it",
+      sections: [{ section: "prerequisiti", text: "Fisica I:\n\n- Analisi\n- Algebra" }],
+    };
+    const { unmount } = open(true);
+    await settle();
+    await show("Prerequisiti");
+    // The editor's chunk loaded once, the next box mounts it within a task.
+    await openEditor("Prerequisiti", "Modifica");
+    await press("Annulla");
+    act(() => button("Modifica · Prerequisiti")?.click());
+    for (let turn = 0; turn < 20 && editorIn("Prerequisiti") === undefined; turn += 1) {
+      await act(async () => {
+        await Promise.resolve();
+      });
+    }
+    const mounted = editorIn("Prerequisiti") !== undefined;
+    act(() => button("Annulla")?.click());
+    await settle();
+    const seen = [mounted, editorIn("Prerequisiti") ?? null, caption("Prerequisiti")];
+    unmount();
+
+    expect(seen).toEqual([true, null, "Compilata"]);
+  });
+
   it("lets the page go while every box holds the text it opened on", async () => {
     const { router, unmount } = open(true);
     await settle();
@@ -552,6 +579,41 @@ it("sends a language chosen while another is on its way after it, and shows and 
     said: "Lingua del syllabus: 简体中文.",
     stored: "zh-hans",
   });
+});
+
+it("shows the language the server last took when the last one chosen is refused", async () => {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const answer = globalThis.fetch;
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    if (init.method === "PATCH" && String(init.body).includes('"en"')) await gate;
+    if (init.method === "PATCH" && String(init.body).includes('"zh-hans"')) {
+      return new Response(JSON.stringify({ detail: { message: "Server error.", code: "error" } }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return answer(input, init);
+  });
+  const { unmount } = open(true);
+  await settle();
+  const select = field("Lingua del syllabus") as unknown as HTMLSelectElement | null;
+  type(select, "en");
+  await settle();
+  type(select, "zh-hans");
+  await settle();
+  release();
+  await settle();
+  const seen = {
+    stored: server.syllabus.locale,
+    shown: select?.value,
+    tagged: panel("Prerequisiti")?.querySelector("[lang]")?.getAttribute("lang"),
+  };
+  unmount();
+
+  expect(seen).toEqual({ stored: "en", shown: "en", tagged: "en" });
 });
 
 it("offers no edit to a reader without the permission, and names the language", async () => {

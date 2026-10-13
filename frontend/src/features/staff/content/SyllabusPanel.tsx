@@ -68,8 +68,10 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
   if (syllabus.error !== null) return <PartFailure onRetry={() => void syllabus.reload()} />;
   if (locale === null) return null;
 
-  // One choice at a time, in the order made, and only the last is shown and
-  // said: the arrows on a closed select change it at every press.
+  // One choice at a time, in the order made, and only the last is said: the
+  // arrows on a closed select change it at every press. Each answer taken is
+  // the server's language until the next, so the text follows every one, and
+  // a last choice refused leaves it on the one before.
   const choose = (next: UiLocale) => {
     chosen.current = next;
     setChoosing(next);
@@ -78,8 +80,8 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
       if (chosen.current !== next) return;
       try {
         const answered = await setSyllabusLocale(edition, next);
-        if (chosen.current !== next) return;
         syllabus.relabelled(answered.locale);
+        if (chosen.current !== next) return;
         setStatus(t("staff.syllabus.relabelled", { language: endonym(answered.locale) }));
       } catch (error) {
         if (chosen.current !== next) return;

@@ -79,6 +79,7 @@ export function SectionText({
     draft,
     setDraft,
     readBack,
+    edit,
     rich,
     running,
     clearing,
@@ -160,7 +161,7 @@ export function SectionText({
               >
                 <SyllabusEditor
                   markdown={text}
-                  onChange={setDraft}
+                  onChange={edit}
                   onRead={readBack}
                   labelledBy={headingId}
                   lang={locale}
