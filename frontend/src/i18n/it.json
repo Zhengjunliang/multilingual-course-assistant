@@ -246,6 +246,11 @@
     "open": "Apri",
     "current": "Corrente",
     "past": "Non corrente",
+    "period": {
+      "label": "Periodo",
+      "first_semester": "1° semestre",
+      "second_semester": "2° semestre"
+    },
     "course": {
       "inPlan": "Nel piano di studi di",
       "twoCodesBoth": "Due codici, un solo insegnamento: ogni edizione vale per entrambi i curriculum.",
