@@ -21,7 +21,7 @@
  * A section can still hold what the editor cannot write, through the plain
  * box, the API or the admin: a heading, a table, code, raw HTML. The parser
  * drops such a block, or, for a node the schema lacks, empties the whole
- * document, and the next save would store what is left. `holds` looks at a
+ * document, and the next save would store what is left. `written` looks at a
  * text before the editor is offered: one with a block or a mark the editor
  * does not write, or that loses a word read in and written back, is written
  * as the Markdown it is instead.
@@ -91,20 +91,24 @@ function words(text: string): string {
   return text.match(/[\p{L}\p{N}]+/gu)?.join(" ") ?? "";
 }
 
+/** `markdown` read into `editor` and written back, or null when that loses a word. */
+function readBack(editor: Editor, markdown: string): string | null {
+  editor.commands.setContent(markdown, { contentType: "markdown" });
+  const back = markdownOf(editor);
+  return words(back) === words(markdown) ? back : null;
+}
+
 /**
- * Whether the editor keeps `markdown` whole: every block and mark in it is one
- * the editor writes, read by the parser the editor reads with, and read in and
- * written back it keeps every word.
+ * `markdown` as the editor writes it back once read, or null when the editor
+ * would not keep it whole: a block or a mark in it that the editor does not
+ * write, read by the parser the editor reads with, or a word lost on the way
+ * in and back. The text goes into an empty editor only once its blocks pass,
+ * since one the schema lacks has Tiptap warn of it.
  */
-export function holds(markdown: string): boolean {
-  const editor = new Editor({
-    extensions: syllabusKit(),
-    content: markdown,
-    contentType: "markdown",
-  });
+export function written(markdown: string): string | null {
+  const editor = new Editor({ extensions: syllabusKit() });
   const tokens: readonly Token[] | undefined = editor.markdown?.instance.lexer(markdown);
-  const kept =
-    tokens !== undefined && writable(tokens) && words(markdownOf(editor)) === words(markdown);
+  const back = tokens !== undefined && writable(tokens) ? readBack(editor, markdown) : null;
   editor.destroy();
-  return kept;
+  return back;
 }
