@@ -756,7 +756,9 @@
  * fade, every 1250 ms, as Linear's thread composer does (E9 of #135). It sits
  * at the end of the last paragraph, of the last item when a list is last (of
  * its last paragraph when the list is loose), of a quote's last paragraph,
- * and alone before the first word. Reduced motion keeps it, still.
+ * after the last line of code when a code block is last (inside its `pre`,
+ * not under the block's head and body, features/chat/CodeBlock.tsx), and
+ * alone before the first word. Reduced motion keeps it, still.
  */
 @keyframes caret {
   50% {
@@ -766,7 +768,8 @@
 
 @utility caret-after {
   &:empty::after,
-  & > :last-child:not(ul, ol, blockquote)::after,
+  & > :last-child:not(ul, ol, blockquote, :has(> pre))::after,
+  & > :last-child > pre:last-child::after,
   & > :is(ul, ol):last-child > li:last-child:not(:has(> p))::after,
   & > :is(ul, ol):last-child > li:last-child > p:last-child::after,
   & > blockquote:last-child > :last-child::after {
@@ -782,7 +785,8 @@
 
   @media (prefers-reduced-motion: reduce) {
     &:empty::after,
-    & > :last-child:not(ul, ol, blockquote)::after,
+    & > :last-child:not(ul, ol, blockquote, :has(> pre))::after,
+    & > :last-child > pre:last-child::after,
     & > :is(ul, ol):last-child > li:last-child:not(:has(> p))::after,
     & > :is(ul, ol):last-child > li:last-child > p:last-child::after,
     & > blockquote:last-child > :last-child::after {

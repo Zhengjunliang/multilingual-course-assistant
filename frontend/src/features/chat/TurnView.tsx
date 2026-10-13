@@ -54,7 +54,7 @@ interface TurnViewProps {
   retry: { seconds: number; attempt: number } | null;
   /**
    * The turn's failure happened just now, rather than being read back with a
-   * stored conversation: only then is its banner announced.
+   * stored conversation: only then is it announced.
    */
   failedNow: boolean;
   /**
@@ -93,6 +93,24 @@ export const TurnView = memo(function TurnView({
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const working = thinking || live;
   const waiting = working && turn.answer === "";
+
+  const retrying =
+    retry === null ? null : t("status.retrying", { ...retry, total: MAX_BUSY_RETRIES });
+  const failed =
+    turn.failure === null
+      ? null
+      : {
+          heading: turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete"),
+          kept: !visitor && turn.answer !== "" ? t("answer.kept") : undefined,
+        };
+  // What the banners show, said once as it happens. Through a region that is
+  // on the page before its words change, rather than through the banners'
+  // own role: a live region inserted with its words already in it is not
+  // reliably announced (MDN, ARIA live regions). A failure read back with a
+  // stored conversation says nothing.
+  let said = "";
+  if (retrying !== null) said = `${t("status.busy")} ${retrying}`;
+  else if (failed !== null && failedNow) said = [failed.heading, failed.kept].join(" ").trim();
 
   return (
     <article className="flex flex-col gap-gutter">
@@ -160,8 +178,8 @@ export const TurnView = memo(function TurnView({
           )}
 
           {retry !== null && (
-            <Banner role="status" icon={Spinner} heading={t("status.busy")}>
-              {t("status.retrying", { ...retry, total: MAX_BUSY_RETRIES })}
+            <Banner icon={Spinner} heading={t("status.busy")}>
+              {retrying}
               <span
                 aria-hidden
                 className="mt-hair block h-hair overflow-hidden rounded-full bg-accent-line"
@@ -177,18 +195,15 @@ export const TurnView = memo(function TurnView({
           {/* An answer cut short keeps what it had written (docs/api.md): a
               signed-in reader's is stored as far as it got, which the banner
               says when there is something to keep. */}
-          {turn.failure !== null && (
-            <Banner
-              tone="warn"
-              role={failedNow ? "status" : undefined}
-              icon={TriangleAlert}
-              heading={
-                turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete")
-              }
-            >
-              {!visitor && turn.answer !== "" ? t("answer.kept") : undefined}
+          {failed !== null && (
+            <Banner tone="warn" icon={TriangleAlert} heading={failed.heading}>
+              {failed.kept}
             </Banner>
           )}
+
+          <p role="status" className="sr-only">
+            {said}
+          </p>
         </div>
       </div>
     </article>

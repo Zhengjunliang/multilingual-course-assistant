@@ -126,7 +126,7 @@ function SourceActions({ citation }: { citation: Citation }) {
  * known ones, and this never throws on the rest either.
  */
 export function CitationPill({ numbers }: { numbers?: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const citations = useContext(PillContext);
   const highlighted = useContext(HighlightContext);
   // One per page: «+N», the card and the name a screen reader hears count
@@ -156,6 +156,10 @@ export function CitationPill({ numbers }: { numbers?: string }) {
   const look =
     "group mx-0.5 inline-flex items-center gap-hair rounded-full border border-line bg-mark px-tight align-baseline font-medium text-caption text-ink no-underline transition-colors hover:border-ink data-highlighted:border-ink data-[state=open]:border-ink data-[state=open]:bg-ink data-[state=open]:text-canvas";
   const pointed = sources.some((source) => source.marker === highlighted) || undefined;
+  // What the pill shows and its name are the interface's words («Slide
+  // p. 12», «fonte»), in its language inside an answer in another (WCAG
+  // 3.1.2); a site's name reads the same in any.
+  const lang = i18n.language;
 
   return (
     <HoverCard
@@ -171,7 +175,7 @@ export function CitationPill({ numbers }: { numbers?: string }) {
         // not a web URL, has nowhere to go: a plain pill, which still previews
         // under the pointer; its source is in the sources panel for everyone
         // else.
-        <span data-pill data-highlighted={pointed} className={look}>
+        <span lang={lang} data-pill data-highlighted={pointed} className={look}>
           {pill}
         </span>
       ) : (
@@ -179,6 +183,7 @@ export function CitationPill({ numbers }: { numbers?: string }) {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
+          lang={lang}
           aria-label={label}
           data-pill
           data-highlighted={pointed}

@@ -86,7 +86,9 @@ export function Composer({
     waiting.phase === "queued" || waiting.phase === "streaming" || waiting.phase === "retrying";
   const ready = question.trim().length > 0 && !busy;
   // The send button was pressed with nothing to send: the foot says so until
-  // the next keystroke.
+  // the next keystroke, or until the field is left, so a hint does not follow
+  // the reader into another conversation and a second press, which takes the
+  // focus off the field first, is announced again.
   const [missing, setMissing] = useState(false);
 
   const send = () => {
@@ -170,6 +172,7 @@ export function Composer({
               setMissing(false);
             }}
             onKeyDown={onKeyDown}
+            onBlur={() => setMissing(false)}
             className="field-sizing-content max-h-[40vh] min-h-control-icon min-w-0 flex-1 resize-none bg-transparent px-hair py-tight text-body text-ink outline-none placeholder:text-muted"
           />
           {/* One round button that says what it does, as the prototype of

@@ -39,6 +39,17 @@ describe("a code block", () => {
     expect(seen).toEqual({ button: "Copiato", said: "Copiato" });
   });
 
+  it("speaks the interface's language in its head, inside an answer in another", () => {
+    const { container, unmount } = mount(
+      <AnswerMarkdown text={"```\nprint(1)\n```"} citations={[]} lang="zh" />,
+    );
+    const button = container.querySelector("pre")?.previousElementSibling?.querySelector("button");
+    const spoken = button?.closest("[lang]")?.getAttribute("lang");
+    unmount();
+
+    expect(spoken).toBe("it");
+  });
+
   it("names nothing when its fence named no language", () => {
     const { container, unmount } = block("```\nplain\n```");
     const head = container.querySelector("pre")?.previousElementSibling;

@@ -24,13 +24,18 @@ function languageOf(children: ComponentProps<"pre">["children"]): string | undef
 }
 
 export function CodeBlock({ children }: ComponentProps<"pre">) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { copied, copy } = useCopy();
   const block = useRef<HTMLPreElement>(null);
 
   return (
     <div className="flex min-w-0 flex-col overflow-hidden rounded-control border border-line bg-tint">
-      <div className="flex items-center gap-tight border-line border-b py-hair pr-hair pl-snug">
+      {/* The head is the interface, in its language inside an answer in
+          another (WCAG 3.1.2), so a screen reader voices «Copia» as Italian. */}
+      <div
+        lang={i18n.language}
+        className="flex items-center gap-tight border-line border-b py-hair pr-hair pl-snug"
+      >
         <span className="flex-1 font-mono text-caption text-muted">{languageOf(children)}</span>
         <Button
           type="button"
