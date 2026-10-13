@@ -1,6 +1,7 @@
 /**
  * axe finds nothing on any screen, in either theme (#134), nor with a source
- * card open over a pill, nor with an answer's sources open; nor, in the shell
+ * card open over a pill, nor with an answer's sources open on a phone, where
+ * neither the conversation nor the panel runs past its width; nor, in the shell
  * (#191), with the account menu and its languages open, with the sidebar
  * folded into its rail, or with the drawer open on a phone, where nothing
  * scrolls sideways either. Escape closes those layers one at a time, which
@@ -112,6 +113,12 @@ function floatingContrast(page: Page, selector: string): Promise<number[]> {
   }, selector);
 }
 
+/**
+ * How many pixels an element's content runs past its width. Content cut by an
+ * ellipsis (`truncate`) is clipped by its own box and does not count.
+ */
+const overrun = (element: Element) => Math.max(0, element.scrollWidth - element.clientWidth);
+
 function screen(path: string, as: Screen["as"]): Screen {
   const found = SCREENS.find((candidate) => candidate.path === path && candidate.as === as);
   if (found === undefined) throw new Error(`${path} as a ${as} is not a screen`);
@@ -147,10 +154,27 @@ for (const colorScheme of ["light", "dark"] as const) {
       expect(await violations(page)).toEqual([]);
     });
 
-    test("an answer's sources open: axe finds nothing", async ({ page, api }) => {
+    test("an answer's sources open on a phone: axe finds nothing, nothing runs past the width", async ({
+      page,
+      api,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
       await visit(page, api, stored());
+      // The conversation's own column, not the document: `main` scrolls by
+      // itself, so a row under an answer that ran past 375 px would widen it
+      // and leave the document's width as it was.
+      expect(await page.locator("main").evaluate(overrun), "the conversation").toBe(0);
       await page.getByRole("button", { name: it.sources.title }).click();
-      await expect(page.getByRole("dialog", { name: it.sources.title })).toBeVisible();
+      const panel = page.getByRole("dialog", { name: it.sources.title });
+      await expect(panel).toBeVisible();
+      // Each row as well as the panel: the rows scroll in a box of their own,
+      // which keeps what runs past it from the panel's width.
+      expect(await panel.evaluate(overrun), "the sources panel").toBe(0);
+      const rows = await panel.getByRole("listitem").all();
+      expect(rows.length, "the panel's rows").toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(await row.evaluate(overrun), "a source's row").toBe(0);
+      }
       expect(await violations(page)).toEqual([]);
     });
 

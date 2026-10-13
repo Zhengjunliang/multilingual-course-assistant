@@ -45,40 +45,42 @@ export const PAIRS = [
     back: "ink",
     min: TEXT,
     where:
-      "tooltip.tsx content, sonner.tsx toast, AnswerMarkdown.tsx citation pill under the pointer or open",
+      "tooltip.tsx content, sonner.tsx toast, CitationPill.tsx citation pill while its card is open",
   },
   {
     front: "ink",
     back: "surface",
     min: TEXT,
-    where: "card.tsx card body, dialog.tsx and alert-dialog.tsx body",
+    where:
+      "card.tsx card body, dialog.tsx and alert-dialog.tsx body, TurnView.tsx the question's bubble, ProcessLine.tsx the line once the search is done, AnswerActions.tsx the sources button, CitationPill.tsx a source's title in its card",
   },
   {
     front: "muted",
     back: "canvas",
     min: TEXT,
     where:
-      "EntryScreen.tsx and StatusPanel.tsx subtitle, ChatShell.tsx icon-only buttons (button.tsx ghost), ConversationList.tsx a row's time and group headings",
+      "EntryScreen.tsx and StatusPanel.tsx subtitle, ChatShell.tsx icon-only buttons (button.tsx ghost), ConversationList.tsx a row's time and group headings, ProcessLine.tsx the count of cited sources, AnswerActions.tsx the search's seconds, Composer.tsx the foot of the question box",
   },
   {
     front: "muted",
     back: "surface",
     min: TEXT,
     where:
-      "SourcesPanel.tsx where a source is and its excerpt, LineField.tsx a field's underline and label, kbd.tsx a key's cap",
+      "SourcesPanel.tsx where a source is and its excerpt, CitationPill.tsx the excerpt in a source's card, ProcessLine.tsx the line while the search runs, LineField.tsx a field's underline and label, kbd.tsx a key's cap",
   },
   {
     front: "ink",
     back: "mark",
     min: TEXT,
-    where: "chip.tsx and avatar.tsx neutral tone, SourcesPanel.tsx row title under the pointer",
+    where:
+      "chip.tsx and avatar.tsx neutral tone (SourceParts.tsx a language), CitationPill.tsx citation pill, AnswerMarkdown.tsx a quotation and inline code",
   },
   {
     front: "muted",
     back: "mark",
     min: TEXT,
     where:
-      "AnswerMarkdown.tsx citation pill at rest, SourcesPanel.tsx row under the pointer, count.tsx, avatar-stack.tsx the rest as +N",
+      "CitationPill.tsx a citation pill's mark, count.tsx neutral tone (AnswerActions.tsx, SourcesPanel.tsx), avatar-stack.tsx the rest as +N",
   },
   {
     front: "accent-ink",
@@ -96,40 +98,40 @@ export const PAIRS = [
     front: "accent",
     back: "surface",
     min: TEXT,
-    where:
-      "field.tsx a focused field's edge, AnswerMarkdown.tsx a source's open link in its hover card",
+    where: "field.tsx a focused field's edge, SourcesPanel.tsx a source's link in focus",
   },
   {
     front: "accent",
     back: "accent-soft",
     min: TEXT,
     where:
-      "badge.tsx, chip.tsx and avatar.tsx accent tone, button.tsx soft variant, dialog.tsx disc, sonner.tsx success disc, ConversationSidebar.tsx open conversation, ManagementNav.tsx current page",
+      "badge.tsx, chip.tsx and avatar.tsx accent tone, button.tsx soft variant, dialog.tsx disc, sonner.tsx success disc, banner.tsx info icon, ConversationSidebar.tsx open conversation, ManagementNav.tsx current page, ProcessLine.tsx the check's disc, AnswerActions.tsx the stacked source marks, SourcesPanel.tsx a row's mark",
   },
   {
     front: "warn-ink",
     back: "warn",
     min: TEXT,
     where:
-      "TurnView.tsx failure box, button.tsx warn variant, chip.tsx warn tone, dialog.tsx warn disc, sonner.tsx failure disc",
+      "banner.tsx warn icon (TurnView.tsx an answer cut short), button.tsx warn variant, chip.tsx warn tone, dialog.tsx warn disc, sonner.tsx failure disc",
   },
   {
     front: "muted",
     back: "tint",
     min: TEXT,
-    where: "toggle-group.tsx an option not chosen, card.tsx CardFooter's caption",
+    where:
+      "toggle-group.tsx an option not chosen, card.tsx CardFooter's caption, CodeBlock.tsx the language and the copy button in its head",
   },
   {
     front: "ink",
     back: "accent-soft",
     min: TEXT,
-    where: "banner.tsx info title",
+    where: "banner.tsx info title, CitationPill.tsx the passage marked in a card's excerpt",
   },
   {
     front: "muted",
     back: "accent-soft",
     min: TEXT,
-    where: "banner.tsx info sentence",
+    where: "banner.tsx info sentence (TurnView.tsx a question asked again)",
   },
   {
     front: "ink",
@@ -153,14 +155,14 @@ export const PAIRS = [
     front: "accent",
     back: "tint",
     min: TEXT,
-    where: "hover-card.tsx an icon in its head (routes/styleguide/overlays.tsx)",
+    where: "hover-card.tsx an icon in its head (CitationPill.tsx a source's mark)",
   },
   {
     front: "ink",
     back: "tint",
     min: TEXT,
     where:
-      "card.tsx CardFooter, hover-card.tsx head, routes/styleguide/basics.tsx the --tint swatch",
+      "card.tsx CardFooter, hover-card.tsx head, CodeBlock.tsx the code, routes/styleguide/basics.tsx the --tint swatch",
   },
   {
     front: "warn-ink",
@@ -198,14 +200,14 @@ export const TINTS = [
     ground: "surface",
     fronts: ["ink", "muted"],
     where:
-      "button.tsx ghost and outline variants under the pointer, in a card or a dialog; table.tsx a row under the pointer, its name and the code under it",
+      "button.tsx ghost and outline variants under the pointer, in a card or a dialog; table.tsx a row under the pointer, its name and the code under it; SourcesPanel.tsx a row under the pointer, its title and where it is; AnswerActions.tsx the sources button under the pointer",
   },
   {
     tint: "hover",
     ground: "tint",
     fronts: ["ink"],
     where:
-      "toggle-group.tsx an option under the pointer, dialog.tsx an outlined button in the foot under the pointer",
+      "toggle-group.tsx an option under the pointer, dialog.tsx an outlined button in the foot under the pointer, CodeBlock.tsx the copy button under the pointer",
   },
   {
     tint: "selected",
