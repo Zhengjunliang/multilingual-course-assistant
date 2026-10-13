@@ -1,23 +1,28 @@
-"""Fill the database with the demo: two real programmes, their courses in two years, and its staff.
+"""Fill the database with the demo: three real programmes, their courses in the years they are
+offered, the demo teacher's syllabi and books, and its staff.
 
-    uv run python manage.py populate_demo                # demo_catalog.json, beside this file
-    uv run python manage.py populate_demo --data <path>
+    uv run python manage.py populate_demo  # demo_catalog.json, demo_content.json, beside this file
+    uv run python manage.py populate_demo --data <path> --content <path>
 
 A demo seed, as Saleor's `populatedb` and Zulip's `populate_db` are (outside
-the repository), not an import path: the catalogue is entered in the admin. The
+the repository), not an import path: the catalogue is entered in the admin. Each
 data file names its source and the rules it was transcribed by. The command
 merges by natural key, so it runs again at any time, on an empty database or
 on one holding rows of its own:
 
 - A programme by code, a course by code, a curriculum entry by programme,
   curriculum and course, an edition by course and year: created when missing,
-  never changed when present. Each new row passes `full_clean()` first, so the
-  models' own rules — an AD code belongs to one course (apps/catalog/models.py)
-  — stop a bad data file at the row that breaks them. A course the file marks
+  never changed when present, but for an edition with no teaching start, which
+  gets the file's. Each new row passes `full_clean()` first, so the models' own
+  rules — an AD code belongs to one course (apps/catalog/models.py) — stop a
+  bad data file at the row that breaks them. A course the file marks
   `code_source: cineca-only` is created so; one with no mark, as from its
-  Moodle course.
+  Moodle course. A row the file does not name is kept, an edition included.
 - No edition is made current: which one is follows its teaching start
   (apps/catalog/editions.py).
+- Content: an edition gets the content file's syllabus in a language only when
+  it holds no section in that language, and its books in a language only when
+  it holds no book in it, so a run never overwrites what a teacher wrote.
 - Accounts: `demo-` ones only, and the file may name no other. A declared
   account's name, superuser flag and role rows are made the file's, rows it does not
   declare removed; a `demo-` account the file does not name keeps the account
@@ -39,6 +44,7 @@ command prints each one it adds or removes.
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -53,6 +59,8 @@ from apps.catalog.models import (
     CourseEdition,
     CurriculumEntry,
     DegreeProgramme,
+    ReadingItem,
+    Syllabus,
 )
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Role
@@ -63,6 +71,7 @@ if TYPE_CHECKING:
     from django.db.models import Model
 
 DATA = Path(__file__).with_name("demo_catalog.json")
+CONTENT = Path(__file__).with_name("demo_content.json")
 PREFIX = "demo-"
 
 
@@ -71,11 +80,18 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
-            "--data", type=Path, default=DATA, help="the data file (default: %(default)s)"
+            "--data", type=Path, default=DATA, help="the catalogue file (default: %(default)s)"
+        )
+        parser.add_argument(
+            "--content",
+            type=Path,
+            default=CONTENT,
+            help="the editions' syllabi and books (default: %(default)s)",
         )
 
-    def handle(self, *args: object, data: Path, **options: object) -> None:
+    def handle(self, *args: object, data: Path, content: Path, **options: object) -> None:
         demo = json.loads(data.read_text(encoding="utf-8"))
+        texts = json.loads(content.read_text(encoding="utf-8"))
         secret = env.demo_password.get_secret_value() if env.demo_password is not None else ""
         password = secret or None
         strangers = [
@@ -84,8 +100,10 @@ class Command(BaseCommand):
         if strangers:
             raise CommandError(f"the data file names accounts outside {PREFIX}: {strangers}")
         self.created: dict[str, int] = {}
+        self.dated = 0
         with transaction.atomic():
             self._catalogue(demo)
+            self._content(texts)
             for account in demo["accounts"]:
                 self._account(account, password)
             declared = [a["username"] for a in demo["accounts"]]
@@ -95,21 +113,24 @@ class Command(BaseCommand):
             for row in undeclared.select_related("user", "programme", "edition__course"):
                 row.delete()
                 self.stdout.write(f"removed role {row}")
+        if self.dated:
+            self.stdout.write(f"dated {self.dated} course editions")
         made = ", ".join(f"{count} {name}" for name, count in self.created.items()) or "nothing"
         self.stdout.write(f"created {made}")
 
     def _merge[M: Model](self, model: type[M], key: dict[str, Any], fields: dict[str, Any]) -> M:
         """The row `key` names, created with `fields` when there is none."""
         row = model._default_manager.filter(**key).first()
-        if row is not None:
-            return row
-        row = model(**key, **fields)
+        return row if row is not None else self._create(model(**key, **fields))
+
+    def _create[M: Model](self, row: M) -> M:
+        """`row`, checked by its model's rules, saved and counted."""
         try:
             row.full_clean()
         except ValidationError as exc:
-            raise CommandError(f"{model._meta.verbose_name} {row}: {exc.messages}") from None
+            raise CommandError(f"{row._meta.verbose_name} {row}: {exc.messages}") from None
         row.save()
-        name = str(model._meta.verbose_name_plural)
+        name = str(row._meta.verbose_name_plural)
         self.created[name] = self.created.get(name, 0) + 1
         return row
 
@@ -140,8 +161,34 @@ class Command(BaseCommand):
                     },
                     {"year_of_study": e["year_of_study"], "ad_code": e["ad_code"]},
                 )
-            for year in demo["academic_years"]:
-                self._merge(CourseEdition, {"course": course, "academic_year": year}, {})
+            for e in c["editions"]:
+                starts = date.fromisoformat(e["teaching_starts"])
+                edition = self._merge(
+                    CourseEdition,
+                    {"course": course, "academic_year": e["academic_year"]},
+                    {"teaching_starts": starts},
+                )
+                if edition.teaching_starts is None:
+                    edition.teaching_starts = starts
+                    edition.save(update_fields=["teaching_starts"])
+                    self.dated += 1
+
+    def _content(self, texts: dict[str, Any]) -> None:
+        for e in texts["editions"]:
+            code, _, year = e["edition"].partition(":")
+            edition = CourseEdition.objects.filter(course__code=code, academic_year=year).first()
+            if edition is None:
+                raise CommandError(f"no edition {e['edition']} to hold its content")
+            for locale, sections in e["syllabus"].items():
+                if not Syllabus.objects.filter(edition=edition, locale=locale).exists():
+                    for section, text in sections.items():
+                        self._create(
+                            Syllabus(edition=edition, locale=locale, section=section, text=text)
+                        )
+            for locale, books in e["readings"].items():
+                if not ReadingItem.objects.filter(edition=edition, locale=locale).exists():
+                    for book in books:
+                        self._create(ReadingItem(edition=edition, locale=locale, **book))
 
     def _account(self, account: dict[str, Any], password: str | None) -> None:
         # Checked here, inside the transaction, and not before the run: a name

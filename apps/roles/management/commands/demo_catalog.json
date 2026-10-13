@@ -1,24 +1,31 @@
 {
   "source": {
-    "url": "https://unifi.coursecatalogue.cineca.it/corsi/2024/458?annoOrdinamento=2010 https://unifi.coursecatalogue.cineca.it/corsi/2024/817?annoOrdinamento=2016",
-    "read": "2026-09-29",
-    "cohort": "2024/2025"
+    "url": [
+      "https://unifi.coursecatalogue.cineca.it/corsi/2024/458?annoOrdinamento=2010",
+      "https://unifi.coursecatalogue.cineca.it/corsi/2025/4278?annoOrdinamento=2025",
+      "https://unifi.coursecatalogue.cineca.it/corsi/2024/817?annoOrdinamento=2016",
+      "https://unifi.coursecatalogue.cineca.it/api/v1/corso-offerta/458?codicione=0480106200800002&annoOrdinamento=2010&sede=1183",
+      "https://unifi.coursecatalogue.cineca.it/api/v1/corso-offerta/817?codicione=0480106200900005&annoOrdinamento=2016&sede=1183"
+    ],
+    "read": "2026-09-29 for the study plans of B047 and B222, 2026-10-13 for B308's and the offer lists",
+    "cohort": "2024/2025 for B047 and B222, 2025/2026 for B308"
   },
   "rules": [
-    "Two programmes: B047 (both curricula) and the UniFi bachelor's programme whose study plan shares the most AD codes with B047's.",
+    "Three programmes: B047 (both curricula), from its 2024 cohort's study plan; B308, which replaced B047 from the 2025 cohort under the same codicione and lists the same teachings, from its 2025 cohort's study plan; and B222, the UniFi bachelor's programme whose study plan shares the most AD codes with B047's. B406, which replaced B222 from the 2025 cohort, is not listed.",
     "Every teaching of the study plan that is taught, mandatory or a named option; no prova finale, tirocinio, free-choice placeholder or idoneità without a teaching.",
-    "One course per teaching; a teaching listed in two curricula, or shared by the two programmes under one AD code, is one course with an entry in each.",
+    "One course per teaching; a teaching listed in two curricula, or shared by two programmes under one AD code, is one course with an entry in each.",
     "Course code: the AD code of the Moodle course that holds the material (docs/decisions.md, 2026-09-25, PPM read from Moodle and Cineca, point 1), read from the course summaries Moodle shows without a login; where no single Moodle course holds the material, as for an integrated course (C.I.), the course says code_source cineca-only and takes the code its curricula list (the same entry, point 6).",
     "Entry AD code: the one the curriculum lists; of two, the one listed only in that curriculum (the same entry, point 2). A course already in the database keeps its row.",
-    "Two editions per course, one per academic year below; which one is current follows the teaching start (apps/catalog/editions.py)."
-  ],
-  "academic_years": [
-    "2024-2025",
-    "2025-2026"
+    "Editions: one for each academic year, 2025-2026 and 2026-2027, in which the offer lists (corso-offerta, which list B308 with B047 and B406 with B222) offer the course under any of its AD codes, in any programme. Its teaching_starts is the first day of the earliest Periodo didattico among those offers, so the edition is current from the day the first programme teaches it (apps/catalog/editions.py). A course offered in neither year has no edition."
   ],
   "programmes": [
     {
       "code": "B047",
+      "name": "INGEGNERIA INFORMATICA",
+      "locale": "it"
+    },
+    {
+      "code": "B308",
       "name": "INGEGNERIA INFORMATICA",
       "locale": "it"
     },
@@ -52,7 +59,8 @@
           "year_of_study": 1,
           "ad_code": "B000023"
         }
-      ]
+      ],
+      "editions": []
     },
     {
       "code": "B000060",
@@ -76,6 +84,16 @@
           "curriculum": "PROGETTUALE INDUSTRIALE",
           "year_of_study": 3,
           "ad_code": "B000060"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -102,6 +120,16 @@
           "year_of_study": 1,
           "ad_code": "B000066"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
       ]
     },
     {
@@ -127,6 +155,16 @@
           "year_of_study": 1,
           "ad_code": "B000068"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
+        }
       ]
     },
     {
@@ -151,6 +189,12 @@
           "curriculum": "PROGETTUALE INDUSTRIALE",
           "year_of_study": 2,
           "ad_code": "B000069"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
         }
       ]
     },
@@ -182,6 +226,28 @@
           "curriculum": "PROGETTUALE INDUSTRIALE",
           "year_of_study": 3,
           "ad_code": "B000072"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B000072"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B000072"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -208,6 +274,16 @@
           "year_of_study": 2,
           "ad_code": "B000073"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
+        }
       ]
     },
     {
@@ -233,6 +309,16 @@
           "year_of_study": 3,
           "ad_code": "B000077"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
+        }
       ]
     },
     {
@@ -251,6 +337,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 2,
           "ad_code": "B002348"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B002348"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B002348"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -258,6 +366,7 @@
       "code": "B003271",
       "name": "GEOMETRIA E ALGEBRA LINEARE/CALCOLO NUMERICO C.I.",
       "locale": "it",
+      "code_source": "cineca-only",
       "entries": [
         {
           "programme": "B047",
@@ -270,9 +379,30 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 1,
           "ad_code": "B003271"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B003271"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B003271"
         }
       ],
-      "code_source": "cineca-only"
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
+      ]
     },
     {
       "code": "B003368",
@@ -290,6 +420,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 2,
           "ad_code": "B003368"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B003368"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B003368"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -303,6 +455,22 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 2,
           "ad_code": "B003370"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B003370"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -316,6 +484,22 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B003372"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003372"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -329,6 +513,22 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B003376"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003376"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -348,6 +548,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 1,
           "ad_code": "B003423"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B003423"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B003423"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -367,6 +589,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B003725"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B014959"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003725"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -386,6 +630,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B003779"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B003779"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003779"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -405,6 +671,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 1,
           "ad_code": "B006853"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B006853"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B006853"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -424,6 +712,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B003719"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B014955"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003719"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -443,6 +753,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B003734"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B014964"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003734"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -469,6 +801,16 @@
           "year_of_study": 1,
           "ad_code": "B015801"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
       ]
     },
     {
@@ -481,6 +823,22 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 1,
           "ad_code": "B019481"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B019481"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -494,6 +852,22 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 2,
           "ad_code": "B024249"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B024249"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -507,6 +881,22 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B024250"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B024250"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -526,6 +916,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 2,
           "ad_code": "B024251"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B024251"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B024251"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -533,6 +945,7 @@
       "code": "B024253",
       "name": "BASI DI DATI/ INGEGNERIA DEL SOFTWARE C.I.",
       "locale": "it",
+      "code_source": "cineca-only",
       "entries": [
         {
           "programme": "B047",
@@ -545,14 +958,36 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B024253"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B024253"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B024253"
         }
       ],
-      "code_source": "cineca-only"
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
+      ]
     },
     {
       "code": "B024256",
       "name": "CALCOLATORI/ SISTEMI OPERATIVI C.I.",
       "locale": "it",
+      "code_source": "cineca-only",
       "entries": [
         {
           "programme": "B047",
@@ -565,9 +1000,30 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 2,
           "ad_code": "B024256"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B024256"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B024256"
         }
       ],
-      "code_source": "cineca-only"
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
+      ]
     },
     {
       "code": "B024259",
@@ -585,6 +1041,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B029535"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B010474"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B029535"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -604,6 +1082,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 1,
           "ad_code": "B024260"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B024260"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B024260"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -611,6 +1111,7 @@
       "code": "B024279",
       "name": "FONDAMENTI DI INFORMATICA/PROGRAMMAZIONE C.I.",
       "locale": "it",
+      "code_source": "cineca-only",
       "entries": [
         {
           "programme": "B047",
@@ -623,9 +1124,30 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 1,
           "ad_code": "B024279"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B024279"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B024279"
         }
       ],
-      "code_source": "cineca-only"
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
+      ]
     },
     {
       "code": "B024762",
@@ -637,6 +1159,22 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B024762"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B024762"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -656,6 +1194,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 2,
           "ad_code": "B024767"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B024767"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B024767"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -682,6 +1242,16 @@
           "year_of_study": 2,
           "ad_code": "B025500"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
       ]
     },
     {
@@ -707,6 +1277,16 @@
           "year_of_study": 2,
           "ad_code": "B025502"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
       ]
     },
     {
@@ -726,6 +1306,16 @@
           "year_of_study": 2,
           "ad_code": "B025506"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
       ]
     },
     {
@@ -744,6 +1334,16 @@
           "curriculum": "PROGETTUALE INDUSTRIALE",
           "year_of_study": 3,
           "ad_code": "B025551"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -770,6 +1370,16 @@
           "year_of_study": 3,
           "ad_code": "B025559"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
       ]
     },
     {
@@ -794,6 +1404,16 @@
           "curriculum": "PROGETTUALE INDUSTRIALE",
           "year_of_study": 3,
           "ad_code": "B025563"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -820,6 +1440,16 @@
           "year_of_study": 1,
           "ad_code": "B025574"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
+        }
       ]
     },
     {
@@ -832,6 +1462,22 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 1,
           "ad_code": "B026220"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 1,
+          "ad_code": "B026220"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -845,6 +1491,22 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 2,
           "ad_code": "B026221"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B026221"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -864,6 +1526,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 2,
           "ad_code": "B026228"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B026228"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B026228"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -884,6 +1568,16 @@
           "year_of_study": 2,
           "ad_code": "B027622"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
       ]
     },
     {
@@ -896,6 +1590,22 @@
           "curriculum": "TECNICO APPLICATIVO",
           "year_of_study": 1,
           "ad_code": "B028450"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 1,
+          "ad_code": "B028450"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -915,6 +1625,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B003712"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 3,
+          "ad_code": "B028451"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B003712"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
         }
       ]
     },
@@ -941,12 +1673,23 @@
           "year_of_study": 3,
           "ad_code": "B028767"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
       ]
     },
     {
       "code": "B029082",
       "name": "FISICA GENERALE C.I.",
       "locale": "it",
+      "code_source": "cineca-only",
       "entries": [
         {
           "programme": "B222",
@@ -967,7 +1710,16 @@
           "ad_code": "B029082"
         }
       ],
-      "code_source": "cineca-only"
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
+        }
+      ]
     },
     {
       "code": "B030592",
@@ -979,6 +1731,22 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 3,
           "ad_code": "B030592"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 3,
+          "ad_code": "B030592"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     },
@@ -1005,6 +1773,16 @@
           "year_of_study": 1,
           "ad_code": "B032662"
         }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2026-02-23"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2027-02-22"
+        }
       ]
     },
     {
@@ -1023,6 +1801,28 @@
           "curriculum": "TECNICO SCIENTIFICO",
           "year_of_study": 2,
           "ad_code": "B033621"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO APPLICATIVO",
+          "year_of_study": 2,
+          "ad_code": "B033621"
+        },
+        {
+          "programme": "B308",
+          "curriculum": "TECNICO SCIENTIFICO",
+          "year_of_study": 2,
+          "ad_code": "B033621"
+        }
+      ],
+      "editions": [
+        {
+          "academic_year": "2025-2026",
+          "teaching_starts": "2025-09-15"
+        },
+        {
+          "academic_year": "2026-2027",
+          "teaching_starts": "2026-09-14"
         }
       ]
     }
@@ -1040,6 +1840,10 @@
         {
           "role": "secretariat",
           "programme": "B047"
+        },
+        {
+          "role": "secretariat",
+          "programme": "B308"
         }
       ]
     },
@@ -1056,12 +1860,20 @@
     },
     {
       "username": "demo-teacher",
-      "first_name": "Laura",
-      "last_name": "Conti",
+      "first_name": "Demo",
+      "last_name": "Teacher",
       "roles": [
         {
           "role": "teacher",
-          "edition": "B028451:2025-2026"
+          "edition": "B003725:2026-2027"
+        },
+        {
+          "role": "teacher",
+          "edition": "B024251:2026-2027"
+        },
+        {
+          "role": "teacher",
+          "edition": "B028451:2026-2027"
         }
       ]
     },

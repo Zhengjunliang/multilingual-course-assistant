@@ -11,6 +11,8 @@ extend-exclude = [
   "frontend/src/i18n/zh-hans.json",
   # Italian course and programme names, transcribed from the Cineca catalogue.
   "apps/roles/management/commands/demo_catalog.json",
+  # Syllabi copied word for word from the same catalogue, its misspellings included.
+  "apps/roles/management/commands/demo_content.json",
   # Generated, and full of package names.
   "uv.lock",
   "frontend/package-lock.json",
