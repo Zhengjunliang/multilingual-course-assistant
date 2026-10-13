@@ -140,6 +140,20 @@ export interface ReadingItem {
 }
 
 /**
+ * A book as the reading list's form sends it, every field but the id; the
+ * year as typed, which the server reads as a number or refuses with `invalid`.
+ */
+export interface ReadingDraft {
+  locale: UiLocale;
+  title: string;
+  authors: string;
+  year: string | null;
+  isbn: string;
+  url: string;
+  importance: Importance;
+}
+
+/**
  * The codes a staff page has words for (apps/catalog/errors.py): this
  * project's own, a closed set, and the few of DRF's the pages name. DRF's codes
  * are not a closed set, so any other one gets a general sentence.
@@ -213,4 +227,56 @@ export function removeMember(scope: MemberScope, username: string): Promise<void
   return request<void>(`${membersPath(scope)}/${encodeURIComponent(username)}`, {
     method: "DELETE",
   });
+}
+
+/** The edition's syllabus, by language and in the catalogue's order of sections; an empty section is not listed. */
+export function listSyllabus(edition: number): Promise<SyllabusSection[]> {
+  return request<SyllabusSection[]>(`${CATALOG}/editions/${edition}/syllabus`);
+}
+
+/**
+ * Writes one section in one language and answers with it; a text blank once
+ * trimmed clears the section, which the server answers with 204, here `null`.
+ */
+export async function writeSyllabus(
+  edition: number,
+  locale: UiLocale,
+  section: SyllabusSectionKey,
+  text: string,
+): Promise<SyllabusSection | null> {
+  const written = await request<SyllabusSection | undefined>(
+    `${CATALOG}/editions/${edition}/syllabus/${locale}/${section}`,
+    { method: "PUT", body: JSON.stringify({ text }) },
+  );
+  return written ?? null;
+}
+
+/** The edition's books, by language and title. */
+export function listReadings(edition: number): Promise<ReadingItem[]> {
+  return request<ReadingItem[]>(`${CATALOG}/editions/${edition}/readings`);
+}
+
+/** The server answers 201 with the book. */
+export function addReading(edition: number, book: ReadingDraft): Promise<ReadingItem> {
+  return request<ReadingItem>(`${CATALOG}/editions/${edition}/readings`, {
+    method: "POST",
+    body: JSON.stringify(book),
+  });
+}
+
+/** Writes every field of the form; 404 when the book was removed elsewhere first. */
+export function changeReading(
+  edition: number,
+  id: number,
+  book: ReadingDraft,
+): Promise<ReadingItem> {
+  return request<ReadingItem>(`${CATALOG}/editions/${edition}/readings/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(book),
+  });
+}
+
+/** The server answers 204, or 404 when the book was removed elsewhere first. */
+export function removeReading(edition: number, id: number): Promise<void> {
+  return request<void>(`${CATALOG}/editions/${edition}/readings/${id}`, { method: "DELETE" });
 }

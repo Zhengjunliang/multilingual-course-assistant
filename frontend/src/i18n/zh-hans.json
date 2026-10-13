@@ -160,6 +160,9 @@
   },
   "staff": {
     "cancel": "取消",
+    "edit": "编辑",
+    "save": "保存",
+    "saving": "正在保存…",
     "breadcrumb": "路径",
     "nav": {
       "programmes": "专业",
@@ -183,8 +186,8 @@
     "error": {
       "no_such_user": "没有这个名字的用户。",
       "already_held": "该用户在这里已有此角色。",
-      "required": "请输入用户名。",
-      "blank": "请输入用户名。",
+      "required": "请填写此项。",
+      "blank": "请填写此项。",
       "not_authenticated": "会话已结束，请重新登录。",
       "permission_denied": "你没有权限执行此操作。",
       "not_found": "它已经不存在了。",
@@ -259,6 +262,60 @@
       "starts": "{{date}} 开课",
       "empty": "本版本没有指派教师。"
     },
+    "syllabus": {
+      "title": "教学大纲",
+      "sub": "Cineca 课程目录的各个部分，网站的每种语言各一份。",
+      "languages": "大纲语言",
+      "empty": "这种语言还没有内容。",
+      "write": "撰写",
+      "saved": "已保存「{{section}}」。",
+      "cleared": "已清空「{{section}}」。",
+      "section": {
+        "obiettivi_formativi": "教学目标",
+        "prerequisiti": "先修要求",
+        "contenuti": "课程内容",
+        "programma_esteso": "详细大纲",
+        "metodi_didattici": "教学方法",
+        "verifica_apprendimento": "考核方式",
+        "altro": "其他信息"
+      },
+      "clear": {
+        "title": "清空这一部分？",
+        "body": "「{{section}}」的{{language}}版本将没有内容，原文不会另外保存。",
+        "action": "清空"
+      }
+    },
+    "readings": {
+      "title": "参考书目",
+      "add": "添加书目",
+      "empty": "参考书目为空。",
+      "year": "年份",
+      "actions": "操作",
+      "link": "打开书目链接",
+      "remove": "移除",
+      "removeTitle": "移除这本书？",
+      "removeBody": "「{{title}}」将不再列在本版本的参考书目中。",
+      "removed": "已移除书目",
+      "added": "已添加书目",
+      "changed": "已更新书目",
+      "gone": "「{{title}}」已经不在了：它已在别处被移除。",
+      "addTitle": "添加书目",
+      "editTitle": "编辑书目",
+      "importance": {
+        "required": "必读",
+        "recommended": "推荐"
+      },
+      "field": {
+        "title": "书名",
+        "authors": "作者",
+        "authorsHint": "照大纲的写法，例如 Mazzoldi、Nigro、Voci。",
+        "year": "年份（选填）",
+        "isbn": "ISBN（选填）",
+        "url": "链接（选填）",
+        "importance": "重要性",
+        "locale": "语言"
+      }
+    },
     "mine": {
       "title": "我的课程",
       "sub": "你任教的课程及其全部版本：每一个版本你都能修改。",
@@ -271,6 +328,7 @@
       "teacher": "指派教师",
       "secretariat": "指派秘书",
       "username": "用户名",
+      "empty": "请输入用户名。",
       "placeholder": "例如 luca.verdi",
       "hint": "此人登录用的名字；账号必须存在。",
       "submit": "指派",
@@ -290,7 +348,8 @@
     "retry": "重试",
     "failure": {
       "title": "无法打开此页面",
-      "body": "服务器没有正常响应。请稍后重试；如果仍然失败，请回到你的起始页。"
+      "body": "服务器没有正常响应。请稍后重试；如果仍然失败，请回到你的起始页。",
+      "part": "页面的这一部分没有加载出来。"
     }
   },
   "shortcuts": {

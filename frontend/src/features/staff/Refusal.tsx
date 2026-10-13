@@ -15,7 +15,10 @@
  * cat: the page is out of the reader's reach, which is not the same as an
  * address the application does not have. Its code is on a chip; the ways on
  * are the reader's own start and a new conversation, or, for a failure that
- * may pass, reading the page again and the start.
+ * may pass, reading the page again and the start. A part of a page read on
+ * its own, an edition's syllabus or books, says where it would be that it
+ * did not load, with the button that reads it again, and the rest of the
+ * page stands.
  */
 
 import { ArrowLeft, Ban, CircleAlert, Lock, RotateCw, SquarePen } from "lucide-react";
@@ -99,6 +102,25 @@ export function LoadFailure({ error, back, onRetry }: LoadFailureProps) {
         <BackLink back={back} variant={onRetry === undefined ? "primary" : "outline"} />
       </StatusPanel>
     </div>
+  );
+}
+
+/** A part of a page that did not load, in its place. */
+export function PartFailure({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Banner
+      tone="warn"
+      role="alert"
+      icon={CircleAlert}
+      heading={t("staff.failure.part")}
+      action={
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          <RotateCw aria-hidden className="size-icon" />
+          {t("staff.retry")}
+        </Button>
+      }
+    />
   );
 }
 

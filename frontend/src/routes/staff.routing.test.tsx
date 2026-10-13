@@ -262,6 +262,8 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   if (lost && path.startsWith("/api/catalog/editions/5")) {
     return json({ detail: { message: "Not found.", code: "not_found" } }, 404);
   }
+  // Every edition's syllabus and books are empty: the pages around them are what this file asks.
+  if (/^\/api\/catalog\/editions\/\d+\/(syllabus|readings)$/.test(path)) return json([]);
   const one = EDITIONS.find((e) => path === `/api/catalog/editions/${e.id}`);
   if (one !== undefined) {
     await held;

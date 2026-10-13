@@ -1,14 +1,17 @@
 /**
- * `/staff/editions/:id`: one academic year of a course, and who teaches it.
+ * `/staff/editions/:id`: one academic year of a course, who teaches it, its
+ * syllabus and its reading list.
  *
  * An edition outside the caller's scope is a 404, and the page says "not
  * found". Its head names the year, whether it is current and, where it was
  * entered, the day its teaching starts, which is what makes it current
  * (apps/catalog/editions.py). Who may assign a teacher here is the edition's
  * `permissions`: the button is in the page's head, and nobody else is offered
- * it. The path it was reached through is `?programme=`, or the teacher's own
- * courses when no programme the reader may view lists it
- * (features/staff/crumbs.ts).
+ * it. The syllabus and the books are read and written on their own
+ * (features/staff/content/), and edited by whoever holds
+ * `edition.edit_content`. The path it was reached through is `?programme=`,
+ * or the teacher's own courses when no programme the reader may view lists
+ * it (features/staff/crumbs.ts).
  */
 
 import { useCallback } from "react";
@@ -17,12 +20,13 @@ import { useParams, useSearchParams } from "react-router-dom";
 
 import { readEdition } from "@/api/catalog";
 import { Chip } from "@/components/ui/chip";
-import { Count } from "@/components/ui/count";
 import { useMembers } from "@/features/staff/actions";
+import { ReadingList } from "@/features/staff/content/ReadingList";
+import { SyllabusPanel } from "@/features/staff/content/SyllabusPanel";
 import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine } from "@/features/staff/crumbs";
 import { isNotFound } from "@/features/staff/errors";
-import { Code, PageHead } from "@/features/staff/page";
+import { Code, PageHead, Section } from "@/features/staff/page";
 import { StaffList, shownName } from "@/features/staff/people";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { useCrumbs, useShell } from "./shell";
@@ -36,6 +40,7 @@ export default function EditionPage() {
   const edition = useLoad(load);
   const data = edition.data;
   const assigns = data?.permissions.includes("edition.assign_teacher") ?? false;
+  const edits = data?.permissions.includes("edition.edit_content") ?? false;
   const object = data === null ? "" : `${data.course.name} · ${data.academic_year}`;
   const members = useMembers({
     scope: { kind: "edition", id: Number(id) },
@@ -100,18 +105,16 @@ export default function EditionPage() {
         sub={programmeLine(course.entries, i18n.language)}
         actions={members.assign}
       />
-      <section className="flex flex-col gap-snug">
-        <div className="flex items-center gap-tight">
-          <h2 className="font-semibold text-ink text-title">{t("staff.edition.teachers")}</h2>
-          <Count value={data.teachers.length} />
-        </div>
+      <Section heading={t("staff.edition.teachers")} count={data.teachers.length}>
         <StaffList
           people={data.teachers}
           staffRole="teacher"
           empty={t("staff.edition.empty")}
           action={members.action}
         />
-      </section>
+      </Section>
+      <SyllabusPanel edition={data.id} editable={edits} reloadPage={edition.reload} />
+      <ReadingList edition={data.id} editable={edits} reloadPage={edition.reload} />
       {members.dialogs}
     </>
   );

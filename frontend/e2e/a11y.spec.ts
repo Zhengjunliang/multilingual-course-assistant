@@ -44,6 +44,12 @@ const WCAG_22_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
  * page content line by line, whatever the layer's own colours. That text is
  * measured here instead (`floatingContrast`), and only a ratio under 4.5:1
  * is reported.
+ *
+ * A staff page's `main` scrolls by itself (routes/StaffLayout.tsx), so text
+ * across its lower edge is cut by it, and axe leaves that text unmeasured
+ * too, as `elmPartiallyObscured`, whatever its colours. That text is
+ * scrolled to the middle of the view and measured again (`measuredInView`);
+ * text another element covers stays covered there, and is reported.
  */
 async function violations(page: Page): Promise<string[]> {
   await page.addStyleTag({ content: ":root, [data-theme] { --grain: none !important; }" });
@@ -58,6 +64,7 @@ async function violations(page: Page): Promise<string[]> {
     .flatMap(({ nodes }) => nodes)) {
     const reason = (any[0]?.data as { messageKey?: string } | null)?.messageKey ?? "no reason";
     const selector = target.join(" ");
+    if (reason === "elmPartiallyObscured" && (await measuredInView(page, selector))) continue;
     if (reason === "elmPartiallyObscuring") {
       const ratios = await floatingContrast(page, selector);
       if (ratios.length > 0 && ratios.every((ratio) => ratio >= 4.5)) continue;
@@ -69,6 +76,19 @@ async function violations(page: Page): Promise<string[]> {
     unmeasured.push(`color-contrast unmeasured (${reason}): ${selector}`);
   }
   return [...found, ...unmeasured];
+}
+
+/** Whether the text `selector` names passes axe's contrast once scrolled to the middle of the view. */
+async function measuredInView(page: Page, selector: string): Promise<boolean> {
+  await page.evaluate(
+    (css) => document.querySelector(css)?.scrollIntoView({ block: "center" }),
+    selector,
+  );
+  const { violations, incomplete } = await new AxeBuilder({ page })
+    .include(selector)
+    .withRules(["color-contrast"])
+    .analyze();
+  return violations.length === 0 && incomplete.length === 0;
 }
 
 /**
@@ -231,6 +251,21 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.getByRole("button", { name: revoke }).click();
       await expect(page.getByRole("alertdialog", { name: it.staff.revoke.title })).toBeVisible();
       expect(await violations(page), "revoking").toEqual([]);
+    });
+
+    test("an edition's syllabus box and book form open: axe finds nothing", async ({
+      page,
+      api,
+    }) => {
+      await visit(page, api, screen("/staff/editions/12", "staff"));
+      const section = it.staff.syllabus.section.prerequisiti;
+      await page.getByRole("button", { name: `${it.staff.edit} · ${section}` }).click();
+      await expect(page.getByRole("textbox", { name: section })).toBeFocused();
+      expect(await violations(page), "a section in its box").toEqual([]);
+
+      await page.getByRole("button", { name: it.staff.readings.add }).click();
+      await expect(page.getByRole("dialog", { name: it.staff.readings.addTitle })).toBeVisible();
+      expect(await violations(page), "adding a book").toEqual([]);
     });
   });
 }
