@@ -13,11 +13,12 @@
  * the choice is sent on its own and changes no text; anyone else reads it
  * there. Each section is edited in its own panel (SectionText.tsx), and
  * every panel stays mounted, so a section half written is still there after
- * a look at another. A standing status line says what was saved, since the
- * box closing is all a screen reader would otherwise miss.
+ * a look at another: its tab says it is not saved, and leaving the page asks
+ * first (LeaveGuard.tsx). A standing status line says what was saved, since
+ * the box closing is all a screen reader would otherwise miss.
  */
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type SyllabusSectionKey, setSyllabusLocale } from "@/api/catalog";
@@ -27,6 +28,7 @@ import { endonym, isUiLocale, UI_LOCALES, type UiLocale } from "@/i18n";
 import { useFailure } from "../context";
 import { isNotFound } from "../errors";
 import { PartFailure } from "../Refusal";
+import { LeaveGuard } from "./LeaveGuard";
 import { SectionText } from "./SectionText";
 import { type EditionSyllabus, SECTION_NAME, SECTIONS } from "./syllabus";
 
@@ -47,6 +49,17 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
   /** The language being sent, shown in the select until the server answers. */
   const [choosing, setChoosing] = useState<UiLocale | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  /** The sections whose box holds text not saved. */
+  const [unsaved, setUnsaved] = useState<ReadonlySet<SyllabusSectionKey>>(() => new Set());
+  const mark = useCallback((section: SyllabusSectionKey, value: boolean) => {
+    setUnsaved((was) => {
+      if (was.has(section) === value) return was;
+      const next = new Set(was);
+      if (value) next.add(section);
+      else next.delete(section);
+      return next;
+    });
+  }, []);
   const { locale } = syllabus;
 
   if (syllabus.error !== null) return <PartFailure onRetry={() => void syllabus.reload()} />;
@@ -108,7 +121,13 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
           return {
             value: section,
             label: t(SECTION_NAME[section]),
-            caption: t(text === "" ? "staff.syllabus.blank" : "staff.syllabus.written"),
+            caption: t(
+              unsaved.has(section)
+                ? "staff.syllabus.unsaved"
+                : text === ""
+                  ? "staff.syllabus.blank"
+                  : "staff.syllabus.written",
+            ),
             content: (
               <SectionText
                 edition={edition}
@@ -123,12 +142,14 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
                   syllabus.saved(row);
                   setStatus(message);
                 }}
+                onUnsaved={mark}
                 reloadPage={reloadPage}
               />
             ),
           };
         })}
       />
+      <LeaveGuard unsaved={unsaved.size} />
     </>
   );
 }

@@ -278,6 +278,7 @@
       "next": "Next section",
       "written": "Written",
       "blank": "Empty",
+      "unsaved": "Not saved",
       "empty": {
         "title": "Empty section",
         "write": "Write its text with “Write”, above.",
@@ -299,6 +300,13 @@
         "title": "Clear the section?",
         "body": "\"{{section}}\" will have no text, and the text is not kept anywhere else.",
         "action": "Clear"
+      },
+      "leave": {
+        "title": "Leave without saving?",
+        "body_one": "A section has changes not saved, which leaving will lose.",
+        "body_other": "{{count}} sections have changes not saved, which leaving will lose.",
+        "stay": "Stay",
+        "action": "Leave"
       },
       "editor": {
         "toolbar": "Formatting",

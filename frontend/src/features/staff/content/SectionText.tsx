@@ -71,6 +71,8 @@ interface SectionTextProps {
   editable: boolean;
   /** Shows the section as the write answered it, its text empty once cleared, and says `message`. */
   onSaved: (row: SyllabusSection, message: string) => void;
+  /** Told whenever the box holds what the section's text does not, or no longer does. */
+  onUnsaved: (section: SyllabusSectionKey, unsaved: boolean) => void;
   reloadPage: () => Promise<boolean>;
 }
 
@@ -84,6 +86,7 @@ export function SectionText({
   text,
   editable,
   onSaved,
+  onUnsaved,
   reloadPage,
 }: SectionTextProps) {
   const { t } = useTranslation();
@@ -102,7 +105,7 @@ export function SectionText({
     keys,
     clear,
     keep,
-  } = useSectionDraft({ edition, section, name, text, onSaved, reloadPage });
+  } = useSectionDraft({ edition, section, name, text, onSaved, onUnsaved, reloadPage });
   const apple = onApple();
 
   const refused = (
