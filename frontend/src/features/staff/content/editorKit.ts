@@ -90,13 +90,14 @@ function writable(tokens: readonly Token[]): boolean {
  * A text's words, its runs of letters and digits in order, whatever marks them
  * up, and apart from what the editor writes in its own form: `&`, `<` and `>`
  * as entities, a bare URL as a link to itself, a list's numbers counted afresh.
+ * A 0 stays: the editor starts a list counted from 0 at 1.
  */
 function words(text: string): string {
   return (
     text
       .replace(/&(?:amp|lt|gt);/g, " ")
       .replace(/\[([^\]]+)\]\(\1\)/g, "$1")
-      .replace(/^[ \t]*\d+[.)][ \t]/gm, "")
+      .replace(/^[ \t]*0*[1-9]\d*[.)][ \t]/gm, "")
       .match(/[\p{L}\p{N}]+/gu)
       ?.join(" ") ?? ""
   );
