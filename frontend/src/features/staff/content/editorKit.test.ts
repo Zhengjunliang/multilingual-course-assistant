@@ -62,6 +62,7 @@ describe("the syllabus editor", () => {
     ["an image", "![Schema](https://www.unifi.it/schema.png)"],
     ["a quote", "> Dal regolamento."],
     ["raw HTML", "<b>Orale</b> e scritto."],
+    ["a list counted from 0", "0. Richiami\n1. Logica"],
   ])("knows it would lose %s", (_, text) => {
     expect(written(text)).toBeNull();
   });
