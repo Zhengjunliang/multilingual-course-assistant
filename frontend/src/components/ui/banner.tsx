@@ -9,7 +9,7 @@
  *
  * `role` is the caller's: a notice that must interrupt is an `alert`, which a
  * screen reader announces as it appears. One that only informs is said through
- * a `status` region already on the page (features/chat/TurnView.tsx): a status
+ * a `status` region already on the page (features/chat/notice.ts): a status
  * inserted with its words in it is not reliably announced. One that is part of
  * the page as it opens is read with the page and needs neither.
  */

@@ -21,6 +21,12 @@ interface ComposerProps {
   onSubmit: (question: string) => void;
   onStop: () => void;
   /**
+   * The conversation the question goes to, `null` for a new one. What the foot
+   * said about an empty press is let go when it changes: the key for a new
+   * conversation changes the page without the field ever being left.
+   */
+  conversation?: number | null;
+  /**
    * Centred under the empty state, or parked at the foot of a thread.
    *
    * The same component either way. Two composers — one for the first question
@@ -43,6 +49,7 @@ export function Composer({
   waiting,
   onSubmit,
   onStop,
+  conversation = null,
   placement = "foot",
   travelFrom = null,
   rise = false,
@@ -86,10 +93,18 @@ export function Composer({
     waiting.phase === "queued" || waiting.phase === "streaming" || waiting.phase === "retrying";
   const ready = question.trim().length > 0 && !busy;
   // The send button was pressed with nothing to send: the foot says so until
-  // the next keystroke, or until the field is left, so a hint does not follow
-  // the reader into another conversation and a second press, which takes the
-  // focus off the field first, is announced again.
+  // the next keystroke, until the field is left, so that a second press,
+  // which takes the focus off the field first, is announced again, or until
+  // the conversation changes, so that the hint does not follow the reader.
   const [missing, setMissing] = useState(false);
+  // The conversation last drawn, to notice the change while drawing rather
+  // than in an effect a frame later (react.dev, "Adjusting some state when a
+  // prop changes").
+  const [drawnFor, setDrawnFor] = useState(conversation);
+  if (drawnFor !== conversation) {
+    setDrawnFor(conversation);
+    setMissing(false);
+  }
 
   const send = () => {
     if (!ready) return;

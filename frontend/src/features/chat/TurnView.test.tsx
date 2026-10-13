@@ -13,7 +13,7 @@
  * that by naming the tag; a mounted turn answers it with `closest`.
  */
 
-import { act, useState } from "react";
+import { act } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -79,14 +79,7 @@ function view(
   // A router because a visitor's turn may link to the login page.
   return render(
     <MemoryRouter>
-      <TurnView
-        turn={t}
-        live={live}
-        thinking={thinking}
-        retry={retry}
-        failedNow={false}
-        visitor={visitor}
-      />
+      <TurnView turn={t} live={live} thinking={thinking} retry={retry} visitor={visitor} />
     </MemoryRouter>,
   );
 }
@@ -123,14 +116,7 @@ describe("the process line", () => {
     // thing in the quietest voice available. Guarding the negative keeps a
     // later tidy-up from putting it back.
     const { container, unmount } = mount(
-      <TurnView
-        turn={turn()}
-        live={false}
-        thinking={false}
-        retry={null}
-        failedNow={false}
-        visitor={false}
-      />,
+      <TurnView turn={turn()} live={false} thinking={false} retry={null} visitor={false} />,
     );
     const line = container.querySelector("summary")?.closest(TYPE_SIZES);
     if (line == null) throw new Error("no type size is set around the process line");
@@ -176,7 +162,6 @@ describe("the answer's language", () => {
         live={false}
         thinking={false}
         retry={null}
-        failedNow={false}
         visitor={false}
       />,
     );
@@ -261,16 +246,7 @@ function sourcesButton(container: HTMLElement) {
 }
 
 function mounted(of: Turn) {
-  return mount(
-    <TurnView
-      turn={of}
-      live={false}
-      thinking={false}
-      retry={null}
-      failedNow={false}
-      visitor={false}
-    />,
-  );
+  return mount(<TurnView turn={of} live={false} thinking={false} retry={null} visitor={false} />);
 }
 
 const CALENDAR_URL = "https://ingegneria.unifi.it/p537.html";
@@ -660,6 +636,48 @@ describe("the row under the answer", () => {
     });
   });
 
+  it("forgets the row under the pointer once a filter takes it away", () => {
+    // The row goes without the pointer ever leaving it, so no leave is heard.
+    const web: Citation = {
+      ...CALENDAR[0],
+      marker: "[https://www.unifi.it/tasse · 2026-09-20]",
+      url: "https://www.unifi.it/tasse",
+    } as Citation;
+    const { container, unmount } = mounted(
+      turn({
+        answer: `Prima [Excerpt 1]. Poi ${web.marker}.`,
+        citations: [citation("[Excerpt 1]", 3), citation("[Excerpt 2]", 4), web],
+      }),
+    );
+    const marked = () =>
+      [...container.querySelectorAll("a[data-pill]")].map((pill) =>
+        pill.hasAttribute("data-highlighted"),
+      );
+    act(() => sourcesButton(container)?.click());
+    const panel = () => document.body.querySelector('[role="dialog"]');
+    const rowOf = (href: string) =>
+      [...(panel()?.querySelectorAll("li") ?? [])].find((row) =>
+        row.querySelector("a")?.getAttribute("href")?.startsWith(href),
+      );
+
+    act(() => {
+      rowOf("https://www.unifi.it/tasse")?.dispatchEvent(
+        new MouseEvent("pointerover", { bubbles: true }),
+      );
+    });
+    const pointed = marked();
+    act(() =>
+      [...(panel()?.querySelectorAll<HTMLButtonElement>('[role="radio"]') ?? [])]
+        .find((option) => option.textContent?.startsWith("Slide"))
+        ?.click(),
+    );
+    act(() => rowOf("/api/sources/")?.querySelector("a")?.focus());
+    const focused = marked();
+    unmount();
+
+    expect({ pointed, focused }).toEqual({ pointed: [false, true], focused: [true, false] });
+  });
+
   it("gives focus back to the sources button when the panel closes", async () => {
     const { container, unmount } = mounted(turn());
     const open = sourcesButton(container);
@@ -696,33 +714,23 @@ describe("the row under the answer", () => {
 describe("a turn that did not get all the way", () => {
   const cut = turn({ answer: "La scadenza è", complete: false, failure: { kind: "incomplete" } });
 
-  /** What the warning banner shows, and what the turn's live region says. */
-  function banner(of: Turn, { visitor = false, failedNow = true } = {}) {
+  /** What the warning banner shows, and the role it carries. */
+  function banner(of: Turn, { visitor = false } = {}) {
     const { container, unmount } = mount(
       <MemoryRouter>
-        <TurnView
-          turn={of}
-          live={false}
-          thinking={false}
-          retry={null}
-          failedNow={failedNow}
-          visitor={visitor}
-        />
+        <TurnView turn={of} live={false} thinking={false} retry={null} visitor={visitor} />
       </MemoryRouter>,
     );
-    const seen = {
-      text: container.querySelector(".bg-warn")?.textContent ?? null,
-      said: container.querySelector('p[role="status"]')?.textContent ?? null,
-    };
+    const shown = container.querySelector(".bg-warn");
+    const seen = { text: shown?.textContent ?? null, role: shown?.getAttribute("role") ?? null };
     unmount();
     return seen;
   }
 
   it("says in a warning banner that the answer stopped, and that what was written is kept", () => {
-    expect(banner(cut)).toEqual({
-      text: "La risposta si è interrotta prima della fine.Quello che vedi è stato salvato così com'è.",
-      said: "La risposta si è interrotta prima della fine. Quello che vedi è stato salvato così com'è.",
-    });
+    expect(banner(cut).text).toBe(
+      "La risposta si è interrotta prima della fine.Quello che vedi è stato salvato così com'è.",
+    );
   });
 
   it("promises nothing kept when nothing was written, or for a visitor, whose turn is stored nowhere", () => {
@@ -732,8 +740,10 @@ describe("a turn that did not get all the way", () => {
     expect(banner(cut, { visitor: true }).text).toBe(heading);
   });
 
-  it("is announced only when it happened just now, not when a stored conversation is read back", () => {
-    expect(banner(cut, { failedNow: false }).said).toBe("");
+  it("leaves announcing it to the page's live region, which is there before it happens", () => {
+    // A banner inserted with its words in it is not reliably announced; the
+    // page says them (notice.ts, routes/ChatPage.tsx).
+    expect(banner(cut).role).toBeNull();
   });
 
   it("says, while a busy server is waited out, how long until the next try and which it is", () => {
@@ -747,44 +757,7 @@ describe("a turn that did not get all the way", () => {
 
     expect(html).toContain("C&#x27;è un&#x27;altra domanda in corso.");
     expect(html).toContain("Riprovo tra 5 secondi (1 di 2).");
-  });
-
-  it("says each in a live region that was on the page before it happened", () => {
-    // A screen reader hears a live region change, and not reliably one that
-    // is inserted with its words already in it (MDN, ARIA live regions).
-    let happen: (props: { turn?: Turn; retry?: typeof RETRY | null; failedNow?: boolean }) => void =
-      () => {};
-    function Live() {
-      const [props, setProps] = useState({
-        turn: turn({ answer: "La scadenza è", complete: false }),
-        retry: null as typeof RETRY | null,
-        failedNow: false,
-      });
-      happen = (next) => setProps((now) => ({ ...now, ...next }));
-      return (
-        <MemoryRouter>
-          <TurnView {...props} live={false} thinking={false} visitor={false} />
-        </MemoryRouter>
-      );
-    }
-    const { container, unmount } = mount(<Live />);
-    const region = container.querySelector('p[role="status"]');
-
-    const before = region?.textContent;
-    act(() => happen({ retry: RETRY }));
-    const retrying = region?.textContent;
-    act(() => happen({ retry: null, turn: cut, failedNow: true }));
-    const failed = region?.textContent;
-    const same = container.querySelector('p[role="status"]') === region;
-    unmount();
-
-    expect({ before, retrying, failed, same }).toEqual({
-      before: "",
-      retrying: "C'è un'altra domanda in corso. Riprovo tra 5 secondi (1 di 2).",
-      failed:
-        "La risposta si è interrotta prima della fine. Quello che vedi è stato salvato così com'è.",
-      same: true,
-    });
+    expect(html).not.toContain('role="status"');
   });
 });
 

@@ -39,6 +39,16 @@ describe("a code block", () => {
     expect(seen).toEqual({ button: "Copiato", said: "Copiato" });
   });
 
+  it("ends its code at the last character, so the caret written after it stays on that line", () => {
+    // Markdown ends every block's code with a newline, after which a `pre`
+    // would put the caret (index.css, `caret-after`) on a line of its own.
+    const { container, unmount } = block("```sql\nSELECT 1;\n```");
+    const code = container.querySelector("pre")?.textContent;
+    unmount();
+
+    expect(code).toBe("SELECT 1;");
+  });
+
   it("speaks the interface's language in its head, inside an answer in another", () => {
     const { container, unmount } = mount(
       <AnswerMarkdown text={"```\nprint(1)\n```"} citations={[]} lang="zh" />,
