@@ -32,7 +32,7 @@ describe("the reading list", () => {
     ]);
   });
 
-  it("names every language a book may be in, in the interface's language and its order", async () => {
+  it("names a book's language in the interface's language, every one in its order in the form, and on the row under its title and authors", async () => {
     const { unmount } = open(true);
     await settle();
     await press("Aggiungi testo");
@@ -42,11 +42,16 @@ describe("the reading list", () => {
     type(field("Titolo"), "Physik");
     type(field("Autori"), "Demtröder");
     await press("Salva");
+    const added = document.body.querySelector("tbody tr:last-child");
     const seen = {
       count: names.length,
       sorted: names.slice(0, 3),
       german: names.includes("Tedesco"),
       sent: JSON.parse(server.writes[0]?.split(" ").slice(2).join(" ") ?? "{}").locale,
+      row: [
+        ...[...(added?.querySelectorAll("td:first-child span") ?? [])].map((span) => text(span)),
+        text(added?.querySelector("td:nth-child(4)")),
+      ],
     };
     unmount();
 
@@ -55,6 +60,7 @@ describe("the reading list", () => {
       sorted: ["Afrikaans", "Albanese", "Alto sorabo"],
       german: true,
       sent: "de",
+      row: ["Physik", "Demtröder", "Tedesco"],
     });
   });
 
@@ -66,7 +72,7 @@ describe("the reading list", () => {
     await press("Salva");
     const seen = [
       [...server.writes],
-      text(document.body.querySelector("tbody tr td:nth-child(3)")),
+      text(document.body.querySelector("tbody tr td:nth-child(2)")),
     ];
     unmount();
 
