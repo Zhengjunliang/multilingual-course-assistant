@@ -8,6 +8,7 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
+from pydantic import SecretStr
 from test_agent import ScriptedCompleter
 from test_index import StubDense, StubSparse, make_chunk
 from test_search import ORM_TEXT, TASSE_TEXT, TASSE_URL, KeywordReranker, make_web_chunk
@@ -473,7 +474,11 @@ def test_routing_report_short_circuits_before_the_retrieval_stack(
         raise AssertionError("the routing report must not build the retrieval stack")
 
     def stub_completer(
-        base_url: str, api_key: str, model: str, temperature: float = 0.0, seed: int | None = None
+        base_url: str,
+        api_key: SecretStr,
+        model: str,
+        temperature: float = 0.0,
+        seed: int | None = None,
     ) -> ScriptedCompleter:
         assert (temperature, seed) == (0.0, 0)  # routing is pinned: greedy plus a fixed seed
         return ScriptedCompleter([routed("slides"), routed("both")])

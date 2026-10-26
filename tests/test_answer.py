@@ -12,6 +12,7 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 
 import pytest
+from pydantic import SecretStr
 from test_index import StubDense, StubSparse, make_chunk
 from test_search import ORM_TEXT, SORT_TEXT
 
@@ -207,7 +208,7 @@ def test_cli_answers_end_to_end_with_sources(
         return StubSparse()
 
     def stub_streamer(
-        base_url: str, api_key: str, model: str, temperature: float = 0.0
+        base_url: str, api_key: SecretStr, model: str, temperature: float = 0.0
     ) -> StubStreamer:
         assert temperature == 0.0  # decoding stays greedy: two runs, one answer
         return StubStreamer()
