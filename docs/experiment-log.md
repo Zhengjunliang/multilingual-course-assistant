@@ -2,6 +2,51 @@
 
 What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; each entry's *Reproducibility* section says how its numbers were produced, and what of that was not kept. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
+## 2026-10-26 — vLLM serves Qwen3-4B in fp16 on ultron's Turing card, a restart costs about 80 s, and switching the laptop to it changes only `.env`
+
+The first part of `#18`: the generation endpoint for the M3 experiments, on MICC. Retrieval stayed on the laptop (its Qdrant service, embedding and reranker); the index on the server, the smoke gate run there and the CUDA build of torch in the project's environment wait for the snapshots of `#122`.
+
+### 1. The server
+
+| Item | Value |
+| --- | --- |
+| Machine and card | ultron, GPU 0, Titan RTX 24 GB (compute capability 7.5); the other card busy with another user's job |
+| Driver | 535.183.06 (CUDA 12.2) |
+| vLLM | 0.32.0, the release page's `+cu129` wheel, in its own environment (Python 3.12.15 through uv 0.13.5) |
+| torch | 2.13.0+cu129 |
+| Model | `Qwen/Qwen3-4B-Instruct-2507`, revision `cdbee75f17c01a7cc42f958dc650907174af0554` for weights and tokenizer |
+| Precision | fp16: the checkpoint is bf16, which Turing cards lack, and vLLM casts it on load; the weights take 7.64 GiB |
+| Attention | `TRITON_ATTN`, chosen by vLLM between `TRITON_ATTN` and `FLEX_ATTENTION`; FlashAttention 2 needs compute capability 8.0, and FlashInfer's sampler falls back on 7.5 |
+| Limits | `--max-model-len 16384`, `--gpu-memory-utilization 0.55` (13.5 GB of a shared card, 14.1 GB in use with the process) |
+| Seed | `--seed 0` |
+
+### 2. Start and restart
+
+The first start compiled the model with torch.compile and Triton and was ready in 177 s; the compiled kernels are cached on `/oblivion`. Three restarts, each 15 s after stopping the server: 80 s, 78 s and 78 s to the first `200` on `/v1/models`. One configuration of the size grid of `#27` therefore costs about 80 s before its first question. The first request of a fresh server compiled one more Triton kernel (`kernel_unified_attention`) during inference, so a timed run starts after one warm-up request.
+
+### 3. The switch
+
+With a tunnel from the laptop's port 8100 to the server's 8417 and three lines in `.env` (`LLM_BASE_URL=http://localhost:8100/v1`, the server's key, `LLM_MODEL=Qwen/Qwen3-4B-Instruct-2507`), `rag.answer "What is an ORM?"` answered from the course slides and cited `2-orm_django_2025.pdf` pages 11, 26 and 12. `git status --short` was empty: no line of code changed. The server's log holds the inference at the minute of the question.
+
+Sampling: `rag/answer.py` asks for `temperature=0.0`, which decodes greedily; the model's `generation_config.json` gives vLLM its defaults for what a request leaves out (`temperature` 0.7, `top_k` 20, `top_p` 0.8), which greedy decoding does not use. `max_tokens` is not set, and no request carries a seed.
+
+### 4. What the server needed
+
+- PyPI's `vllm` 0.32.0 is built for CUDA 13 and failed at import (`libcudart.so.13` not found); CUDA 13 needs driver 580 or later, so the wheel is the `+cu129` build with `--torch-backend=cu129`.
+- ultron's root filesystem was mounted read-only: `/tmp` refused `mktemp` and tmux. `TMPDIR` moved to `/oblivion`, the server ran under `nohup`, and vLLM's process sockets went to `/dev/shm` (`VLLM_RPC_BASE_PATH`) rather than NFS.
+- ultron's `/usr/bin/gcc` (gcc-11) stopped with "internal compiler error: Illegal instruction" on an empty program, which ended the first start during compilation; gcc-12 and gcc-9 compile, and Triton uses the compiler `CC` names, so `CC=gcc-12`.
+- ultron's `/home` had 12 GB free, so uv, its Python, the environment and every cache live under `/oblivion/users/jzheng`: 20 GB with the model.
+
+### Reproducibility
+
+The commands are in [development.md](development.md), section "Working on the MICC servers"; the question:
+
+```bash
+uv run python -m rag.answer "What is an ORM?"    # on the laptop, with the tunnel and the three .env lines
+```
+
+The start times are kept on the server in `/oblivion/users/jzheng/vllm-timings.txt`; the server's log is rewritten at every start, and was not kept.
+
 ## 2026-10-12 — Each passage once, sources by the reranker, citations by number: the gold sets hold, copies leave the top 5, no excerpt number in the prose
 
 Retrieval and generation changed as [decisions.md](decisions.md), 2026-10-12, *A result list holds each passage once, as many as the reranker judges relevant, and an answer cites them by number*, records, one commit per step, for `#124` and `#187`. Everything ran on the local Qdrant service (`unifi_web` 29098 points, all crawled; `slides` 1234), whose index none of the steps changes; generation on Qwen3-4B q4 through the local Ollama, greedy.

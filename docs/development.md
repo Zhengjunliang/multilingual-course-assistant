@@ -135,11 +135,45 @@ The endpoint and model are `LLM_BASE_URL` and `LLM_MODEL` in `.env`; the M3 expe
 
 Access and hardware are in [docs/architecture.md](architecture.md). SSH aliases live in the local `~/.ssh/config` (`ssh targaryen` and so on).
 
-**Starting.** Check the GPU dashboard (Grafana / Discord `#gpu-monitoring-dream-`) and pick a machine with **free VRAM and low CPU**; day to day that is a 2080 Ti machine, and ultron (24 GB) only when an experiment needs the memory. Confirm with `nvidia-smi` after logging in and pin a free card with `CUDA_VISIBLE_DEVICES=<id>`. Long jobs go in tmux: `tmux new -s tesi`, reattach with `tmux attach -t tesi`.
+**Starting.** Check the GPU dashboard (Grafana / Discord `#gpu-monitoring-dream-`) and pick a machine with **free VRAM and low CPU**; day to day that is a 2080 Ti machine, and ultron (24 GB) only when an experiment needs the memory. Confirm with `nvidia-smi` after logging in and pin a free card with `CUDA_VISIBLE_DEVICES=<id>`. `ssh -o ServerAliveInterval=30 <server>` keeps an idle session from being dropped. Long jobs go in tmux (`tmux new -s tesi`, reattach with `tmux attach -t tesi`), or under `nohup` with their output in a log where tmux cannot create its socket: on 2026-10-26 ultron's root filesystem was mounted read-only, and `/tmp` with it.
 
-**Storage.** Model caches and datasets go on the NAS home, **not the server's local `/home`** (small, and shared by everyone). The NAS volumes `/andromeda` `/equilibrium` `/fishtank` `/oblivion` are mounted on every server, and personal directories differ per volume: `/oblivion/users/<user>` has `users/`, `/equilibrium/<user>` does not, andromeda and fishtank have none (ask the sysadmin). Check free space before choosing a volume; this project uses `/oblivion/users/jzheng`, with `export HF_HOME=/oblivion/users/jzheng/hf_cache` in the server's `~/.bashrc`. Shared datasets are under `/<volume>/DATASETS`, `/<volume>/datasets` or `/home/DATASETS` (naming differs per machine); datasets in a personal directory get cleaned up by the NAS rules.
+**Storage.** Model caches and datasets go on the NAS home, **not the server's local `/home`** (small, and shared by everyone; ultron's had 12 GB free on 2026-10-26). The NAS volumes `/andromeda` `/equilibrium` `/fishtank` `/oblivion` are mounted on every server, and personal directories differ per volume: `/oblivion/users/<user>` has `users/`, `/equilibrium/<user>` does not, andromeda and fishtank have none (ask the sysadmin). Check free space before choosing a volume; this project uses `/oblivion/users/jzheng`, and these lines at the end of the server's `~/.bashrc` send every cache, uv's Python, its virtual environments and temporary files there:
 
-**Finishing.** Check `nvidia-smi` for leftover processes of yours and `kill <PID>` them; Jupyter kernels hold GPU memory too. Close idle tmux sessions (`tmux kill-session -t tesi`). Release GPU memory when a run ends.
+```bash
+export XDG_CACHE_HOME=/oblivion/users/jzheng/.cache
+export HF_HOME=/oblivion/users/jzheng/hf_cache
+export UV_CACHE_DIR=/oblivion/users/jzheng/uv_cache
+export UV_PYTHON_INSTALL_DIR=/oblivion/users/jzheng/uv_python
+export UV_PYTHON_BIN_DIR=/oblivion/users/jzheng/bin
+export TRITON_CACHE_DIR=/oblivion/users/jzheng/.triton
+export TMPDIR=/oblivion/users/jzheng/tmp
+export VLLM_RPC_BASE_PATH=/dev/shm       # vLLM's process sockets stay off NFS
+export VLLM_NO_USAGE_STATS=1
+export HF_HUB_DISABLE_TELEMETRY=1
+export PATH=/oblivion/users/jzheng/bin:$PATH   # uv, installed with UV_INSTALL_DIR there
+```
+
+On ultron the system `gcc` (gcc-11) stops with "internal compiler error: Illegal instruction" on any input, and Triton compiles its kernel launchers with the compiler `CC` names, so ultron's `~/.bashrc` also exports `CC=gcc-12`. Shared datasets are under `/<volume>/DATASETS`, `/<volume>/datasets` or `/home/DATASETS` (naming differs per machine); datasets in a personal directory get cleaned up by the NAS rules.
+
+**Serving the LLM.** vLLM pins its own torch, so it gets a virtual environment of its own, and the project reaches it over HTTP only. PyPI's `vllm` 0.32.0 is built for CUDA 13, which needs driver 580 or later; ultron's driver is 535, so the wheel is the release page's `+cu129` build:
+
+```bash
+uv venv /oblivion/users/jzheng/venvs/vllm --python 3.12
+uv pip install --python /oblivion/users/jzheng/venvs/vllm/bin/python "https://github.com/vllm-project/vllm/releases/download/v0.32.0/vllm-0.32.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl" --torch-backend=cu129
+REV=$(curl -s https://huggingface.co/api/models/Qwen/Qwen3-4B-Instruct-2507 | python3 -c "import json,sys;print(json.load(sys.stdin)['sha'])")
+(umask 077; openssl rand -hex 16 > ~/.vllm_key); KEY=$(cat ~/.vllm_key)
+CUDA_VISIBLE_DEVICES=0 nohup /oblivion/users/jzheng/venvs/vllm/bin/vllm serve Qwen/Qwen3-4B-Instruct-2507 \
+  --revision "$REV" --tokenizer-revision "$REV" --dtype float16 --host 127.0.0.1 --port 8417 \
+  --api-key "$KEY" --max-model-len 16384 --gpu-memory-utilization 0.55 --seed 0 > ~/vllm.log 2>&1 &
+```
+
+The server listens on loopback with a key because the MICC servers answer from the internet. A first start compiles kernels for about three minutes into the caches above, and a restart takes about 80 s ([experiment-log.md](experiment-log.md), entry of 2026-10-26). On the laptop, a tunnel and three lines of `.env` (`.env.example` names them) point the project at it, with no change to the code:
+
+```bash
+ssh -o ServerAliveInterval=30 -N -L 8100:127.0.0.1:8417 ultron
+```
+
+**Finishing.** Check `nvidia-smi` for leftover processes of yours and `kill <PID>` them (`pkill -u $USER -f "vllm serve"` for the server above); Jupyter kernels hold GPU memory too. Close idle tmux sessions (`tmux kill-session -t tesi`). Release GPU memory when a run ends, and take the three lines out of the laptop's `.env` to go back to Ollama.
 
 ## CI
 
