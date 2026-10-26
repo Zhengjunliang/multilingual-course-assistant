@@ -53,6 +53,8 @@ INSTALLED_APPS = [
 # `/api/ask` would then deliver its answer as a single block at the finish, the
 # exact behaviour the event stream exists to remove (apps/qa/views.py).
 MIDDLEWARE = [
+    # First, so that what every middleware below logs carries the request's id.
+    "config.request_id.RequestIdMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     # After the session (it may carry the user's language), before Common: without
@@ -252,15 +254,26 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Console-only on purpose: locally the console is where the developer looks, and in
 # deployment (M6) stdout is what the process manager collects. Timestamps matter —
-# ingest and evaluation runs last minutes to hours.
+# ingest and evaluation runs last minutes to hours. The bracketed field is the
+# request's id (config/request_id.py), `-` outside a request: the id a page shows
+# beside an unexpected error finds that request's lines.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {"()": "config.request_id.RequestIdFilter"},
+    },
     "formatters": {
-        "timestamped": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"},
+        "timestamped": {
+            "format": "%(asctime)s %(levelname)s [%(request_id)s] %(name)s: %(message)s"
+        },
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "timestamped"},
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "timestamped",
+            "filters": ["request_id"],
+        },
     },
     "root": {"handlers": ["console"], "level": env.django_log_level},
 }
