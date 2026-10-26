@@ -6,21 +6,40 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "beautifulsoup4>=4.15.0",
     "django>=5.2,<6",
-    "djangorestframework>=3.18.0",
-    "docling>=2.132.0",
-    "fastembed>=0.8.0",
+    "djangorestframework>=3.18.2",
     "httpx>=0.28.1",
     "openai>=2.53.0",
     "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2",
-    "pypdf>=6.14.2",
+    "pypdf>=6.21.2",
     "qdrant-client>=1.18.0",
-    "sentence-transformers>=5.6.1",
+    # The measured pipeline: every package whose code turns a document or a
+    # question into what the evaluation scores — the parser and its OCR engine,
+    # the dense encoder and the reranker, BM25, and the torch they run on. CI
+    # runs no ingest and loads no model, so it cannot tell when a new version
+    # changes what gold and campus measure. Each is pinned exactly, the
+    # transitive ones included, because Renovate reads this table and not
+    # [tool.uv] constraint-dependencies: a pin it cannot see would never move.
+    # They move together, on approval, in the session that re-measures
+    # (.github/renovate.json), or alone for a security fix.
+    "docling==2.142.0",
+    "docling-core==2.104.0",
+    "docling-ibm-models==4.0.4",
+    "docling-parse==7.22.4",
+    "docling-slim==2.142.0",
+    "fastembed==0.9.1",
+    "mmh3==5.2.1",
+    "onnxruntime==1.28.0",
+    "py-rust-stemmers==0.1.8",
+    "rapidocr==3.9.2",
+    "sentence-transformers==5.6.1",
+    "tokenizers==0.22.2",
     # rag/ imports torch itself; torchvision is docling's alone, named here so that
     # [tool.uv.sources] below can reach it — uv applies sources to direct
     # dependencies only.
-    "torch>=2.13",
-    "torchvision>=0.28",
+    "torch==2.13.0",
+    "torchvision==0.28.0",
+    "transformers==5.10.1",
 ]
 
 [dependency-groups]
