@@ -1,0 +1,45 @@
+# Security updates only. Version updates are Renovate's (renovate.json, beside
+# this file); Dependabot keeps the one job Renovate does not do here: a fix
+# for every package of uv.lock and package-lock.json the day its advisory
+# appears, transitive ones included. Renovate raises fixes only for the
+# packages a manifest names, and 59 of the 79 alerts of 2026-10 were
+# transitive.
+#
+# Alerts and security updates are switches in the repository settings rather
+# than in this file, and both stay on. What this file adds to them: no
+# version update (`open-pull-requests-limit: 0`, which security updates
+# ignore, as they have a fixed limit of their own), and the one label of the
+# account's manifest (Zhengjunliang/.github, labels/labels.json) instead of a
+# label per ecosystem that the next label sync would delete again.
+#
+# A security update ignores `cooldown`. The seven days are here for zizmor's
+# dependabot-cooldown audit, and would apply to a version update, of which
+# there are none.
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 0
+    labels: ["dependencies"]
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 0
+    labels: ["dependencies"]
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 0
+    labels: ["dependencies"]
+    cooldown:
+      default-days: 7
