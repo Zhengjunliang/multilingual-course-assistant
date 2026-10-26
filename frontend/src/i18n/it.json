@@ -146,6 +146,47 @@
   "error": {
     "incomplete": "La risposta si è interrotta prima della fine."
   },
+  "errors": {
+    "INVALID_ARGUMENT": "Controlla i campi evidenziati.",
+    "MALFORMED_REQUEST": "$t(errors.INTERNAL)",
+    "WRONG_CREDENTIALS": "Nome utente o password errati.",
+    "UNAUTHENTICATED": "La sessione è scaduta. Accedi di nuovo.",
+    "PERMISSION_DENIED": "Non hai il permesso di farlo.",
+    "CSRF_FAILED": "La pagina è scaduta: ricaricala e riprova.",
+    "NOT_FOUND": "Non esiste più.",
+    "CONVERSATION_GONE": "Questa conversazione non esiste più: iniziane una nuova.",
+    "METHOD_NOT_ALLOWED": "$t(errors.INTERNAL)",
+    "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
+    "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
+    "ROLE_ALREADY_HELD": "Questo utente ha già questo ruolo qui.",
+    "RESOURCE_EXHAUSTED": "Troppe richieste. Riprova tra {{retry_after_seconds}} secondi.",
+    "UNAVAILABLE": "Il servizio sta rispondendo ad altre domande. Riprovo tra poco.",
+    "ENGINE_DOWN": "Il servizio delle risposte non è disponibile. Riprova più tardi.",
+    "INTERNAL": "Qualcosa è andato storto. Riprova tra poco.",
+    "NETWORK": "Il server non risponde. Controlla la connessione e riprova.",
+    "BAD_RESPONSE": "Il server ha risposto in modo inatteso. Riprova tra poco.",
+    "STREAM_INTERRUPTED": "La risposta si è interrotta prima della fine.",
+    "field": {
+      "REQUIRED": "Compila questo campo.",
+      "INVALID": "Questo valore non è valido.",
+      "TOO_LONG": "Al massimo {{max_length}} caratteri.",
+      "TOO_SHORT": "Almeno {{min_length}} caratteri.",
+      "TOO_SMALL": "Almeno {{min_value}}.",
+      "TOO_LARGE": "Al massimo {{max_value}}.",
+      "ALREADY_EXISTS": "Esiste già.",
+      "NO_SUCH_USER": "Nessun utente con questo nome.",
+      "TOO_COMMON": "Questa password è troppo comune.",
+      "ENTIRELY_NUMERIC": "La password non può essere fatta solo di numeri.",
+      "TOO_SIMILAR": "La password è troppo simile al nome utente.",
+      "username": {
+        "INVALID": "Usa solo lettere, numeri e i segni @ . + - _",
+        "ALREADY_EXISTS": "Questo nome utente è già in uso."
+      },
+      "title": {
+        "ALREADY_EXISTS": "Questo titolo è già nell'elenco."
+      }
+    }
+  },
   "notFound": {
     "title": "Pagina non trovata",
     "body": "A questo indirizzo non c'è nessuna pagina: il link potrebbe essere sbagliato o non più valido.",
