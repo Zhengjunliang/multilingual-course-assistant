@@ -143,21 +143,28 @@ def server_version(http: httpx.Client) -> str:
 def _download(
     http: httpx.Client, collection: str, snapshot: str, checksum: str | None, target: Path
 ) -> str:
-    """Stream one snapshot to `target` and return its sha256. A file that does not
-    match the checksum the server computed is removed, never left in place
-    looking complete."""
+    """Stream one snapshot to `target` and return its sha256. A download that
+    breaks off, or does not match the checksum the server computed, leaves no
+    file behind."""
     part = target.with_name(target.name + ".part")
     digest = hashlib.sha256()
-    with http.stream("GET", f"/collections/{collection}/snapshots/{snapshot}") as reply:
-        reply.raise_for_status()
-        with part.open("wb") as file:
-            for block in reply.iter_bytes():
-                file.write(block)
-                digest.update(block)
-    sha256 = digest.hexdigest()
-    if checksum is not None and checksum != sha256:
-        part.unlink()
-        raise RuntimeError(f"{collection}: downloaded sha256 {sha256}, the server's is {checksum}")
+    try:
+        with http.stream("GET", f"/collections/{collection}/snapshots/{snapshot}") as reply:
+            reply.raise_for_status()
+            with part.open("wb") as file:
+                for block in reply.iter_bytes():
+                    file.write(block)
+                    digest.update(block)
+        sha256 = digest.hexdigest()
+        if checksum is not None and checksum != sha256:
+            raise RuntimeError(
+                f"{collection}: downloaded sha256 {sha256}, the server's is {checksum}"
+            )
+    except BaseException:
+        # A dropped connection, a full disk and Ctrl-C too: the web collection's
+        # part file alone is a quarter of a gigabyte.
+        part.unlink(missing_ok=True)
+        raise
     part.replace(target)
     return sha256
 
@@ -214,7 +221,8 @@ def restore(http: httpx.Client, client: QdrantClient, directory: Path) -> bool:
     held = [name for name in manifest["collections"] if client.collection_exists(name)]
     if held:
         raise SystemExit(
-            f"the server holds {', '.join(held)} already, and an upload would replace it"
+            f"the server holds {', '.join(held)} already, and an upload would replace it; "
+            "if an earlier restore stopped halfway and left them, delete them and run it again"
         )
 
     for collection, entry in manifest["collections"].items():

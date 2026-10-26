@@ -158,6 +158,34 @@ def test_take_leaves_no_file_that_does_not_match_the_server_checksum(
     assert ("DELETE", f"/collections/{COLLECTION}/snapshots/{COLLECTION}.snapshot") in server.calls
 
 
+class _ResetStream(httpx.SyncByteStream):
+    def __iter__(self) -> Iterator[bytes]:
+        yield b"half a snapshot"
+        raise httpx.ReadError("connection reset by peer")
+
+
+class ResetDownload(FakeServer):
+    """A server whose connection drops halfway through every download."""
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path != "/":
+            self.calls.append((request.method, request.url.path))
+            return httpx.Response(200, stream=_ResetStream())
+        return super().__call__(request)
+
+
+def test_take_leaves_no_partial_file_when_the_download_breaks(
+    source: QdrantClient, tmp_path: Path
+) -> None:
+    server = ResetDownload()
+    with pytest.raises(httpx.ReadError):
+        take(http_for(server), source, tmp_path / "snapshots")
+
+    (directory,) = (tmp_path / "snapshots").iterdir()
+    assert list(directory.iterdir()) == []
+    assert ("DELETE", f"/collections/{COLLECTION}/snapshots/{COLLECTION}.snapshot") in server.calls
+
+
 @pytest.mark.parametrize(
     ("source_version", "target_version", "expected"),
     [
