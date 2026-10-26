@@ -49,6 +49,7 @@ def test_each_response_carries_a_fresh_trace_id(rf: RequestFactory) -> None:
     assert TRACE_ID.match(second["X-Request-ID"])
     assert first["X-Request-ID"] != second["X-Request-ID"]
     # The view ran under the id the response names.
+    assert isinstance(first, HttpResponse)
     assert first.content.decode() == first["X-Request-ID"]
 
 
