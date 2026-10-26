@@ -2,9 +2,9 @@
 
 What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; each entry's *Reproducibility* section says how its numbers were produced, and what of that was not kept. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
-## 2026-10-26 — vLLM serves Qwen3-4B in fp16 on ultron's Turing card, a restart costs about 80 s, and switching the laptop to it changes only `.env`
+## 2026-10-26 — vLLM serves Qwen3-4B in fp16 on ultron's Turing card, a restart costs about 80 s, switching the laptop to it changes only `.env`, and the index restored on ultron repeats the smoke gate's 38/40
 
-The first part of `#18`: the generation endpoint for the M3 experiments, on MICC. Retrieval stayed on the laptop (its Qdrant service, embedding and reranker); the index on the server, the smoke gate run there and the CUDA build of torch in the project's environment wait for the snapshots of `#122`.
+`#18` on MICC. Sections 1–4: the generation endpoint for the M3 experiments, with retrieval on the laptop (its Qdrant service, embedding and reranker). Sections 5–7: the index restored on the server from the laptop's snapshots (`#122`), the project's environment with the CUDA build of torch, and the smoke gate run there.
 
 ### 1. The server
 
@@ -37,6 +37,34 @@ Sampling: `rag/answer.py` asks for `temperature=0.0`, which decodes greedily; th
 - ultron's `/usr/bin/gcc` (gcc-11) stopped with "internal compiler error: Illegal instruction" on an empty program, which ended the first start during compilation; gcc-12 and gcc-9 compile, and Triton uses the compiler `CC` names, so `CC=gcc-12`.
 - ultron's `/home` had 12 GB free, so uv, its Python, the environment and every cache live under `/oblivion/users/jzheng`: 20 GB with the model.
 
+### 5. The index on the server
+
+| Item | Value |
+| --- | --- |
+| Qdrant | 1.19.1, the release page's musl build, checked against the page's SHA-256; the gnu build stopped at start, needing `GLIBC_2.38` where ultron has 2.35 |
+| Storage | `/dev/shm`, 1.3 GB after the restore: `/oblivion` is NFS, on which Qdrant does not run (outside the repository: Qdrant documentation, "Installation"), and the server's only local disk is the full `/home`; a reboot empties it |
+| Access | loopback, with an API key (`QDRANT_API_KEY`, `config/env.py`); a request without it got `401` |
+| Snapshot | `data/snapshots/20261026-170015/`, taken on the laptop's service at 17:00 UTC: `slides` 14.5 MB, `unifi_web` 242 MB, copied to `/oblivion` with `tar` over SSH |
+
+`rag.snapshot --restore` took 20 s from the command to its counts, against 7 s on the laptop:
+
+| Collection | Points, source / restored | (`url`, `ingest_source`) pairs, source / restored | Differing |
+| --- | --- | --- | --- |
+| `slides` | 1234 / 1234 | 1 / 1 | 0 |
+| `unifi_web` | 29098 / 29098 | 940 / 940 | 0 |
+
+`open_client()` on the server then counted 1234 and 29098 points, the reference counts of the entry of 2026-08-22, section 1.
+
+### 6. The project's environment
+
+`uv sync --locked --no-dev` installed the lockfile, which gives Linux the CPU build of torch (`pyproject.toml`, `[tool.uv.sources]`). `uv pip install "torch==2.13.0+cu126" "torchvision==0.28.0+cu126" --torch-backend=cu126` replaced the pair with the CUDA 12.6 build of the same versions, the laptop's; driver 535 runs it through CUDA's minor-version compatibility, and `torch.cuda.is_available()` was true on the Titan RTX (7.5). `#18` proposed `--torch-backend=auto`, which picks the build from the driver's version; a named one is the same build whatever the driver. `UV_NO_SYNC=1` keeps `uv run` from syncing the CPU build back. The environment takes 6.8 GB on `/oblivion`; transformers 5.10.1, sentence-transformers 5.6.1, fastembed 0.9.1 and qdrant-client 1.19.1, as the lockfile pins.
+
+### 7. The smoke gate on the server
+
+`rag.gold gold/smoke.jsonl` on GPU 0, with vLLM stopped: hit@5 **38/40**, the misses `q018` (the wanted page 38 of `3.6-Resolutions-Static-vs-Liquid-Layouts-Media-Queries-Semantic-Web.pdf`, page 36 on top) and `q028` (the wanted page 11 of `4.2 Docker.pdf`, page 58 of `4.1 Docker.pdf` on top) — the laptop's result and misses (entry of 2026-08-24, section 4). The run took 185 s, downloading both 0.6B models. The course PDFs (`data/`) are not on the server: the gate reads the source file and page from the index, and only warned that the `answer_ref` files were missing.
+
+At `q038` PyTorch logged a failed allocation on GPU 0 (3.68 GB asked, 2.32 GB of 25.4 GB free), released its cache, retried, and the question scored. What held the rest of the card was not recorded. The reranker's largest tensor is the logits of every padded position over the whole vocabulary, about 152,000 entries in fp16, of which `_QwenReranker.rerank` (`rag/search.py`) keeps the last position only: 3.68 GB is that tensor for about 12,000 positions.
+
 ### Reproducibility
 
 The commands are in [development.md](development.md), section "Working on the MICC servers"; the question:
@@ -45,7 +73,7 @@ The commands are in [development.md](development.md), section "Working on the MI
 uv run python -m rag.answer "What is an ORM?"    # on the laptop, with the tunnel and the three .env lines
 ```
 
-The start times are kept on the server in `/oblivion/users/jzheng/vllm-timings.txt`; the server's log is rewritten at every start, and was not kept.
+The start times are kept on the server in `/oblivion/users/jzheng/vllm-timings.txt`; the server's log is rewritten at every start, and was not kept. Sections 5–7 ran from two scripts sent over SSH, on the code of the pull request that adds this entry; their output was kept outside the repository. The snapshot directory stays on the laptop and on `/oblivion`.
 
 ## 2026-10-12 — Each passage once, sources by the reranker, citations by number: the gold sets hold, copies leave the top 5, no excerpt number in the prose
 
