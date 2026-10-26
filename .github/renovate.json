@@ -1,11 +1,16 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "The account's preset (Zhengjunliang/.github, default.json), the pre-commit hook revs, and the holds this repository needs.",
+  "description": [
+    "The account's preset (Zhengjunliang/.github, default.json), the pre-commit hook revs, and the rules this repository needs.",
+    "Security fixes are Dependabot's (dependabot.yml, beside this file), not Renovate's: Renovate raises them for the packages pyproject.toml names, and Dependabot for every package of uv.lock, transitive ones included, as soon as an advisory appears. One bot for them keeps two pull requests from racing for the same lockfile."
+  ],
   "extends": ["local>Zhengjunliang/.github", ":enablePreCommit"],
-  "dependencyDashboardHeader": "Before approving an update, read the description of its rule in `.github/renovate.json`.",
+  "vulnerabilityAlerts": {
+    "enabled": false
+  },
   "packageRules": [
     {
-      "description": "The measured pipeline, pinned with == in pyproject.toml: the parser and its OCR engine, the dense encoder and the reranker, BM25, and the torch they run on. CI runs no ingest and loads no model, so a green build says nothing about what gold and campus measure. Approve the group in the session that re-measures them. A security fix still opens at once; before it merges, compare the parse and BM25 output of a few documents before and after.",
+      "description": "The measured pipeline, pinned with == in pyproject.toml: the parser and its OCR engine, the dense encoder and the reranker, BM25, and the torch they run on. CI runs no ingest and loads no model, so a green build says nothing about what gold and campus measure. Its updates wait together in one draft pull request, marked ready and merged in the session that re-measures them.",
       "matchPackageNames": [
         "docling",
         "docling-*",
@@ -22,18 +27,35 @@
       ],
       "groupName": "measured pipeline",
       "groupSlug": "measured-pipeline",
-      "dependencyDashboardApproval": true
+      "draftPR": true
     },
     {
-      "description": "Django stays on 5.2, the LTS that docs/architecture.md decides (Chosen stack) and the <6 bound in pyproject.toml holds. Moving past it is that decision revisited, not an update to approve.",
+      "description": "torch and torchvision come from the PyTorch indexes, whose versions carry a local label (2.13.0+cpu, 2.13.0+cu126). A pin must not take one: the label names a single platform's build, and == on the bare version already matches every label.",
+      "matchPackageNames": ["torch", "torchvision"],
+      "allowedVersions": "/^[0-9]+(\\.[0-9]+)*$/"
+    },
+    {
+      "description": "No lock file refresh for uv.lock: it would move what the pins above leave free underneath the pipeline (pypdfium2, which renders the pages, opencv, numpy) without waiting seven days. A transitive Python package moves for a security fix, through Dependabot, and otherwise with the package that needs it.",
+      "matchManagers": ["pep621"],
+      "lockFileMaintenance": {
+        "enabled": false
+      }
+    },
+    {
+      "description": "Django stays on 5.2, the LTS that docs/architecture.md decides (Chosen stack) and the <6 bound in pyproject.toml holds. Moving past it is that decision revisited, not an update.",
       "matchPackageNames": ["django"],
       "allowedVersions": "<6"
     },
     {
-      "description": "katex is a direct dependency for its stylesheet alone (MathMarkdown.tsx); rehype-katex writes the markup and holds its own katex range. A bump of either one alone installs a second katex and pairs one version's stylesheet with the other's markup. Approve the two together once rehype-katex's range accepts the new katex (docs/security.md, accepted risks).",
+      "description": "katex is a direct dependency for its stylesheet alone (MathMarkdown.tsx); rehype-katex writes the markup and holds its own katex range. The two move in one pull request, so that the stylesheet always matches the markup.",
       "matchPackageNames": ["katex", "rehype-katex"],
       "groupName": "katex",
-      "dependencyDashboardApproval": true
+      "groupSlug": "katex"
+    },
+    {
+      "description": "rehype-katex's range is katex ^0.16: a katex past it would install a second copy beside the one rehype-katex uses. Lift this the day rehype-katex's range accepts a newer katex (docs/security.md, accepted risks).",
+      "matchPackageNames": ["katex"],
+      "allowedVersions": "<0.17"
     }
   ]
 }

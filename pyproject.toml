@@ -20,8 +20,10 @@ dependencies = [
     # changes what gold and campus measure. Each is pinned exactly, the
     # transitive ones included, because Renovate reads this table and not
     # [tool.uv] constraint-dependencies: a pin it cannot see would never move.
-    # They move together, on approval, in the session that re-measures
-    # (.github/renovate.json), or alone for a security fix.
+    # Renovate keeps their updates in one draft pull request, merged in the
+    # session that re-measures (.github/renovate.json); a security fix comes
+    # at once, from Dependabot. torch and torchvision move as a pair: each
+    # torchvision release requires exactly one torch.
     "docling==2.142.0",
     "docling-core==2.104.0",
     "docling-ibm-models==4.0.4",
