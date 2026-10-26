@@ -1,0 +1,39 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "The account's preset (Zhengjunliang/.github, default.json), the pre-commit hook revs, and the holds this repository needs.",
+  "extends": ["local>Zhengjunliang/.github", ":enablePreCommit"],
+  "dependencyDashboardHeader": "Before approving an update, read the description of its rule in `.github/renovate.json`.",
+  "packageRules": [
+    {
+      "description": "The measured pipeline, pinned with == in pyproject.toml: the parser and its OCR engine, the dense encoder and the reranker, BM25, and the torch they run on. CI runs no ingest and loads no model, so a green build says nothing about what gold and campus measure. Approve the group in the session that re-measures them. A security fix still opens at once; before it merges, compare the parse and BM25 output of a few documents before and after.",
+      "matchPackageNames": [
+        "docling",
+        "docling-*",
+        "rapidocr",
+        "onnxruntime",
+        "sentence-transformers",
+        "transformers",
+        "tokenizers",
+        "torch",
+        "torchvision",
+        "fastembed",
+        "mmh3",
+        "py-rust-stemmers"
+      ],
+      "groupName": "measured pipeline",
+      "groupSlug": "measured-pipeline",
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Django stays on 5.2, the LTS that docs/architecture.md decides (Chosen stack) and the <6 bound in pyproject.toml holds. Moving past it is that decision revisited, not an update to approve.",
+      "matchPackageNames": ["django"],
+      "allowedVersions": "<6"
+    },
+    {
+      "description": "katex is a direct dependency for its stylesheet alone (MathMarkdown.tsx); rehype-katex writes the markup and holds its own katex range. A bump of either one alone installs a second katex and pairs one version's stylesheet with the other's markup. Approve the two together once rehype-katex's range accepts the new katex (docs/security.md, accepted risks).",
+      "matchPackageNames": ["katex", "rehype-katex"],
+      "groupName": "katex",
+      "dependencyDashboardApproval": true
+    }
+  ]
+}
