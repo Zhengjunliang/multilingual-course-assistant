@@ -161,7 +161,8 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     # About twice this job's run with all four specs, 68 s (tests 34 s,
-    # Chromium 17 s), rounded up to minutes.
+    # Chromium 17 s), rounded up to minutes. 15 s of that Chromium step was
+    # apt, which it no longer runs, so the cap has room to spare.
     timeout-minutes: 3
     steps:
       # As in `hooks`, the token is not left in .git/config: nothing here needs it.
@@ -179,11 +180,16 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      # The headless shell alone, the only Chromium build headless tests use,
-      # and the system libraries it needs. Not cached: Playwright's CI guide
-      # finds restoring the browsers about as slow as downloading them.
+      # The headless shell alone, the only Chromium build headless tests use.
+      # No --with-deps: the runner image carries the libraries it loads, and
+      # what apt would add is fonts, which no spec looks at (they read computed
+      # styles, never pixels); a slow Ubuntu mirror made that apt step outlast
+      # the job's cap. Vite, Vue and SvelteKit install Chromium the same way.
+      # A library the image drops stops the launch with Playwright's "Host
+      # system is missing dependencies", naming it. Not cached: Playwright's CI
+      # guide finds restoring the browsers about as slow as downloading them.
       - name: Chromium
-        run: npx playwright install --with-deps --only-shell chromium
+        run: npx playwright install --only-shell chromium
         working-directory: frontend
 
       - name: Browser tests
