@@ -10,7 +10,7 @@
   },
   "packageRules": [
     {
-      "description": "The measured pipeline, pinned with == in pyproject.toml: the parser and its OCR engine, the dense encoder and the reranker, BM25, and the torch they run on. CI runs no ingest and loads no model, so a green build says nothing about what gold and campus measure. Its updates wait together in one draft pull request, marked ready and merged in the session that re-measures them.",
+      "description": "The measured pipeline, pinned with == in pyproject.toml: the parser and its OCR engine, the dense encoder and the reranker, BM25, and the torch they run on. CI runs no ingest and loads no model, so a green build says nothing about what gold and campus measure. Its updates wait together in one draft pull request, majors included, since the pins depend on one another; it is marked ready and merged in the session that re-measures them.",
       "matchPackageNames": [
         "docling",
         "docling-*",
@@ -27,6 +27,7 @@
       ],
       "groupName": "measured pipeline",
       "groupSlug": "measured-pipeline",
+      "separateMajorMinor": false,
       "draftPR": true
     },
     {
@@ -53,9 +54,14 @@
       "groupSlug": "katex"
     },
     {
-      "description": "rehype-katex's range is katex ^0.16: a katex past it would install a second copy beside the one rehype-katex uses. Lift this the day rehype-katex's range accepts a newer katex (docs/security.md, accepted risks).",
+      "description": "rehype-katex's range is katex ^0.16: a katex past it would install a second copy beside the one rehype-katex uses. Lift this, and the rule below, the day a rehype-katex accepts a newer katex (docs/security.md, accepted risks).",
       "matchPackageNames": ["katex"],
       "allowedVersions": "<0.17"
+    },
+    {
+      "description": "The other half of the same hold: a rehype-katex 8 that requires a newer katex would bring its own copy while the stylesheet stays on 0.16.",
+      "matchPackageNames": ["rehype-katex"],
+      "allowedVersions": "<8"
     }
   ]
 }
