@@ -11,8 +11,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import qdrant_client
+from pydantic import SecretStr
 from qdrant_client import QdrantClient
 
+from config.env import env
 from rag.chunk import Chunk, Locale, chunk_id_of, edition_of
 from rag.index import (
     COLLECTION,
@@ -116,6 +119,27 @@ def test_open_client_refuses_what_is_neither_a_url_nor_a_directory(
     with pytest.raises(SystemExit):
         parser.parse_args(["--qdrant", location])
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    ("key", "sent"),
+    [(SecretStr("k"), "k"), (SecretStr(""), None), (None, None)],
+    ids=["set", "empty", "unset"],
+)
+def test_the_api_key_goes_to_a_server_and_never_to_an_embedded_index(
+    key: SecretStr | None, sent: str | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A recorder in place of the client, since a real remote one checks the
+    # server's version on a thread of its own (above).
+    opened: list[dict[str, object]] = []
+    monkeypatch.setattr(qdrant_client, "QdrantClient", lambda **kwargs: opened.append(kwargs))
+    monkeypatch.setattr(env, "qdrant_api_key", key)
+    open_client("http://127.0.0.1:6333")
+    open_client(tmp_path / "qdrant")
+    assert opened == [
+        {"url": "http://127.0.0.1:6333", "api_key": sent},
+        {"path": str(tmp_path / "qdrant")},
+    ]
 
 
 def test_indexing_is_idempotent_across_reruns(client: QdrantClient) -> None:
