@@ -146,6 +146,47 @@
   "error": {
     "incomplete": "回答在结束之前中断了。"
   },
+  "errors": {
+    "INVALID_ARGUMENT": "请检查标出的字段。",
+    "MALFORMED_REQUEST": "$t(errors.INTERNAL)",
+    "WRONG_CREDENTIALS": "用户名或密码错误。",
+    "UNAUTHENTICATED": "会话已结束，请重新登录。",
+    "PERMISSION_DENIED": "你没有权限执行此操作。",
+    "CSRF_FAILED": "页面已过期，请重新加载后再试。",
+    "NOT_FOUND": "它已经不存在了。",
+    "CONVERSATION_GONE": "这个对话已经不存在了，请开始新的对话。",
+    "METHOD_NOT_ALLOWED": "$t(errors.INTERNAL)",
+    "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
+    "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
+    "ROLE_ALREADY_HELD": "该用户在这里已有此角色。",
+    "RESOURCE_EXHAUSTED": "请求太多，请 {{retry_after_seconds}} 秒后再试。",
+    "UNAVAILABLE": "服务正在回答其他问题，稍后自动重试。",
+    "ENGINE_DOWN": "回答服务暂时不可用，请稍后再试。",
+    "INTERNAL": "出错了，请稍后再试。",
+    "NETWORK": "无法连接服务器，请检查网络后再试。",
+    "BAD_RESPONSE": "服务器的回应异常，请稍后再试。",
+    "STREAM_INTERRUPTED": "回答在结束之前中断了。",
+    "field": {
+      "REQUIRED": "请填写此项。",
+      "INVALID": "该值无效。",
+      "TOO_LONG": "最多 {{max_length}} 个字符。",
+      "TOO_SHORT": "至少 {{min_length}} 个字符。",
+      "TOO_SMALL": "不能小于 {{min_value}}。",
+      "TOO_LARGE": "不能大于 {{max_value}}。",
+      "ALREADY_EXISTS": "已经存在。",
+      "NO_SUCH_USER": "没有这个名字的用户。",
+      "TOO_COMMON": "这个密码太常见了。",
+      "ENTIRELY_NUMERIC": "密码不能全是数字。",
+      "TOO_SIMILAR": "密码和用户名太相似了。",
+      "username": {
+        "INVALID": "只能使用字母、数字和 @ . + - _",
+        "ALREADY_EXISTS": "这个用户名已被占用。"
+      },
+      "title": {
+        "ALREADY_EXISTS": "书目中已有这个书名。"
+      }
+    }
+  },
   "notFound": {
     "title": "页面不存在",
     "body": "这个地址上没有页面，链接可能写错了或已经失效。",

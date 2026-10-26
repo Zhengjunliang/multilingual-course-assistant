@@ -1,14 +1,17 @@
 /**
- * The three catalogues must carry exactly the same keys, and Chinese strings
- * take Chinese punctuation.
+ * The three catalogues must carry exactly the same keys, each string the same
+ * placeholders in every language, and Chinese strings take Chinese punctuation.
  *
  * A missing key does not crash — i18next falls back and the reader sees Italian
- * inside an English page — so nothing else would catch it. Translation quality
- * still needs eyes; this only guarantees that every string has a slot in every
- * language, and that a Chinese string writes the full-width comma, colon,
- * semicolon, question and exclamation marks rather than the Latin ones, which
- * Figtree draws narrow: the Chinese stack hands it U+0000-00FF. An
- * interpolation, a nested key and a time such as 8:30 keep their Latin marks.
+ * inside an English page — so nothing else would catch it; nor would a
+ * placeholder misspelt in one language, which the reader sees as written,
+ * braces and all. A plural form may leave its count out ("one more course").
+ * Translation quality still needs eyes; this only guarantees that every string
+ * has a slot in every language, fills in the same values in each, and that a
+ * Chinese string writes the full-width comma, colon, semicolon, question and
+ * exclamation marks rather than the Latin ones, which Figtree draws narrow: the
+ * Chinese stack hands it U+0000-00FF. An interpolation, a nested key and a time
+ * such as 8:30 keep their Latin marks.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -25,6 +28,17 @@ const HAN = /\p{Script=Han}/u;
 const LATIN_MARK = /[,:;?!]/;
 /** i18next's `{{value, format}}` and `$t(key, options)`, and a time. */
 const NOT_PROSE = /\{\{[^}]*\}\}|\$t\([^)]*\)|\d:\d/g;
+/** The name in `{{name}}` or `{{name, format}}`. */
+const PLACEHOLDER = /\{\{\s*([^,}\s]+)/g;
+const PLURAL_FORM = /_(zero|one|two|few|many|other)$/;
+
+/** A string's placeholder names, sorted and joined; a plural form's count aside. */
+function placeholdersOf(key, value) {
+  if (typeof value !== "string") return "";
+  const names = new Set([...value.matchAll(PLACEHOLDER)].map((match) => match[1]));
+  if (PLURAL_FORM.test(key)) names.delete("count");
+  return [...names].sort().join(", ");
+}
 
 /** Each leaf of a catalogue as [key, value]. */
 function entries(value, prefix = "") {
@@ -59,6 +73,28 @@ for (const [name, keys] of keysByFile) {
   }
 }
 
+const [[firstName, firstLeaves], ...otherCatalogues] = [...entriesByFile];
+const firstPlaceholders = new Map(
+  firstLeaves.map(([key, value]) => [key, placeholdersOf(key, value)]),
+);
+for (const [name, leaves] of otherCatalogues) {
+  const differing = leaves.filter(
+    ([key, value]) =>
+      firstPlaceholders.has(key) && firstPlaceholders.get(key) !== placeholdersOf(key, value),
+  );
+  if (differing.length > 0) {
+    failed = true;
+    console.error(
+      `${name} fills in other values than ${firstName} in ${differing.length} string(s):`,
+    );
+    for (const [key, value] of differing) {
+      console.error(
+        `  ${key}: {${placeholdersOf(key, value)}}, not {${firstPlaceholders.get(key)}}`,
+      );
+    }
+  }
+}
+
 if (!entriesByFile.has(CHINESE_CATALOGUE)) {
   failed = true;
   console.error(`no ${CHINESE_CATALOGUE} in src/i18n: its punctuation went unchecked`);
@@ -77,5 +113,5 @@ if (latinMarks.length > 0) {
 
 if (failed) process.exit(1);
 console.log(
-  `${files.length} catalogues, ${everyKey.size} keys, all present; no Latin , : ; ? ! in a Chinese string.`,
+  `${files.length} catalogues, ${everyKey.size} keys, all present, the same placeholders in each; no Latin , : ; ? ! in a Chinese string.`,
 );

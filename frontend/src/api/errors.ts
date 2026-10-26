@@ -6,7 +6,9 @@
  * `message`, and finds the sentence for it in its own catalogue (#186).
  * `tests/test_error_contract.py` reads this file as plain text and holds
  * `ERROR_CODES` equal to `SPEC`, `FIELD_REASONS` equal to `FIELD_SPEC`, and the
- * body's field names equal to the pydantic models'.
+ * body's field names equal to the pydantic models'. `LOCAL_CODES` and
+ * `FIELD_OVERRIDES` are the client's alone; `src/i18n/errors.test.ts` holds
+ * every catalogue to a sentence for each code, reason and override here.
  */
 
 /**
@@ -57,6 +59,25 @@ export const FIELD_REASONS = {
 } as const satisfies Record<string, { dataKeys: readonly string[] }>;
 
 export type FieldReason = keyof typeof FIELD_REASONS;
+
+/**
+ * The client's own codes, for a failure no server named: no answer at all, an
+ * answer that is not this API's body, and an answer stream that stopped before
+ * its end. Each is a `failure`, and carries no data.
+ */
+export const LOCAL_CODES = ["NETWORK", "BAD_RESPONSE", "STREAM_INTERRUPTED"] as const;
+
+export type LocalCode = (typeof LOCAL_CODES)[number];
+
+/**
+ * The fields whose reasons read better in words of their own, under
+ * `errors.field.<field>.<REASON>`: "This username is taken" rather than "This
+ * already exists". Any other field takes the reason's general sentence.
+ */
+export const FIELD_OVERRIDES = {
+  username: ["INVALID", "ALREADY_EXISTS"],
+  title: ["ALREADY_EXISTS"],
+} as const satisfies Record<string, readonly FieldReason[]>;
 
 /** Numbers stay numbers, for the page to format in its own language. */
 export type ErrorData = Record<string, number | string>;

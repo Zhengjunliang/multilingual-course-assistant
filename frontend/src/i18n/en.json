@@ -146,6 +146,47 @@
   "error": {
     "incomplete": "The answer stopped before it was finished."
   },
+  "errors": {
+    "INVALID_ARGUMENT": "Check the highlighted fields.",
+    "MALFORMED_REQUEST": "$t(errors.INTERNAL)",
+    "WRONG_CREDENTIALS": "Wrong username or password.",
+    "UNAUTHENTICATED": "Your session has ended. Sign in again.",
+    "PERMISSION_DENIED": "You are not allowed to do this.",
+    "CSRF_FAILED": "This page has expired: reload it and try again.",
+    "NOT_FOUND": "This is no longer there.",
+    "CONVERSATION_GONE": "This conversation no longer exists: start a new one.",
+    "METHOD_NOT_ALLOWED": "$t(errors.INTERNAL)",
+    "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
+    "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
+    "ROLE_ALREADY_HELD": "This user already holds this role here.",
+    "RESOURCE_EXHAUSTED": "Too many requests. Try again in {{retry_after_seconds}} seconds.",
+    "UNAVAILABLE": "The service is answering other questions. Trying again shortly.",
+    "ENGINE_DOWN": "The answering service is not available. Try again later.",
+    "INTERNAL": "Something went wrong. Try again in a moment.",
+    "NETWORK": "The server cannot be reached. Check your connection and try again.",
+    "BAD_RESPONSE": "The server gave an unexpected answer. Try again in a moment.",
+    "STREAM_INTERRUPTED": "The answer stopped before it was finished.",
+    "field": {
+      "REQUIRED": "Fill in this field.",
+      "INVALID": "This value is not valid.",
+      "TOO_LONG": "At most {{max_length}} characters.",
+      "TOO_SHORT": "At least {{min_length}} characters.",
+      "TOO_SMALL": "At least {{min_value}}.",
+      "TOO_LARGE": "At most {{max_value}}.",
+      "ALREADY_EXISTS": "This already exists.",
+      "NO_SUCH_USER": "No user has this name.",
+      "TOO_COMMON": "This password is too common.",
+      "ENTIRELY_NUMERIC": "The password cannot be only numbers.",
+      "TOO_SIMILAR": "The password is too similar to the username.",
+      "username": {
+        "INVALID": "Use only letters, digits and @ . + - _",
+        "ALREADY_EXISTS": "This username is taken."
+      },
+      "title": {
+        "ALREADY_EXISTS": "This title is already on the list."
+      }
+    }
+  },
   "notFound": {
     "title": "Page not found",
     "body": "There is no page at this address: the link may be mistyped or out of date.",
