@@ -22,6 +22,7 @@ from types import SimpleNamespace
 from typing import Any, Literal
 
 import pytest
+from pydantic import SecretStr
 from test_answer import StubStreamer
 from test_crawl import StubFetcher, page
 from test_index import StubDense, StubSparse, make_chunk, make_web_chunk
@@ -1140,13 +1141,17 @@ def test_empty_retrieval_refuses_then_points_to_a_url(
         return StubSparse()
 
     def stub_completer(
-        base_url: str, api_key: str, model: str, temperature: float = 0.0, seed: int | None = None
+        base_url: str,
+        api_key: SecretStr,
+        model: str,
+        temperature: float = 0.0,
+        seed: int | None = None,
     ) -> StubCompleter:
         assert (temperature, seed) == (0.0, 0)  # routing is pinned: greedy plus a fixed seed
         return StubCompleter(SLIDES_REPLY)
 
     def stub_streamer(
-        base_url: str, api_key: str, model: str, temperature: float = 0.0
+        base_url: str, api_key: SecretStr, model: str, temperature: float = 0.0
     ) -> StubStreamer:
         return StubStreamer()
 
@@ -1198,13 +1203,17 @@ def test_cli_answers_from_the_routed_collection_with_sources(
         return StubSparse()
 
     def stub_completer(
-        base_url: str, api_key: str, model: str, temperature: float = 0.0, seed: int | None = None
+        base_url: str,
+        api_key: SecretStr,
+        model: str,
+        temperature: float = 0.0,
+        seed: int | None = None,
     ) -> ScriptedCompleter:
         assert (temperature, seed) == (0.0, 0)  # routing is pinned: greedy plus a fixed seed
         return ScriptedCompleter([SLIDES_REPLY, ANSWERABLE])
 
     def stub_streamer(
-        base_url: str, api_key: str, model: str, temperature: float = 0.0
+        base_url: str, api_key: SecretStr, model: str, temperature: float = 0.0
     ) -> StubStreamer:
         return streamer
 

@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from pydantic import SecretStr
 from qdrant_client import QdrantClient
 from test_agent import ScriptedCompleter
 from test_crawl import StubFetcher, page
@@ -725,7 +726,11 @@ def test_cli_ingests_a_url_and_unloads_the_llm_before_the_heavy_work(
     monkeypatch.setattr("rag.live.maybe_unload_llm", stub_unload)
 
     def stub_completer(
-        base_url: str, api_key: str, model: str, temperature: float = 0.0, seed: int | None = None
+        base_url: str,
+        api_key: SecretStr,
+        model: str,
+        temperature: float = 0.0,
+        seed: int | None = None,
     ) -> StubCompleter:
         assert (temperature, seed) == (0.0, 0)  # the gate is pinned: greedy plus a fixed seed
         return StubCompleter(RELEVANT)

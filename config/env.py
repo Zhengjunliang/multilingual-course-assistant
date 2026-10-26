@@ -63,9 +63,10 @@ class Settings(BaseSettings):
     # Ollama (fully offline loop); M3 experiments point this at the MICC vLLM
     # tunnel by overriding `.env` — nothing else changes. Ollama ignores the API
     # key, which the OpenAI client insists on; vLLM on MICC is started with one,
-    # since every user of the server reaches its loopback port.
+    # since every user of the server reaches its loopback port, so it is a
+    # SecretStr like the keys above.
     llm_base_url: str = "http://localhost:11434/v1"
-    llm_api_key: str = "unused"
+    llm_api_key: SecretStr = SecretStr("unused")
     llm_model: str = "qwen3:4b-instruct-2507-q4_K_M"
 
     # The password every demo- account gets from `manage.py populate_demo`

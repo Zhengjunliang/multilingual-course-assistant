@@ -15,7 +15,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 from test_answer import tags_read_leniently
 from test_index import make_web_chunk
 
@@ -121,18 +121,23 @@ def test_decoding_parameters_reach_both_call_shapes(monkeypatch: pytest.MonkeyPa
 
     completions = RecordingCompletions()
     clients: list[float] = []
+    keys: list[str] = []
 
     def fake_openai(base_url: str, api_key: str, timeout: float) -> Any:
         clients.append(timeout)
+        keys.append(api_key)
         return SimpleNamespace(chat=SimpleNamespace(completions=completions))
 
     monkeypatch.setattr("openai.OpenAI", fake_openai)
     messages: list[Message] = [{"role": "user", "content": "hi"}]
+    key = SecretStr("vllm-key")
 
-    streamer = build_streamer("http://localhost:11434/v1", "unused", "qwen3:4b")
+    streamer = build_streamer("http://localhost:11434/v1", key, "qwen3:4b")
     assert "".join(streamer.stream(messages)) == "ok"
-    completer = build_completer("http://localhost:11434/v1", "unused", "qwen3:4b", seed=42)
+    completer = build_completer("http://localhost:11434/v1", key, "qwen3:4b", seed=42)
     assert completer.complete(messages) == "ok"
+    # The SDK gets the key itself; everything above it holds the SecretStr.
+    assert keys == ["vllm-key", "vllm-key"]
 
     streamed, completed = completions.calls
     assert streamed["temperature"] == 0.0

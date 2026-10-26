@@ -41,7 +41,7 @@ import unicodedata
 import urllib.parse
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, SecretStr, ValidationError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -77,7 +77,7 @@ class _OpenAIClient:
     def __init__(
         self,
         base_url: str,
-        api_key: str,
+        api_key: SecretStr,
         model: str,
         temperature: float = 0.0,
         seed: int | None = None,
@@ -85,7 +85,11 @@ class _OpenAIClient:
     ) -> None:
         from openai import OpenAI, omit
 
-        self._client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
+        # Unwrapped here and nowhere else: every frame above holds the SecretStr,
+        # which Django's debug page prints as `**********`.
+        self._client = OpenAI(
+            base_url=base_url, api_key=api_key.get_secret_value(), timeout=timeout
+        )
         self._model = model
         self._temperature = temperature
         # `omit` is the SDK sentinel for "leave the field out of the request":
@@ -118,7 +122,7 @@ class _OpenAIClient:
 
 def build_streamer(
     base_url: str,
-    api_key: str,
+    api_key: SecretStr,
     model: str,
     temperature: float = 0.0,
     seed: int | None = None,
@@ -129,7 +133,7 @@ def build_streamer(
 
 def build_completer(
     base_url: str,
-    api_key: str,
+    api_key: SecretStr,
     model: str,
     temperature: float = 0.0,
     seed: int | None = None,
