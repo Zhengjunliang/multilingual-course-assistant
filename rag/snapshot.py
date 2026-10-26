@@ -36,6 +36,7 @@ from rag.index import (
     WEB_COLLECTION,
     add_qdrant_argument,
     open_client,
+    qdrant_api_key,
 )
 from rag.probe import configure_cli_logging
 
@@ -116,6 +117,21 @@ def _by_pair(pair: VersionKey) -> tuple[str, str]:
 def _result(reply: httpx.Response) -> Any:
     reply.raise_for_status()
     return reply.json()["result"]
+
+
+def server_http(url: str) -> httpx.Client:
+    """The REST client of the snapshot endpoints, which qdrant-client does not
+    cover, with the key `open_client` sends too."""
+    import httpx
+
+    key = qdrant_api_key()
+    return httpx.Client(
+        base_url=url,
+        headers={"api-key": key} if key is not None else None,
+        # Writing and streaming the web collection's snapshot takes a while: a
+        # deadline on connecting, none on reading.
+        timeout=httpx.Timeout(30.0, read=None),
+    )
 
 
 def server_version(http: httpx.Client) -> str:
@@ -258,15 +274,11 @@ def main(argv: list[str] | None = None) -> None:
 
     configure_cli_logging()
 
-    import httpx
-
     from config.env import env
 
     url: str = args.qdrant or env.qdrant_url
     client = open_client(url)
-    # Writing and streaming the web collection's snapshot takes a while: a
-    # deadline on connecting, none on reading.
-    with httpx.Client(base_url=url, timeout=httpx.Timeout(30.0, read=None)) as http:
+    with server_http(url) as http:
         if args.restore is not None:
             equal = restore(http, client, args.restore)
         else:

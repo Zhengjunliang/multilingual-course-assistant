@@ -13,10 +13,12 @@ from typing import Any
 
 import httpx
 import pytest
+from pydantic import SecretStr
 from qdrant_client import QdrantClient, models
 
+from config.env import env
 from rag.index import COLLECTION, WEB_COLLECTION, open_client
-from rag.snapshot import MANIFEST, main, restorable, restore, take
+from rag.snapshot import MANIFEST, main, restorable, restore, server_http, take
 
 SLIDES: list[dict[str, Any]] = [{"source_file": "deck.pdf"}, {"source_file": "deck.pdf"}]
 WEB: list[dict[str, Any]] = [
@@ -227,6 +229,17 @@ def test_restore_refuses_a_server_too_new_for_the_snapshots(
     with pytest.raises(SystemExit, match=r"1\.21\.0"):
         restore(http_for(server), target, directory)
     assert server.uploads == []
+
+
+def test_the_snapshot_requests_carry_the_key_open_client_sends(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(env, "qdrant_api_key", SecretStr("k"))
+    with server_http("http://127.0.0.1:6333") as http:
+        assert http.headers["api-key"] == "k"
+    monkeypatch.setattr(env, "qdrant_api_key", None)
+    with server_http("http://127.0.0.1:6333") as http:
+        assert "api-key" not in http.headers
 
 
 def test_a_directory_is_no_server_to_snapshot(tmp_path: Path) -> None:

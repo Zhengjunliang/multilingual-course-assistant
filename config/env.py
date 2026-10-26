@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # connection per request to a local host, so every request would first be
     # refused.
     qdrant_url: str = "http://127.0.0.1:6333"
+    # The key of a Qdrant server started with QDRANT__SERVICE__API_KEY. The
+    # compose service has none, listening on this host's loopback only; the one
+    # on MICC has one, since every user of a shared server reaches its loopback
+    # port. Unset or empty sends no key.
+    qdrant_api_key: SecretStr | None = None
 
     # HTTPS redirect, HSTS and secure cookies are meaningless — or actively
     # break the site — when nothing terminates TLS, and a demo on the MICC

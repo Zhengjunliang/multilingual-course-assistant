@@ -181,7 +181,8 @@ def open_client(location: str | Path | None = None) -> QdrantClient:
     server every process shares; any other value is a directory opened as an
     embedded index, which one process holds at a time (the tests, a machine
     without the service). `None` is the server named by QDRANT_URL
-    (config/env.py). What `qdrant_location` refuses is an error here too.
+    (config/env.py). A server gets QDRANT_API_KEY, when one is set. What
+    `qdrant_location` refuses is an error here too.
     """
     from qdrant_client import QdrantClient
 
@@ -191,8 +192,17 @@ def open_client(location: str | Path | None = None) -> QdrantClient:
         location = env.qdrant_url
     text = qdrant_location(str(location))
     if text.startswith(SERVER_SCHEMES):
-        return QdrantClient(url=text)
+        return QdrantClient(url=text, api_key=qdrant_api_key())
     return QdrantClient(path=text)
+
+
+def qdrant_api_key() -> str | None:
+    """QDRANT_API_KEY (config/env.py), or None when it is unset or empty, as
+    `.env.example` leaves it."""
+    from config.env import env
+
+    key = env.qdrant_api_key
+    return (key.get_secret_value() or None) if key is not None else None
 
 
 def add_qdrant_argument(parser: argparse.ArgumentParser) -> None:
