@@ -4,7 +4,8 @@
 #
 # Every rev is a commit SHA, as the action pins in ci.yml are: a tag can be
 # moved, a SHA cannot. The `# frozen:` comment is the readable half, and
-# Dependabot's pre-commit ecosystem moves both together.
+# Renovate's pre-commit manager (`:enablePreCommit` in .github/renovate.json)
+# moves both together.
 #
 # `pre-commit install` sets up both git hooks below. Every hook runs at commit
 # time except commit-msg, which runs on the message; without default_stages, a
