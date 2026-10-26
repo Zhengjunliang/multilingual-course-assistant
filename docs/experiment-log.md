@@ -53,7 +53,7 @@ Sampling: `rag/answer.py` asks for `temperature=0.0`, which decodes greedily; th
 | `slides` | 1234 / 1234 | 1 / 1 | 0 |
 | `unifi_web` | 29098 / 29098 | 940 / 940 | 0 |
 
-`open_client()` on the server then counted 1234 and 29098 points, the reference counts of the entry of 2026-08-22, section 1.
+`open_client()` on the server then counted 1234 and 29098 points, the reference counts of the entries of 2026-08-21 and 2026-08-22, section 1 of each.
 
 ### 6. The project's environment
 
