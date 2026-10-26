@@ -151,6 +151,7 @@ export TMPDIR=/oblivion/users/jzheng/tmp
 export VLLM_RPC_BASE_PATH=/dev/shm       # vLLM's process sockets stay off NFS
 export VLLM_NO_USAGE_STATS=1
 export HF_HUB_DISABLE_TELEMETRY=1
+export UV_NO_SYNC=1                      # uv run keeps the CUDA torch (Serving the index)
 export PATH=/oblivion/users/jzheng/bin:$PATH   # uv, installed with UV_INSTALL_DIR there
 ```
 
@@ -187,21 +188,21 @@ mkdir -p /oblivion/users/jzheng/qdrant && cd /oblivion/users/jzheng/qdrant
 curl -fsSLO https://github.com/qdrant/qdrant/releases/download/v1.19.1/qdrant-x86_64-unknown-linux-musl.tar.gz
 echo "70a40529e2ebe0a2787d574d3a2e28437cfe94f26f24fa419f6ac57b4ae817c9  qdrant-x86_64-unknown-linux-musl.tar.gz" | sha256sum -c - && tar -xzf qdrant-x86_64-unknown-linux-musl.tar.gz
 [ -f ~/.qdrant_key ] || (umask 077; openssl rand -hex 32 > ~/.qdrant_key)
-D=/dev/shm/jzheng-qdrant; mkdir -p -m 700 $D
+D=/dev/shm/jzheng-qdrant; mkdir -p -m 700 $D; [ -O $D ] || echo "$D belongs to another user"
 QDRANT__SERVICE__HOST=127.0.0.1 QDRANT__SERVICE__API_KEY=$(cat ~/.qdrant_key) QDRANT__TELEMETRY_DISABLED=true \
   QDRANT__STORAGE__STORAGE_PATH=$D/storage QDRANT__STORAGE__SNAPSHOTS_PATH=$D/snapshots QDRANT__STORAGE__TEMP_PATH=$D/tmp \
   nohup ./qdrant > qdrant.log 2>&1 < /dev/null &
+sleep 3; curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:6333/collections   # 401, or stop
 
 git clone https://github.com/Zhengjunliang/multilingual-course-assistant.git /oblivion/users/jzheng/multilingual-course-assistant
 cd /oblivion/users/jzheng/multilingual-course-assistant
 uv sync --locked --no-dev
 uv pip install "torch==<torch>+cu126" "torchvision==<torchvision>+cu126" --torch-backend=cu126
-export UV_NO_SYNC=1
 uv run python -m rag.snapshot --restore /oblivion/users/jzheng/snapshots/<time>
 CUDA_VISIBLE_DEVICES=0 uv run python -m rag.gold gold/smoke.jsonl
 ```
 
-The lockfile gives Linux the CPU build of torch (`pyproject.toml`, `[tool.uv.sources]`), so the CUDA build of the versions `pyproject.toml` pins goes over it: cu126, the laptop's, which driver 535 runs through CUDA's minor-version compatibility. The local version `+cu126` is part of the requirement because the CPU build that `uv sync` installed meets `torch==<torch>`. `UV_NO_SYNC=1` keeps `uv run` from syncing the CPU build back. The server's `.env` (created with `umask 077`) holds `QDRANT_URL=http://127.0.0.1:6333`, `QDRANT_API_KEY`, and any value for `DJANGO_SECRET_KEY` and `DJANGO_DB_PASSWORD`, which the settings require although no Django runs there; the three `LLM_*` lines name `http://127.0.0.1:8417/v1`, the vLLM above, with no tunnel.
+The lockfile gives Linux the CPU build of torch (`pyproject.toml`, `[tool.uv.sources]`), so the CUDA build of the versions `pyproject.toml` pins goes over it: cu126, the laptop's, which driver 535 runs through CUDA's minor-version compatibility. The local version `+cu126` is part of the requirement because the CPU build that `uv sync` installed meets `torch==<torch>`. `UV_NO_SYNC=1`, among the `~/.bashrc` lines above, keeps every `uv run`, in every session, from syncing the CPU build back, under which the models would run on the CPU without an error. Another user's Qdrant on port 6333 stops this one at start, which only `qdrant.log` reports; the request without the key gets `401` only from a server that checks a key, so `200` is another user's open server, which the restore would fill and send the key to, and `000` is no server at all. A restore refuses a server holding any of the collections; one that stopped halfway leaves those it finished, which `curl -X DELETE -H "api-key: $(cat ~/.qdrant_key)" http://127.0.0.1:6333/collections/<name>` removes before it runs again. The server's `.env` (created with `umask 077`) holds `QDRANT_URL=http://127.0.0.1:6333`, `QDRANT_API_KEY`, and any value for `DJANGO_SECRET_KEY` and `DJANGO_DB_PASSWORD`, which the settings require although no Django runs there; the three `LLM_*` lines name `http://127.0.0.1:8417/v1`, the vLLM above, with no tunnel.
 
 **Finishing.** Check `nvidia-smi` for leftover processes of yours and `kill <PID>` them (`pkill -u $USER -f "vllm serve"` for the server above); Jupyter kernels hold GPU memory too. `pkill -u $USER -x qdrant` stops the index server; its storage stays in `/dev/shm` until a reboot, and the same start command serves it again. Close idle tmux sessions (`tmux kill-session -t tesi`). Release GPU memory when a run ends, and take the three lines out of the laptop's `.env` to go back to Ollama.
 
