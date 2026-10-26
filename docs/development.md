@@ -162,13 +162,13 @@ On ultron the system `gcc` (gcc-11) stops with "internal compiler error: Illegal
 uv venv /oblivion/users/jzheng/venvs/vllm --python 3.12
 uv pip install --python /oblivion/users/jzheng/venvs/vllm/bin/python "https://github.com/vllm-project/vllm/releases/download/v0.32.0/vllm-0.32.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl" --torch-backend=cu129
 REV=$(curl -s https://huggingface.co/api/models/Qwen/Qwen3-4B-Instruct-2507 | python3 -c "import json,sys;print(json.load(sys.stdin)['sha'])")
-(umask 077; openssl rand -hex 16 > ~/.vllm_key); KEY=$(cat ~/.vllm_key)
-CUDA_VISIBLE_DEVICES=0 nohup /oblivion/users/jzheng/venvs/vllm/bin/vllm serve Qwen/Qwen3-4B-Instruct-2507 \
+(umask 077; openssl rand -hex 16 > ~/.vllm_key)
+VLLM_API_KEY=$(cat ~/.vllm_key) CUDA_VISIBLE_DEVICES=0 nohup /oblivion/users/jzheng/venvs/vllm/bin/vllm serve Qwen/Qwen3-4B-Instruct-2507 \
   --revision "$REV" --tokenizer-revision "$REV" --dtype float16 --host 127.0.0.1 --port 8417 \
-  --api-key "$KEY" --max-model-len 16384 --gpu-memory-utilization 0.55 --seed 0 > ~/vllm.log 2>&1 &
+  --max-model-len 16384 --gpu-memory-utilization 0.55 --seed 0 > ~/vllm.log 2>&1 &
 ```
 
-The server listens on loopback with a key because the MICC servers answer from the internet. A first start compiles kernels for about three minutes into the caches above, and a restart takes about 80 s ([experiment-log.md](experiment-log.md), entry of 2026-10-26). On the laptop, a tunnel and three lines of `.env` (`.env.example` names them) point the project at it, with no change to the code:
+The server listens on loopback because the MICC servers answer from the internet, and checks a key because every user of the server reaches its loopback port. The key travels in `VLLM_API_KEY`, not `--api-key`: `ps` shows any process's command line to every user. A first start compiles kernels for about three minutes into the caches above, and a restart takes about 80 s ([experiment-log.md](experiment-log.md), entry of 2026-10-26). On the laptop, a tunnel and three lines of `.env` (`.env.example` names them) point the project at it, with no change to the code:
 
 ```bash
 ssh -o ServerAliveInterval=30 -N -L 8100:127.0.0.1:8417 ultron
