@@ -6,13 +6,13 @@ build to serve — so the browser's own cookie jar is the entire mechanism. A JW
 would add a second credential to issue, store, refresh and leak, bought for a
 cross-origin problem this project does not have.
 
-**Why `GET /api/auth/me` answers 200 to a stranger.** With only
-`SessionAuthentication` configured, `authenticate_header` returns nothing, so
-DRF refuses an unauthenticated request with 403 rather than 401 — and a CSRF
-failure is a 403 too. Left that way, the SPA would have to guess which of the
-two a bare 403 meant. Making "nobody is logged in" an ordinary 200 with a flag
-in the body gives each code one meaning: this endpoint's body answers "who am
-I", and a 403 anywhere means the request itself was refused.
+**Why `GET /api/auth/me` answers 200 to a stranger.** "Who am I" has an
+answer for a stranger too, a flag in the body, and the SPA asks it before
+anything else; a refusal there would be logged as one and read by the page as
+a session that ended. Elsewhere a request that needs a session and has none is
+a 401 `UNAUTHENTICATED`, and a failed CSRF check a 403 `CSRF_FAILED`
+(config/errors.py, apps/accounts/authentication.py), so each status has one
+meaning.
 
 That endpoint is also the only place the CSRF cookie is issued, and it has to
 be: `ensure_csrf_cookie` normally rides on a rendered template, and in
