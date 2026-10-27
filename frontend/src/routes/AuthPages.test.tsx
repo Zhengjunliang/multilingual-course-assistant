@@ -180,12 +180,27 @@ describe("a registration", () => {
   it.each([
     {
       refusal: "a password the validators refuse: the focus goes to it, described",
-      error: new ApiError(400, "Invalid input.", { password: ["This password is too common."] }),
+      error: new ApiError({
+        status: 400,
+        code: "INVALID_ARGUMENT",
+        violations: [
+          {
+            field: "password",
+            reason: "INVALID",
+            data: {},
+            legacyText: "This password is too common.",
+          },
+        ],
+      }),
       after: { focused: "password", invalid: "true", alert: null },
     },
     {
       refusal: "a failure no field carries: it is an alert",
-      error: new ApiError(429, "Troppi tentativi."),
+      error: new ApiError({
+        status: 429,
+        code: "RESOURCE_EXHAUSTED",
+        legacyText: "Troppi tentativi.",
+      }),
       after: { focused: "", invalid: null, alert: "Troppi tentativi." },
     },
   ])("refused, $refusal", async ({ error, after }) => {

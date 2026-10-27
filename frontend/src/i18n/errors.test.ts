@@ -7,8 +7,9 @@
  * code without a sentence would show the reader i18next's raw key, and a
  * sentence without a code is one nobody can reach: both directions are
  * checked, in each catalogue. A `{{value}}` that is not in the error's `data`
- * would reach the reader as written, braces and all. That the three catalogues
- * agree on each sentence's placeholders is check-i18n.mjs's.
+ * would reach the reader as written, braces and all; the reference under an
+ * unexpected error fills in the code and the request id alone. That the three
+ * catalogues agree on each sentence's placeholders is check-i18n.mjs's.
  */
 
 import { describe, expect, it } from "vitest";
@@ -46,7 +47,7 @@ function strays(key: string, sentence: string, carried: readonly string[] = []):
 }
 
 describe.each(UI_LOCALES)("the %s error sentences", (locale) => {
-  const { field, ...codes } = CATALOGUES[locale].errors;
+  const { field, reference, legacy, ...codes } = CATALOGUES[locale].errors;
   const fieldEntries = Object.entries<string | Record<string, string>>(field);
   const reasons = fieldEntries.filter(
     (entry): entry is [string, string] => typeof entry[1] === "string",
@@ -88,6 +89,10 @@ describe.each(UI_LOCALES)("the %s error sentences", (locale) => {
         strays(code, sentence, CODE_DATA[code]),
       ),
       ...reasons.flatMap(([reason, sentence]) => strays(reason, sentence, REASON_DATA[reason])),
+      ...Object.entries(reference).flatMap(([name, sentence]) =>
+        strays(`reference.${name}`, sentence, ["code", "id"]),
+      ),
+      ...strays("legacy", legacy, ["text"]),
       ...overrides.flatMap(([name, sentences]) =>
         Object.entries(sentences).flatMap(([reason, sentence]) =>
           strays(`${name}.${reason}`, sentence, REASON_DATA[reason]),

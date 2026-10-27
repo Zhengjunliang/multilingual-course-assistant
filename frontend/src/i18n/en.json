@@ -166,6 +166,11 @@
     "NETWORK": "The server cannot be reached. Check your connection and try again.",
     "BAD_RESPONSE": "The server gave an unexpected answer. Try again in a moment.",
     "STREAM_INTERRUPTED": "The answer stopped before it was finished.",
+    "reference": {
+      "withId": "{{code}} · ref. {{id}}",
+      "codeOnly": "{{code}}"
+    },
+    "legacy": "{{text}}",
     "field": {
       "REQUIRED": "Fill in this field.",
       "INVALID": "This value is not valid.",

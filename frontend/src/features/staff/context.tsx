@@ -6,8 +6,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { isSessionLost } from "@/api/http";
 import { useSession } from "@/auth/useSession";
-import { errorKey, isSessionLost } from "./errors";
+import { errorKey } from "./errors";
 
 /**
  * The sentence for a refusal, for an event handler to show. A lost session is
