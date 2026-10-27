@@ -56,7 +56,7 @@ export function ConversationRow({
   return (
     <li className="group relative">
       <NavLink
-        to={`/c/${conversation.id}`}
+        to={`/chat/${conversation.id}`}
         onClick={onNavigate}
         className={({ isActive }) =>
           cn(

@@ -39,7 +39,7 @@ export default function ShellLayout() {
   const { t } = useTranslation();
   const { account, forget } = useSession();
   const navigate = useNavigate();
-  const open = useMatch("/c/:conversationId")?.params.conversationId;
+  const open = useMatch("/chat/:conversationId")?.params.conversationId;
 
   // `null` until the first list arrives, so the sidebar shows rows on their
   // way rather than telling a reader with conversations that they have none.

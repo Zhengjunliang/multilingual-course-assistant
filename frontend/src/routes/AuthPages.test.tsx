@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/http";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
+import { uuidOf } from "@/test/conversations";
 import { mount } from "@/test/mount";
 import { render } from "@/test/render";
 import LoginPage from "./LoginPage";
@@ -73,7 +74,7 @@ function signIn(logIn: () => Promise<void>, from?: string) {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<p id="front" />} />
-          <Route path="/c/7" element={<p id="thread" />} />
+          <Route path={`/chat/${uuidOf(7)}`} element={<p id="thread" />} />
         </Routes>
       </MemoryRouter>
     </SessionContext>,
@@ -143,7 +144,7 @@ describe("a sign-in", () => {
 
   it("accepted on the way to another page: it goes there after the check, with no jump", async () => {
     vi.useFakeTimers();
-    const { container, unmount } = signIn(async () => {}, "/c/7");
+    const { container, unmount } = signIn(async () => {}, `/chat/${uuidOf(7)}`);
     await send(container);
     await act(async () => {
       vi.advanceTimersByTime(ACCEPTED_FOR);

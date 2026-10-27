@@ -32,7 +32,7 @@ import VisitorLayout from "@/routes/VisitorLayout";
  * Five routes, the staff pages, and a page for every other address; two of the
  * five are the same page.
  *
- * `/` and `/c/:conversationId` both render the chat because a new conversation
+ * `/` and `/chat/:conversationId` both render the chat because a new conversation
  * and a stored one differ only in whether the thread starts empty — the page
  * itself, the composer and the sidebar are one thing, and splitting them would
  * be two components to keep identical. A reader's first question moves from
@@ -50,7 +50,7 @@ import VisitorLayout from "@/routes/VisitorLayout";
  * the staff pages share its sidebar, whose "Gestione" group opens the staff
  * pages. A reader without an account gets `/` alone, in `VisitorLayout`, and
  * the login page for every other address; one guard decides both, so `/` and
- * `/c/:conversationId` stay one route tree. `/staff/*` is open to an account
+ * `/chat/:conversationId` stay one route tree. `/staff/*` is open to an account
  * holding a role or the superuser (`RequireStaff`); `/staff` lands on the
  * account's first Gestione item, and the pages are objects — programmes,
  * courses, editions — not roles.
@@ -73,7 +73,7 @@ export const routes: RouteObject[] = [
             errorElement: <RouteError />,
             children: [
               { path: "/", element: <ChatPage /> },
-              { path: "/c/:conversationId", element: <ChatPage /> },
+              { path: "/chat/:conversationId", element: <ChatPage /> },
               {
                 path: "/staff",
                 element: (

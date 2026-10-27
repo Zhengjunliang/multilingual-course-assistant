@@ -128,7 +128,7 @@ export class Api {
     this.json<ConversationSummary[]>("/api/conversations", []);
   }
 
-  /** One stored conversation, listed in the sidebar and readable at `/c/<id>`. */
+  /** One stored conversation, listed in the sidebar and readable at `/chat/<id>`. */
   conversation(detail: ConversationDetail): void {
     const { messages: _, ...summary } = detail;
     this.json<ConversationSummary[]>("/api/conversations", [summary]);

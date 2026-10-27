@@ -2,17 +2,18 @@
  * The chat itself: thread and composer, inside the shell's frame
  * (routes/ShellLayout.tsx), which holds the sidebar and its conversations.
  *
- * The URL owns which conversation is open. `/` is a new one and `/c/:id` is a
+ * The URL owns which conversation is open. `/` is a new one and `/chat/:id` is a
  * stored one, which makes a thread a place — bookmarkable, shareable with
  * yourself, and reachable with the back button — rather than a state hidden
  * inside a component.
  *
  * That has one consequence worth naming: when the first question of a new
- * conversation gets its id, this navigates to `/c/<id>` while the answer is
+ * conversation gets its id, this navigates to `/chat/<id>` while the answer is
  * still arriving. `loaded` is what stops that navigation from being read as
  * "open a different thread" and refetching over a stream in progress. The
- * reverse must not be read as a new id either: leaving `/c/7` for `/` renders
- * once with the URL at `/` and the hook still holding 7, before the reset lands.
+ * reverse must not be read as a new id either: leaving `/chat/<id>` for `/`
+ * renders once with the URL at `/` and the hook still holding the id, before
+ * the reset lands.
  *
  * The page tells the frame two things: that the list of conversations
  * changed, and which conversation is being answered, whose delete the sidebar
@@ -131,7 +132,7 @@ export default function ChatPage() {
     previousId.current = ask.conversationId;
     if (before !== null || ask.conversationId === null || conversationId !== undefined) return;
     loaded.current = ask.conversationId;
-    void navigate(`/c/${ask.conversationId}`, { replace: true });
+    void navigate(`/chat/${ask.conversationId}`, { replace: true });
     refreshConversations();
   }, [ask.conversationId, conversationId, navigate, refreshConversations]);
 

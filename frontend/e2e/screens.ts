@@ -29,7 +29,7 @@ export const SCREENS: Screen[] = [
   { path: "/", as: "visitor", mark: heading(it.entry.caption) },
   { path: "/", as: "student", mark: heading(it.entry.caption) },
   {
-    path: `/c/${CONVERSATION.id}`,
+    path: `/chat/${CONVERSATION.id}`,
     as: "student",
     mark: { role: "button", name: it.answer.copy },
   },

@@ -293,7 +293,7 @@ def test_a_path_no_view_has_is_not_found_whatever_the_method_and_whoever_asks() 
 
 def test_a_500_no_view_answered_is_the_coded_body_under_api_only(rf: RequestFactory) -> None:
     api = server_error(rf.get("/api/conversations"))
-    page = server_error(rf.get("/c/7"))
+    page = server_error(rf.get("/chat/3f1c9a52-6b0e-4d7a-9c1e-2a5b8d4f0e17"))
 
     assert (api.status_code, json.loads(api.content)["error"]["code"]) == (500, "INTERNAL")
     assert (page.status_code, page["Content-Type"].split(";")[0]) == (500, "text/html")
