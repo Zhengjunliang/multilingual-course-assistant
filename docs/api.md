@@ -57,7 +57,7 @@ An anonymous caller has no stored conversation: it omits `conversation_id`, gets
 | Method and path | Does |
 | --------------- | ---- |
 | `GET /api/conversations` | the sidebar list, pinned conversations first, each group by its last message, newest first; a row is `id`, `locale`, `created_at`, `last_message_at`, `title`, `title_locale`, `pinned` and `last_source` (below) |
-| `GET /api/conversations/<id>` | one conversation, its row as the list shows it with its `messages`: the thread from its first question to its current leaf, each message after the one it names as `parent`, in the same number of queries however long; someone else's is **404, not 403** — a 403 would confirm the id exists |
+| `GET /api/conversations/<id>` | one conversation, its row as the list shows it with its `messages`: the thread from its first question to its current leaf, each message after the one it follows, in the same number of queries however long; someone else's is **404, not 403** — a 403 would confirm the id exists |
 | `PATCH /api/conversations/<id>` | `{"pinned": true}` or `false` pins or unpins it and answers with its row (200); `pinned` is the only field a conversation takes, in a JSON body only (any other is 415), and there is no `PUT`; someone else's is 404 |
 | `DELETE /api/conversations/<id>` | deletes one of your conversations with its messages (204); someone else's is 404; a question queued for a conversation deleted meanwhile is refused with 404 `CONVERSATION_GONE` |
 

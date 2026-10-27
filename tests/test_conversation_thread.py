@@ -15,6 +15,7 @@ import uuid
 
 import pytest
 from django.db import connection
+from django.db.models import RestrictedError
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from test_conversation_list import START, URL, client, owner, started, turn, web
@@ -95,8 +96,16 @@ def test_a_question_hangs_from_the_leaf_the_locked_row_holds() -> None:
     stale = Conversation.objects.get(pk=conversation.pk)
 
     first = record_exchange(stale, start_event("Prima?"))
-    second = record_exchange(stale, start_event("Seconda?"))
+    with CaptureQueriesContext(connection) as captured:
+        second = record_exchange(stale, start_event("Seconda?"))
 
+    # Read under the lock, before anything is written: two questions reading
+    # the same leaf would both hang from it, and the second to set the leaf
+    # would drop the first exchange from the thread.
+    reads = [
+        query["sql"] for query in captured.captured_queries if query["sql"].startswith("SELECT")
+    ]
+    assert reads[0].endswith("FOR UPDATE")
     assert Message.objects.get(parent_id=first).text == "Seconda?"
     leaf = Conversation.objects.get(pk=conversation.pk).current_leaf_id
     assert leaf == second
@@ -196,26 +205,41 @@ def test_a_uuid_naming_nothing_is_not_found(method: str) -> None:
     assert (response.status_code, refused(response)) == (404, ("NOT_FOUND", {}))
 
 
-def test_the_admin_deletes_no_message_on_its_own(admin_client) -> None:
-    """Every later message hangs from it, so deleting one would cut the thread
-    short without a word: neither its delete page nor the bulk action exists."""
+@pytest.mark.parametrize("which", ["question", "answer"])
+def test_no_message_is_deleted_on_its_own(which: str) -> None:
+    """Its replies go with it, the leaf among them, so a deletion would leave a
+    thread with no end and its rows read as nothing: it is refused, from a shell
+    as from any other caller, and nothing is gone."""
+    conversation = started(0)
+    role = Message.Role.USER if which == "question" else Message.Role.ASSISTANT
+
+    with pytest.raises(RestrictedError):
+        Message.objects.filter(conversation=conversation, role=role).delete()
+
+    assert len(client().get(f"{URL}/{conversation.pk}").json()["messages"]) == 2
+
+
+def test_the_admin_refuses_to_delete_a_message_on_its_own(admin_client) -> None:
+    """Its page names the conversation that stands in the way, and a confirmed
+    deletion deletes nothing."""
     conversation = started(0)
     first = Message.objects.filter(conversation=conversation).first()
     assert first is not None
+    url = reverse("admin:qa_message_delete", args=[first.pk])
 
-    page = admin_client.get(reverse("admin:qa_message_delete", args=[first.pk]))
-    listing = admin_client.get(reverse("admin:qa_message_changelist"))
+    page = admin_client.get(url)
+    confirmed = admin_client.post(url, {"post": "yes"})
 
-    assert page.status_code == 403
-    assert listing.context["action_form"] is None
+    assert page.context["protected"]
+    assert confirmed.status_code == 200
     assert Message.objects.filter(conversation=conversation).count() == 2
 
 
 def test_the_admin_deletes_a_conversation_and_an_account_with_their_messages(
     admin_client,
 ) -> None:
-    """The delete permission on a message stays, because the admin checks it
-    on every row a deletion takes along."""
+    """A conversation that goes takes its leaf with it, so its messages are no
+    longer held back: the refusal above is for a message alone."""
     conversation = started(0)
     stranger = User.objects.create_user(username="stranger")
     theirs = Conversation.objects.create(owner=stranger, locale="it")
