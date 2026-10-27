@@ -19,8 +19,8 @@ model server that dies halfway through an answer — travels as an `error` event
 under a 200 that was already committed.
 
 **CSRF, for a caller with a session and for one without.** A logged-in request
-is checked by `SessionAuthentication`, the project-wide default
-(config/settings.py), while it authenticates the caller. An anonymous one is
+is checked by the session authentication, the project-wide default
+(apps/accounts/authentication.py), while it authenticates the caller. An anonymous one is
 not, because that class checks only the callers it finds, so the permission
 class below runs the same check for them (apps/accounts/permissions.py). The
 browser sends the token as `X-CSRFToken`, the header Django's
@@ -40,25 +40,16 @@ project to ASGI starts here.
 
 from __future__ import annotations
 
+import contextvars
 import logging
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from django.http import StreamingHttpResponse
-from rest_framework import status
 from rest_framework.renderers import BaseRenderer, JSONRenderer
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import AllowAnyWithCsrf
-from apps.qa.contract import (
-    EndEvent,
-    ErrorEvent,
-    StartEvent,
-    TokenEvent,
-    Unavailable,
-    sse,
-    sse_event,
-)
+from apps.qa.contract import EndEvent, ErrorEvent, StartEvent, TokenEvent, sse, sse_event
 from apps.qa.conversations import (
     ConversationGoneError,
     open_conversation,
@@ -68,10 +59,10 @@ from apps.qa.conversations import (
 )
 from apps.qa.engine import EngineBusyError, EngineUnavailableError, stream_answer
 from apps.qa.serializers import AskRequest
-from config.errors import ErrorCode, fail
+from config.errors import ErrorCode, error_body, fail
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterator, Mapping
+    from collections.abc import Generator, Mapping
 
     from rest_framework.request import Request
 
@@ -80,9 +71,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Every 503 here is transient by construction: a stopped model server, a
-# stopped Qdrant service, a question still being answered. A minute is long
-# enough that a retry is not simply requeued behind the same work.
+# How long a question refused behind another one is told to wait (`UNAVAILABLE`).
+# A minute is long enough that a retry is not simply requeued behind the same
+# work. An outage (`ENGINE_DOWN`) names no wait: asking again will not end it.
 RETRY_AFTER_SECONDS = 60
 
 
@@ -93,9 +84,10 @@ class ServerSentEventRenderer(BaseRenderer):
     renderer claiming this media type, a client that politely asks for the one
     thing this endpoint speaks is refused with a 406 by the endpoint that speaks
     it. The successful response is built below as a `StreamingHttpResponse` and
-    never passes through a renderer at all; what reaches this one is only DRF's
-    error bodies — 400 from the serializer, 429 from the throttle, 503 from the
-    engine — which keep their own shape inside the framing the caller asked for.
+    never passes through a renderer at all; what reaches this one is only the
+    error bodies (config/errors.py) — 400 from the serializer, 429 from the
+    throttle, 503 from the engine — framed as the `error` event a failure inside
+    the stream is.
     """
 
     media_type = "text/event-stream"
@@ -108,9 +100,8 @@ class ServerSentEventRenderer(BaseRenderer):
         accepted_media_type: str | None = None,
         renderer_context: Mapping[str, Any] | None = None,
     ) -> str:
-        # DRF's own JSON renderer rather than `json.dumps`: those bodies are
-        # full of `ErrorDetail` and lazy translation proxies, which it knows how
-        # to serialise and the standard library does not.
+        # The JSON renderer the same body gets as `application/json`, so the
+        # two framings carry the same bytes.
         return sse(ErrorEvent.NAME, JSONRenderer().render(data).decode())
 
 
@@ -136,6 +127,12 @@ class _EventStream:
     its place, or a reader who left. All three settle the row — what differs is
     only whether the text in it is complete. An anonymous answer has no row,
     `answer_pk` is None, and the stream is the same without the write.
+
+    Everything it runs, runs in a copy of the view's context. Under WSGI the
+    body is read after the response has left the middleware, which has reset
+    the request's id by then (config/request_id.py): without the copy, the
+    lines the stream writes and the id its `error` event carries would name no
+    request.
     """
 
     def __init__(
@@ -146,26 +143,47 @@ class _EventStream:
         self._answer_pk = answer_pk
         self._parts: list[str] = []
         self._settled = False
+        self._context = contextvars.copy_context()
+        self._frames = self._framed()
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> _EventStream:
+        return self
+
+    def __next__(self) -> str:
+        return self._context.run(next, self._frames)
+
+    def _framed(self) -> Generator[str, None, None]:
         yield sse_event(self._first)
         complete = False
-        for event in self._rest:
-            if isinstance(event, TokenEvent):
-                self._parts.append(event.text)
-            elif isinstance(event, EndEvent):
-                complete = True
-            yield sse_event(event)
-        # Reached only when `rest` ran out, which means its `finally` has already
+        try:
+            for event in self._rest:
+                if isinstance(event, TokenEvent):
+                    self._parts.append(event.text)
+                elif isinstance(event, EndEvent):
+                    complete = True
+                yield sse_event(event)
+        except EngineUnavailableError:
+            # In the place `end` would have taken. The engine's message names
+            # what is down and goes to the log, with its cause (#14).
+            failure = ErrorEvent.model_validate(error_body(ErrorCode.ENGINE_DOWN))
+            logger.exception(
+                "the stream ended in %s: %s", failure.error.code, failure.error.message
+            )
+            yield sse_event(failure)
+        # Reached only once `rest` has ended, which means its `finally` has already
         # returned the queue lock. Settling before this point would put a
         # database round trip inside everyone else's wait.
         self._settle(complete=complete)
 
     def close(self) -> None:
+        self._context.run(self._close)
+
+    def _close(self) -> None:
         # Same ordering, same reason, and here it is the expensive case: `rest`
         # is suspended mid-answer and still holding the lock, so it is closed
         # first and written about second.
         self._rest.close()
+        self._frames.close()
         self._settle(complete=False)
 
     def _settle(self, *, complete: bool) -> None:
@@ -218,28 +236,7 @@ class AskView(APIView):
     # (docs/security.md).
     throttle_scope = "ask"
 
-    def unavailable(
-        self, exc: EngineUnavailableError, reason: Literal["busy", "unavailable"]
-    ) -> Response:
-        """A 503 the caller can act on.
-
-        Returned rather than raised so the retry hint can ride along — DRF's
-        `Throttled` sets that header for a 429, and a 503 without one leaves the
-        caller nothing to back off against.
-
-        `reason` is what separates the two failures that would otherwise arrive
-        identically: a queue that is full clears on its own, a model server that
-        is not running does not. Without it a client counts down and retries
-        forever against an outage. The engine has already logged the cause; what
-        travels is the sentence written for whoever called.
-        """
-        return Response(
-            Unavailable(detail=str(exc), reason=reason).model_dump(),
-            status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            headers={"Retry-After": str(RETRY_AFTER_SECONDS)},
-        )
-
-    def post(self, request: Request) -> Response | StreamingHttpResponse:
+    def post(self, request: Request) -> StreamingHttpResponse:
         payload = AskRequest(data=request.data, context={"request": request})
         payload.is_valid(raise_exception=True)
         validated = payload.validated_data
@@ -268,11 +265,15 @@ class AskView(APIView):
             # Routing and retrieval happen inside this call — see the module
             # docstring: it is the last moment a status code is still on offer.
             first = next(events)
-        # Order matters: the busy case is a subclass of the other one.
-        except EngineBusyError as exc:
-            return self.unavailable(exc, "busy")
-        except EngineUnavailableError as exc:
-            return self.unavailable(exc, "unavailable")
+        # Order matters: the busy case is a subclass of the other one. Two codes
+        # because the caller acts differently: a queue clears on its own, a
+        # model server that is not running does not, and retrying it is a wait
+        # that never ends. Raised inside the `except`, so the engine's error,
+        # and its cause, are in the log line for the 503 (config/errors.py).
+        except EngineBusyError:
+            fail(ErrorCode.UNAVAILABLE, retry_after_seconds=RETRY_AFTER_SECONDS)
+        except EngineUnavailableError:
+            fail(ErrorCode.ENGINE_DOWN)
 
         # Written here and not a line earlier. Everything above could still have
         # ended as a 503, and a question refused before it was asked must leave

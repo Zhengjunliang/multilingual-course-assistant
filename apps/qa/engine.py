@@ -33,15 +33,12 @@ question touches no database at all.
 
 from __future__ import annotations
 
-import logging
 import threading
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from django.utils.translation import gettext_lazy as _
-
-from apps.qa.contract import Citation, EndEvent, ErrorEvent, Event, StartEvent, TokenEvent
+from apps.qa.contract import Citation, EndEvent, Event, StartEvent, TokenEvent
 from rag.agent import collections_for, route
 from rag.answer import answer
 from rag.chunk import detect_locale
@@ -58,8 +55,6 @@ if TYPE_CHECKING:
     from rag.llm import ChatStreamer, Completer
     from rag.search import Reranker
 
-logger = logging.getLogger(__name__)
-
 # The most sources an answer is given: `search()` keeps fewer when the reranker
 # calls the rest irrelevant (`RELEVANCE_CUTOFF`). The CLI default (`rag.answer`,
 # `rag.agent`), restated rather than imported because those are argparse
@@ -74,42 +69,25 @@ QUEUE_TIMEOUT_SECONDS = 90.0
 
 # One message for both LLM roles: the router and the generator talk to the same
 # endpoint, so whichever notices first is reporting the same outage.
-LLM_DOWN = _(
+LLM_DOWN = (
     "The generation endpoint did not respond. Check that the model server is "
     "running (Ollama by default)."
 )
 
-# The index is the compose service every process shares (docker-compose.yml);
-# naming the service, not a command, keeps server commands out of what the
-# caller reads.
-INDEX_DOWN = _("The search index did not respond. Check that the Qdrant service is running.")
+# The index is the compose service every process shares (docker-compose.yml).
+INDEX_DOWN = "The search index did not respond. Check that the Qdrant service is running."
 
 
 class EngineUnavailableError(Exception):
     """A dependency this endpoint cannot answer without is out of reach.
 
     Deliberately not a DRF exception: the engine knows nothing about HTTP, and
-    choosing a status code is the view's job. The message is written to be
-    shown to whoever called the API — no filesystem paths, no stack — while the
-    original exception travels as `__cause__` for the log.
-
-    Raised only from the part of `Engine.stream` that runs before its first
-    event. Once an event has been yielded the response is already on the wire
-    and a failure has to travel as `ErrorEvent` instead.
-
-    Its messages are marked for translation like every other user-facing string
-    here, and no catalogue translates them: for the thesis these read as the
-    English written below. Three languages meet in this project and each has an
-    owner — the interface belongs to the frontend's own catalogues, the answer's
-    language to the prompt in rag/answer.py, and this layer to whoever is
-    reading a server log next to it. A fourth translation layer would be work
-    with no reader.
-
-    The markers stay because they cost nothing and losing them costs a hunt
-    through every string. One visible consequence, worth knowing before it
-    looks like a bug: DRF ships its own translated validation messages and
-    LANGUAGE_CODE is Italian, so a single error body can mix its Italian with
-    this module's English.
+    choosing what the caller is told is the view's job — a 503 before the first
+    event, an `error` event in the stream after it (apps/qa/views.py). Either
+    way the caller reads a code. The message is for the server log, where the
+    view writes it with the original exception, its `__cause__`: it names the
+    service that is down and the command that starts it, which no caller is
+    shown (#14).
     """
 
 
@@ -165,8 +143,8 @@ class Engine:
 
         Everything up to `StartEvent` can still fail into a status code, which
         is why routing and retrieval happen before the first `yield` rather than
-        lazily alongside the tokens. After it, the only way to report a failure
-        is to describe it inside the stream.
+        lazily alongside the tokens. After it, the view can report a failure
+        only inside the stream.
         """
         # Lazy on purpose: `rag/` imports the OpenAI SDK and qdrant-client inside
         # the functions that need them, and Django's startup should not pay for
@@ -190,7 +168,6 @@ class Engine:
             # why the answers stay out of a prompt that demands strict JSON.
             decision = route(question, self.completer, history)
         except APIError as exc:
-            logger.warning("routing failed: %s", exc)
             raise EngineUnavailableError(LLM_DOWN) from exc
 
         try:
@@ -205,10 +182,8 @@ class Engine:
             )
             if not available:
                 raise EngineUnavailableError(
-                    _(
-                        "The search index cannot answer yet. Build it with "
-                        "`uv run python -m rag.index data/chunks`."
-                    )
+                    "The search index cannot answer yet. Build it with "
+                    "`uv run python -m rag.index data/chunks`."
                 )
 
             # No `except ValueError` around this: with the collections checked
@@ -237,7 +212,6 @@ class Engine:
             # for ValueError.
             if isinstance(exc.source, ValidationError):
                 raise
-            logger.warning("index unreachable: %s", exc)
             raise EngineUnavailableError(INDEX_DOWN) from exc
 
         yield StartEvent(
@@ -256,11 +230,8 @@ class Engine:
                 yield TokenEvent(text=delta)
         except APIError as exc:
             # Unlike `complete_json`, which swallows a dead endpoint into a
-            # fallback, the streaming path raises. `str()` because the message
-            # is a lazy translation proxy and the event field is a string.
-            logger.warning("generation failed: %s", exc)
-            yield ErrorEvent(detail=str(LLM_DOWN))
-            return
+            # fallback, the streaming path raises.
+            raise EngineUnavailableError(LLM_DOWN) from exc
 
         yield EndEvent()
 
@@ -301,15 +272,12 @@ def build_engine() -> Engine:
         # A failed build is not cached, so the next request opens a client of
         # its own; closing this one — after a first-run download or an
         # out-of-memory card fails a model load — keeps its connections from
-        # piling up with every retry. Converting the failure also matters on its
-        # own: an exception escaping here carries a frame holding `env`, and
-        # Django's debug page prints frame locals verbatim.
+        # piling up with every retry. Converting the failure is what makes it a
+        # 503 the caller can wait out rather than a 500; its traceback reaches
+        # the log as this error's cause.
         if client is not None:
             client.close()
-        logger.exception("engine build failed")
-        raise EngineUnavailableError(
-            _("The question service could not start. See the server log.")
-        ) from exc
+        raise EngineUnavailableError("The question service could not start.") from exc
 
 
 @dataclass
@@ -370,9 +338,7 @@ def stream_answer(
     """
     asked_at = time.monotonic()
     if not _HOLDER.lock.acquire(timeout=QUEUE_TIMEOUT_SECONDS):
-        raise EngineBusyError(
-            _("The question service is busy answering another question. Try again shortly.")
-        )
+        raise EngineBusyError("The question service is busy answering another question.")
     try:
         if _HOLDER.engine is None:
             _HOLDER.engine = build_engine()

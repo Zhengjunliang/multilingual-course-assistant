@@ -13,6 +13,7 @@ runtime proving that PBKDF2 is expensive.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
@@ -275,15 +276,19 @@ def test_the_django_locale_maps_onto_the_one_rag_speaks() -> None:
 
 
 @pytest.mark.parametrize("logged_in", [True, False], ids=["logged-in", "anonymous"])
-def test_a_question_without_the_csrf_token_is_refused(student: User, logged_in: bool) -> None:
+def test_a_question_without_the_csrf_token_is_refused(
+    student: User, logged_in: bool, caplog: pytest.LogCaptureFixture
+) -> None:
     """A cookie rides along with every request the browser makes, including one
     a different site caused. The token is what separates those, and it is
     enforced before the handler, so a refused request costs no GPU at all.
 
-    Logged in, `SessionAuthentication` checks it while authenticating. Anonymous,
-    there is no session for that class to check, and the view's permission
-    class does it instead (apps/accounts/permissions.py): without it any site
-    could ask from a visitor's browser, on the visitor's rate limit.
+    Logged in, the session authentication checks it while authenticating.
+    Anonymous, there is no session for that class to check, and the view's
+    permission class does it instead (apps/accounts/permissions.py): without it
+    any site could ask from a visitor's browser, on the visitor's rate limit.
+    Either way the code is its own, not `PERMISSION_DENIED`: what the reader
+    needs is a reload, and Django's reason is in the log.
     """
     client = APIClient(enforce_csrf_checks=True)
     if logged_in:
@@ -293,11 +298,12 @@ def test_a_question_without_the_csrf_token_is_refused(student: User, logged_in: 
     # pass this test with no CSRF check at all.
     body = {"question": "What is an ORM?"} if logged_in else {"question": "?", "history": []}
 
-    response = client.post(ASK_URL, body, format="json")
+    with caplog.at_level(logging.INFO, logger="apps.accounts.authentication"):
+        response = client.post(ASK_URL, body, format="json")
 
-    assert response.status_code == 403
-    assert refused(response) == ("PERMISSION_DENIED", {})
+    assert (response.status_code, refused(response)) == (403, ("CSRF_FAILED", {}))
     assert engine_module._HOLDER.engine is None
+    assert "CSRF check failed: CSRF cookie not set." in caplog.messages
 
 
 @pytest.mark.parametrize("logged_in", [True, False], ids=["logged-in", "anonymous"])
@@ -341,7 +347,7 @@ def test_signing_in_without_the_csrf_token_is_refused(
 
     response = client.post(url, {"username": username, "password": PASSWORD}, format="json")
 
-    assert response.status_code == 403
+    assert (response.status_code, refused(response)) == (403, ("CSRF_FAILED", {}))
     assert "sessionid" not in response.cookies
 
 

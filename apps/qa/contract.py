@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from config.errors import ErrorBody
 from rag.agent import RouteDecision
 from rag.answer import source_marker
 
@@ -190,37 +191,17 @@ class EndEvent(Event):
 
 
 class ErrorEvent(Event):
-    """Generation failed after the response had already started.
+    """The answer failed after the response had already started.
 
     By then there is no status code left to send, so this stands in for the 503
     the same failure would have produced a moment earlier — apps/qa/views.py
-    draws that line. `detail` is written for whoever called the API.
+    draws that line — and carries the body that 503 would have: `ENGINE_DOWN`,
+    under the id of the request (config/errors.py).
     """
 
     NAME = "error"
 
-    detail: str
-
-
-class Unavailable(BaseModel):
-    """The body of the 503 this endpoint sends before a stream has begun.
-
-    Not an event — by definition it happens while a status code is still
-    available (apps/qa/views.py draws that line) — but part of the same wire
-    contract, so it is declared here and mirrored on the client like the rest.
-
-    `detail` keeps DRF's shape. `reason` is what makes the two collapsed cases
-    tellable apart: `busy` is somebody else's question still being answered and
-    is worth retrying in a moment, `unavailable` is a service the answer needs —
-    the model server or the Qdrant service — that is not running and will not
-    start by asking again. Without it a client counts down and retries forever
-    against an outage.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    detail: str
-    reason: Literal["busy", "unavailable"]
+    error: ErrorBody
 
 
 def sse(name: str, data: str) -> str:

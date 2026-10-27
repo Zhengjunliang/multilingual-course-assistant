@@ -36,7 +36,6 @@ from apps.qa.contract import (
     ErrorEvent,
     StartEvent,
     TokenEvent,
-    Unavailable,
 )
 from apps.qa.models import HISTORY_WINDOW_TURNS
 from apps.qa.serializers import (
@@ -61,8 +60,8 @@ CONVERSATION_MIRROR = API / "conversations.ts"
 
 # Every model that crosses the wire. `RouteDecision` is here because `StartEvent`
 # embeds it verbatim rather than copying its fields (apps/qa/contract.py), so the
-# client has to know its shape too. `Unavailable` is not an event at all — it is
-# the 503 body — but it is the same wire and drifts the same way.
+# client has to know its shape too. The `ErrorBody` an `error` event carries is
+# every error body's, mirrored in `api/errors.ts` (tests/test_error_contract.py).
 MIRRORED: tuple[type[BaseModel], ...] = (
     RouteDecision,
     Citation,
@@ -70,7 +69,6 @@ MIRRORED: tuple[type[BaseModel], ...] = (
     TokenEvent,
     EndEvent,
     ErrorEvent,
-    Unavailable,
 )
 
 FIELDS = [(model.__name__, field) for model in MIRRORED for field in model.model_fields]

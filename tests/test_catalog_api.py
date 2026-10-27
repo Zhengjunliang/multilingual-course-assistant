@@ -296,12 +296,12 @@ def rolled_back[T](call: Callable[[], T]) -> T:
 def test_a_write_without_the_csrf_token_is_refused() -> None:
     w = world()
     client = APIClient(enforce_csrf_checks=True)
-    # The secretariat may assign here, so a 403 is the missing token's.
+    # The secretariat may assign here: the refusal is the missing token's.
     client.force_login(w.secretariat)
 
     response = client.post(teachers(w.ppm_new), {"username": "student"})
 
-    assert (response.status_code, code_of(response)) == (403, "PERMISSION_DENIED")
+    assert (response.status_code, code_of(response)) == (403, "CSRF_FAILED")
     assert not RoleAssignment.objects.filter(user=w.student).exists()
 
 

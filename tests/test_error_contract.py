@@ -5,13 +5,15 @@ shadow, read as text the way tests/test_qa_contract.py reads the answer
 stream's: each code's status, kind and data, each field reason's data, and the
 body's field names are compared both ways, since the page picks a sentence by
 the code's string and fills it from `data` by name, neither of which a type
-error would catch.
+error would catch. And each code and reason is used somewhere in `apps/` or
+`config/`, read off their syntax trees.
 
 No `django_db` marker: building an error reaches no database.
 """
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 from pathlib import Path
@@ -47,7 +49,8 @@ if TYPE_CHECKING:
 
     from config.errors import ErrorData
 
-MIRROR = Path(__file__).resolve().parent.parent / "frontend" / "src" / "api" / "errors.ts"
+ROOT = Path(__file__).resolve().parent.parent
+MIRROR = ROOT / "frontend" / "src" / "api" / "errors.ts"
 
 # `NAME: { status: 400, kind: "fixable", dataKeys: [] }`, on one line or wrapped.
 CODE_ROW = re.compile(r'(\w+): \{\s*status: (\d+),\s*kind: "(\w+)",\s*dataKeys: \[([^\]]*)\]')
@@ -118,6 +121,67 @@ def test_the_mirror_declares_exactly_the_bodys_fields(mirror: str) -> None:
     assert {model.__name__: declared_shape(mirror, model.__name__) for model in models} == {
         model.__name__: shape(model) for model in models
     }
+
+
+TABLES = (ErrorCode, FieldReason)
+EVERY_MEMBER = {f"{table.__name__}.{member.name}" for table in TABLES for member in table}
+# The tables that define the members, which naming one there does not use.
+DEFINING = {"SPEC", "FIELD_SPEC"}
+
+
+def named(source: str) -> set[str]:
+    """The members a module names, `ErrorCode.NOT_FOUND`, outside `DEFINING`."""
+    found: set[str] = set()
+    for statement in ast.parse(source).body:
+        if isinstance(statement, ast.Assign):
+            targets = statement.targets
+        elif isinstance(statement, ast.AnnAssign):
+            targets = [statement.target]
+        else:
+            targets = []
+        if any(isinstance(target, ast.Name) and target.id in DEFINING for target in targets):
+            continue
+        found |= {
+            f"{node.value.id}.{node.attr}"
+            for node in ast.walk(statement)
+            if isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in {table.__name__ for table in TABLES}
+        }
+    return found
+
+
+@pytest.fixture(scope="module")
+def uses() -> dict[Path, set[str]]:
+    sources = {
+        path: path.read_text(encoding="utf-8")
+        for package in ("apps", "config")
+        for path in (ROOT / package).rglob("*.py")
+    }
+    # Only a module that spells a table's name can name a member of it, and
+    # parsing the rest, migrations above all, is most of the time.
+    return {
+        path: named(source)
+        for path, source in sources.items()
+        if any(table.__name__ in source for table in TABLES)
+    }
+
+
+def test_every_code_and_reason_is_raised_mapped_or_read(uses: dict[Path, set[str]]) -> None:
+    """One nothing uses is an error that cannot happen, with a sentence in three
+    catalogues for it: deleted, not kept."""
+    assert EVERY_MEMBER - set().union(*uses.values()) == set()
+
+
+def test_a_code_that_loses_its_only_use_is_reported(uses: dict[Path, set[str]]) -> None:
+    """The check above, against a tree whose one CSRF refusal became another code."""
+    [only] = [path for path, found in uses.items() if "ErrorCode.CSRF_FAILED" in found]
+    source = only.read_text(encoding="utf-8")
+    lost = named(source.replace("ErrorCode.CSRF_FAILED", "ErrorCode.PERMISSION_DENIED"))
+
+    used = set().union(*(found for path, found in uses.items() if path != only), lost)
+
+    assert EVERY_MEMBER - used == {"ErrorCode.CSRF_FAILED"}
 
 
 class Probe(serializers.Serializer):

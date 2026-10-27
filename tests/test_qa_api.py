@@ -31,6 +31,7 @@ tests/test_accounts_api.py against a real one.
 
 import dataclasses
 import json
+import logging
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
@@ -53,10 +54,11 @@ from test_index import StubDense, StubSparse, make_chunk
 from apps.accounts.models import User
 from apps.qa import engine as engine_module
 from apps.qa import views as views_module
-from apps.qa.engine import Engine
+from apps.qa.engine import LLM_DOWN, Engine
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from apps.qa.serializers import MAX_HISTORY_ANSWER_CHARS, MAX_QUESTION_CHARS
 from config.env import env
+from config.request_id import RequestIdFilter
 from rag import index as rag_index
 from rag import search as rag_search
 from rag.chunk import Chunk
@@ -169,6 +171,18 @@ def install_engine(
     )
     engine_module._HOLDER.engine = engine
     return engine
+
+
+def install_dead_generation(client: QdrantClient) -> None:
+    """An engine whose generation endpoint dies once the stream has begun."""
+    engine = install_engine(client, SLIDES_ROUTE)
+    engine_module._HOLDER.engine = dataclasses.replace(engine, streamer=DeadStreamer())
+
+
+def install_refusing_router(client: QdrantClient) -> None:
+    """An engine whose model server refuses the router, before the stream has begun."""
+    engine = install_engine(client, SLIDES_ROUTE)
+    engine_module._HOLDER.engine = dataclasses.replace(engine, completer=RefusingCompleter())
 
 
 def student() -> User:
@@ -486,35 +500,53 @@ def test_a_generation_failure_ends_the_stream_without_an_end_event(index: Qdrant
     """Once the first event is out, the status code is spent. The failure that
     used to be a 503 has to travel inside the stream instead — and the absence
     of `end` is what tells the client the answer it holds is a fragment."""
-    engine = install_engine(index, SLIDES_ROUTE)
-    engine_module._HOLDER.engine = Engine(
-        client=engine.client,
-        dense=engine.dense,
-        sparse=engine.sparse,
-        reranker=None,
-        completer=ScriptedCompleter([SLIDES_ROUTE]),
-        streamer=DeadStreamer(),
-    )
+    install_dead_generation(index)
     response = ask()
 
     assert response.status_code == 200
     stream = events(response)
     assert names(stream) == ["start", "error"]
-    assert "model server" in stream[-1][1]["detail"]
+    assert stream[-1][1]["error"]["code"] == "ENGINE_DOWN"
 
 
-def test_an_unbuilt_index_becomes_503(tmp_path: Path) -> None:
-    """A fresh checkout has no collection; the answer is a remedy, not a 500.
+def test_a_failure_inside_the_stream_is_one_line_under_the_requests_id(
+    index: QdrantClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The stream is read after the response has left the middleware that set
+    the request's id (config/request_id.py), and its event and its log line
+    still carry the id in the response's header. The engine's sentence, which
+    names the model server, is in that line and not in the event (#14)."""
+    install_dead_generation(index)
+    caplog.handler.addFilter(RequestIdFilter())
+
+    with caplog.at_level(logging.WARNING):
+        response = ask()
+        error = events(response)[-1][1]["error"]
+
+    request_id = response["X-Request-ID"]
+    [line] = caplog.records
+    assert (line.levelno, getattr(line, "request_id", None)) == (logging.ERROR, request_id)
+    assert error["request_id"] == request_id
+    assert LLM_DOWN in caplog.text
+    assert "model server" not in json.dumps(error)
+
+
+def test_an_unbuilt_index_becomes_503(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """A fresh checkout has no collection: an outage, not a 500. The remedy is a
+    server command, so it is in the log line for the 503 and not in its body (#14).
 
     Retrieval runs before the first event, so this one is still a status code —
     that boundary is the whole reason the view primes the stream by hand.
     """
     empty = open_client(tmp_path / "empty")
     install_engine(empty, SLIDES_ROUTE)
-    response = ask()
+    with caplog.at_level(logging.ERROR, logger="config.errors"):
+        response = ask()
     empty.close()
-    assert response.status_code == 503
-    assert "rag.index" in response.json()["detail"]
+
+    assert (response.status_code, refused(response)) == (503, ("ENGINE_DOWN", {}))
+    assert "rag.index" not in response.content.decode()
+    assert "uv run python -m rag.index" in caplog.text
 
 
 def unparsable_reply() -> ValidationError:
@@ -564,26 +596,30 @@ def test_an_index_server_that_fails_is_a_503_only_when_unreachable(
         assert line.exc_info[0] is ResponseHandlingException
         return
     response = ask()
-    assert response.status_code == 503
-    assert "Qdrant service" in response.json()["detail"]
+    assert (response.status_code, refused(response)) == (503, ("ENGINE_DOWN", {}))
+    assert "Qdrant" not in response.content.decode()
 
 
-def test_a_router_the_server_refuses_becomes_503(index: QdrantClient) -> None:
+def test_a_router_the_server_refuses_becomes_503(
+    index: QdrantClient, caplog: pytest.LogCaptureFixture
+) -> None:
     """The first-run mistake — the model was never pulled — reaches routing
     before generation, so it lands on the side of the boundary where a status
-    code is still available."""
-    engine = install_engine(index, SLIDES_ROUTE)
-    engine_module._HOLDER.engine = Engine(
-        client=engine.client,
-        dense=engine.dense,
-        sparse=engine.sparse,
-        reranker=None,
-        completer=RefusingCompleter(),
-        streamer=ScriptedStreamer(["unreachable"]),
-    )
-    response = ask()
-    assert response.status_code == 503
-    assert "model server" in response.json()["detail"]
+    code is still available.
+
+    One line in the log for it, the 503's, with the engine's error and the
+    server's refusal as its causes: the engine writes none of its own."""
+    install_refusing_router(index)
+
+    with caplog.at_level(logging.WARNING):
+        response = ask()
+
+    assert (response.status_code, refused(response)) == (503, ("ENGINE_DOWN", {}))
+    assert [record.getMessage() for record in caplog.records] == [
+        "POST api/ask 503 ENGINE_DOWN: A service the answer needs is not running."
+    ]
+    assert LLM_DOWN in caplog.text
+    assert "model 'qwen3:4b' not found" in caplog.text
 
 
 def test_a_both_route_survives_a_collection_the_index_never_built(tmp_path: Path) -> None:
@@ -635,7 +671,7 @@ def test_a_failed_build_releases_the_index_and_is_not_cached(
 def test_a_qdrant_url_the_client_cannot_parse_is_a_503(monkeypatch: pytest.MonkeyPatch) -> None:
     """config/env.py checks only the scheme; qdrant-client parses the rest when
     the client is built. A failure there is converted like any other build
-    failure, so no frame holding `env` reaches Django's debug page."""
+    failure, into a 503."""
     monkeypatch.setattr(env, "qdrant_url", "http://127.0.0.1:65536")
 
     def unreachable(*_: object, **__: object) -> object:
@@ -786,15 +822,7 @@ def test_a_generation_failure_keeps_the_fragment_and_marks_it_incomplete(
 ) -> None:
     """What the student saw is what is stored. The fragments are also the raw
     material for M3's error taxonomy, which deleting them would throw away."""
-    engine = install_engine(index, SLIDES_ROUTE)
-    engine_module._HOLDER.engine = Engine(
-        client=engine.client,
-        dense=engine.dense,
-        sparse=engine.sparse,
-        reranker=None,
-        completer=ScriptedCompleter([SLIDES_ROUTE]),
-        streamer=DeadStreamer(),
-    )
+    install_dead_generation(index)
     events(ask())
 
     role, text, complete = turns_of(only_conversation())[1]
@@ -861,21 +889,17 @@ def test_a_busy_engine_and_a_dead_one_are_told_apart(
     finally:
         engine_module._HOLDER.lock.release()
 
-    assert busy.json()["reason"] == "busy"
+    assert (busy.status_code, refused(busy)) == (503, ("UNAVAILABLE", {}))
+    assert busy.json()["error"]["data"] == {"retry_after_seconds": views_module.RETRY_AFTER_SECONDS}
 
 
 def test_an_outage_is_not_worth_retrying(index: QdrantClient) -> None:
-    engine = install_engine(index, SLIDES_ROUTE)
-    engine_module._HOLDER.engine = Engine(
-        client=engine.client,
-        dense=engine.dense,
-        sparse=engine.sparse,
-        reranker=None,
-        completer=RefusingCompleter(),
-        streamer=ScriptedStreamer(["unreachable"]),
-    )
+    install_refusing_router(index)
 
-    assert ask().json()["reason"] == "unavailable"
+    response = ask()
+
+    assert refused(response) == ("ENGINE_DOWN", {})
+    assert "Retry-After" not in response.headers
 
 
 def test_a_follow_up_stays_in_the_same_conversation(index: QdrantClient) -> None:

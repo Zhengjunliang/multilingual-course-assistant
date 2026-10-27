@@ -142,7 +142,8 @@ AUTHENTICATION_BACKENDS = [
 # for one process; Redis arrives with Celery.
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
+        # DRF's session authentication, with a failed CSRF check refused by its own code.
+        "apps.accounts.authentication.CodedSessionAuthentication",
         # Basic only while developing, which is the point of the condition:
         # authentication runs before throttling (`APIView.initial`), so a wrong
         # password is refused without ever reaching a rate limit. Deployed, that

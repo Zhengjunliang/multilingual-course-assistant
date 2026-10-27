@@ -9,6 +9,8 @@
  * copied verbatim rather than camelCased.
  */
 
+import type { ErrorBody } from "./errors";
+
 /** `rag.agent.RouteDecision` — the router owns this schema. */
 export interface RouteDecision {
   target: "slides" | "unifi_web" | "both";
@@ -73,23 +75,12 @@ export interface TokenEvent {
 /** The answer is complete. Empty on purpose: its arrival is the message. */
 export type EndEvent = Record<string, never>;
 
-/** Generation failed after the response had already started. */
-export interface ErrorEvent {
-  detail: string;
-}
-
 /**
- * The body of the 503 sent before a stream has begun.
- *
- * `reason` separates the two failures that otherwise arrive identically:
- * `busy` is another question still being answered and clears on its own,
- * `unavailable` is a service the answer needs (the model server or the Qdrant
- * service) that is not running and will not start because we asked again.
- * Only the first is worth an automatic retry.
+ * The answer failed after the response had already started: the body the same
+ * failure would have carried as a 503 a moment earlier.
  */
-export interface Unavailable {
-  detail: string;
-  reason: "busy" | "unavailable";
+export interface ErrorEvent {
+  error: ErrorBody;
 }
 
 /**
