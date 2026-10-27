@@ -24,10 +24,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, FieldError, Select } from "@/components/ui/field";
 import { ToggleGroup } from "@/components/ui/toggle-group";
-import { describeError } from "@/lib/errorText";
+import type { ErrorText, Sentence } from "@/lib/errorText";
 import { useFailure } from "../context";
 import { isForbidden, isNotFound } from "../errors";
-import { Forbidden } from "../Refusal";
+import { Forbidden, WriteFailure } from "../Refusal";
 import {
   bookLanguages,
   changes,
@@ -67,10 +67,10 @@ export function ReadingDialog({
   const languages = useMemo(() => bookLanguages(i18n.language), [i18n.language]);
   const [shownFor, setShownFor] = useState<ReadingItem | "new" | null>(null);
   const [draft, setDraft] = useState<Draft>(() => draftOf("new", language));
-  const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<FieldName, Sentence>>>({});
   const [running, setRunning] = useState(false);
   const [forbidden, setForbidden] = useState(false);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<ErrorText | null>(null);
 
   // A dialog opened for another book starts from that book.
   if (book !== shownFor) {
@@ -117,27 +117,32 @@ export function ReadingDialog({
         onClose();
         return;
       }
-      const { fieldSentences } = describeError(error, { shownFields: FIELDS });
-      const refused: Partial<Record<FieldName, string>> = {};
+      const said = fail(error, { shownFields: FIELDS });
+      const refused: Partial<Record<FieldName, Sentence>> = {};
       for (const field of FIELDS) {
-        const sentence = fieldSentences[field]?.[0];
-        if (sentence !== undefined) refused[field] = t(sentence.key, sentence.values);
+        const sentence = said.fieldSentences[field]?.[0];
+        if (sentence !== undefined) refused[field] = sentence;
       }
       const first = FIELDS.find((field) => refused[field] !== undefined);
       if (first !== undefined) {
         setErrors(refused);
         document.getElementById(`${id}-${first}`)?.focus();
       } else if (isForbidden(error)) setForbidden(true);
-      else setRefusal(fail(error));
+      else setRefusal(said);
     } finally {
       setRunning(false);
     }
   };
 
+  const errorOf = (name: FieldName) => {
+    const sentence = errors[name];
+    return sentence === undefined ? undefined : t(sentence.key, sentence.values);
+  };
+
   const field = (name: "title" | "authors" | "year" | "isbn" | "url") => ({
     id: `${id}-${name}`,
     value: draft[name],
-    error: errors[name],
+    error: errorOf(name),
     onChange: (event: { target: { value: string } }) => set(name, event.target.value),
   });
 
@@ -205,7 +210,7 @@ export function ReadingDialog({
       <Choice
         id={`${id}-importance`}
         label={t("staff.readings.field.importance")}
-        error={errors.importance}
+        error={errorOf("importance")}
       >
         <ToggleGroup
           label={t("staff.readings.field.importance")}
@@ -221,16 +226,12 @@ export function ReadingDialog({
         id={`${id}-locale`}
         label={t("staff.readings.field.locale")}
         value={draft.locale}
-        error={errors.locale}
+        error={errorOf("locale")}
         onChange={(event) => set("locale", event.target.value)}
         options={languages}
       />
       {forbidden && <Forbidden permission="edition.edit_content" />}
-      {refusal !== null && (
-        <p role="alert" className="text-body text-warn-ink">
-          {refusal}
-        </p>
-      )}
+      {refusal !== null && <WriteFailure text={refusal} />}
     </Dialog>
   );
 }

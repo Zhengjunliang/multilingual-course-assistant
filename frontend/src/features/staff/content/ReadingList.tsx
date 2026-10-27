@@ -31,9 +31,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { ErrorText } from "@/lib/errorText";
 import { type Loaded, useFailure } from "../context";
 import { isForbidden, isNotFound } from "../errors";
-import { Forbidden, PartFailure } from "../Refusal";
+import { Forbidden, PartFailure, WriteFailure } from "../Refusal";
 import { ReadingDialog } from "./ReadingDialog";
 import { bookLanguage } from "./readingDraft";
 
@@ -56,7 +57,7 @@ export function ReadingList({ edition, books, language, editable, reloadPage }: 
   const [editing, setEditing] = useState<ReadingItem | "new" | null>(null);
   const [removing, setRemoving] = useState<ReadingItem | null>(null);
   const [forbidden, setForbidden] = useState(false);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<ErrorText | null>(null);
   const add = useRef<HTMLButtonElement>(null);
   const opener = useRef<HTMLElement | null>(null);
 
@@ -233,11 +234,7 @@ export function ReadingList({ edition, books, language, editable, reloadPage }: 
         onCloseAutoFocus={returnFocus}
       >
         {forbidden && <Forbidden permission="edition.edit_content" />}
-        {refusal !== null && (
-          <p role="alert" className="text-body text-warn-ink">
-            {refusal}
-          </p>
-        )}
+        {refusal !== null && <WriteFailure text={refusal} />}
       </AlertDialog>
     </section>
   );
