@@ -1,4 +1,4 @@
-"""The one view Django serves that is not an API: the SPA's shell.
+"""The views Django serves outside the apps: the SPA's shell, and the API's fallbacks.
 
 Every path the SPA routes to on its own — `/`, `/login`, `/c/7` — has to answer
 something when the reader reloads it or pastes the link back in, because at
@@ -16,18 +16,28 @@ built would answer with a stack trace instead of the sentence that fixes it.
 And frontend/index.html contains no Django template syntax at all. Handing it
 to the template engine adds a way for it to fail — the day some Vite plugin
 inlines a script holding `{{` — in exchange for nothing.
+
+An `/api/` path no view has, and a 500 no API view answered itself, are
+answered in the API's coded error body (config/errors.py) rather than with a
+page of HTML, which a caller would meet as a JSON parse error.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils.translation import gettext_lazy as _
+from django.views import defaults
+from rest_framework.permissions import AllowAny
+from rest_framework.views import APIView
+
+from config.errors import SPEC, ErrorCode, error_body, fail
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
+    from rest_framework.request import Request
 
 # Written for whoever is running the server, because they are the only person
 # who can act on it: the shell is missing exactly when the frontend has never
@@ -55,3 +65,25 @@ def spa(request: HttpRequest) -> HttpResponse:
             str(MISSING_BUILD), status=503, content_type="text/plain; charset=utf-8"
         )
     return HttpResponse(shell, content_type="text/html; charset=utf-8")
+
+
+class ApiNotFound(APIView):
+    """Every `/api/` path no view has, whatever the method: `NOT_FOUND`.
+
+    It refuses before reading who asks, so an unknown path answers anyone the
+    same, and before the method is looked at, which no view here has.
+    """
+
+    authentication_classes = ()
+    permission_classes = (AllowAny,)
+
+    def initial(self, request: Request, *args: Any, **kwargs: Any) -> None:
+        fail(ErrorCode.NOT_FOUND)
+
+
+def server_error(request: HttpRequest) -> HttpResponse:
+    """A 500 that no API view answered itself (`handler500`): the coded body under `/api/`."""
+    if request.path.startswith("/api/"):
+        status = SPEC[ErrorCode.INTERNAL].status
+        return JsonResponse(error_body(ErrorCode.INTERNAL), status=status)
+    return defaults.server_error(request)

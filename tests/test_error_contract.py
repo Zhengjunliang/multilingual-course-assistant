@@ -41,7 +41,7 @@ from config.request_id import RequestIdMiddleware
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from django.http import HttpRequest
+    from django.http import HttpRequest, HttpResponseBase
     from django.test import RequestFactory
     from pydantic import BaseModel
 
@@ -67,6 +67,19 @@ def table(mirror: str, name: str) -> str:
 
 def keys(array: str) -> frozenset[str]:
     return frozenset(re.findall(r'"(\w+)"', array))
+
+
+def refused(response: HttpResponseBase) -> tuple[str, dict[str | None, list[str]]]:
+    """A refusal as a page reads it: its code, and the reasons of each field it rejected.
+
+    The other API tests read their refusals through this, so none of them leans
+    on the body's layout or on its English message.
+    """
+    error = response.json()["error"]  # pyright: ignore[reportAttributeAccessIssue]
+    fields: dict[str | None, list[str]] = {}
+    for violation in error["fields"]:
+        fields.setdefault(violation["field"], []).append(violation["reason"])
+    return error["code"], fields
 
 
 def test_the_mirror_holds_every_code_with_its_status_kind_and_data(mirror: str) -> None:

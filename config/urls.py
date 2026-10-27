@@ -8,7 +8,8 @@ patterns after `include("apps.qa.urls")` declines a path, so a bare `^.*$`
 would answer `/api/typo` with a page of HTML and a 200 — leaving a caller to
 discover their typo as a JSON parse error on `<!doctype html>`, a symptom that
 points nowhere near its cause. Excluding the prefixes Django owns lets a wrong
-API path be the 404 it is.
+API path be the 404 it is, which `ApiNotFound` answers in the API's own error
+body, as `handler500` does a 500 no API view answered (config/views.py).
 
 `/favicon.ico` is asked for at the root by whatever does not read the page's
 `<link rel="icon">` (feed readers, bookmark tools, a browser's first guess).
@@ -21,13 +22,15 @@ from django.templatetags.static import static
 from django.urls import include, path, re_path
 from django.views.generic import RedirectView
 
-from config.views import spa
+from config.errors import UNMATCHED
+from config.views import ApiNotFound, spa
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.accounts.urls")),
     path("api/catalog/", include("apps.catalog.urls")),
     path("api/", include("apps.qa.urls")),
+    re_path(r"^api/", ApiNotFound.as_view(), name=UNMATCHED),
     path(
         "favicon.ico",
         RedirectView.as_view(url=static("favicon.ico"), permanent=True),
@@ -35,3 +38,5 @@ urlpatterns = [
     ),
     re_path(r"^(?!api/|admin/|static/).*$", spa, name="spa"),
 ]
+
+handler500 = "config.views.server_error"

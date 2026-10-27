@@ -62,6 +62,9 @@ OPEN: dict[str, str] = {
         "an anonymous student may ask campus questions; AskView stores nothing for them "
         "and answers them from no course material"
     ),
+    "api-unmatched": (
+        "an /api/ path no view has: ApiNotFound answers NOT_FOUND before reading who asks"
+    ),
     "spa": "the shell is static HTML; every call it makes is an API route checked here",
     "favicon": "a redirect to a public static file, reading nothing",
 }

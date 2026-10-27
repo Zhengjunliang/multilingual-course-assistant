@@ -44,9 +44,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from django.http import StreamingHttpResponse
-from django.utils.translation import gettext_lazy as _
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -70,6 +68,7 @@ from apps.qa.conversations import (
 )
 from apps.qa.engine import EngineBusyError, EngineUnavailableError, stream_answer
 from apps.qa.serializers import AskRequest
+from config.errors import ErrorCode, fail
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterator, Mapping
@@ -289,10 +288,9 @@ class AskView(APIView):
                 # Closed here rather than left to garbage collection: closing is
                 # what runs the engine's `finally` and frees the one answer slot.
                 events.close()
-                # A list, as the serializer's own refusal of an unknown id has
-                # it (apps/qa/serializers.py): one error, one shape, whenever it
-                # is found.
-                raise ValidationError({"conversation_id": [_("No such conversation.")]}) from None
+                # The serializer's own refusal of an unknown id
+                # (apps/qa/serializers.py): one error, whenever it is found.
+                fail(ErrorCode.CONVERSATION_GONE)
 
         return StreamingHttpResponse(
             _EventStream(first, events, answer_pk),

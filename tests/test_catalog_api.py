@@ -50,11 +50,10 @@ def as_user(user: User | None) -> APIClient:
     return client
 
 
-def code_of(response: HttpResponseBase) -> str | None:
-    """The code of a refusal of the whole request; None when Django, not DRF, answered."""
-    if not response["Content-Type"].startswith("application/json"):
-        return None
-    return response.json()["detail"]["code"]  # pyright: ignore[reportAttributeAccessIssue]
+def code_of(response: HttpResponseBase) -> str:
+    """The code of a refusal of the whole request, in the coded body or the staff envelope."""
+    body = response.json()  # pyright: ignore[reportAttributeAccessIssue]
+    return body["error"]["code"] if "error" in body else body["detail"]["code"]
 
 
 def row_label(row: dict[str, Any]) -> str:
@@ -573,8 +572,8 @@ def test_staff_requests_that_change_nothing(
         "DELETE on the collection": (405, "method_not_allowed"),
         "OPTIONS on the collection": (405, "method_not_allowed"),
         # No route matches, so Django answers before any view, with no code.
-        "a programme code with a NUL byte": (404, None),
-        "a username with a NUL byte": (404, None),
+        "a programme code with a NUL byte": (404, "NOT_FOUND"),
+        "a username with a NUL byte": (404, "NOT_FOUND"),
     }
     assert RoleAssignment.objects.count() == rows
     assert grant_lines(caplog) == []
