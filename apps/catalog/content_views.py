@@ -21,10 +21,7 @@ from typing import TYPE_CHECKING
 
 import psycopg
 from django.db import IntegrityError, transaction
-from django.http import Http404
-from django.utils.translation import gettext_lazy as _
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from apps.catalog.content_serializers import (
@@ -36,6 +33,7 @@ from apps.catalog.models import CourseEdition, ReadingItem, Syllabus, SyllabusSe
 from apps.catalog.views import EditionView
 from apps.roles.registry import Permission
 from apps.roles.scopes import editions_for
+from config.errors import ErrorCode, FieldReason, fail, field_error
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -120,10 +118,7 @@ class _Books(_EditionContent):
                 and cause.diag.constraint_name == "catalog_reading_unique_title"
             ):
                 raise
-            raise ValidationError(
-                {"title": [_("This title is already on the list.")]},
-                code="unique",
-            ) from None
+            raise field_error(FieldReason.ALREADY_EXISTS, field="title") from None
 
 
 class EditionReadingsView(_Books):
@@ -153,7 +148,7 @@ class EditionReadingView(_Books):
     def book(self, item: int) -> ReadingItem:
         found = self.books().filter(pk=item).first()
         if found is None:
-            raise Http404
+            fail(ErrorCode.NOT_FOUND)
         return found
 
     def patch(self, request: Request, pk: int, item: int) -> Response:

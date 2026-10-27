@@ -5,12 +5,12 @@
 tests/test_qa_contract.py reads the answer stream's mirror: the fields a
 serializer declares and the field names of the interface of the same name are
 one set, so neither side can add a field the other lacks. The permission
-names, the code sources, the syllabus sections, the importances and the error
-codes are compared both ways, since the SPA matches them as strings: a misspelt
-permission would hide a button, a misspelt code show the general sentence,
-without any type error. The languages a book may be written in are held one
-way only, inside Django's table: a Django that adds a language leaves the
-form a language short, never offering one the server refuses.
+names, the code sources, the syllabus sections and the importances are
+compared both ways, since the SPA matches them as strings: a misspelt
+permission would hide a button without any type error. The languages a book
+may be written in are held one way only, inside Django's table: a Django that
+adds a language leaves the form a language short, never offering one the
+server refuses.
 """
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ from apps.catalog.content_serializers import (
     SyllabusSectionSerializer,
     SyllabusSerializer,
 )
-from apps.catalog.errors import DRF_CODES_SHOWN, StaffError
 from apps.catalog.models import CodeSource, Importance, SyllabusSection, TeachingPeriod
 from apps.catalog.serializers import (
     CourseSerializer,
@@ -86,14 +85,12 @@ def test_the_mirror_names_every_closed_set(mirror: str) -> None:
         union(mirror, "SyllabusSectionKey"),
         union(mirror, "TeachingPeriod"),
         union(mirror, "Importance"),
-        union(mirror, "StaffErrorCode"),
     ) == (
         set(Permission),
         set(CodeSource.values),
         set(SyllabusSection.values),
         set(TeachingPeriod.values),
         set(Importance.values),
-        set(StaffError) | DRF_CODES_SHOWN,
     )
 
 

@@ -12,9 +12,9 @@ from typing import Any
 
 from django.conf import settings
 from rest_framework import serializers
-from rest_framework.exceptions import NotFound
 
 from apps.catalog.models import ReadingItem, Syllabus
+from config.errors import ErrorCode, fail
 
 
 # `ModelSerializer[...]` for the reason apps/accounts/serializers.py gives, and
@@ -65,7 +65,7 @@ class ReadingItemSerializer(serializers.ModelSerializer[ReadingItem]):
         back.
         """
         if not ReadingItem.objects.filter(pk=instance.pk).update(**validated_data):
-            raise NotFound
+            fail(ErrorCode.NOT_FOUND)
         for field, value in validated_data.items():
             setattr(instance, field, value)
         return instance

@@ -275,26 +275,6 @@ export interface ReadingDraft {
   importance: Importance;
 }
 
-/**
- * The codes a staff page has words for (apps/catalog/errors.py): this
- * project's own, a closed set, and the few of DRF's the pages name. DRF's codes
- * are not a closed set, so any other one gets a general sentence.
- */
-export type StaffErrorCode =
-  | "no_such_user"
-  | "already_held"
-  | "required"
-  | "blank"
-  | "not_authenticated"
-  | "permission_denied"
-  | "not_found"
-  | "max_length"
-  | "invalid"
-  | "invalid_choice"
-  | "min_value"
-  | "max_value"
-  | "unique";
-
 /** Where staff members belong: an edition's teachers, or a programme's secretariat. */
 export type MemberScope = { kind: "edition"; id: number } | { kind: "programme"; code: string };
 

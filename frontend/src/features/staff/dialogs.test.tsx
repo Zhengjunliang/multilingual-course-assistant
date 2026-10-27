@@ -4,7 +4,7 @@
  * The two staff dialogs against each answer the server can give: the
  * write done, a refusal of the field, a missing permission, the object gone.
  * The network is faked at `fetch` with each refusal in both bodies the server
- * may send, the staff endpoints' envelope (config/exceptions.py) and the coded
+ * may send, the staff endpoints' envelope from before #186 and the coded
  * `{"error": ...}`, so the codes travel through `api/http.ts` as they would in
  * the application.
  */

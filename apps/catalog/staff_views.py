@@ -21,13 +21,9 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
-from django.http import Http404
-from django.utils.translation import gettext_lazy as _
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from apps.catalog.errors import StaffError
 from apps.catalog.models import CourseEdition, DegreeProgramme
 from apps.catalog.serializers import StaffMemberSerializer
 from apps.catalog.views import EditionView, ProgrammeView
@@ -35,6 +31,7 @@ from apps.roles.api import ScopedObjectView
 from apps.roles.grants import AlreadyHeldError, grant, revoke
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import GRANT_PERMISSION, Role
+from config.errors import ErrorCode, fail
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -66,10 +63,7 @@ class _StaffList[M: (CourseEdition, DegreeProgramme)](_Staff[M]):
         try:
             grant(cast("User", request.user), user, self.role, self.scope)
         except AlreadyHeldError:
-            raise ValidationError(
-                {"username": [_("This user already holds this role here.")]},
-                code=StaffError.ALREADY_HELD,
-            ) from None
+            fail(ErrorCode.ROLE_ALREADY_HELD)
         return Response(StaffMemberSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
@@ -77,7 +71,7 @@ class _StaffMember[M: (CourseEdition, DegreeProgramme)](_Staff[M]):
     def delete(self, request: Request, username: str, **kwargs: object) -> Response:
         row = self.rows().filter(user__username=username).first()
         if row is None or not revoke(cast("User", request.user), row):
-            raise Http404
+            fail(ErrorCode.NOT_FOUND)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

@@ -14,9 +14,6 @@ and a course is read by whoever views a programme that lists it
 goes through one queryset function below, so its cost does not grow with the
 rows it holds. Which edition is current is worked out on the day of the
 request (`with_current()`, apps/catalog/editions.py), so nothing here changes it.
-
-Every view here names each refusal with a code (`CodedErrors`,
-config/exceptions.py; the codes: apps/catalog/errors.py).
 """
 
 from __future__ import annotations
@@ -46,7 +43,6 @@ from apps.roles.api import ScopedObjectView
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Permission, Role
 from apps.roles.scopes import courses_for, editions_for, programmes_for
-from config.exceptions import CodedErrors
 
 if TYPE_CHECKING:
     from django.contrib.auth.base_user import AbstractBaseUser
@@ -108,7 +104,7 @@ def _programmes(
     )
 
 
-class ProgrammeListView(CodedErrors, ListAPIView[DegreeProgramme]):
+class ProgrammeListView(ListAPIView[DegreeProgramme]):
     permission_classes = (IsAuthenticated,)
     serializer_class = ProgrammeSerializer
     visible_with = Permission.PROGRAMME_VIEW
@@ -117,7 +113,7 @@ class ProgrammeListView(CodedErrors, ListAPIView[DegreeProgramme]):
         return _programmes(self.request.user, self.visible_with)
 
 
-class EditionListView(CodedErrors, ListAPIView[CourseEdition]):
+class EditionListView(ListAPIView[CourseEdition]):
     permission_classes = (IsAuthenticated,)
     serializer_class = EditionSerializer
     visible_with = Permission.EDITION_VIEW
@@ -208,7 +204,7 @@ class ProgrammeCoursesView(ProgrammeView):
         return Response(StudyPlanCourseSerializer(courses, many=True).data)
 
 
-class CourseDetailView(CodedErrors, RetrieveAPIView[Course]):
+class CourseDetailView(RetrieveAPIView[Course]):
     """`GET` reads one course, named by its code, with its entries in every programme.
 
     Not a `ScopedObjectView`: a course is no scope of the registry, so there
