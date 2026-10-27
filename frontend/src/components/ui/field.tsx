@@ -51,14 +51,22 @@ interface FieldErrorProps {
    */
   role?: "alert";
   children: ReactNode;
+  /**
+   * For a failure the reader can only report: its code and request id, on a
+   * second line in `text-caption` and `muted` (lib/errorText.ts).
+   */
+  reference?: string;
 }
 
 /** What was refused, in the warning's ink after an icon, under the field it is about. */
-export function FieldError({ id, role, children }: FieldErrorProps) {
+export function FieldError({ id, role, children, reference }: FieldErrorProps) {
   return (
     <p id={id} role={role} className="flex items-start gap-tight text-body text-warn-ink">
       <CircleAlert aria-hidden className="mt-hair size-icon shrink-0" />
-      <span>{children}</span>
+      <span className="flex flex-col">
+        <span>{children}</span>
+        {reference !== undefined && <span className="text-caption text-muted">{reference}</span>}
+      </span>
     </p>
   );
 }

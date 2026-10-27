@@ -2,15 +2,16 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, useLocation } from "react-router-dom";
 
-import { ApiError } from "@/api/http";
 import { useSession } from "@/auth/useSession";
 import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
 import { FieldError } from "@/components/ui/field";
+import { describeError, type ErrorText } from "@/lib/errorText";
 import { AuthButton, AuthLayout } from "./AuthLayout";
 import { useLanding } from "./landing";
 
 const FAILURE = "login-failure";
+const FIELDS = ["username", "password"];
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -18,7 +19,7 @@ export default function LoginPage() {
   const location = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState<ErrorText | null>(null);
 
   // Wherever `RequireSession` sent this reader from, or the front page.
   const back = (location.state as { from?: string } | null)?.from ?? "/";
@@ -34,6 +35,12 @@ export default function LoginPage() {
 
   if (account !== null && landing.phase === "idle") return <Navigate to={back} replace />;
 
+  // One line under the password says it all: a field's own words where the
+  // server named a field, else the sentence for the whole request. Rendered
+  // here rather than when it arrived, so a change of language rewords it.
+  const said = failure && (Object.values(failure.fieldSentences).flat()[0] ?? failure.sentence);
+  const reference = failure?.reference;
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (landing.phase !== "idle") return;
@@ -42,10 +49,10 @@ export default function LoginPage() {
       () => logIn(username, password),
       (error) => {
         // The server answers wrong password and unknown account identically on
-        // purpose (apps/accounts/serializers.py); this shows whatever it said
-        // and does not try to be more helpful than that. The password goes, as
-        // the macOS sign-in window empties it.
-        setFailure(error instanceof ApiError ? error.detail : t("auth.failed"));
+        // purpose (apps/accounts/serializers.py); this says what it said and
+        // does not try to be more helpful than that. The password goes, as the
+        // macOS sign-in window empties it.
+        setFailure(describeError(error, { shownFields: FIELDS }));
         setPassword("");
       },
     );
@@ -91,7 +98,14 @@ export default function LoginPage() {
           invalid={failure !== null}
           describedBy={failure !== null ? FAILURE : undefined}
         />
-        {failure !== null && <FieldError id={FAILURE}>{failure}</FieldError>}
+        {said !== null && (
+          <FieldError
+            id={FAILURE}
+            reference={reference ? t(reference.key, reference.values) : undefined}
+          >
+            {t(said.key, said.values)}
+          </FieldError>
+        )}
         <AuthButton phase={landing.phase}>{t("auth.logIn")}</AuthButton>
       </form>
     </AuthLayout>

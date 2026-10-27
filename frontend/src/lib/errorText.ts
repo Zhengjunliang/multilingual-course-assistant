@@ -32,8 +32,8 @@ export interface Sentence {
 export interface ErrorText {
   /** For the request as a whole. */
   sentence: Sentence;
-  /** For each refused field among `shownFields`, by its name. */
-  fieldSentences: Record<string, Sentence>;
+  /** For each refused field among `shownFields`, by its name, in the server's order. */
+  fieldSentences: Record<string, Sentence[]>;
   /** The code and the request id, for an error the reader can only report; null otherwise. */
   reference: Sentence | null;
 }
@@ -98,13 +98,14 @@ export function describeError(
   }
 
   const { code, data, requestId } = error;
-  const fieldSentences: Record<string, Sentence> = {};
+  const fieldSentences: Record<string, Sentence[]> = {};
   let whole: Sentence | undefined;
   let unshown = false;
   for (const violation of error.violations) {
     const { field } = violation;
     if (field === null) whole ??= fieldSentence(violation);
-    else if (shownFields.includes(field)) fieldSentences[field] ??= fieldSentence(violation);
+    else if (shownFields.includes(field))
+      fieldSentences[field] = [...(fieldSentences[field] ?? []), fieldSentence(violation)];
     else unshown = true;
   }
 
