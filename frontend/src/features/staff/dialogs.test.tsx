@@ -3,9 +3,10 @@
 /**
  * The two staff dialogs against each answer the server can give: the
  * write done, a refusal of the field, a missing permission, the object gone.
- * The network is faked at `fetch` with the server's own error envelope
- * (config/exceptions.py), so the codes travel through `api/http.ts` as they
- * would in the application.
+ * The network is faked at `fetch` with each refusal in both bodies the server
+ * may send, the staff endpoints' envelope (config/exceptions.py) and the coded
+ * `{"error": ...}`, so the codes travel through `api/http.ts` as they would in
+ * the application.
  */
 
 import { act, type ReactElement } from "react";
@@ -47,6 +48,22 @@ const REFUSED = {
   alreadyHeld: () => json({ username: [{ message: "Already held.", code: "already_held" }] }, 400),
   forbidden: () => json({ detail: { message: "No permission.", code: "permission_denied" } }, 403),
   gone: () => json({ detail: { message: "Not found.", code: "not_found" } }, 404),
+  broken: () => json({ detail: { message: "Server error.", code: "error" } }, 500),
+};
+
+function coded(status: number, code: string, fields: unknown[] = []): Response {
+  const error = { code, message: "Server's words.", data: {}, fields, request_id: "0".repeat(32) };
+  return json({ error }, status);
+}
+
+/** The same refusals in the coded body (#186). */
+const CODED = {
+  noSuchUser: () =>
+    coded(400, "INVALID_ARGUMENT", [{ field: "username", reason: "NO_SUCH_USER", data: {} }]),
+  alreadyHeld: () => coded(409, "ROLE_ALREADY_HELD"),
+  forbidden: () => coded(403, "PERMISSION_DENIED"),
+  gone: () => coded(404, "NOT_FOUND"),
+  broken: () => coded(500, "INTERNAL"),
 };
 
 let changed = 0;
@@ -207,7 +224,13 @@ describe("assigning a member", () => {
 
   it.each([
     ["no such user", REFUSED.noSuchUser, "Nessun utente con questo nome."],
+    ["no such user, coded", CODED.noSuchUser, "Nessun utente con questo nome."],
     ["one already holding the role", REFUSED.alreadyHeld, "Questo utente ha già questo ruolo qui."],
+    [
+      "one already holding the role, coded",
+      CODED.alreadyHeld,
+      "Questo utente ha già questo ruolo qui.",
+    ],
   ])("refuses %s at the field, which takes focus back", async (_, refusal, sentence) => {
     const seen = await assign(EDITION, refusal);
 
@@ -216,16 +239,42 @@ describe("assigning a member", () => {
   });
 
   it.each([
-    [EDITION, "edition.assign_teacher", "Puoi vedere questa edizione, ma non assegnare docenti."],
+    ["old", REFUSED.broken],
+    ["coded", CODED.broken],
+  ])(
+    "says a server error from the %s body in the catalogue's words, blaming no field",
+    async (_, refusal) => {
+      const seen = await assign(EDITION, refusal);
+
+      expect([seen.closed, seen.invalid, seen.focusedAfter]).toEqual([0, null, true]);
+      expect(seen.text).toContain("Qualcosa è andato storto. Riprova tra poco.");
+      expect(seen.text).not.toMatch(/Server/);
+    },
+  );
+
+  it.each([
+    [
+      EDITION,
+      REFUSED.forbidden,
+      "edition.assign_teacher",
+      "Puoi vedere questa edizione, ma non assegnare docenti.",
+    ],
+    [
+      EDITION,
+      CODED.forbidden,
+      "edition.assign_teacher",
+      "Puoi vedere questa edizione, ma non assegnare docenti.",
+    ],
     [
       B047,
+      REFUSED.forbidden,
       "programme.assign_secretariat",
       "Solo l'amministratore assegna la segreteria didattica.",
     ],
   ])(
     "names the missing permission under the field and leaves the button on",
-    async (scope, permission, sentence) => {
-      const seen = await assign(scope, REFUSED.forbidden);
+    async (scope, refusal, permission, sentence) => {
+      const seen = await assign(scope, refusal);
 
       // Focus back in the field, since the button was off while the request ran.
       expect([seen.closed, seen.submitOff, seen.focusedAfter]).toEqual([0, false, true]);
@@ -234,11 +283,17 @@ describe("assigning a member", () => {
     },
   );
 
-  it("closes and reads the page again when the scope is gone", async () => {
-    const seen = await assign(EDITION, REFUSED.gone);
+  it.each([
+    ["old", REFUSED.gone],
+    ["coded", CODED.gone],
+  ])(
+    "closes and reads the page again when the %s body says the scope is gone",
+    async (_, refusal) => {
+      const seen = await assign(EDITION, refusal);
 
-    expect([seen.closed, seen.changed]).toEqual([1, 1]);
-  });
+      expect([seen.closed, seen.changed]).toEqual([1, 1]);
+    },
+  );
 });
 
 describe("revoking a role", () => {
@@ -295,12 +350,18 @@ describe("revoking a role", () => {
     expect(seen.text).toContain("Mario Rossi · B047");
   });
 
-  it("takes a member gone elsewhere for the outcome asked for, and says so", async () => {
-    const seen = await revoke(REFUSED.gone);
+  it.each([
+    ["old", REFUSED.gone],
+    ["coded", CODED.gone],
+  ])(
+    "takes a member gone elsewhere, as the %s body says, for the outcome asked for, and says so",
+    async (_, refusal) => {
+      const seen = await revoke(refusal);
 
-    expect([seen.closed, seen.changed]).toEqual([1, 1]);
-    expect(seen.text).toContain("era già stato revocato altrove");
-  });
+      expect([seen.closed, seen.changed]).toEqual([1, 1]);
+      expect(seen.text).toContain("era già stato revocato altrove");
+    },
+  );
 
   it("closes without a toast when the page is gone too", async () => {
     readable = false;
@@ -310,10 +371,16 @@ describe("revoking a role", () => {
     expect(seen.text).not.toContain("Ruolo revocato");
   });
 
-  it("names the missing permission, leaves the button on and hands focus to Cancel", async () => {
-    const seen = await revoke(REFUSED.forbidden);
+  it.each([
+    ["old", REFUSED.forbidden],
+    ["coded", CODED.forbidden],
+  ])(
+    "names the missing permission from the %s body, leaves the button on and hands focus to Cancel",
+    async (_, refusal) => {
+      const seen = await revoke(refusal);
 
-    expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, false, "Annulla"]);
-    expect(seen.text).toContain("Permesso mancante: programme.assign_secretariat");
-  });
+      expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, false, "Annulla"]);
+      expect(seen.text).toContain("Permesso mancante: programme.assign_secretariat");
+    },
+  );
 });

@@ -79,29 +79,36 @@ describe("the reading list", () => {
     expect(seen).toEqual([[`PATCH ${BASE}/readings/21 {"year":"2022"}`], "2022"]);
   });
 
-  it("shows a title the list already holds under its field, the dialog kept open", async () => {
-    const { unmount } = open(true);
-    await settle();
-    await press("Aggiungi testo");
-    type(field("Titolo"), "Fisica II");
-    type(field("Autori"), "Mazzoldi");
-    await press("Salva");
-    const title = field("Titolo");
-    const seen = {
-      open: document.body.querySelector('[role="dialog"]') !== null,
-      invalid: title?.getAttribute("aria-invalid"),
-      error: text(document.getElementById(`${title?.id}-error`)),
-      focused: document.activeElement === title,
-    };
-    unmount();
+  it.each([
+    ["the staff envelope", false],
+    ["the coded body", true],
+  ])(
+    "shows a title the list already holds, refused in %s, under its field, the dialog kept open",
+    async (_, coded) => {
+      server.coded = coded;
+      const { unmount } = open(true);
+      await settle();
+      await press("Aggiungi testo");
+      type(field("Titolo"), "Fisica II");
+      type(field("Autori"), "Mazzoldi");
+      await press("Salva");
+      const title = field("Titolo");
+      const seen = {
+        open: document.body.querySelector('[role="dialog"]') !== null,
+        invalid: title?.getAttribute("aria-invalid"),
+        error: text(document.getElementById(`${title?.id}-error`)),
+        focused: document.activeElement === title,
+      };
+      unmount();
 
-    expect(seen).toEqual({
-      open: true,
-      invalid: "true",
-      error: "Questo titolo è già nell'elenco.",
-      focused: true,
-    });
-  });
+      expect(seen).toEqual({
+        open: true,
+        invalid: "true",
+        error: "Questo titolo è già nell'elenco.",
+        focused: true,
+      });
+    },
+  );
 
   it("removes a book only once the reader confirms", async () => {
     const { unmount } = open(true);

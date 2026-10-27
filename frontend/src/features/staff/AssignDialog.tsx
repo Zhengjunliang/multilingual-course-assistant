@@ -28,15 +28,9 @@ import { addMember, type MemberScope } from "@/api/catalog";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
+import { describeError } from "@/lib/errorText";
 import { useFailure } from "./context";
-import {
-  errorKey,
-  fieldErrorKey,
-  grantPermission,
-  isForbidden,
-  isHeldAlready,
-  isNotFound,
-} from "./errors";
+import { grantPermission, isForbidden, isHeldAlready, isNotFound } from "./errors";
 import { shownName } from "./people";
 import { Forbidden } from "./Refusal";
 
@@ -101,13 +95,14 @@ export function AssignDialog({
       });
       close();
     } catch (error) {
-      const field = isHeldAlready(error) ? errorKey(error) : fieldErrorKey(error, "username");
       if (isNotFound(error)) {
         await onChanged();
         close();
         return;
       }
-      if (field !== null) setFieldError(t(field));
+      const said = describeError(error, { shownFields: ["username"] });
+      const atName = isHeldAlready(error) ? said.sentence : said.fieldSentences.username?.[0];
+      if (atName !== undefined) setFieldError(t(atName.key, atName.values));
       else if (isForbidden(error)) setForbidden(true);
       else setRefusal(fail(error));
       input.current?.focus();

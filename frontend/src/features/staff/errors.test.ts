@@ -1,62 +1,75 @@
 /**
- * A staff refusal, read into the sentence a page shows by its code, and the one
- * refusal that means the caller lacks the permission the page offered.
+ * What a staff page tells apart in a refusal, read by its code from either
+ * body the server may send: the coded `{"error": ...}`, and the staff
+ * endpoints' `{"message", "code"}` from before it (config/exceptions.py).
  */
 
 import { describe, expect, it } from "vitest";
 
-import { ApiError } from "@/api/http";
-import i18n from "@/i18n";
-import { ERROR_KEYS, errorKey, fieldErrorKey, isForbidden } from "./errors";
+import { failureOf } from "@/api/http";
+import { isForbidden, isHeldAlready, isNotFound } from "./errors";
+
+const ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+
+function answered(status: number, body: unknown) {
+  return failureOf(
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+}
+
+function coded(status: number, code: string) {
+  return answered(status, { error: { code, message: "…", data: {}, fields: [], request_id: ID } });
+}
 
 describe("a staff refusal", () => {
   it.each([
+    ["coded", () => coded(409, "ROLE_ALREADY_HELD")],
     [
-      "a code a staff page has words for",
-      new ApiError({ status: 409, code: "ROLE_ALREADY_HELD" }),
-      "staff.error.already_held",
+      "old",
+      () => answered(400, { username: [{ message: "Already held.", code: "already_held" }] }),
     ],
-    ["another of them", new ApiError({ status: 404, code: "NOT_FOUND" }), "staff.error.not_found"],
-    [
-      "a code the pages have no words for",
-      new ApiError({ status: 405, code: "METHOD_NOT_ALLOWED" }),
-      "staff.error.unknown",
-    ],
-    [
-      "an answer that is not the API's",
-      new ApiError({ status: 502, code: "BAD_RESPONSE" }),
-      "staff.error.unknown",
-    ],
-    ["not an answer of the server", new TypeError("offline"), "staff.error.unknown"],
-  ])("reads %s", (_, error, key) => {
-    expect(errorKey(error)).toBe(key);
-  });
-
-  it("reads a field's refusal, and nothing for a field that was not refused", () => {
-    const error = new ApiError({
-      status: 400,
-      code: "INVALID_ARGUMENT",
-      violations: [{ field: "username", reason: "NO_SUCH_USER", data: {} }],
-    });
-
-    expect([fieldErrorKey(error, "username"), fieldErrorKey(error, "role")]).toEqual([
-      "staff.error.no_such_user",
-      null,
-    ]);
+  ])("reads a role held already from the %s body", async (_, refusal) => {
+    expect(isHeldAlready(await refusal())).toBe(true);
   });
 
   it.each([
-    ["a refused permission", new ApiError({ status: 403, code: "PERMISSION_DENIED" }), true],
-    ["the session ended", new ApiError({ status: 401, code: "UNAUTHENTICATED" }), false],
-  ])("offers the permission's own notice only for %s", (_, error, forbidden) => {
-    expect(isForbidden(error)).toBe(forbidden);
+    ["coded", () => coded(404, "NOT_FOUND")],
+    ["old", () => answered(404, { detail: { message: "Not found.", code: "not_found" } })],
+  ])("reads the object gone from the %s body", async (_, refusal) => {
+    expect(isNotFound(await refusal())).toBe(true);
   });
 
-  it("has words for every code in every catalogue", () => {
-    const missing = ["it", "en", "zh-hans"].flatMap((lng) =>
-      ERROR_KEYS.filter((key) => !i18n.exists(key, { lng })).map((key) => `${lng}: ${key}`),
-    );
+  it("does not take a conversation gone for a staff object gone", async () => {
+    expect(isNotFound(await coded(404, "CONVERSATION_GONE"))).toBe(false);
+  });
 
-    expect(missing).toEqual([]);
+  it.each([
+    ["a refused permission, coded", () => coded(403, "PERMISSION_DENIED"), true],
+    [
+      "a refused permission, old",
+      () => answered(403, { detail: { message: "No permission.", code: "permission_denied" } }),
+      true,
+    ],
+    ["the session ended, coded", () => coded(401, "UNAUTHENTICATED"), false],
+    [
+      "the session ended, old",
+      () => answered(403, { detail: "Authentication credentials were not provided." }),
+      false,
+    ],
+  ])("offers the permission's own notice only for %s", async (_, refusal, forbidden) => {
+    expect(isForbidden(await refusal())).toBe(forbidden);
+  });
+
+  it("reads none of them from what is not an answer of the server", () => {
+    const offline = new TypeError("offline");
+
+    expect([isHeldAlready(offline), isNotFound(offline), isForbidden(offline)]).toEqual([
+      false,
+      false,
+      false,
+    ]);
   });
 });
