@@ -225,22 +225,6 @@
       "none": "Nessuno",
       "footnote": "Un insegnamento nel piano di studi di più corsi di laurea conta in ciascuno."
     },
-    "error": {
-      "no_such_user": "Nessun utente con questo nome.",
-      "already_held": "Questo utente ha già questo ruolo qui.",
-      "required": "Compila questo campo.",
-      "blank": "Compila questo campo.",
-      "not_authenticated": "La sessione è scaduta. Accedi di nuovo.",
-      "permission_denied": "Non hai il permesso di farlo.",
-      "not_found": "Non esiste più.",
-      "max_length": "Il testo è troppo lungo.",
-      "invalid": "Questo valore non è valido.",
-      "invalid_choice": "Scegli una delle opzioni proposte.",
-      "min_value": "Il numero è troppo piccolo.",
-      "max_value": "Il numero è troppo grande.",
-      "unique": "Questo titolo è già nell'elenco.",
-      "unknown": "Qualcosa è andato storto. Riprova."
-    },
     "source": "Piano di studi dal catalogo dei corsi Cineca.",
     "you": "tu",
     "plan": {

@@ -225,22 +225,6 @@
       "none": "Nobody",
       "footnote": "A course in the study plan of several degree programmes counts in each."
     },
-    "error": {
-      "no_such_user": "No user has this name.",
-      "already_held": "This user already holds this role here.",
-      "required": "Fill in this field.",
-      "blank": "Fill in this field.",
-      "not_authenticated": "Your session has ended. Sign in again.",
-      "permission_denied": "You are not allowed to do this.",
-      "not_found": "This is no longer there.",
-      "max_length": "The text is too long.",
-      "invalid": "This value is not valid.",
-      "invalid_choice": "Choose one of the options offered.",
-      "min_value": "The number is too small.",
-      "max_value": "The number is too large.",
-      "unique": "This title is already on the list.",
-      "unknown": "Something went wrong. Try again."
-    },
     "source": "Study plan from the Cineca course catalogue.",
     "you": "you",
     "plan": {

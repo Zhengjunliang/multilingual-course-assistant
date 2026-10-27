@@ -8,11 +8,12 @@ import { useTranslation } from "react-i18next";
 
 import { isSessionLost } from "@/api/http";
 import { useSession } from "@/auth/useSession";
-import { errorKey } from "./errors";
+import { describeError } from "@/lib/errorText";
 
 /**
- * The sentence for a refusal, for an event handler to show. A lost session is
- * forgotten on the spot, and `RequireSession` sends the reader to sign in.
+ * The sentence for a refusal of the whole request, for an event handler to
+ * show. A lost session is forgotten on the spot, and `RequireSession` sends
+ * the reader to sign in.
  */
 export function useFailure(): (error: unknown) => string {
   const { t } = useTranslation();
@@ -20,7 +21,8 @@ export function useFailure(): (error: unknown) => string {
   return useCallback(
     (error: unknown) => {
       if (isSessionLost(error)) forget();
-      return t(errorKey(error));
+      const { sentence } = describeError(error);
+      return t(sentence.key, sentence.values);
     },
     [forget, t],
   );

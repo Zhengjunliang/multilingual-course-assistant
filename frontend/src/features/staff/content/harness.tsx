@@ -47,6 +47,8 @@ export const server = {
   books: [] as ReadingItem[],
   /** Whether reading the syllabus fails, as a dropped connection would. */
   unreadable: false,
+  /** Whether a refused book is answered in the coded body (#186), not the staff envelope. */
+  coded: false,
   /** Every write that reached the server, as `METHOD path body`. */
   writes: [] as string[],
 };
@@ -88,8 +90,16 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   if (path === `${BASE}/readings` && method === "POST") {
     const book = JSON.parse(String(init.body)) as Omit<ReadingItem, "id">;
     if (server.books.some((listed) => listed.title === book.title)) {
+      if (!server.coded) {
+        return json(
+          { title: [{ message: "This title is already on the list.", code: "unique" }] },
+          400,
+        );
+      }
+      const fields = [{ field: "title", reason: "ALREADY_EXISTS", data: {} }];
+      const id = "0".repeat(32);
       return json(
-        { title: [{ message: "This title is already on the list.", code: "unique" }] },
+        { error: { code: "INVALID_ARGUMENT", message: "…", data: {}, fields, request_id: id } },
         400,
       );
     }
@@ -117,6 +127,7 @@ export function serve() {
   server.syllabus = { locale: "it", sections: [{ section: "prerequisiti", text: "Fisica I." }] };
   server.books = [FISICA];
   server.unreadable = false;
+  server.coded = false;
   server.writes.length = 0;
   vi.stubGlobal("fetch", fakeApi);
 }

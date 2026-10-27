@@ -24,8 +24,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, FieldError, Select } from "@/components/ui/field";
 import { ToggleGroup } from "@/components/ui/toggle-group";
+import { describeError } from "@/lib/errorText";
 import { useFailure } from "../context";
-import { fieldErrorKey, isForbidden, isNotFound } from "../errors";
+import { isForbidden, isNotFound } from "../errors";
 import { Forbidden } from "../Refusal";
 import {
   bookLanguages,
@@ -116,11 +117,12 @@ export function ReadingDialog({
         onClose();
         return;
       }
-      const refused = Object.fromEntries(
-        FIELDS.map((field) => [field, fieldErrorKey(error, field)])
-          .filter((entry): entry is [FieldName, string] => entry[1] !== null)
-          .map(([field, key]) => [field, t(key)]),
-      );
+      const { fieldSentences } = describeError(error, { shownFields: FIELDS });
+      const refused: Partial<Record<FieldName, string>> = {};
+      for (const field of FIELDS) {
+        const sentence = fieldSentences[field]?.[0];
+        if (sentence !== undefined) refused[field] = t(sentence.key, sentence.values);
+      }
       const first = FIELDS.find((field) => refused[field] !== undefined);
       if (first !== undefined) {
         setErrors(refused);
