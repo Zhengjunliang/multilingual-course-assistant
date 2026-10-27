@@ -120,30 +120,6 @@ describe("describeError", () => {
     ]);
   });
 
-  it("shows the server's own sentence for an old body that gave no code", () => {
-    const error = new ApiError({
-      status: 400,
-      code: "INVALID_ARGUMENT",
-      violations: [
-        { field: "password", reason: "INVALID", data: {}, legacyText: "Too common." },
-        { field: null, reason: "INVALID", data: {}, legacyText: "Wrong." },
-      ],
-    });
-    const whole = new ApiError({ status: 404, code: "NOT_FOUND", legacyText: "Gone." });
-
-    expect([
-      describeError(error, { shownFields: ["password"] }),
-      describeError(whole).sentence,
-    ]).toEqual([
-      {
-        sentence: { key: "errors.legacy", values: { text: "Wrong." } },
-        fieldSentences: { password: [{ key: "errors.legacy", values: { text: "Too common." } }] },
-        reference: null,
-      },
-      { key: "errors.legacy", values: { text: "Gone." } },
-    ]);
-  });
-
   it("reads the reference in the interface's language", async () => {
     const { reference } = describeError(
       new ApiError({ status: 503, code: "ENGINE_DOWN", requestId: ID }),

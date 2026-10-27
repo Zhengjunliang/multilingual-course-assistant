@@ -16,6 +16,7 @@ import { listReadings, type ReadingItem, type Syllabus } from "@/api/catalog";
 import { SessionContext } from "@/auth/SessionProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { mount } from "@/test/mount";
+import { codedRefusal } from "@/test/refusal";
 import { useLoad } from "../context";
 import { ReadingList } from "./ReadingList";
 import { SyllabusPanel } from "./SyllabusPanel";
@@ -47,8 +48,6 @@ export const server = {
   books: [] as ReadingItem[],
   /** Whether reading the syllabus fails, as a dropped connection would. */
   unreadable: false,
-  /** Whether a refused book is answered in the coded body (#186), not the staff envelope. */
-  coded: false,
   /** Every write that reached the server, as `METHOD path body`. */
   writes: [] as string[],
 };
@@ -65,8 +64,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   const method = init.method ?? "GET";
   if (method !== "GET") server.writes.push(`${method} ${path} ${init.body ?? ""}`.trim());
   if (path === `${BASE}/syllabus` && method === "GET") {
-    if (server.unreadable)
-      return json({ detail: { message: "Server error.", code: "error" } }, 500);
+    if (server.unreadable) return codedRefusal("INTERNAL");
     return json(server.syllabus);
   }
   if (path === `${BASE}/syllabus` && method === "PATCH") {
@@ -90,18 +88,9 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   if (path === `${BASE}/readings` && method === "POST") {
     const book = JSON.parse(String(init.body)) as Omit<ReadingItem, "id">;
     if (server.books.some((listed) => listed.title === book.title)) {
-      if (!server.coded) {
-        return json(
-          { title: [{ message: "This title is already on the list.", code: "unique" }] },
-          400,
-        );
-      }
-      const fields = [{ field: "title", reason: "ALREADY_EXISTS", data: {} }];
-      const id = "0".repeat(32);
-      return json(
-        { error: { code: "INVALID_ARGUMENT", message: "…", data: {}, fields, request_id: id } },
-        400,
-      );
+      return codedRefusal("INVALID_ARGUMENT", {
+        fields: [{ field: "title", reason: "ALREADY_EXISTS", data: {} }],
+      });
     }
     const added = { ...book, id: 30, year: book.year === null ? null : Number(book.year) };
     server.books = [...server.books, added];
@@ -119,7 +108,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     server.books = server.books.filter((book) => book.id !== Number(one[1]));
     return new Response(null, { status: 204 });
   }
-  return json({ detail: { message: "Not found.", code: "not_found" } }, 404);
+  return codedRefusal("NOT_FOUND");
 }
 
 /** Starts each test from one Italian section, Prerequisiti, and one book. */
@@ -127,7 +116,6 @@ export function serve() {
   server.syllabus = { locale: "it", sections: [{ section: "prerequisiti", text: "Fisica I." }] };
   server.books = [FISICA];
   server.unreadable = false;
-  server.coded = false;
   server.writes.length = 0;
   vi.stubGlobal("fetch", fakeApi);
 }

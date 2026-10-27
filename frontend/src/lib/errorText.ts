@@ -18,10 +18,11 @@ import {
   FIELD_OVERRIDES,
   FIELD_REASONS,
   type FieldReason,
+  type FieldViolation,
   LOCAL_CODES,
   type LocalCode,
 } from "@/api/errors";
-import { type ApiCode, ApiError, type Violation } from "@/api/http";
+import { type ApiCode, ApiError } from "@/api/http";
 
 /** A catalogue key and the values it fills in, for `t(key, values)`. */
 export interface Sentence {
@@ -56,17 +57,8 @@ function hasOverride(field: string, reason: FieldReason): boolean {
   return reasons[field]?.includes(reason) ?? false;
 }
 
-/**
- * Transitional (#186): the server's own sentence, for a body that gave no code;
- * `errors.legacy` shows its value as it is.
- */
-function legacy(text: string): Sentence {
-  return { key: "errors.legacy", values: { text } };
-}
-
 /** A field's sentence: its own words when `FIELD_OVERRIDES` lists them, else the reason's. */
-function fieldSentence({ field, reason, data, legacyText }: Violation): Sentence {
-  if (legacyText !== undefined) return legacy(legacyText);
+function fieldSentence({ field, reason, data }: FieldViolation): Sentence {
   const filled = fills(FIELD_REASONS[reason].dataKeys, data);
   const shown = filled ? reason : "INVALID";
   const values = filled ? data : {};
@@ -116,7 +108,7 @@ export function describeError(
       ? { key: `errors.${code}`, values: data }
       : { key: "errors.INTERNAL", values: {} };
   return {
-    sentence: error.legacyText === null ? (whole ?? own) : legacy(error.legacyText),
+    sentence: whole ?? own,
     fieldSentences,
     reference: failure ? referenceOf(code, requestId) : null,
   };

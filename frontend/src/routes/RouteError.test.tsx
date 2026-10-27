@@ -26,6 +26,7 @@ import { AppCrash } from "@/components/AppCrash";
 import { AnswerStream } from "@/features/chat/AnswerStream";
 import i18n from "@/i18n";
 import { type Mounted, mount } from "@/test/mount";
+import { codedRefusal } from "@/test/refusal";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
 const breaks = vi.hoisted(() => ({ chat: false, frame: false }));
@@ -81,7 +82,7 @@ function json(body: unknown, status = 200): Response {
 
 async function fakeApi(input: RequestInfo | URL): Promise<Response> {
   if (String(input) === "/api/conversations") return json([]);
-  return json({ detail: "Not found." }, 404);
+  return codedRefusal("NOT_FOUND");
 }
 
 function at(path: string, account: Account | null = STUDENT): Mounted {

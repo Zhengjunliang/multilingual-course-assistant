@@ -22,6 +22,7 @@ import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
 import { summary } from "@/test/conversations";
 import { type Mounted, mount } from "@/test/mount";
+import { codedRefusal } from "@/test/refusal";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
 const STORED_ROW = summary({
@@ -99,24 +100,24 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   const method = init.method ?? "GET";
   requested.push(`${method} ${path}`);
   if (method === "GET" && path === "/api/conversations") {
-    return listFails ? json({ detail: "Server error." }, 500) : json(conversations);
+    return listFails ? codedRefusal("INTERNAL") : json(conversations);
   }
   if (method === "GET" && path === "/api/conversations/7") return json(STORED);
   if (method === "DELETE" && path.startsWith("/api/conversations/")) {
-    if (deleteFails) return json({ detail: "Server error." }, 500);
+    if (deleteFails) return codedRefusal("INTERNAL");
     const id = Number(path.slice("/api/conversations/".length));
-    if (!conversations.some((row) => row.id === id)) return json({ detail: "Not found." }, 404);
+    if (!conversations.some((row) => row.id === id)) return codedRefusal("NOT_FOUND");
     conversations = conversations.filter((row) => row.id !== id);
     return new Response(null, { status: 204 });
   }
   if (method === "PATCH" && path.startsWith("/api/conversations/")) {
     if (pinFailures > 0) {
       pinFailures -= 1;
-      return json({ detail: "Server error." }, 500);
+      return codedRefusal("INTERNAL");
     }
     const id = Number(path.slice("/api/conversations/".length));
     const row = conversations.find((listed) => listed.id === id);
-    if (row === undefined) return json({ detail: "Not found." }, 404);
+    if (row === undefined) return codedRefusal("NOT_FOUND");
     const { pinned } = JSON.parse(String(init.body)) as { pinned: boolean };
     // In the server's order: pinned rows first, each group by its last message.
     conversations = conversations
@@ -128,7 +129,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return json({ ...row, pinned });
   }
   if (method === "POST" && path === "/api/ask") {
-    if (askFails) return json({ detail: "Server error." }, 500);
+    if (askFails) return codedRefusal("INTERNAL");
     const { question, history } = JSON.parse(String(init.body)) as {
       question: string;
       history?: unknown;
@@ -141,7 +142,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     ];
     return answerStream(9, question);
   }
-  return json({ detail: "Not found." }, 404);
+  return codedRefusal("NOT_FOUND");
 }
 
 const STUDENT: Account = {
@@ -595,7 +596,7 @@ describe("a visitor's addresses", () => {
     expect({ before, receding, said, kept }).toEqual({
       before: "",
       receding: true,
-      said: "Server error.",
+      said: i18n.t("errors.INTERNAL"),
       kept: true,
     });
   });

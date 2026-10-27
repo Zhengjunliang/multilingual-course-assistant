@@ -9,6 +9,7 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { codedRefusal } from "@/test/refusal";
 import { markdownOf } from "./editorKit";
 import {
   BASE,
@@ -590,10 +591,7 @@ it("shows the language the server last took when the last one chosen is refused"
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
     if (init.method === "PATCH" && String(init.body).includes('"en"')) await gate;
     if (init.method === "PATCH" && String(init.body).includes('"zh-hans"')) {
-      return new Response(JSON.stringify({ detail: { message: "Server error.", code: "error" } }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
+      return codedRefusal("INTERNAL");
     }
     return answer(input, init);
   });

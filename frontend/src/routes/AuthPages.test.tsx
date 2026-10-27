@@ -183,14 +183,7 @@ describe("a registration", () => {
       error: new ApiError({
         status: 400,
         code: "INVALID_ARGUMENT",
-        violations: [
-          {
-            field: "password",
-            reason: "INVALID",
-            data: {},
-            legacyText: "This password is too common.",
-          },
-        ],
+        violations: [{ field: "password", reason: "TOO_COMMON", data: {} }],
       }),
       after: { focused: "password", invalid: "true", alert: null },
     },
@@ -200,9 +193,12 @@ describe("a registration", () => {
         status: 429,
         code: "RESOURCE_EXHAUSTED",
         data: { retry_after_seconds: 30 },
-        legacyText: "Troppi tentativi.",
       }),
-      after: { focused: "", invalid: null, alert: "Troppi tentativi." },
+      after: {
+        focused: "",
+        invalid: null,
+        alert: "Troppe richieste. Riprova tra 30 secondi.",
+      },
     },
   ])("refused, $refusal", async ({ error, after }) => {
     const register = async () => {

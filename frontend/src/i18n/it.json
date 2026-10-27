@@ -166,7 +166,6 @@
       "withId": "{{code}} · rif. {{id}}",
       "codeOnly": "{{code}}"
     },
-    "legacy": "{{text}}",
     "field": {
       "REQUIRED": "Compila questo campo.",
       "INVALID": "Questo valore non è valido.",
