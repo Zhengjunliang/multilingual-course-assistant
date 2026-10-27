@@ -48,7 +48,7 @@ export interface AskBody {
 }
 
 /** An answer on its way. */
-export interface Answering {
+interface Answering {
   /** The body to read events from. */
   body: ReadableStream<Uint8Array>;
   /**

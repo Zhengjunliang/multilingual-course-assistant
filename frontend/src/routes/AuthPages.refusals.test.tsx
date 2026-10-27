@@ -13,15 +13,14 @@ import { act } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ERROR_CODES, type ErrorCode, type ErrorData, type FieldViolation } from "@/api/errors";
+import type { ErrorCode, ErrorData, FieldViolation } from "@/api/errors";
 import { failureOf } from "@/api/http";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n, { UI_LOCALES, type UiLocale } from "@/i18n";
 import { mount } from "@/test/mount";
+import { codedRefusal, REQUEST_ID } from "@/test/refusal";
 import LoginPage from "./LoginPage";
 import RegisterPage from "./RegisterPage";
-
-const ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
 /** The browser's language, which the server's message follows: never the page's. */
 const BROWSER: Record<UiLocale, UiLocale> = { it: "en", en: "zh-hans", "zh-hans": "it" };
@@ -63,9 +62,8 @@ async function refused(form: "login" | "register", error: unknown) {
 }
 
 /** The coded body the server sends, its message in the browser's language, read as `request()` reads it. */
-function coded(status: number, code: ErrorCode, message: string, fields: FieldViolation[] = []) {
-  const body = { error: { code, message, data: {}, fields, request_id: ID } };
-  return failureOf(new Response(JSON.stringify(body), { status }));
+function coded(code: ErrorCode, message: string, fields: FieldViolation[] = []) {
+  return failureOf(codedRefusal(code, { message, fields }));
 }
 
 interface Case {
@@ -121,7 +119,7 @@ afterEach(async () => {
 describe.each(UI_LOCALES)("a refusal in the %s interface", (locale) => {
   it.each(CASES)("reads $refusal in the interface's words", async (case_) => {
     const message = i18n.getFixedT(BROWSER[locale])(case_.key, case_.values);
-    const error = await coded(ERROR_CODES[case_.code].status, case_.code, message, case_.fields);
+    const error = await coded(case_.code, message, case_.fields);
     await act(() => i18n.changeLanguage(locale));
 
     const { container, unmount } = await refused(case_.form, error);
@@ -134,7 +132,7 @@ describe.each(UI_LOCALES)("a refusal in the %s interface", (locale) => {
 });
 
 it("rewords a refusal on screen when the interface changes language", async () => {
-  const error = await coded(400, "INVALID_ARGUMENT", "…", [
+  const error = await coded("INVALID_ARGUMENT", "…", [
     { field: "password", reason: "TOO_SHORT", data: { min_length: 8 } },
   ]);
 
@@ -153,8 +151,8 @@ it("rewords a refusal on screen when the interface changes language", async () =
 it.each([
   [
     "the server's, with the request id",
-    () => coded(500, "INTERNAL", "Boom."),
-    `INTERNAL · rif. ${ID}`,
+    () => coded("INTERNAL", "Boom."),
+    `INTERNAL · rif. ${REQUEST_ID}`,
   ],
   ["the network's, with none", async () => new TypeError("Failed to fetch"), "NETWORK"],
 ])("adds the code under a failure to report: %s", async (_, failure, reference) => {

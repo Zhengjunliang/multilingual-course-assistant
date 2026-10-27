@@ -78,7 +78,7 @@ export type Waiting =
   | { phase: "streaming" }
   /** Refused as busy, waiting out attempt `attempt` of `MAX_BUSY_RETRIES`. */
   | { phase: "retrying"; seconds: number; attempt: number }
-  | { phase: "stopped"; failure: Failure; canRetry: boolean };
+  | { phase: "stopped"; failure: Failure };
 
 interface AskState {
   turns: Turn[];
@@ -247,7 +247,7 @@ export function useAsk(visitor: boolean) {
           if (!busy || attempt >= MAX_BUSY_RETRIES) {
             const failure: Failure = { kind: "failed", error: failed };
             patch({ failure });
-            settle({ phase: "stopped", failure, canRetry: busy });
+            settle({ phase: "stopped", failure });
             return;
           }
 
@@ -319,7 +319,7 @@ async function run(
       case "error": {
         const failure: Failure = { kind: "failed", error: failureOfEvent(event.data, requestId) };
         patch({ failure });
-        settle({ phase: "stopped", failure, canRetry: false });
+        settle({ phase: "stopped", failure });
         return;
       }
     }
@@ -334,7 +334,7 @@ async function run(
       error: new ApiError({ status: 200, code: "STREAM_INTERRUPTED", requestId }),
     };
     patch({ failure });
-    settle({ phase: "stopped", failure, canRetry: true });
+    settle({ phase: "stopped", failure });
     return;
   }
   patch({ complete: true });

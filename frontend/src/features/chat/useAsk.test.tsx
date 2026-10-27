@@ -243,7 +243,6 @@ describe("a question that does not get its whole answer", () => {
     });
     expect(last).toMatchObject({
       phase: "stopped",
-      canRetry: true,
       failure: { kind: "failed", error: { code: "UNAVAILABLE", requestId: ID } },
     });
   });
@@ -256,7 +255,6 @@ describe("a question that does not get its whole answer", () => {
     expect(calls).toHaveBeenCalledTimes(1);
     expect(waiting).toMatchObject({
       phase: "stopped",
-      canRetry: false,
       failure: { kind: "failed", error: { status: 503, code: "ENGINE_DOWN", requestId: ID } },
     });
   });
@@ -270,7 +268,6 @@ describe("a question that does not get its whole answer", () => {
 
     expect(waiting).toMatchObject({
       phase: "stopped",
-      canRetry: false,
       failure: { kind: "failed", error: { status: 0, code: "NETWORK", requestId: null } },
     });
   });
@@ -288,7 +285,6 @@ describe("a question that does not get its whole answer", () => {
       expect(turn?.answer).toBe("Entro il");
       expect(waiting).toMatchObject({
         phase: "stopped",
-        canRetry: false,
         failure: { kind: "failed", error: { status: 200, requestId: ID, code } },
       });
     },
@@ -302,7 +298,6 @@ describe("a question that does not get its whole answer", () => {
     expect(turn?.answer).toBe("Entro il");
     expect(waiting).toMatchObject({
       phase: "stopped",
-      canRetry: true,
       failure: { kind: "failed", error: { code: "STREAM_INTERRUPTED", requestId: ID } },
     });
   });
