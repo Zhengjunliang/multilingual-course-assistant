@@ -5,8 +5,9 @@ shadow, read as text the way tests/test_qa_contract.py reads the answer
 stream's: each code's status, kind and data, each field reason's data, and the
 body's field names are compared both ways, since the page picks a sentence by
 the code's string and fills it from `data` by name, neither of which a type
-error would catch. And each code and reason is used somewhere in `apps/` or
-`config/`, read off their syntax trees.
+error would catch. docs/api.md's two tables, which a client's developer reads,
+are held to the same rows. And each code and reason is used somewhere in
+`apps/` or `config/`, read off their syntax trees.
 
 No `django_db` marker: building an error reaches no database.
 """
@@ -98,6 +99,44 @@ def test_the_mirror_holds_every_field_reason_with_its_data(mirror: str) -> None:
     rows = {
         reason: keys(data) for reason, data in REASON_ROW.findall(table(mirror, "FIELD_REASONS"))
     }
+
+    assert rows == FIELD_SPEC
+
+
+API_DOCUMENT = ROOT / "docs" / "api.md"
+
+# A row of the document's two tables: `| `CODE` | 400 | fixable | means | `key` |`
+# and `| `REASON` | means | `key` |`, the data cell empty when there is none.
+DOCUMENTED_CODE = re.compile(
+    r"^\| `(\w+)` \| (\d{3}) \| (\w+) \| [^|\n]* \|([^|\n]*)\|$", re.MULTILINE
+)
+DOCUMENTED_REASON = re.compile(r"^\| `(\w+)` \| [^|\n]* \|([^|\n]*)\|$", re.MULTILINE)
+
+
+@pytest.fixture(scope="module")
+def documented() -> str:
+    """The section of docs/api.md a client's developer reads the codes in."""
+    text = API_DOCUMENT.read_text(encoding="utf-8")
+    start = text.index("\n## Errors\n")
+    end = text.find("\n## ", start + 1)
+    return text[start : None if end == -1 else end]
+
+
+def documented_keys(cell: str) -> frozenset[str]:
+    return frozenset(re.findall(r"`(\w+)`", cell))
+
+
+def test_the_api_document_lists_every_code_with_its_status_kind_and_data(documented: str) -> None:
+    rows = {
+        code: (int(status), kind, documented_keys(data))
+        for code, status, kind, data in DOCUMENTED_CODE.findall(documented)
+    }
+
+    assert rows == {code: (spec.status, spec.kind, spec.data_keys) for code, spec in SPEC.items()}
+
+
+def test_the_api_document_lists_every_field_reason_with_its_data(documented: str) -> None:
+    rows = {reason: documented_keys(data) for reason, data in DOCUMENTED_REASON.findall(documented)}
 
     assert rows == FIELD_SPEC
 

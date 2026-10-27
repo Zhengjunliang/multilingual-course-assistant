@@ -1,6 +1,6 @@
 # HTTP API
 
-This file owns the HTTP API the site serves: accounts, question answering, conversations and the catalogue. The shapes' single sources are [apps/qa/contract.py](../apps/qa/contract.py) and [apps/catalog/serializers.py](../apps/catalog/serializers.py); how to run the server is [development.md](development.md).
+This file owns the HTTP API the site serves: accounts, question answering, conversations, the catalogue, and the one body every error answers. The shapes' single sources are [apps/qa/contract.py](../apps/qa/contract.py) and [apps/catalog/serializers.py](../apps/catalog/serializers.py); how to run the server is [development.md](development.md).
 
 ## Accounts
 
@@ -14,7 +14,7 @@ Every endpoint needs a session except `GET /api/auth/me`, `login`, `register` an
 | `POST /api/auth/logout` | end the session (204) |
 | `POST /api/auth/register` | open self-registration, logged in on success (201) |
 
-`me` answers 200 rather than 403 when nobody is logged in because with `SessionAuthentication` alone DRF answers unauthenticated calls with 403 — and a failed CSRF check is also 403. Making "nobody is logged in" a normal result leaves 403 one meaning: this request was refused. Throttling is per endpoint (`ask` 4/min per account or, anonymous, per address; `auth` 5/min per address) with no global cap; the reasons are next to the rates in [config/settings.py](../config/settings.py).
+`me` answers 200 when nobody is logged in: "who am I" has an answer for a stranger too, and the page asks it before anything else. Elsewhere a request that needs a session and has none is a 401 `UNAUTHENTICATED`, and a failed CSRF check a 403 `CSRF_FAILED` (section *Errors*). Throttling is per endpoint (`ask` 4/min per account or, anonymous, per address; `auth` 5/min per address) with no global cap; the reasons are next to the rates in [config/settings.py](../config/settings.py).
 
 ## Question-answering API
 
@@ -34,7 +34,7 @@ curl.exe -N -u <username>:<password> -X POST http://127.0.0.1:8000/api/ask `
 
 The stream is `start` (route, citations and how long the reader waited for it, once, before generation) → `token` (a fragment of the answer, many times) → `end` (the answer is complete), or `error` in place of `end`. The answer is the concatenation of every `token`'s `text`, and it cites the n-th citation of `start` as `[n]`. The citations are the passages the answer is grounded on, each once, as many as the reranker judges relevant and at most five ([decisions.md](decisions.md), 2026-10-12). Events, fields, and why "was this cited?" is the client's to compute are defined in [apps/qa/contract.py](../apps/qa/contract.py), the single source.
 
-The first request takes about a minute while the models load into GPU memory. Answers are served one at a time — 8 GB cannot hold two concurrent rerank + generation passes — and a request that waits in the queue longer than 90 s gets a 503 with `Retry-After`. Closing the stream cancels the generation and frees the queue. A 503 carries `reason`: `busy` (worth retrying) or `unavailable` (the model server or the Qdrant service is down). Once the first event has gone out the status is 200 whatever happens, so a generation that dies midway is an `error` event.
+The first request takes about a minute while the models load into GPU memory. Answers are served one at a time — 8 GB cannot hold two concurrent rerank + generation passes — and a request that waits in the queue longer than 90 s gets a 503 `UNAVAILABLE`, which says how many seconds to wait before asking again. Closing the stream cancels the generation and frees the queue. A model server or Qdrant service that is down is a 503 `ENGINE_DOWN`, which asking again does not fix. Once the first event has gone out the status is 200 whatever happens, so a generation that dies midway is an `error` event, `ENGINE_DOWN` (section *Errors*).
 
 | Method and path | Does |
 | --------------- | ---- |
@@ -46,14 +46,14 @@ The first request takes about a minute while the models load into GPU memory. An
 
 `POST /api/ask` takes an optional `conversation_id` to continue a conversation; without it a new one starts, and its id arrives in the `start` event.
 
-An anonymous caller has no stored conversation: it omits `conversation_id`, gets `"conversation_id": null` in the `start` event, and sends its own history as `history`, `[]` for a first question and otherwise a list of at most 3 `{"question", "answer"}` objects, oldest first, with each question at most 1000 characters and each answer at most 4000 (`MAX_HISTORY_ANSWER_CHARS`, [apps/qa/serializers.py](../apps/qa/serializers.py)), empty where the answer never arrived. The server stores none of it and trusts none of it: it is bounded, quoted in the prompt like any text the project did not write, and anything out of bounds is a 400. Each caller has one source of history, so a logged-in `history` (even `[]`) is a 400 too. A request without a session that sends no `history`, or names a `conversation_id`, is shaped like a signed-in client's whose session ended, and gets the 403 it got before anonymous questions existed, before the engine runs.
+An anonymous caller has no stored conversation: it omits `conversation_id`, gets `"conversation_id": null` in the `start` event, and sends its own history as `history`, `[]` for a first question and otherwise a list of at most 3 `{"question", "answer"}` objects, oldest first, with each question at most 1000 characters and each answer at most 4000 (`MAX_HISTORY_ANSWER_CHARS`, [apps/qa/serializers.py](../apps/qa/serializers.py)), empty where the answer never arrived. The server stores none of it and trusts none of it: it is bounded, quoted in the prompt like any text the project did not write, and anything out of bounds is a 400. Each caller has one source of history, so a logged-in `history` (even `[]`) is a 400 too. A request without a session that sends no `history`, or names a `conversation_id`, is shaped like a signed-in client's whose session ended, and gets the 401 `UNAUTHENTICATED` that sends such a client to sign in, before the engine runs.
 
 | Method and path | Does |
 | --------------- | ---- |
 | `GET /api/conversations` | the sidebar list, pinned conversations first, each group by its last message, newest first; a row is `id`, `locale`, `created_at`, `last_message_at`, `title`, `title_locale`, `pinned` and `last_source` (below) |
 | `GET /api/conversations/<id>` | one conversation, its row as the list shows it with its `messages`; someone else's is **404, not 403** — a 403 would confirm the id exists |
 | `PATCH /api/conversations/<id>` | `{"pinned": true}` or `false` pins or unpins it and answers with its row (200); `pinned` is the only field a conversation takes, in a JSON body only (any other is 415), and there is no `PUT`; someone else's is 404 |
-| `DELETE /api/conversations/<id>` | deletes one of your conversations with its messages (204); someone else's is 404; a question queued for a conversation deleted meanwhile is refused with 400 |
+| `DELETE /api/conversations/<id>` | deletes one of your conversations with its messages (204); someone else's is 404; a question queued for a conversation deleted meanwhile is refused with 404 `CONVERSATION_GONE` |
 
 - A row's fields other than `pinned` derive from its messages and are never stored: `title` is the first question cut to 60 characters, `title_locale` the language that question was asked in (`Message.locale`: a conversation has no single language), `last_message_at` the time of its last message. `last_source` is what its newest answer with excerpts drew on, `{"courses": [{"name", "locale"}], "web": bool}`: the courses of its slides excerpts in citation order, each once, named as `Course` names them (a code no course holds is shown as stored, with a `null` locale), and whether any excerpt was a university page. An answer refused for want of excerpts is skipped for the one before, and `last_source` is `null` when every answer was. The list costs the same queries for one conversation and for thirty.
 - Pinning reorders nothing: the pinned rows follow their last message like the rest, so unpinning returns a row to its place (LibreChat and LobeChat order theirs the same way). A conversation with no messages, which a question refused with a 503 leaves behind, is not listed, opened, pinned or deleted: its id never reached the client.
@@ -61,8 +61,6 @@ An anonymous caller has no stored conversation: it omits `conversation_id`, gets
 - The last 3 turns (`HISTORY_WINDOW_TURNS`, [apps/qa/models.py](../apps/qa/models.py)) go into the prompt with the next question. The window is capped because the 4B model's context is the same space the retrieved excerpts need.
 - **The router sees only the student's past questions**; the generator sees whole turns, with answers cut to 400 characters and stripped of their citations (an old `[2]` or marker names an excerpt of that turn, not of this one). History is always one `user` message, never alternating roles: the router is asked to output one JSON object, and a real `assistant` prose turn demonstrates the opposite. The sha256 of both prompts is pinned in `tests/test_agent.py` and `tests/test_answer.py`.
 - Answers are **stored as they stream**: question and empty answer are written just before `start`, the text when the stream stops. `complete` is true only when `end` arrived; a half answer is kept, unless the student deletes the conversation, because it is what the student saw and a sample for the M3 error taxonomy. `citations`, `route` and `search_ms` are stored with it, so a stored turn renders exactly like a live one; `search_ms` is `null` on a question.
-- Errors: 400 validation · 403 a wrong CSRF token, or no session where the request needs one (told apart by `GET /api/auth/me`) · 429 throttled · 503 a dependency is unavailable. With `Accept: text/event-stream` they arrive as an `error` event, otherwise as JSON.
-- **These messages are in English by decision, not by omission**: the interface belongs to the frontend catalogues, the answer language to the prompt in [rag/answer.py](../rag/answer.py), and the readers of a 503 or an `error` are whoever reads the server log — a catalogue for them would have no reader. The strings stay marked with `gettext_lazy`. **A visible consequence, so it is not chased as a bug**: DRF's own validation messages do have Italian translations and follow `Accept-Language` (`LANGUAGE_CODE` is `it`), so one 400 body can hold both `"Questo campo è obbligatorio."` and `"No such conversation."`.
 
 The deepening loop is not in this endpoint: it fetches pages and writes to the shared index, up to 3 fetches, so it runs only from `rag.agent` on the command line. Its web path is an asynchronous task (🔜 `#34`, M5).
 
@@ -84,11 +82,66 @@ What staff see and change, each within the scopes their roles cover ([apps/roles
 | `PATCH /api/catalog/editions/<id>/syllabus` | `{"locale": "en"}` sets the syllabus's language and answers with the syllabus; no section is changed or translated; needs `edition.edit_content` |
 | `PUT /api/catalog/editions/<id>/syllabus/<section>` | `{"text": "..."}` writes that section's Markdown (200, answering with the section), and a text blank once trimmed clears it (204); needs `edition.edit_content`. `<section>` is one of `SyllabusSection` ([apps/catalog/models.py](../apps/catalog/models.py)); any other matches no route |
 | `GET /api/catalog/editions/<id>/readings` | the edition's books, `[{"id", "locale", "title", "authors", "year", "isbn", "url", "importance"}]` by title, `locale` the language the book is written in, a tag Django knows such as `en` or `de`, `year` a number or `null`, `isbn` and `url` `""` when not given, `importance` `required` or `recommended` |
-| `POST /api/catalog/editions/<id>/readings` | adds a book (201, answering with it); `locale` defaults to `it`; a title the edition lists is refused as `unique` on `title`; needs `edition.edit_content` |
+| `POST /api/catalog/editions/<id>/readings` | adds a book (201, answering with it); `locale` defaults to `it`; a title the edition lists is refused as `ALREADY_EXISTS` on `title`; needs `edition.edit_content` |
 | `PATCH /api/catalog/editions/<id>/readings/<book id>` | changes the fields the body names (200, the book); `DELETE` removes it (204); both need `edition.edit_content`, and a book of another edition is a 404 |
 | `POST /api/catalog/programmes/<code>/secretariat` | makes a user secretariat staff of the programme (201, the member likewise); needs `programme.assign_secretariat`, which only the superuser holds |
 | `DELETE /api/catalog/programmes/<code>/secretariat/<username>` | revokes it (204) |
 
-- Status codes: 401 not logged in · 404 outside the caller's scope, whether or not it exists · 403 inside it without the permission · then 400 for the body's fields · 405 for a method the route does not serve, `OPTIONS` included. Each refusal answers the API's one coded body, `{"error": {"code": "NOT_FOUND", ...}}`, or `INVALID_ARGUMENT` with each refused field as `{"field": "username", "reason": "NO_SUCH_USER"}` ([config/errors.py](../config/errors.py)); a path no route matches is a `NOT_FOUND` too. The scope is looked up before the permission and the permission before the fields, so a refusal says nothing the caller may not see; only a body that is not JSON at all is refused first, since the CSRF check reads it.
-- Books: a field the model refuses carries DRF's code (`required`, `blank`, `max_length`, `invalid`, `invalid_choice`, `min_value`, `max_value`), and a title the edition lists in that language is a 400 on `title` with `unique`.
-- Assigning: an unknown username (`no_such_user`), or a role the user holds on that scope (`already_held`), is a 400, and each grant and revocation made here writes one `INFO` line to the `apps.roles.grants` logger. To revoke every role of one person, the superuser searches the role assignments for their exact username in the admin.
+- Status codes (section *Errors*): 401 not logged in · 404 outside the caller's scope, whether or not it exists · 403 inside it without the permission · then 400 for the body's fields · 405 for a method the route does not serve, `OPTIONS` included. The scope is looked up before the permission and the permission before the fields, so a refusal says nothing the caller may not see; only a body that is not JSON at all is refused first, since the CSRF check reads it.
+- Books: a refused field carries `REQUIRED`, `TOO_LONG`, `INVALID`, `TOO_SMALL` or `TOO_LARGE`, and a title the edition lists in that language is a 400 with `ALREADY_EXISTS` on `title`.
+- Assigning: an unknown username is a 400 with `NO_SUCH_USER` on `username`, a role the user holds on that scope a 409 `ROLE_ALREADY_HELD`, and each grant and revocation made here writes one `INFO` line to the `apps.roles.grants` logger. To revoke every role of one person, the superuser searches the role assignments for their exact username in the admin.
+
+## Errors
+
+Every error of an `/api/` path answers one body, built by `api_exception_handler` in [config/errors.py](../config/errors.py) and mirrored for the interface in [frontend/src/api/errors.ts](../frontend/src/api/errors.ts):
+
+```json
+{"error": {"code": "INVALID_ARGUMENT", "message": "The request has fields that were rejected.",
+           "data": {},
+           "fields": [{"field": "password", "reason": "TOO_SHORT", "data": {"min_length": 8}}],
+           "request_id": "4bf92f3577b34da6a3ce929d0e0e4736"}}
+```
+
+- `code` comes from the closed table below, and the status is the code's: no view picks a status of its own. A view refuses with `fail(code)`, a serializer with `field_error(reason)`, and DRF's and Django's own exceptions are read by their class.
+- `message` is the code's English template filled in with `data`, for the developer and the log. No page shows it, and nothing an exception says reaches it: the interface words each code from its own catalogues, in the interface's language ([decisions.md](decisions.md), 2026-08-27).
+- `data` holds the values the code's sentence fills in, as the table names them; numbers stay numbers.
+- `fields` lists the rejected fields beside `INVALID_ARGUMENT`, each with a `reason` from the second table and its own `data`. `field` is the path from the top of the body, dots between names and list indexes (`history.0.answer`), or `null` for a refusal of the object as a whole. A code of DRF's or Django's that no reason names is read as `INVALID`, and logged as a WARNING.
+- `request_id` is the request's id, also in the `X-Request-ID` header of every response and on every log line the request writes: 32 lowercase hexadecimal characters, the format of a W3C Trace Context trace id. The server makes it and ignores any id the request sends ([config/request_id.py](../config/request_id.py)). How to find a request's lines by it is [development.md](development.md).
+- A 401 carries `WWW-Authenticate: Session realm="api"`, and a code that carries `retry_after_seconds` sends the same number as `Retry-After`.
+- `POST /api/ask` asks for `text/event-stream`, so its refusals arrive as one `error` event holding the same body; a failure after the stream has begun is an `error` event too, under the stream's own 200.
+- Each refusal writes one log line: a WARNING with the method, the route's pattern rather than the path asked for, the status, the code and the message, or for a 5xx an ERROR with the traceback.
+
+`Kind` is what a page does with the code: a `fixable` error is one the reader can act on, and the page shows its sentence alone; a `failure` is one they cannot, and the page adds the code and the request id, for a report. [tests/test_error_contract.py](../tests/test_error_contract.py) keeps both tables equal to `SPEC` and `FIELD_SPEC`.
+
+| Code | Status | Kind | Means | `data` |
+| ---- | ------ | ---- | ----- | ------ |
+| `INVALID_ARGUMENT` | 400 | fixable | fields were rejected, each named in `fields` | |
+| `MALFORMED_REQUEST` | 400 | failure | the body is not JSON | |
+| `WRONG_CREDENTIALS` | 400 | fixable | the login's username or password is wrong; not a 401, on which the page signs its reader out | |
+| `UNAUTHENTICATED` | 401 | fixable | the request needs a session and has none | |
+| `PERMISSION_DENIED` | 403 | fixable | the signed-in user lacks the permission | |
+| `CSRF_FAILED` | 403 | failure | the CSRF token is missing or does not match; reloading the page fixes it | |
+| `NOT_FOUND` | 404 | fixable | no such object within the caller's scope, or no route for the path | |
+| `CONVERSATION_GONE` | 404 | fixable | the conversation a question names does not exist, or was deleted while the question waited | |
+| `METHOD_NOT_ALLOWED` | 405 | failure | the route does not serve the method | |
+| `NOT_ACCEPTABLE` | 406 | failure | no response matches `Accept` | |
+| `ROLE_ALREADY_HELD` | 409 | fixable | the user holds the role being granted, on that scope | |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | failure | the route parses no body of that `Content-Type` | |
+| `RESOURCE_EXHAUSTED` | 429 | fixable | throttled | `retry_after_seconds` |
+| `INTERNAL` | 500 | failure | anything no row names; the traceback is in the log line | |
+| `UNAVAILABLE` | 503 | fixable | another question is being answered; the page asks again by itself | `retry_after_seconds` |
+| `ENGINE_DOWN` | 503 | failure | a service the answer needs, the model server or Qdrant, is not running | |
+
+| Reason | Means | `data` |
+| ------ | ----- | ------ |
+| `REQUIRED` | missing, blank or null | |
+| `INVALID` | not a value the field takes, or a code no reason names | |
+| `TOO_LONG` | longer than the field takes | `max_length` |
+| `TOO_SHORT` | shorter than the field takes, a password included | `min_length` |
+| `TOO_SMALL` | below the field's least value | `min_value` |
+| `TOO_LARGE` | above the field's greatest value | `max_value` |
+| `ALREADY_EXISTS` | another row holds the value: a username, a book's title in its edition | |
+| `NO_SUCH_USER` | no account has the username | |
+| `TOO_COMMON` | a password on Django's list of common ones | |
+| `ENTIRELY_NUMERIC` | a password of digits only | |
+| `TOO_SIMILAR` | a password too close to the account's username or name | |

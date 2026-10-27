@@ -51,6 +51,7 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 | Markdown prose | English | `language` |
 | Every tracked file | no known misspelling | `typos` |
 | Frontend sources (TypeScript, CSS, JSON) | Biome's rules and format, and no JSX `title` attribute (`DESIGN.md`) | `biome` |
+| `/api/` refusals (Python) | `fail()` or `field_error()` of `config/errors.py`, never DRF's or Django's exceptions (`docs/api.md`, section "Errors") | `ruff-check` (TID251) |
 | Status markers, temporal wording, links between files | the conventions below | `doc-conventions` |
 | Links, document paths, decision references, paths a status marker cites | they resolve | `doc-references` |
 | Commit messages | English Conventional Commits, no AI signature | `commit-msg`, `commit-history` |
