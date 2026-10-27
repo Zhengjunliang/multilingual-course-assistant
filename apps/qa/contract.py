@@ -16,8 +16,8 @@ and never builds one.
 A stream is one `start`, any number of `token`s, and one terminator::
 
     event: start
-    data: {"question": "...", "conversation_id": 7, "locale": "en", "route": {...},
-           "citations": [...]}
+    data: {"question": "...", "conversation_id": "3f1c9a52-…", "locale": "en",
+           "route": {...}, "citations": [...]}
 
     event: token
     data: {"text": "An ORM "}
@@ -37,6 +37,7 @@ adding a field is additive there, renaming one breaks it.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -165,7 +166,7 @@ class StartEvent(Event):
     NAME = "start"
 
     question: str
-    conversation_id: int | None
+    conversation_id: UUID | None
     locale: str
     route: RouteDecision
     citations: list[Citation]

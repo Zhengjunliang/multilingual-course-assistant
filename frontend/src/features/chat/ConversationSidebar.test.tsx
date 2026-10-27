@@ -20,13 +20,17 @@ import { ApiError } from "@/api/http";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
 import { describeError, type ErrorText } from "@/lib/errorText";
-import { summary } from "@/test/conversations";
+import { summary, uuidOf } from "@/test/conversations";
 import { mount } from "@/test/mount";
 import { ConversationSidebar } from "./ConversationSidebar";
 
-const ORM = summary({ id: 7, created_at: "2026-09-28T10:00:00Z", title: "Che cos'è un ORM?" });
+const ORM = summary({
+  id: uuidOf(7),
+  created_at: "2026-09-28T10:00:00Z",
+  title: "Che cos'è un ORM?",
+});
 const FEES = summary({
-  id: 8,
+  id: uuidOf(8),
   created_at: "2026-09-27T10:00:00Z",
   title: "Quando scadono le tasse?",
 });
@@ -34,7 +38,7 @@ const ROWS: ConversationSummary[] = [ORM, FEES];
 
 function sidebar(
   conversations: ConversationSummary[] | null,
-  onDelete: (id: number) => Promise<ErrorText | null> = async () => null,
+  onDelete: (id: string) => Promise<ErrorText | null> = async () => null,
 ) {
   return mount(
     <MemoryRouter>
@@ -99,7 +103,7 @@ const groupTitles = (container: HTMLElement, group: string) =>
 
 /** The row's second line: what its last answer drew on. */
 const sourceLine = (container: HTMLElement, id: number) =>
-  container.querySelector(`a[href="/c/${id}"]`)?.lastElementChild;
+  container.querySelector(`a[href="/c/${uuidOf(id)}"]`)?.lastElementChild;
 
 describe("the conversation sidebar", () => {
   it("marks itself as the sidebar's panel, so the shell's keys work in the drawer", () => {
@@ -164,15 +168,15 @@ describe("the conversation sidebar", () => {
     const course = (name: string) => ({ name, locale: "it" });
     const { container, unmount } = sidebar([
       summary({
-        id: 1,
+        id: uuidOf(1),
         title: "a",
         last_source: {
           courses: [course("BASI DI DATI"), course("RETI LOGICHE"), course("CALCOLATORI")],
           web: true,
         },
       }),
-      summary({ id: 2, title: "b", last_source: { courses: [], web: true } }),
-      summary({ id: 3, title: "c", last_source: null }),
+      summary({ id: uuidOf(2), title: "b", last_source: { courses: [], web: true } }),
+      summary({ id: uuidOf(3), title: "c", last_source: null }),
     ]);
     const both = sourceLine(container, 1);
     const lines = [
@@ -194,19 +198,19 @@ describe("the conversation sidebar", () => {
   it("gives a title its first question's language and a course name its own", () => {
     const { container, unmount } = sidebar([
       summary({
-        id: 1,
+        id: uuidOf(1),
         title: "考试报名截止日期",
         title_locale: "zh",
         last_source: { courses: [{ name: "PPM", locale: null }], web: false },
       }),
       summary({
-        id: 2,
+        id: uuidOf(2),
         title: "",
         last_source: { courses: [{ name: "BASI DI DATI", locale: "it" }], web: false },
       }),
     ]);
     const langs = [1, 2].map((id) => {
-      const row = container.querySelector(`a[href="/c/${id}"]`);
+      const row = container.querySelector(`a[href="/c/${uuidOf(id)}"]`);
       return [
         row?.firstElementChild?.getAttribute("lang"),
         row?.querySelector("[lang]:not(:first-child)")?.getAttribute("lang") ?? null,

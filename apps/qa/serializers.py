@@ -13,13 +13,17 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 from rest_framework import serializers
 
+from apps.qa.conversations import thread
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from config.errors import ErrorCode, FieldReason, fail, field_error
 from rag.answer import Turn
 from rag.chunk import normalize_locale
 
 if TYPE_CHECKING:
+    import uuid
+
     from rest_framework.request import Request
+    from rest_framework.utils.serializer_helpers import ReturnDict
 
 # A 4B model's context is a shared, GPU-bound resource: every question is queued
 # onto the one card this project has, and the prompt built around it — system
@@ -38,6 +42,21 @@ MAX_HISTORY_ANSWER_CHARS = 4000
 # How much of the first question becomes a sidebar row's label. Long enough to
 # tell two threads about the same lecture apart, short enough not to wrap.
 TITLE_CHARS = 60
+
+
+class UUIDStringField(serializers.UUIDField):
+    """A UUID written as a string, the only way the API writes one.
+
+    DRF's own field also reads an integer, and a boolean as the integer it is,
+    as the UUID of that value: `7` would name
+    `00000000-0000-0000-0000-000000000007` rather than be refused as the
+    malformed id it is.
+    """
+
+    def to_internal_value(self, data: uuid.UUID | str | int) -> uuid.UUID:
+        if not isinstance(data, str):
+            self.fail("invalid", value=data)
+        return super().to_internal_value(data)
 
 
 class TurnSerializer(serializers.Serializer):
@@ -70,8 +89,10 @@ class AskRequest(serializers.Serializer):
 
     question = serializers.CharField(max_length=MAX_QUESTION_CHARS, trim_whitespace=True)
     # Omitted or null starts a new conversation; the id of the one that was
-    # started comes back in the `start` event.
-    conversation_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    # started comes back in the `start` event. One that is not a UUID is a
+    # malformed field, a 400; a UUID naming nothing of the caller's is
+    # `CONVERSATION_GONE` (`validate`).
+    conversation_id = UUIDStringField(required=False, allow_null=True, default=None)
     # No default: `validate` tells an omitted history from an empty one. An
     # anonymous caller always sends one, a logged-in caller never does. The
     # list spelled out rather than `many=True`, which builds the same one but
@@ -270,9 +291,23 @@ class ConversationSerializer(serializers.ModelSerializer[Conversation]):
 
 
 class ConversationDetailSerializer(ConversationSerializer):
-    """The same row with its messages, for reopening a thread."""
+    """The same row with its messages, for reopening a thread.
 
-    messages = MessageSerializer(many=True, read_only=True)
+    The messages are the thread, root to leaf, walked along `parent` through
+    every row of the conversation, read in one query whatever its length
+    (`thread`, apps/qa/conversations.py). A conversation deleted between the
+    read of its row and this one raises `ConversationGoneError`, which the view
+    answers as it answers any conversation it cannot find.
+    """
+
+    messages = serializers.SerializerMethodField()
 
     class Meta(ConversationSerializer.Meta):
         fields = (*ConversationSerializer.Meta.fields, "messages")
+
+    def get_messages(self, conversation: Conversation) -> list[ReturnDict[str, Any]]:
+        messages = Message.objects.filter(conversation=conversation)
+        return [
+            MessageSerializer(message).data
+            for message in thread(conversation.current_leaf_id, messages)
+        ]

@@ -51,7 +51,7 @@ async function fakeAsk(_: RequestInfo | URL, init: RequestInit = {}): Promise<Re
   sent.push(body);
   const start = {
     question: body.question,
-    conversation_id: "history" in body ? null : 9,
+    conversation_id: "history" in body ? null : "00000000-0000-4000-8000-000000000009",
     locale: "it",
     route: ROUTE,
     citations: [],

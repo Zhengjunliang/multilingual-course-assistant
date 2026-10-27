@@ -24,7 +24,7 @@ belongs to the HTTP layer and never appears in this file.
 
 **No query runs in this file, and that is a rule rather than a coincidence.**
 The conversation history arrives already sliced, as `rag.answer.Turn` — plain
-data — and the conversation id arrives as an integer, or None for an anonymous
+data — and the conversation id arrives as a UUID, or None for an anonymous
 question, because this module emits the `start` event and that event carries
 it. Loading either is the view's job
 (apps/qa/conversations.py), and `tests/test_qa_api.py` asserts that answering a
@@ -46,6 +46,7 @@ from rag.search import RELEVANCE_CUTOFF, search
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterator, Sequence
+    from uuid import UUID
 
     from qdrant_client import QdrantClient
 
@@ -119,7 +120,7 @@ class Engine:
     def stream(
         self,
         question: str,
-        conversation_id: int | None,
+        conversation_id: UUID | None,
         locale: str | None = None,
         history: Sequence[Turn] = (),
         *,
@@ -301,7 +302,7 @@ _HOLDER = _Holder()
 
 def stream_answer(
     question: str,
-    conversation_id: int | None,
+    conversation_id: UUID | None,
     locale: str | None = None,
     history: Sequence[Turn] = (),
     *,

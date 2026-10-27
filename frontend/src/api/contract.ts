@@ -59,7 +59,7 @@ export interface StartEvent {
    * make the next question a follow-up. `null` for an anonymous question, which
    * is filed nowhere: the client keeps the thread and sends it back as `history`.
    */
-  conversation_id: number | null;
+  conversation_id: string | null;
   locale: string;
   route: RouteDecision;
   citations: Citation[];

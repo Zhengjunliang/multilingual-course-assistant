@@ -25,7 +25,7 @@ interface ComposerProps {
    * said about an empty press is let go when it changes: the key for a new
    * conversation changes the page without the field ever being left.
    */
-  conversation?: number | null;
+  conversation?: string | null;
   /**
    * Centred under the empty state, or parked at the foot of a thread.
    *

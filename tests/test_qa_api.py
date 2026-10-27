@@ -32,6 +32,7 @@ tests/test_accounts_api.py against a real one.
 import dataclasses
 import json
 import logging
+import uuid
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,7 @@ from test_index import StubDense, StubSparse, make_chunk
 from apps.accounts.models import User
 from apps.qa import engine as engine_module
 from apps.qa import views as views_module
+from apps.qa.conversations import thread
 from apps.qa.engine import LLM_DOWN, Engine
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from apps.qa.serializers import MAX_HISTORY_ANSWER_CHARS, MAX_QUESTION_CHARS
@@ -831,10 +833,15 @@ def test_two_chunks_of_one_page_stay_two_citations(tmp_path: Path) -> None:
 
 
 def turns_of(conversation: Conversation) -> list[tuple[str, str, bool]]:
-    """Every stored message as `(role, text, complete)`, oldest first."""
+    """Every message of the thread as `(role, text, complete)`, oldest first.
+
+    Along the chain, not by timestamp: the two rows of one exchange can share
+    one, and their random ids would then order them by chance."""
     return [
         (message.role, message.text, message.complete)
-        for message in Message.objects.filter(conversation=conversation)
+        for message in thread(
+            conversation.current_leaf_id, Message.objects.filter(conversation=conversation)
+        )
     ]
 
 
@@ -852,7 +859,8 @@ def test_a_question_starts_a_conversation_and_the_start_event_names_it(
     install_engine(index, SLIDES_ROUTE, ["An answer."])
     stream = events(ask())
 
-    assert start_of(stream)["conversation_id"] == only_conversation().pk
+    # A string on the wire, as every id the API returns.
+    assert start_of(stream)["conversation_id"] == str(only_conversation().pk)
 
 
 def test_a_finished_answer_is_stored_whole_and_marked_complete(index: QdrantClient) -> None:
@@ -999,9 +1007,10 @@ def test_the_history_window_stops_at_its_limit(index: QdrantClient) -> None:
 
 
 def test_somebody_elses_conversation_is_refused(index: QdrantClient) -> None:
-    """An id is a small integer, so this is the whole of the access check. The
-    message is the same one a conversation that never existed gets: telling
-    them apart would say how many exist and whose they are."""
+    """An id is not a credential: whoever holds one is still asked to own it,
+    and this is the whole of the access check. The message is the same one a
+    conversation that never existed gets: telling them apart would say whose
+    they are."""
     install_engine(index, SLIDES_ROUTE)
     stranger = User.objects.create_user(username="stranger")
     theirs = Conversation.objects.create(owner=stranger, locale="it")
@@ -1015,9 +1024,23 @@ def test_somebody_elses_conversation_is_refused(index: QdrantClient) -> None:
 def test_a_conversation_that_never_existed_is_refused(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
 
-    response = ask(conversation_id=4321)
+    response = ask(conversation_id=str(uuid.uuid4()))
 
     assert (response.status_code, refused(response)) == (404, ("CONVERSATION_GONE", {}))
+
+
+@pytest.mark.parametrize("conversation_id", ["abc", 7, True], ids=["text", "integer", "boolean"])
+def test_a_conversation_id_that_is_not_a_uuid_string_is_malformed(conversation_id: object) -> None:
+    """A field the client got wrong, not a conversation that is missing. DRF's
+    own field would read `7` as the UUID ending in 7, and `true` as the one
+    ending in 1, and answer that no such conversation exists."""
+    response = ask(conversation_id=conversation_id)
+
+    assert (response.status_code, refused(response)) == (
+        400,
+        ("INVALID_ARGUMENT", {"conversation_id": ["INVALID"]}),
+    )
+    assert not Conversation.objects.exists()
 
 
 def test_the_sidebar_lists_a_students_own_conversations(index: QdrantClient) -> None:
@@ -1030,7 +1053,7 @@ def test_the_sidebar_lists_a_students_own_conversations(index: QdrantClient) -> 
 
     body = client_for().get(CONVERSATIONS_URL).json()
 
-    assert [row["id"] for row in body] == [only_conversation().pk]
+    assert [row["id"] for row in body] == [str(only_conversation().pk)]
     assert body[0]["title"] == "What is an ORM?"
 
 
@@ -1058,6 +1081,8 @@ def test_reopening_a_conversation_returns_what_the_stream_delivered(
 
     body = client_for().get(f"{CONVERSATIONS_URL}/{conversation_id}").json()
 
+    assert body["id"] == conversation_id
+    assert all(isinstance(message["id"], str) for message in body["messages"])
     answer_message = body["messages"][1]
     assert answer_message["text"] == f"An ORM {SLIDES_MARKER}"
     assert answer_message["citations"] == start_of(stream)["citations"]
@@ -1103,7 +1128,7 @@ class DeletingCompleter:
     delete the conversation from another tab — the window in which a question
     waits for the engine — and then routes as usual."""
 
-    def __init__(self, conversation_pk: int) -> None:
+    def __init__(self, conversation_pk: uuid.UUID) -> None:
         self.conversation_pk = conversation_pk
 
     def complete(self, messages: Sequence[ChatMessage]) -> str:
@@ -1139,6 +1164,33 @@ def test_a_conversation_deleted_while_its_question_waits_is_refused(
     assert len(kept) == 1
     assert engine_module._HOLDER.lock.locked() is False
     assert not Message.objects.exists()
+
+
+@pytest.mark.parametrize("deleted", [True, False], ids=["deleted", "kept"])
+def test_a_conversation_deleted_before_its_history_is_read_is_refused(
+    index: QdrantClient, monkeypatch: pytest.MonkeyPatch, deleted: bool
+) -> None:
+    """Found by the serializer and gone by the time its messages are read: a
+    leaf with no rows under it, which is the refusal of an unknown id rather
+    than a broken thread. Kept, the same follow-up is answered, so the refusal
+    comes from that read and nothing else."""
+    install_engine(index, SLIDES_ROUTE, ["An answer."])
+    conversation_id = start_of(events(ask()))["conversation_id"]
+    install_engine(index, SLIDES_ROUTE, ["Another answer."])
+    if deleted:
+
+        def then_deleted(owner: User, existing: Conversation) -> Conversation:
+            Conversation.objects.filter(pk=existing.pk).delete()
+            return existing
+
+        monkeypatch.setattr(views_module, "open_conversation", then_deleted)
+
+    response = ask("And Active Record?", conversation_id=conversation_id)
+
+    if deleted:
+        assert (response.status_code, refused(response)) == (404, ("CONVERSATION_GONE", {}))
+    else:
+        assert answer_of(events(response)) == "Another answer."
 
 
 # What an anonymous browser sends back after one campus exchange.

@@ -49,18 +49,18 @@ interface ConversationListProps {
   /** What the search field holds; the rows are the titles that contain it. */
   query: string;
   /** The conversation being answered, whose deletion stops its answer. */
-  busy: number | null;
+  busy: string | null;
   /**
    * Resolves to whether the server took it and the list that shows it came,
    * or would leave the row out (routes/ShellLayout.tsx); `retry` is how a
    * failure offers to try again.
    */
-  onPin: (id: number, pinned: boolean, title: string, retry: () => void) => Promise<boolean>;
+  onPin: (id: string, pinned: boolean, title: string, retry: () => void) => Promise<boolean>;
   /**
    * Resolves to `null` once the server has deleted it (routes/ShellLayout.tsx
    * leaves it), else to why it did not.
    */
-  onDelete: (id: number) => Promise<ErrorText | null>;
+  onDelete: (id: string) => Promise<ErrorText | null>;
   onNavigate?: () => void;
   /** Where focus goes once a deletion, here or in another tab, has taken the button it was on away. */
   focusAfterDelete: RefObject<HTMLElement | null>;
@@ -84,8 +84,8 @@ export function ConversationList({
   const [failed, setFailed] = useState<ErrorText | null>(null);
   // The row being pinned or unpinned and where it is going, until the list
   // that has moved it arrives.
-  const [moving, setMoving] = useState<{ id: number; pinned: boolean } | null>(null);
-  const pinButtons = useRef(new Map<number, HTMLButtonElement>());
+  const [moving, setMoving] = useState<{ id: string; pinned: boolean } | null>(null);
+  const pinButtons = useRef(new Map<string, HTMLButtonElement>());
   // The delete button the dialog was opened from. Radix returns focus only to
   // a `Trigger` of its own, which this dialog, opened from state, does not have.
   const askedFrom = useRef<HTMLElement | null>(null);

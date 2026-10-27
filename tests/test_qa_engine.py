@@ -21,6 +21,7 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
+from uuid import UUID
 
 import pytest
 from test_agent import ScriptedCompleter
@@ -35,7 +36,7 @@ from rag.answer import Turn
 from rag.chunk import EditionKey
 from rag.index import ensure_collection, index_chunks, open_client
 
-CONVERSATION_ID = 7
+CONVERSATION_ID = UUID("3f1c9a52-6b0e-4d7a-9c1e-2a5b8d4f0e17")
 
 
 class CountingEngine:
@@ -55,7 +56,7 @@ class CountingEngine:
     def stream(
         self,
         question: str,
-        conversation_id: int | None,
+        conversation_id: UUID | None,
         locale: str | None = None,
         history: Sequence[Turn] = (),
         *,

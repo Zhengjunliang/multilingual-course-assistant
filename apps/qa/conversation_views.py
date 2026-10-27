@@ -26,6 +26,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.catalog.models import Course
+from apps.qa.conversations import ConversationGoneError
 from apps.qa.models import Conversation, Message
 from apps.qa.serializers import (
     COURSE_NAMES,
@@ -159,18 +160,17 @@ class ConversationDetailView(RetrieveDestroyAPIView):
     parser_classes = (JSONParser,)
 
     def get_queryset(self) -> QuerySet[Conversation]:
-        conversations = summaries(self.request.user)
-        # Only a read walks the messages, and without `prefetch_related` the
-        # detail serializer would cost one query per turn.
-        if self.request.method == "GET":
-            return conversations.prefetch_related("messages")
-        return conversations
+        return summaries(self.request.user)
 
     def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         conversation = self.get_object()
-        return Response(
-            self.get_serializer(conversation, context=row_context(self, [conversation])).data
-        )
+        serializer = self.get_serializer(conversation, context=row_context(self, [conversation]))
+        try:
+            return Response(serializer.data)
+        # Deleted from another tab after its row was read and before its
+        # messages were: missing, as it is to the next read.
+        except ConversationGoneError:
+            fail(ErrorCode.NOT_FOUND)
 
     def patch(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Pins or unpins it, and answers with its row as the list shows it."""

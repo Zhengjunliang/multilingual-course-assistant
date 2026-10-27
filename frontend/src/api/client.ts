@@ -39,8 +39,11 @@ export interface HistoryTurn {
  */
 export interface AskBody {
   question: string;
-  /** Omitted starts a new conversation; the id comes back in the `start` event. */
-  conversation_id?: number | null;
+  /**
+   * Omitted starts a new conversation; the id comes back in the `start` event.
+   * Anything but a UUID string is a 400 on this field.
+   */
+  conversation_id?: string | null;
   /** A visitor's last exchanges, oldest first, at most `HISTORY_WINDOW_TURNS`. */
   history?: HistoryTurn[];
   /** Omitted means "decide for me" — the engine detects it from the question. */

@@ -21,7 +21,7 @@ import type { Course, Edition, Programme, StudyPlanCourse } from "@/api/catalog"
 import type { ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
-import { summary } from "@/test/conversations";
+import { summary, uuidOf } from "@/test/conversations";
 import { type Mounted, mount } from "@/test/mount";
 import { codedRefusal, REQUEST_ID } from "@/test/refusal";
 import { ThemeProvider } from "@/theme/ThemeProvider";
@@ -198,7 +198,7 @@ function json(body: unknown, status = 200): Response {
 function endlessAnswer(signal: AbortSignal | null | undefined): Response {
   const start = {
     question: "q",
-    conversation_id: 9,
+    conversation_id: uuidOf(9),
     locale: "it",
     route: { target: "unifi_web", query: "q", fresh: false, reason: "campus question" },
     citations: [],
@@ -232,7 +232,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   }
   if (method === "POST" && path === "/api/ask") {
     conversations = [
-      summary({ id: 9, created_at: "2026-10-05T09:00:00Z", title: "q" }),
+      summary({ id: uuidOf(9), created_at: "2026-10-05T09:00:00Z", title: "q" }),
       ...conversations,
     ];
     return endlessAnswer(init.signal);
@@ -240,7 +240,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   if (method === "DELETE" && path.startsWith("/api/conversations/")) {
     stoppedAtDelete = stopped;
     if (deleteRefused) return codedRefusal("INTERNAL");
-    const id = Number(path.slice("/api/conversations/".length));
+    const id = path.slice("/api/conversations/".length);
     conversations = conversations.filter((listed) => listed.id !== id);
     return new Response(null, { status: 204 });
   }
@@ -392,7 +392,7 @@ function crumbs(container: HTMLElement) {
 }
 
 beforeEach(() => {
-  conversations = [summary({ id: 7, created_at: "2026-10-04T10:00:00Z", title: "ORM" })];
+  conversations = [summary({ id: uuidOf(7), created_at: "2026-10-04T10:00:00Z", title: "ORM" })];
   asked.length = 0;
   stopped = false;
   stoppedAtDelete = null;
@@ -1257,7 +1257,7 @@ describe("deleting while an answer is written", () => {
       stoppedAtDelete,
       stopped,
       path: path(),
-      row: container.querySelector('aside a[href="/c/9"]'),
+      row: container.querySelector(`aside a[href="/c/${uuidOf(9)}"]`),
     };
     unmount();
 
@@ -1282,12 +1282,12 @@ describe("deleting while an answer is written", () => {
     const seen = {
       stopped,
       path: path(),
-      row: container.querySelector('aside a[href="/c/9"]') !== null,
+      row: container.querySelector(`aside a[href="/c/${uuidOf(9)}"]`) !== null,
       said: document.body.textContent?.includes(i18n.t("sidebar.deleteFailed")),
     };
     unmount();
 
-    expect(seen).toEqual({ stopped: false, path: "/c/9", row: true, said: true });
+    expect(seen).toEqual({ stopped: false, path: `/c/${uuidOf(9)}`, row: true, said: true });
   });
 
   it("keeps the deleted conversation off the list when an older list arrives last", async () => {
@@ -1311,7 +1311,7 @@ describe("deleting while an answer is written", () => {
     const late = lateList === null;
     answer();
     await settle();
-    const row = container.querySelector('aside a[href="/c/9"]');
+    const row = container.querySelector(`aside a[href="/c/${uuidOf(9)}"]`);
     unmount();
 
     expect({ late, row }).toEqual({ late: true, row: null });
@@ -1332,7 +1332,7 @@ describe("deleting while an answer is written", () => {
       said: i18n.t("sidebar.deleteBody", { title: "ORM" }),
       stoppedAtDelete: false,
       stopped: false,
-      path: "/c/9",
+      path: `/c/${uuidOf(9)}`,
     });
   });
 });

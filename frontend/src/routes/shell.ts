@@ -33,7 +33,7 @@ export interface Shell {
   setTrail: (trail: Trail) => void;
   refreshConversations: () => void;
   /** The conversation being answered, or `null`; the chat clears it when it unmounts. */
-  setBusy: (id: number | null) => void;
+  setBusy: (id: string | null) => void;
 }
 
 /** The breadcrumb a staff page puts in the header, and the area whose icon leads it. */

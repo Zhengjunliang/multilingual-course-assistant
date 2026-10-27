@@ -44,7 +44,7 @@ export default function ShellLayout() {
   // `null` until the first list arrives, so the sidebar shows rows on their
   // way rather than telling a reader with conversations that they have none.
   const [conversations, setConversations] = useState<ConversationSummary[] | null>(null);
-  const [busy, setBusy] = useState<number | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [trail, setTrail] = useState<Trail>(NO_TRAIL);
   const [programmes, setProgrammes] = useState<{ data: Programme[] | null; error: unknown }>({
     data: null,
@@ -123,7 +123,7 @@ export default function ShellLayout() {
   // the next one's arrival stops it (ChatPage.tsx, `adopt`). Any other
   // conversation leaves the answer be.
   const onDelete = useCallback(
-    async (id: number) => {
+    async (id: string) => {
       try {
         await deleteConversation(id);
       } catch (error) {
@@ -136,7 +136,7 @@ export default function ShellLayout() {
           return describeError(error);
         }
       }
-      if (open === String(id)) void navigate("/", { replace: true });
+      if (open === id) void navigate("/", { replace: true });
       void refreshConversations();
       return null;
     },
@@ -151,7 +151,7 @@ export default function ShellLayout() {
   // (DESIGN.md, Components), so a second try waits and moves the focus as
   // the first did.
   const onPin = useCallback(
-    async (id: number, pinned: boolean, title: string, retry: () => void) => {
+    async (id: string, pinned: boolean, title: string, retry: () => void) => {
       try {
         await pinConversation(id, pinned);
       } catch (error) {
