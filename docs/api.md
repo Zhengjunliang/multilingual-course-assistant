@@ -116,7 +116,7 @@ Every error of an `/api/` path answers one body, built by `api_exception_handler
 | Code | Status | Kind | Means | `data` |
 | ---- | ------ | ---- | ----- | ------ |
 | `INVALID_ARGUMENT` | 400 | fixable | fields were rejected, each named in `fields` | |
-| `MALFORMED_REQUEST` | 400 | failure | the body is not JSON | |
+| `MALFORMED_REQUEST` | 400 | failure | the body cannot be read: not JSON, or more fields or bytes than Django parses | |
 | `WRONG_CREDENTIALS` | 400 | fixable | the login's username or password is wrong; not a 401, on which the page signs its reader out | |
 | `UNAUTHENTICATED` | 401 | fixable | the request needs a session and has none | |
 | `PERMISSION_DENIED` | 403 | fixable | the signed-in user lacks the permission | |
