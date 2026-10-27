@@ -17,9 +17,10 @@ And frontend/index.html contains no Django template syntax at all. Handing it
 to the template engine adds a way for it to fail — the day some Vite plugin
 inlines a script holding `{{` — in exchange for nothing.
 
-An `/api/` path no view has, and a 500 no API view answered itself, are
-answered in the API's coded error body (config/errors.py) rather than with a
-page of HTML, which a caller would meet as a JSON parse error.
+An `/api/` path no view has, a request Django refuses before any view runs,
+and a 500 no API view answered itself, are answered in the API's coded error
+body (config/errors.py) rather than with a page of HTML, which a caller would
+meet as a JSON parse error.
 """
 
 from __future__ import annotations
@@ -79,6 +80,16 @@ class ApiNotFound(APIView):
 
     def initial(self, request: Request, *args: Any, **kwargs: Any) -> None:
         fail(ErrorCode.NOT_FOUND)
+
+
+def bad_request(request: HttpRequest, exception: Exception) -> HttpResponse:
+    """A request Django's middleware refused before any view ran (`handler400`):
+    a `Host` the site does not serve, or a session another request ended. The
+    coded body under `/api/`."""
+    if request.path.startswith("/api/"):
+        status = SPEC[ErrorCode.MALFORMED_REQUEST].status
+        return JsonResponse(error_body(ErrorCode.MALFORMED_REQUEST), status=status)
+    return defaults.bad_request(request, exception)
 
 
 def server_error(request: HttpRequest) -> HttpResponse:

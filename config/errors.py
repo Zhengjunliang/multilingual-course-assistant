@@ -129,7 +129,7 @@ SPEC: dict[ErrorCode, Spec] = {
     ),
     # A body that is not JSON is the client's bug: the reader can only report it.
     ErrorCode.MALFORMED_REQUEST: Spec(
-        HTTPStatus.BAD_REQUEST, "failure", "The request body could not be parsed."
+        HTTPStatus.BAD_REQUEST, "failure", "The request could not be read."
     ),
     # Not 401: the page signs the reader out on a 401, and this one is still signing in.
     ErrorCode.WRONG_CREDENTIALS: Spec(

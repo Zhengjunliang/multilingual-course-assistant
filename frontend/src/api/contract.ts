@@ -77,7 +77,8 @@ export type EndEvent = Record<string, never>;
 
 /**
  * The answer failed after the response had already started: the body the same
- * failure would have carried as a 503 a moment earlier.
+ * failure would have carried a moment earlier, a 503 `ENGINE_DOWN` or a 500
+ * `INTERNAL`.
  */
 export interface ErrorEvent {
   error: ErrorBody;

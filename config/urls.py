@@ -9,7 +9,8 @@ would answer `/api/typo` with a page of HTML and a 200 — leaving a caller to
 discover their typo as a JSON parse error on `<!doctype html>`, a symptom that
 points nowhere near its cause. Excluding the prefixes Django owns lets a wrong
 API path be the 404 it is, which `ApiNotFound` answers in the API's own error
-body, as `handler500` does a 500 no API view answered (config/views.py).
+body, as `handler400` and `handler500` do a 400 and a 500 no API view answered
+(config/views.py).
 
 `/favicon.ico` is asked for at the root by whatever does not read the page's
 `<link rel="icon">` (feed readers, bookmark tools, a browser's first guess).
@@ -39,4 +40,5 @@ urlpatterns = [
     re_path(r"^(?!api/|admin/|static/).*$", spa, name="spa"),
 ]
 
+handler400 = "config.views.bad_request"
 handler500 = "config.views.server_error"

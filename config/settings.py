@@ -279,6 +279,12 @@ LOGGING = {
         },
     },
     "root": {"handlers": ["console"], "level": env.django_log_level},
+    # Django's own default config gives `django` a console handler of its own,
+    # printing the bare message while DEBUG is on, and `dictConfig` leaves a
+    # handler on any logger it is not told about: each `django.*` line would
+    # print twice, once without the request's id. Named here, it has none and
+    # writes through the root's.
+    "loggers": {"django": {"handlers": []}},
 }
 
 

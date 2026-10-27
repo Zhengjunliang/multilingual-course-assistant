@@ -34,7 +34,7 @@ curl.exe -N -u <username>:<password> -X POST http://127.0.0.1:8000/api/ask `
 
 The stream is `start` (route, citations and how long the reader waited for it, once, before generation) → `token` (a fragment of the answer, many times) → `end` (the answer is complete), or `error` in place of `end`. The answer is the concatenation of every `token`'s `text`, and it cites the n-th citation of `start` as `[n]`. The citations are the passages the answer is grounded on, each once, as many as the reranker judges relevant and at most five ([decisions.md](decisions.md), 2026-10-12). Events, fields, and why "was this cited?" is the client's to compute are defined in [apps/qa/contract.py](../apps/qa/contract.py), the single source.
 
-The first request takes about a minute while the models load into GPU memory. Answers are served one at a time — 8 GB cannot hold two concurrent rerank + generation passes — and a request that waits in the queue longer than 90 s gets a 503 `UNAVAILABLE`, which says how many seconds to wait before asking again. Closing the stream cancels the generation and frees the queue. A model server or Qdrant service that is down is a 503 `ENGINE_DOWN`, which asking again does not fix. Once the first event has gone out the status is 200 whatever happens, so a generation that dies midway is an `error` event, `ENGINE_DOWN` (section *Errors*).
+The first request takes about a minute while the models load into GPU memory. Answers are served one at a time — 8 GB cannot hold two concurrent rerank + generation passes — and a request that waits in the queue longer than 90 s gets a 503 `UNAVAILABLE`, which says how many seconds to wait before asking again. Closing the stream cancels the generation and frees the queue. A model server or Qdrant service that is down is a 503 `ENGINE_DOWN`, which asking again does not fix. Once the first event has gone out the status is 200 whatever happens, so a generation that dies midway is an `error` event, `ENGINE_DOWN`, and a defect midway one with `INTERNAL` (section *Errors*).
 
 | Method and path | Does |
 | --------------- | ---- |
@@ -116,7 +116,7 @@ Every error of an `/api/` path answers one body, built by `api_exception_handler
 | Code | Status | Kind | Means | `data` |
 | ---- | ------ | ---- | ----- | ------ |
 | `INVALID_ARGUMENT` | 400 | fixable | fields were rejected, each named in `fields` | |
-| `MALFORMED_REQUEST` | 400 | failure | the body cannot be read: not JSON, or more fields or bytes than Django parses | |
+| `MALFORMED_REQUEST` | 400 | failure | the request cannot be read: a body that is not JSON or a form past one of Django's `DATA_UPLOAD_MAX_*` limits, a `Host` the site does not serve, a session another request ended | |
 | `WRONG_CREDENTIALS` | 400 | fixable | the login's username or password is wrong; not a 401, on which the page signs its reader out | |
 | `UNAUTHENTICATED` | 401 | fixable | the request needs a session and has none | |
 | `PERMISSION_DENIED` | 403 | fixable | the signed-in user lacks the permission | |
