@@ -164,6 +164,8 @@ const STUDENT: Account = {
 interface Page extends Mounted {
   /** Where the router is, as the address bar shows it. */
   path: () => string;
+  /** What the navigation that got there carried, as the login page reads it. */
+  state: () => unknown;
 }
 
 function page(path: string, account: Account | null = STUDENT): Page {
@@ -187,7 +189,11 @@ function page(path: string, account: Account | null = STUDENT): Page {
       </SessionContext>
     </ThemeProvider>,
   );
-  return { ...mounted, path: () => router.state.location.pathname };
+  return {
+    ...mounted,
+    path: () => router.state.location.pathname,
+    state: () => router.state.location.state,
+  };
 }
 
 /** Lets every pending fetch, body read and state update land. */
@@ -285,55 +291,55 @@ describe("the chat page's address", () => {
   it.each<Case>([
     {
       name: "opening a new conversation",
-      from: `/c/${ID_7}`,
+      from: `/chat/${ID_7}`,
       step: openNewConversation,
       lands: "/",
     },
     {
       name: "leaving a conversation before it loaded",
-      from: `/c/${ID_7}`,
+      from: `/chat/${ID_7}`,
       step: openNewConversation,
       lands: "/",
       early: true,
     },
     {
-      name: "asking on / moves to /c/9",
+      name: "asking on / moves to the new conversation's address",
       from: "/",
       step: askFromTheFrontDoor,
-      lands: `/c/${ID_9}`,
+      lands: `/chat/${ID_9}`,
       // A page rebuilt by the move would read the conversation it is still
       // writing, and drop the answer on screen for what the server has so far.
       unrequested: `GET /api/conversations/${ID_9}`,
     },
     {
       name: "deleting the open conversation",
-      from: `/c/${ID_7}`,
+      from: `/chat/${ID_7}`,
       step: deleting(STORED.title),
       lands: "/",
-      gone: `/c/${ID_7}`,
+      gone: `/chat/${ID_7}`,
     },
     {
       name: "deleting another conversation",
-      from: `/c/${ID_7}`,
+      from: `/chat/${ID_7}`,
       step: deleting(OTHER.title),
-      lands: `/c/${ID_7}`,
-      gone: `/c/${ID_8}`,
+      lands: `/chat/${ID_7}`,
+      gone: `/chat/${ID_8}`,
     },
     {
       name: "a delete the server refuses",
-      from: `/c/${ID_7}`,
+      from: `/chat/${ID_7}`,
       step: deleting(STORED.title),
-      lands: `/c/${ID_7}`,
+      lands: `/chat/${ID_7}`,
       failing: true,
-      kept: `/c/${ID_7}`,
+      kept: `/chat/${ID_7}`,
     },
     {
       name: "deleting a conversation another tab deleted",
-      from: `/c/${ID_7}`,
+      from: `/chat/${ID_7}`,
       step: deleting(STORED.title),
       lands: "/",
       deletedElsewhere: ID_7,
-      gone: `/c/${ID_7}`,
+      gone: `/chat/${ID_7}`,
     },
   ])("$name lands on $lands, and stays there", async (scenario) => {
     const { from, step, lands, early, failing, deletedElsewhere, gone, kept, unrequested } =
@@ -410,10 +416,10 @@ describe("the chat page's address", () => {
   });
 
   it.each([
-    ["one gone, as not available", `/c/${uuidOf(99)}`, false, i18n.t("sidebar.unreadable")],
+    ["one gone, as not available", `/chat/${uuidOf(99)}`, false, i18n.t("sidebar.unreadable")],
     [
       "one that failed to load, by why, with its reference",
-      `/c/${ID_7}`,
+      `/chat/${ID_7}`,
       true,
       `${i18n.t("errors.INTERNAL")}INTERNAL · rif. ${REQUEST_ID}`,
     ],
@@ -480,9 +486,9 @@ describe("pinning from the sidebar", () => {
       `PATCH /api/conversations/${ID_8}`,
       `PATCH /api/conversations/${ID_8}`,
     ]);
-    expect(pinned).toEqual([`/c/${ID_8}`]);
+    expect(pinned).toEqual([`/chat/${ID_8}`]);
     expect(focusedOnUnpin).toBe(i18n.t("sidebar.unpin", { title }));
-    expect(recent).toEqual([`/c/${ID_7}`, `/c/${ID_8}`]);
+    expect(recent).toEqual([`/chat/${ID_7}`, `/chat/${ID_8}`]);
     expect(fixed).toBeNull();
   });
 
@@ -503,7 +509,7 @@ describe("pinning from the sidebar", () => {
     unmount();
 
     expect(waiting).toBeNull();
-    expect(pinned).toEqual([`/c/${ID_8}`]);
+    expect(pinned).toEqual([`/chat/${ID_8}`]);
   });
 
   it("says a failed pin in a toast naming the conversation, whose «Riprova» pins it", async () => {
@@ -525,7 +531,7 @@ describe("pinning from the sidebar", () => {
 
     expect(said).toContain(i18n.t("sidebar.pinFailed"));
     expect(said).toContain(title);
-    expect(pinned).toEqual([`/c/${ID_8}`]);
+    expect(pinned).toEqual([`/chat/${ID_8}`]);
   });
 
   it("hands the focus to «Nuova conversazione» when the row was deleted in another tab", async () => {
@@ -543,7 +549,7 @@ describe("pinning from the sidebar", () => {
     const focused = document.activeElement?.textContent;
     unmount();
 
-    expect(rows).toEqual([`/c/${ID_7}`]);
+    expect(rows).toEqual([`/chat/${ID_7}`]);
     expect(focused).toBe(i18n.t("sidebar.new"));
   });
 });
@@ -735,15 +741,36 @@ describe("a visitor's addresses", () => {
     });
   });
 
-  it.each([`/c/${ID_7}`, "/staff", "/staff/programmes"])(
-    "sends %s to the login page",
+  it.each([`/chat/${ID_7}`, "/staff", "/staff/programmes"])(
+    "sends %s to the login page, which brings the reader back to it",
     async (path) => {
-      const { unmount, path: where } = page(path, null);
+      const { unmount, path: where, state } = page(path, null);
       await settle();
-      const landed = where();
+      const landed = { path: where(), state: state() };
       unmount();
 
-      expect(landed).toBe("/login");
+      expect(landed).toEqual({ path: "/login", state: { from: path } });
+    },
+  );
+
+  // No deployment holds a `/c/` link, so none is redirected: it is an address
+  // like any other that names no page, for a reader and a visitor alike.
+  it.each([
+    ["a reader", STUDENT],
+    ["a visitor", null],
+  ])(
+    "shows %s an old /c/ address as a page that is not there, asking the server nothing",
+    async (_, account) => {
+      const { container, unmount, path } = page("/c/7", account);
+      await settle();
+      const seen = {
+        heading: container.querySelector("h1")?.textContent,
+        path: path(),
+        read: requested.filter((request) => request.startsWith("GET /api/conversations/")),
+      };
+      unmount();
+
+      expect(seen).toEqual({ heading: i18n.t("notFound.title"), path: "/c/7", read: [] });
     },
   );
 });

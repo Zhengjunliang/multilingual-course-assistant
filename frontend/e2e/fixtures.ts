@@ -130,7 +130,7 @@ export const campusStream = (conversation: string | null) =>
 export const slidesStream = (conversation: string | null) =>
   stream(SLIDES_QUESTION, SLIDES_ANSWER, SLIDES_ROUTE, SLIDES_CITATION, conversation);
 
-/** The campus exchange, stored: what `/c/<id>` reopens. */
+/** The campus exchange, stored: what `/chat/<id>` reopens. */
 export const CONVERSATION: ConversationDetail = {
   id: uuidOf(7),
   locale: "it",

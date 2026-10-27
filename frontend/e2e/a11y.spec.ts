@@ -146,7 +146,7 @@ function screen(path: string, as: Screen["as"]): Screen {
 }
 
 /** The stored conversation, the one screen with an answer and its sources. */
-const stored = () => screen(`/c/${CONVERSATION.id}`, "student");
+const stored = () => screen(`/chat/${CONVERSATION.id}`, "student");
 
 /** A staff page's tab, by the label its count follows. */
 const tab = (page: Page, label: string) => page.getByRole("tab", { name: new RegExp(`^${label}`) });

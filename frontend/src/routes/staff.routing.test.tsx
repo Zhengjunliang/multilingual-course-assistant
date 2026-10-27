@@ -1257,7 +1257,7 @@ describe("deleting while an answer is written", () => {
       stoppedAtDelete,
       stopped,
       path: path(),
-      row: container.querySelector(`aside a[href="/c/${uuidOf(9)}"]`),
+      row: container.querySelector(`aside a[href="/chat/${uuidOf(9)}"]`),
     };
     unmount();
 
@@ -1282,12 +1282,12 @@ describe("deleting while an answer is written", () => {
     const seen = {
       stopped,
       path: path(),
-      row: container.querySelector(`aside a[href="/c/${uuidOf(9)}"]`) !== null,
+      row: container.querySelector(`aside a[href="/chat/${uuidOf(9)}"]`) !== null,
       said: document.body.textContent?.includes(i18n.t("sidebar.deleteFailed")),
     };
     unmount();
 
-    expect(seen).toEqual({ stopped: false, path: `/c/${uuidOf(9)}`, row: true, said: true });
+    expect(seen).toEqual({ stopped: false, path: `/chat/${uuidOf(9)}`, row: true, said: true });
   });
 
   it("keeps the deleted conversation off the list when an older list arrives last", async () => {
@@ -1311,7 +1311,7 @@ describe("deleting while an answer is written", () => {
     const late = lateList === null;
     answer();
     await settle();
-    const row = container.querySelector(`aside a[href="/c/${uuidOf(9)}"]`);
+    const row = container.querySelector(`aside a[href="/chat/${uuidOf(9)}"]`);
     unmount();
 
     expect({ late, row }).toEqual({ late: true, row: null });
@@ -1332,7 +1332,7 @@ describe("deleting while an answer is written", () => {
       said: i18n.t("sidebar.deleteBody", { title: "ORM" }),
       stoppedAtDelete: false,
       stopped: false,
-      path: `/c/${uuidOf(9)}`,
+      path: `/chat/${uuidOf(9)}`,
     });
   });
 });

@@ -24,10 +24,10 @@ if TYPE_CHECKING:
 
 SHELL = b'<!doctype html>\n<html lang="it"><body><div id="root"></div></body></html>'
 
-# Paths the SPA routes on its own. `/c/7` is the one that matters: it is where
+# Paths the SPA routes on its own. `/chat/<id>` is the one that matters: it is where
 # a reader lands after sharing a conversation with themselves, and the only
 # reason the catch-all exists.
-SPA_PATHS = ["/", "/login", "/register", "/c/7"]
+SPA_PATHS = ["/", "/login", "/register", "/chat/3f1c9a52-6b0e-4d7a-9c1e-2a5b8d4f0e17"]
 
 
 @pytest.fixture

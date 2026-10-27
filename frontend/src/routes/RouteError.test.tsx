@@ -8,7 +8,7 @@
  * still stand, and moving on must clear the error.
  *
  * The pages that throw are the real ones behind a switch: the chat throws on
- * `/c/13` or when told to, and the frame throws when told to.
+ * `/chat/13` or when told to, and the frame throws when told to.
  *
  * One failure must not reach the panel: KaTeX's chunk, which the answer falls
  * back from to its untypeset text (AnswerStream.tsx). Here it never loads.
@@ -144,7 +144,7 @@ function reported(): boolean {
 
 describe("a page that throws", () => {
   it("inside the frame gives way to the panel, with the sidebar still there", async () => {
-    const { container, unmount } = at("/c/13");
+    const { container, unmount } = at("/chat/13");
     await settle();
     const seen = {
       panel: panel(container),
@@ -158,7 +158,7 @@ describe("a page that throws", () => {
   });
 
   it("leaves with the reader, who can open another page from the sidebar", async () => {
-    const { container, unmount } = at("/c/13");
+    const { container, unmount } = at("/chat/13");
     await settle();
     act(() => container.querySelector<HTMLAnchorElement>('aside a[href="/"]')?.click());
     await settle();

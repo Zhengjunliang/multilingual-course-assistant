@@ -1,6 +1,6 @@
 """The views Django serves outside the apps: the SPA's shell, and the API's fallbacks.
 
-Every path the SPA routes to on its own — `/`, `/login`, `/c/7` — has to answer
+Every path the SPA routes to on its own — `/`, `/login`, `/chat/<id>` — has to answer
 something when the reader reloads it or pastes the link back in, because at
 that moment the browser really does ask the server for it. All of them get the
 same file and the SPA sorts out which page that was.

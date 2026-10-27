@@ -94,7 +94,7 @@ function search(container: HTMLElement, text: string) {
 }
 
 const rowTitles = (container: HTMLElement) =>
-  [...container.querySelectorAll('a[href^="/c/"]')].map((row) => row.firstChild?.textContent);
+  [...container.querySelectorAll('a[href^="/chat/"]')].map((row) => row.firstChild?.textContent);
 
 const groupTitles = (container: HTMLElement, group: string) =>
   [...container.querySelectorAll(`nav[aria-label="${group}"] a`)].map(
@@ -103,7 +103,7 @@ const groupTitles = (container: HTMLElement, group: string) =>
 
 /** The row's second line: what its last answer drew on. */
 const sourceLine = (container: HTMLElement, id: number) =>
-  container.querySelector(`a[href="/c/${uuidOf(id)}"]`)?.lastElementChild;
+  container.querySelector(`a[href="/chat/${uuidOf(id)}"]`)?.lastElementChild;
 
 describe("the conversation sidebar", () => {
   it("marks itself as the sidebar's panel, so the shell's keys work in the drawer", () => {
@@ -210,7 +210,7 @@ describe("the conversation sidebar", () => {
       }),
     ]);
     const langs = [1, 2].map((id) => {
-      const row = container.querySelector(`a[href="/c/${uuidOf(id)}"]`);
+      const row = container.querySelector(`a[href="/chat/${uuidOf(id)}"]`);
       return [
         row?.firstElementChild?.getAttribute("lang"),
         row?.querySelector("[lang]:not(:first-child)")?.getAttribute("lang") ?? null,
