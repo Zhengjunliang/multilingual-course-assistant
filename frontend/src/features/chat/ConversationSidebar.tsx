@@ -38,6 +38,7 @@ import { MascotMark } from "@/components/Mascot";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/field";
 import { Tooltip } from "@/components/ui/tooltip";
+import type { ErrorText } from "@/lib/errorText";
 import { cn } from "@/lib/utils";
 import type { SidebarControls } from "./ChatShell";
 import { ConversationList } from "./ConversationList";
@@ -55,11 +56,11 @@ interface ConversationSidebarProps {
    */
   busy: number | null;
   /**
-   * Deletes a conversation and resolves to whether the server did. The layout
-   * route (routes/ShellLayout.tsx) owns the URL, so leaving a deleted
-   * conversation is its job, not this one's.
+   * Deletes a conversation and resolves to `null` once the server did, else
+   * to why it did not. The layout route (routes/ShellLayout.tsx) owns the
+   * URL, so leaving a deleted conversation is its job, not this one's.
    */
-  onDelete: (id: number) => Promise<boolean>;
+  onDelete: (id: number) => Promise<ErrorText | null>;
   /** Pins or unpins a conversation and resolves to whether the server did. */
   onPin: (id: number, pinned: boolean, title: string, retry: () => void) => Promise<boolean>;
   /** Which mount this is, and what the shell lets it do (ChatShell.tsx). */

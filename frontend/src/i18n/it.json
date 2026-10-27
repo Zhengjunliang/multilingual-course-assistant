@@ -156,7 +156,7 @@
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
     "ROLE_ALREADY_HELD": "Questo utente ha già questo ruolo qui.",
     "RESOURCE_EXHAUSTED": "Troppe richieste. Riprova tra {{retry_after_seconds}} secondi.",
-    "UNAVAILABLE": "Il servizio sta rispondendo ad altre domande. Riprovo tra poco.",
+    "UNAVAILABLE": "Il servizio sta rispondendo ad altre domande. Riprova tra poco.",
     "ENGINE_DOWN": "Il servizio delle risposte non è disponibile. Riprova più tardi.",
     "INTERNAL": "Qualcosa è andato storto. Riprova tra poco.",
     "NETWORK": "Il server non risponde. Controlla la connessione e riprova.",

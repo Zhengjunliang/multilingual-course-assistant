@@ -32,6 +32,7 @@ import { ConversationSidebar } from "@/features/chat/ConversationSidebar";
 import { SidebarRail } from "@/features/chat/SidebarRail";
 import { managementItems } from "@/features/staff/landing";
 import { ICON, ManagementNav } from "@/features/staff/ManagementNav";
+import { describeError } from "@/lib/errorText";
 import { NO_TRAIL, type Shell, ShellContext, type Trail } from "./shell";
 
 export default function ShellLayout() {
@@ -132,12 +133,12 @@ export default function ShellLayout() {
         if (!gone) {
           refused(error);
           void refreshConversations();
-          return false;
+          return describeError(error);
         }
       }
       if (open === String(id)) void navigate("/", { replace: true });
       void refreshConversations();
-      return true;
+      return null;
     },
     [open, navigate, refreshConversations, refused],
   );

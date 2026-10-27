@@ -27,31 +27,39 @@ export function retryText(retry: Retry, t: TFunction): string {
   return t("status.retrying", { ...retry, total: MAX_BUSY_RETRIES });
 }
 
+/** What the banner of an answer that stopped says. */
+export interface FailureText {
+  /** Why it stopped, in the interface's words for the error's code. */
+  heading: string;
+  /** For a signed-in reader with part of an answer: that the part is stored (docs/api.md). */
+  kept: string | undefined;
+  /** The code and request id of a failure the reader can only report (lib/errorText.ts). */
+  reference: string | undefined;
+}
+
 /**
- * Why an answer stopped, read from its error's code, and, for a signed-in
- * reader with part of an answer, that the part is stored (docs/api.md);
- * `null` for an answer that did not fail.
+ * What the banner says about an answer that stopped; `null` for one that did
+ * not. A stored answer read back unfinished has no request left to report.
  */
-export function failureText(
-  turn: Turn,
-  visitor: boolean,
-  t: TFunction,
-): { heading: string; kept: string | undefined } | null {
+export function failureText(turn: Turn, visitor: boolean, t: TFunction): FailureText | null {
   if (turn.failure === null) return null;
-  const { key, values }: Sentence =
+  const { sentence, reference }: { sentence: Sentence; reference: Sentence | null } =
     turn.failure.kind === "failed"
-      ? describeError(turn.failure.error).sentence
-      : { key: "errors.STREAM_INTERRUPTED", values: {} };
+      ? describeError(turn.failure.error)
+      : { sentence: { key: "errors.STREAM_INTERRUPTED", values: {} }, reference: null };
   return {
-    heading: t(key, values),
+    heading: t(sentence.key, sentence.values),
     kept: !visitor && turn.answer !== "" ? t("answer.kept") : undefined,
+    reference: reference === null ? undefined : t(reference.key, reference.values),
   };
 }
 
 /**
  * What a screen reader is told about the turn being answered: its banner's
  * words while it is retried or once it has failed just now, and nothing for a
- * failure read back with a stored conversation.
+ * failure read back with a stored conversation. The reference is left out:
+ * read aloud, 32 hexadecimal characters say nothing, and it stays on screen
+ * for whoever reports the failure.
  */
 export function spokenNotice(
   turn: Turn,

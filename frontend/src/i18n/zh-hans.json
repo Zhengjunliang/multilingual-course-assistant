@@ -156,7 +156,7 @@
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
     "ROLE_ALREADY_HELD": "该用户在这里已有此角色。",
     "RESOURCE_EXHAUSTED": "请求太多，请 {{retry_after_seconds}} 秒后再试。",
-    "UNAVAILABLE": "服务正在回答其他问题，稍后自动重试。",
+    "UNAVAILABLE": "服务正在回答其他问题，请稍后再试。",
     "ENGINE_DOWN": "回答服务暂时不可用，请稍后再试。",
     "INTERNAL": "出错了，请稍后再试。",
     "NETWORK": "无法连接服务器，请检查网络后再试。",
