@@ -229,9 +229,14 @@ def test_the_admin_refuses_to_delete_a_message_on_its_own(admin_client) -> None:
 
     page = admin_client.get(url)
     confirmed = admin_client.post(url, {"post": "yes"})
+    bulk = admin_client.post(
+        reverse("admin:qa_message_changelist"),
+        {"action": "delete_selected", "_selected_action": [str(first.pk)], "post": "yes"},
+    )
 
     assert page.context["protected"]
-    assert confirmed.status_code == 200
+    assert (confirmed.status_code, bulk.status_code) == (200, 200)
+    assert bulk.context["protected"]
     assert Message.objects.filter(conversation=conversation).count() == 2
 
 
