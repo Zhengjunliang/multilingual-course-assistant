@@ -2,13 +2,14 @@
 
 /**
  * A visitor's thread: what each question carries back, and how long the
- * thread lasts.
+ * thread lasts; and a question that does not get its whole answer.
  *
  * The server stores nothing for a visitor, so `historyOf` — the server's
  * `recent_turns` done on this side — is what makes a follow-up a follow-up,
  * and the thread itself lasts as long as the page. The hook is mounted for
  * real and the network faked at `fetch`, as the routing test does, because
- * the request body is the claim.
+ * the request body is the claim. A failure is kept as the coded error it
+ * arrived as, whichever body shape the server sent it in (#186).
  */
 
 import { act } from "react";
@@ -16,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HISTORY_WINDOW_TURNS, MAX_HISTORY_ANSWER_CHARS } from "@/api/client";
 import type { RouteDecision } from "@/api/contract";
+import type { ErrorCode, ErrorData } from "@/api/errors";
 import { mount } from "@/test/mount";
 import { historyOf, type Turn, useAsk } from "./useAsk";
 
@@ -85,7 +87,7 @@ describe("what a visitor's question carries back", () => {
       turn("three"),
       turn("four", { answer: "x".repeat(MAX_HISTORY_ANSWER_CHARS + 1) }),
       // Cut off midway, and sent as the reader saw it.
-      turn("five", { answer: "Entro il", complete: false, failure: { kind: "incomplete" } }),
+      turn("five", { answer: "Entro il", complete: false, failure: { kind: "interrupted" } }),
     ];
 
     const history = historyOf(turns);
@@ -158,6 +160,173 @@ describe("a visitor's thread", () => {
       asked: 1,
       reloaded: 0,
       stored: 0,
+    });
+  });
+});
+
+const ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+const START_FRAME = `event: start\ndata: ${JSON.stringify({
+  question: "Quando scadono le tasse?",
+  conversation_id: null,
+  locale: "it",
+  route: ROUTE,
+  citations: [],
+  search_ms: 40,
+})}\n\n`;
+const TOKEN_FRAME = 'event: token\ndata: {"text": "Entro il"}\n\n';
+
+/** The coded body, `{"error": ...}`, as one `error` frame. */
+function codedFrame(code: ErrorCode, data: ErrorData = {}): string {
+  const error = { code, message: "…", data, fields: [], request_id: ID };
+  return `event: error\ndata: ${JSON.stringify({ error })}\n\n`;
+}
+
+/** Transitional (#186): a body from before it, as one `error` frame. */
+function oldFrame(body: Record<string, string>): string {
+  return `event: error\ndata: ${JSON.stringify(body)}\n\n`;
+}
+
+/** `fetch` answering every question with `status` and `body`, framed and with its request id. */
+function answering(status: number, body: string, headers: Record<string, string> = {}) {
+  const calls = vi.fn(
+    async () =>
+      new Response(body, {
+        status,
+        headers: { "Content-Type": "text/event-stream", "X-Request-ID": ID, ...headers },
+      }),
+  );
+  vi.stubGlobal("fetch", calls);
+  return calls;
+}
+
+describe("a question that does not get its whole answer", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** Lets the pending requests, body reads and state updates land, `ms` later. */
+  async function wait(ms: number) {
+    await act(() => vi.advanceTimersByTimeAsync(ms));
+  }
+
+  /** Asks one question as a visitor and hands back where the hook stopped. */
+  async function ask() {
+    const { unmount } = mount(<Probe visitor />);
+    await act(async () => {
+      void hook.submit("Quando scadono le tasse?");
+    });
+    await wait(0);
+    const { waiting, turns } = hook;
+    unmount();
+    return { waiting, turn: turns[0] };
+  }
+
+  it.each([
+    [
+      "the old body",
+      oldFrame({ detail: "The engine is busy.", reason: "busy" }),
+      { "Retry-After": "7" },
+    ],
+    ["the coded body", codedFrame("UNAVAILABLE", { retry_after_seconds: 7 }), {}],
+  ])(
+    "waits out a busy engine for the seconds %s names, twice, and then stops",
+    async (_, body, headers) => {
+      const calls = answering(503, body, headers);
+      const { unmount } = mount(<Probe visitor />);
+
+      await act(async () => {
+        void hook.submit("Quando scadono le tasse?");
+      });
+      await wait(0);
+      const first = hook.waiting;
+      await wait(7000);
+      const second = hook.waiting;
+      await wait(7000);
+      const last = hook.waiting;
+      unmount();
+
+      expect({ first, second, asked: calls.mock.calls.length }).toEqual({
+        first: { phase: "retrying", seconds: 7, attempt: 1 },
+        second: { phase: "retrying", seconds: 7, attempt: 2 },
+        asked: 3,
+      });
+      expect(last).toMatchObject({
+        phase: "stopped",
+        canRetry: true,
+        failure: { kind: "failed", error: { code: "UNAVAILABLE", requestId: ID } },
+      });
+    },
+  );
+
+  it.each([
+    ["the old body", oldFrame({ detail: "Qdrant is not running.", reason: "unavailable" })],
+    ["the coded body", codedFrame("ENGINE_DOWN")],
+  ])("does not ask an engine that is down again, from %s", async (_, body) => {
+    const calls = answering(503, body);
+
+    const { waiting } = await ask();
+
+    expect(calls).toHaveBeenCalledTimes(1);
+    expect(waiting).toMatchObject({
+      phase: "stopped",
+      canRetry: false,
+      failure: { kind: "failed", error: { status: 503, code: "ENGINE_DOWN", requestId: ID } },
+    });
+  });
+
+  it("reads a request that never reached the server as the network's failure", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    const { waiting } = await ask();
+
+    expect(waiting).toMatchObject({
+      phase: "stopped",
+      canRetry: false,
+      failure: { kind: "failed", error: { status: 0, code: "NETWORK", requestId: null } },
+    });
+  });
+
+  it.each([
+    [
+      "the old event",
+      oldFrame({ detail: "The model stopped answering." }),
+      { code: "ENGINE_DOWN", legacyText: "The model stopped answering." },
+    ],
+    ["the coded event", codedFrame("ENGINE_DOWN"), { code: "ENGINE_DOWN", legacyText: null }],
+    ["an event it cannot read", oldFrame({}), { code: "BAD_RESPONSE", legacyText: null }],
+  ])(
+    "keeps the part an error inside the stream cut short, and the error from %s",
+    async (_, frame, read) => {
+      answering(200, START_FRAME + TOKEN_FRAME + frame);
+
+      const { waiting, turn } = await ask();
+
+      expect(turn?.answer).toBe("Entro il");
+      expect(waiting).toMatchObject({
+        phase: "stopped",
+        canRetry: false,
+        failure: { kind: "failed", error: { status: 200, requestId: ID, ...read } },
+      });
+    },
+  );
+
+  it("reads a stream that stops before its end as interrupted, under the response's request id", async () => {
+    answering(200, START_FRAME + TOKEN_FRAME);
+
+    const { waiting, turn } = await ask();
+
+    expect(turn?.answer).toBe("Entro il");
+    expect(waiting).toMatchObject({
+      phase: "stopped",
+      canRetry: true,
+      failure: { kind: "failed", error: { code: "STREAM_INTERRUPTED", requestId: ID } },
     });
   });
 });

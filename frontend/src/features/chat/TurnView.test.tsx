@@ -234,7 +234,7 @@ describe("the cat beside the answer", () => {
   });
 
   it("apologises for an answer that failed", () => {
-    const failed = turn({ complete: false, failure: { kind: "incomplete" } });
+    const failed = turn({ complete: false, failure: { kind: "interrupted" } });
 
     expect(poseIn(view(failed))).toBe("error");
   });
@@ -573,7 +573,7 @@ describe("the row under the answer", () => {
 
   it("lists every source as one, with no heading, under an answer that did not finish", () => {
     const { container, unmount } = mounted(
-      turn({ complete: false, failure: { kind: "incomplete" } }),
+      turn({ complete: false, failure: { kind: "interrupted" } }),
     );
 
     act(() => sourcesButton(container)?.click());
@@ -712,7 +712,7 @@ describe("the row under the answer", () => {
 });
 
 describe("a turn that did not get all the way", () => {
-  const cut = turn({ answer: "La scadenza è", complete: false, failure: { kind: "incomplete" } });
+  const cut = turn({ answer: "La scadenza è", complete: false, failure: { kind: "interrupted" } });
 
   /** What the warning banner shows, and the role it carries. */
   function banner(of: Turn, { visitor = false } = {}) {

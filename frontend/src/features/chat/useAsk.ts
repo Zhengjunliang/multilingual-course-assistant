@@ -7,10 +7,11 @@
  * ninety seconds before refusing it. Showing nothing during that silence is the
  * dishonest part.
  *
- * A `busy` 503 is retried at most twice and then stopped, because an automatic
- * retry that never gives up is a page that looks like it is working while
- * nothing is. `unavailable` is not retried at all — a model server or a Qdrant
- * service that is not running does not start because we asked again.
+ * An `UNAVAILABLE` 503, the engine busy with another question, is retried at
+ * most twice and then stopped, because an automatic retry that never gives up
+ * is a page that looks like it is working while nothing is. `ENGINE_DOWN` is
+ * not retried at all — a model server or a Qdrant service that is not running
+ * does not start because we asked again.
  *
  * A visitor without an account asks the same way and keeps the thread: the
  * server stores nothing for them (docs/decisions.md, 2026-09-25, *The data
@@ -26,7 +27,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-  AskFailed,
   ask,
   HISTORY_WINDOW_TURNS,
   type HistoryTurn,
@@ -34,16 +34,20 @@ import {
 } from "@/api/client";
 import type { Citation, RouteDecision } from "@/api/contract";
 import type { ConversationDetail, StoredMessage } from "@/api/conversations";
+import { ApiError, failureOfEvent } from "@/api/http";
 import { readAnswerEvents } from "@/api/sse";
 
 export const MAX_BUSY_RETRIES = 2;
 
 /** How far a turn got, when it did not get all the way. */
 export type Failure =
-  /** The server said why, in words meant for the reader. */
-  | { kind: "reported"; detail: string }
-  /** The stream stopped without `end`; there is no message, only the absence. */
-  | { kind: "incomplete" };
+  /** This question's request failed, and the error says how, by its code. */
+  | { kind: "failed"; error: ApiError }
+  /**
+   * A stored answer that stopped before its end, read back with its
+   * conversation: the request it came from is long gone.
+   */
+  | { kind: "interrupted" };
 
 /** One exchange as the interface holds it, live or replayed from the database. */
 export interface Turn {
@@ -118,7 +122,7 @@ function replayed(messages: readonly StoredMessage[]): Turn[] {
     open.searchMs = message.search_ms;
     open.locale = message.locale;
     open.complete = message.complete;
-    if (!message.complete) open.failure = { kind: "incomplete" };
+    if (!message.complete) open.failure = { kind: "interrupted" };
   }
   return turns;
 }
@@ -235,20 +239,22 @@ export function useAsk(visitor: boolean) {
         } catch (error) {
           if (controller.signal.aborted) return;
 
-          const busy = error instanceof AskFailed && error.reason === "busy";
+          // Whatever else threw is the connection, as far as the reader can
+          // tell: the request never reached the server, or the stream broke off.
+          const failed =
+            error instanceof ApiError ? error : new ApiError({ status: 0, code: "NETWORK" });
+          const busy = failed.code === "UNAVAILABLE";
           if (!busy || attempt >= MAX_BUSY_RETRIES) {
-            const failure: Failure = {
-              kind: "reported",
-              detail: error instanceof Error ? error.message : String(error),
-            };
+            const failure: Failure = { kind: "failed", error: failed };
             patch({ failure });
             settle({ phase: "stopped", failure, canRetry: busy });
             return;
           }
 
           // The server's own hint, and there always is one on a 503 from this
-          // endpoint (`Retry-After`); the fallback is for a proxy that stripped it.
-          const seconds = (error as AskFailed).retryAfter ?? 30;
+          // endpoint; the fallback is for an answer that lost it on the way.
+          const hint = failed.data.retry_after_seconds;
+          const seconds = typeof hint === "number" ? hint : 30;
           settle({ phase: "retrying", seconds, attempt: attempt + 1 });
           try {
             await sleep(seconds, controller.signal);
@@ -268,7 +274,7 @@ export function useAsk(visitor: boolean) {
 /**
  * One attempt.
  *
- * Throws whatever `ask` threw, so the retry loop above can read the reason off
+ * Throws whatever `ask` threw, so the retry loop above can read the code off
  * it. An `error` event *inside* the stream is not a throw: by then the status
  * code is long spent, the fragment already on screen is worth keeping, and
  * retrying would ask the same question twice.
@@ -285,7 +291,7 @@ async function run(
   let answer = "";
   let ended = false;
 
-  const body = await ask(
+  const { body, requestId } = await ask(
     history === null ? { question, conversation_id: opened.current } : { question, history },
     signal,
   );
@@ -311,7 +317,7 @@ async function run(
         ended = true;
         break;
       case "error": {
-        const failure: Failure = { kind: "reported", detail: event.data.detail };
+        const failure: Failure = { kind: "failed", error: failureOfEvent(event.data, requestId) };
         patch({ failure });
         settle({ phase: "stopped", failure, canRetry: false });
         return;
@@ -320,9 +326,13 @@ async function run(
   }
 
   // The contract makes `end` the completion signal, so a stream that simply
-  // stopped is a failure even though every byte of it arrived.
+  // stopped is a failure even though every byte of it arrived. Its status is
+  // the stream's own 200, as an `error` event's is.
   if (!ended) {
-    const failure: Failure = { kind: "incomplete" };
+    const failure: Failure = {
+      kind: "failed",
+      error: new ApiError({ status: 200, code: "STREAM_INTERRUPTED", requestId }),
+    };
     patch({ failure });
     settle({ phase: "stopped", failure, canRetry: true });
     return;

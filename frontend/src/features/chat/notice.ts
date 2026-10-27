@@ -13,6 +13,7 @@
 
 import type { TFunction } from "i18next";
 
+import { describeError, type Sentence } from "@/lib/errorText";
 import { MAX_BUSY_RETRIES, type Turn } from "./useAsk";
 
 /** The server refused the question as busy: it is asked again in `seconds`, for the `attempt`th time. */
@@ -27,9 +28,9 @@ export function retryText(retry: Retry, t: TFunction): string {
 }
 
 /**
- * Why an answer stopped, the server's words or that it was cut short, and,
- * for a signed-in reader with part of an answer, that the part is stored
- * (docs/api.md); `null` for an answer that did not fail.
+ * Why an answer stopped, read from its error's code, and, for a signed-in
+ * reader with part of an answer, that the part is stored (docs/api.md);
+ * `null` for an answer that did not fail.
  */
 export function failureText(
   turn: Turn,
@@ -37,8 +38,12 @@ export function failureText(
   t: TFunction,
 ): { heading: string; kept: string | undefined } | null {
   if (turn.failure === null) return null;
+  const { key, values }: Sentence =
+    turn.failure.kind === "failed"
+      ? describeError(turn.failure.error).sentence
+      : { key: "errors.STREAM_INTERRUPTED", values: {} };
   return {
-    heading: turn.failure.kind === "reported" ? turn.failure.detail : t("error.incomplete"),
+    heading: t(key, values),
     kept: !visitor && turn.answer !== "" ? t("answer.kept") : undefined,
   };
 }

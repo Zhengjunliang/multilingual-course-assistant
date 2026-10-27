@@ -147,7 +147,6 @@ describe("a refusal in the old body shape", () => {
     expect(failure).toMatchObject({
       code: "RESOURCE_EXHAUSTED",
       data: { retry_after_seconds: 42 },
-      retryAfter: 42,
     });
   });
 
@@ -192,12 +191,12 @@ describe("a refusal in the old body shape", () => {
   });
 
   it.each([
-    ["busy", "UNAVAILABLE", { retry_after_seconds: 60 }, "busy"],
-    ["unavailable", "ENGINE_DOWN", {}, "unavailable"],
-  ])("reads the chat's 503 %s by its reason", async (reason, code, data, read) => {
+    ["busy", "UNAVAILABLE", { retry_after_seconds: 60 }],
+    ["unavailable", "ENGINE_DOWN", {}],
+  ])("reads the chat's 503 %s by its reason", async (reason, code, data) => {
     const failure = await refusal(503, { detail: "…", reason }, { "Retry-After": "60" });
 
-    expect(failure).toMatchObject({ code, data, reason: read });
+    expect(failure).toMatchObject({ code, data });
   });
 });
 

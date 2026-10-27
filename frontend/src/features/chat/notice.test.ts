@@ -5,11 +5,13 @@
 
 import { describe, expect, it } from "vitest";
 
+import { ApiError } from "@/api/http";
 import i18n from "@/i18n";
 import { spokenNotice } from "./notice";
 import type { Turn } from "./useAsk";
 
 const t = i18n.t;
+const ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
 function turn(overrides: Partial<Turn> = {}): Turn {
   return {
@@ -26,7 +28,12 @@ function turn(overrides: Partial<Turn> = {}): Turn {
   };
 }
 
-const cut = turn({ failure: { kind: "incomplete" } });
+const cut = turn({
+  failure: {
+    kind: "failed",
+    error: new ApiError({ status: 200, code: "STREAM_INTERRUPTED", requestId: ID }),
+  },
+});
 const heading = "La risposta si è interrotta prima della fine.";
 const kept = "Quello che vedi è stato salvato così com'è.";
 
@@ -50,13 +57,26 @@ describe("what is said about the turn being answered", () => {
     expect(spokenNotice(cut, null, true, true, t)).toBe(heading);
   });
 
-  it("says the server's own words when it refused the question", () => {
-    const refused = turn({ answer: "", failure: { kind: "reported", detail: "Server error." } });
+  it("says a refusal in the interface's words for its code", () => {
+    const error = new ApiError({ status: 503, code: "ENGINE_DOWN", requestId: ID });
+    const refused = turn({ answer: "", failure: { kind: "failed", error } });
+
+    expect(spokenNotice(refused, null, true, false, t)).toBe(
+      "Il servizio delle risposte non è disponibile. Riprova più tardi.",
+    );
+  });
+
+  it("says the server's own words for a refusal that came with no code", () => {
+    // Transitional (#186): the body from before `{"error": ...}`.
+    const error = new ApiError({ status: 503, code: "ENGINE_DOWN", legacyText: "Server error." });
+    const refused = turn({ answer: "", failure: { kind: "failed", error } });
 
     expect(spokenNotice(refused, null, true, false, t)).toBe("Server error.");
   });
 
   it("says nothing of a failure read back with a stored conversation", () => {
-    expect(spokenNotice(cut, null, false, false, t)).toBe("");
+    const stored = turn({ failure: { kind: "interrupted" } });
+
+    expect(spokenNotice(stored, null, false, false, t)).toBe("");
   });
 });

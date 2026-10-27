@@ -142,9 +142,6 @@
     "copy": "Copia",
     "copied": "Copiato"
   },
-  "error": {
-    "incomplete": "La risposta si è interrotta prima della fine."
-  },
   "errors": {
     "INVALID_ARGUMENT": "Controlla i campi evidenziati.",
     "MALFORMED_REQUEST": "$t(errors.INTERNAL)",
