@@ -142,9 +142,6 @@
     "copy": "Copy",
     "copied": "Copied"
   },
-  "error": {
-    "incomplete": "The answer stopped before it was finished."
-  },
   "errors": {
     "INVALID_ARGUMENT": "Check the highlighted fields.",
     "MALFORMED_REQUEST": "$t(errors.INTERNAL)",

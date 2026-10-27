@@ -4,7 +4,8 @@
  *
  * `client.ts` handles the one streaming call; everything else — who am I, log
  * in, list conversations — is an ordinary request and goes through here. Both
- * read a refusal with `failureOf`.
+ * read a refusal with `failureOf`; a failure inside the stream, once it has
+ * begun, is read with `failureOfEvent`.
  *
  * The token is read from the cookie `GET /api/auth/me` issues and sent back as
  * `X-CSRFToken`, which is the header DRF's `CSRF_HEADER_NAME` names by default.
@@ -76,9 +77,7 @@ export class ApiError extends Error {
     requestId = null,
     legacyText = null,
   }: ApiErrorInit) {
-    // Transitional (#186): the server's sentence, for the chat that still shows
-    // `message`; the code alone once no body comes without one.
-    super(legacyText ?? code);
+    super(code);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
@@ -106,18 +105,6 @@ export class ApiError extends Error {
       fields[name] = [...(fields[name] ?? []), legacyText];
     }
     return fields;
-  }
-
-  /** Transitional (#186): the 503's old `reason`, for the chat's retry. */
-  get reason(): "busy" | "unavailable" | null {
-    if (this.code === "UNAVAILABLE") return "busy";
-    return this.code === "ENGINE_DOWN" ? "unavailable" : null;
-  }
-
-  /** Transitional (#186): the seconds to wait, for the chat's retry. */
-  get retryAfter(): number | null {
-    const seconds = this.data.retry_after_seconds;
-    return typeof seconds === "number" ? seconds : null;
   }
 }
 
@@ -351,6 +338,21 @@ export async function failureOf(response: Response): Promise<ApiError> {
   if (!isRecord(body)) return new ApiError({ status, code: "BAD_RESPONSE", requestId });
   if (isRecord(body.error)) return codedError(status, body.error, requestId);
   return legacyError(status, body, requestId, retryAfterSeconds(response));
+}
+
+/**
+ * An `error` event inside the answer stream, read into its `ApiError`. The
+ * response had begun, so the status is the stream's own 200, and the request
+ * id the one its header carried.
+ */
+export function failureOfEvent(data: unknown, requestId: string | null): ApiError {
+  if (isRecord(data) && isRecord(data.error)) return codedError(200, data.error, requestId);
+  // Transitional (#186): the event before `{"error": ...}`, the server's
+  // sentence for the one failure it sends there.
+  if (isRecord(data) && typeof data.detail === "string") {
+    return new ApiError({ status: 200, code: "ENGINE_DOWN", requestId, legacyText: data.detail });
+  }
+  return new ApiError({ status: 200, code: "BAD_RESPONSE", requestId });
 }
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

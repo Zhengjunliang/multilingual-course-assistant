@@ -142,9 +142,6 @@
     "copy": "复制",
     "copied": "已复制"
   },
-  "error": {
-    "incomplete": "回答在结束之前中断了。"
-  },
   "errors": {
     "INVALID_ARGUMENT": "请检查标出的字段。",
     "MALFORMED_REQUEST": "$t(errors.INTERNAL)",

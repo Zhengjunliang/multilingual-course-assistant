@@ -68,8 +68,6 @@ describe("a refused question", () => {
       code: "UNAVAILABLE",
       data: { retry_after_seconds: 60 },
       requestId: ID,
-      reason: "busy",
-      retryAfter: 60,
     });
   });
 });

@@ -16,13 +16,6 @@ import { ApiError, failureOf, writeHeaders } from "./http";
 const ASK_URL = "/api/ask";
 
 /**
- * Transitional (#186): the old name of a refused question, which is an
- * `ApiError` like any other failed request; it stays until the chat reads codes.
- */
-export const AskFailed = ApiError;
-export type AskFailed = ApiError;
-
-/**
  * The server's caps on a request (apps/qa/serializers.py and the history window
  * of apps/qa/models.py), mirrored so a client can stay inside them rather than
  * meet a 400. `tests/test_qa_contract.py` fails when either side moves alone.
@@ -54,13 +47,24 @@ export interface AskBody {
   locale?: string;
 }
 
+/** An answer on its way. */
+export interface Answering {
+  /** The body to read events from. */
+  body: ReadableStream<Uint8Array>;
+  /**
+   * The response's `X-Request-ID`: a failure inside the stream, after the
+   * status, is reported under it.
+   */
+  requestId: string | null;
+}
+
 /**
  * Ask, and hand back the body to read events from.
  *
  * `signal` is not optional by accident: abandoning a stream without aborting it
  * leaves the server generating for nobody and holding its one engine slot.
  */
-export async function ask(body: AskBody, signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+export async function ask(body: AskBody, signal: AbortSignal): Promise<Answering> {
   const response = await fetch(ASK_URL, {
     method: "POST",
     headers: { ...writeHeaders(), Accept: "text/event-stream" },
@@ -70,12 +74,9 @@ export async function ask(body: AskBody, signal: AbortSignal): Promise<ReadableS
   });
 
   if (!response.ok) throw await failureOf(response);
+  const requestId = response.headers.get("X-Request-ID");
   if (response.body === null) {
-    throw new ApiError({
-      status: response.status,
-      code: "BAD_RESPONSE",
-      requestId: response.headers.get("X-Request-ID"),
-    });
+    throw new ApiError({ status: response.status, code: "BAD_RESPONSE", requestId });
   }
-  return response.body;
+  return { body: response.body, requestId };
 }
