@@ -193,10 +193,11 @@ class EndEvent(Event):
 class ErrorEvent(Event):
     """The answer failed after the response had already started.
 
-    By then there is no status code left to send, so this stands in for the 503
+    By then there is no status code left to send, so this stands in for the one
     the same failure would have produced a moment earlier — apps/qa/views.py
-    draws that line — and carries the body that 503 would have: `ENGINE_DOWN`,
-    under the id of the request (config/errors.py).
+    draws that line — and carries the body it would have: `ENGINE_DOWN` for a
+    service that is down, `INTERNAL` for a defect, under the id of the request
+    (config/errors.py).
     """
 
     NAME = "error"

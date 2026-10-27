@@ -47,7 +47,7 @@ from config.views import server_error
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-    from django.test import RequestFactory
+    from django.test import Client, RequestFactory
     from rest_framework.request import Request
     from rest_framework.response import Response
 
@@ -297,6 +297,18 @@ def test_a_500_no_view_answered_is_the_coded_body_under_api_only(rf: RequestFact
 
     assert (api.status_code, json.loads(api.content)["error"]["code"]) == (500, "INTERNAL")
     assert (page.status_code, page["Content-Type"].split(";")[0]) == (500, "text/html")
+
+
+def test_a_request_django_refuses_before_any_view_is_the_coded_body_under_api_only(
+    client: Client,
+) -> None:
+    """A `Host` the site does not serve is refused by Django's middleware, as a
+    session another request ended is, before any view runs (`handler400`)."""
+    api = client.get("/api/conversations", HTTP_HOST="elsewhere.example")
+    page = client.get("/login", HTTP_HOST="elsewhere.example")
+
+    assert (api.status_code, refused(api)) == (400, ("MALFORMED_REQUEST", {}))
+    assert (page.status_code, page["Content-Type"].split(";")[0]) == (400, "text/html")
 
 
 def serializer_codes() -> dict[str, set[str]]:
