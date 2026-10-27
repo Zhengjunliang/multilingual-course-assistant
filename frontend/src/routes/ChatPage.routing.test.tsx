@@ -20,13 +20,17 @@ import type { Account } from "@/api/account";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
-import { summary } from "@/test/conversations";
+import { summary, uuidOf } from "@/test/conversations";
 import { type Mounted, mount } from "@/test/mount";
 import { codedRefusal, REQUEST_ID } from "@/test/refusal";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
+const ID_7 = uuidOf(7);
+const ID_8 = uuidOf(8);
+const ID_9 = uuidOf(9);
+
 const STORED_ROW = summary({
-  id: 7,
+  id: ID_7,
   created_at: "2026-09-28T10:00:00Z",
   title: "Che cos'è un ORM?",
 });
@@ -35,7 +39,7 @@ const STORED: ConversationDetail = {
   ...STORED_ROW,
   messages: [
     {
-      id: 1,
+      id: uuidOf(1),
       role: "user",
       text: "Che cos'è un ORM?",
       locale: "it",
@@ -46,7 +50,7 @@ const STORED: ConversationDetail = {
       created_at: STORED_ROW.created_at,
     },
     {
-      id: 2,
+      id: uuidOf(2),
       role: "assistant",
       text: "Un ORM mappa le tabelle in classi.",
       locale: "it",
@@ -84,7 +88,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 /** An answer stream in the framing `api/sse.ts` reads: `start`, then `end`. */
-function answerStream(conversationId: number | null, question: string): Response {
+function answerStream(conversationId: string | null, question: string): Response {
   const start = {
     question,
     conversation_id: conversationId,
@@ -104,12 +108,12 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   if (method === "GET" && path === "/api/conversations") {
     return listFails ? codedRefusal("INTERNAL") : json(conversations);
   }
-  if (method === "GET" && path === "/api/conversations/7") {
+  if (method === "GET" && path === `/api/conversations/${ID_7}`) {
     return readFails ? codedRefusal("INTERNAL") : json(STORED);
   }
   if (method === "DELETE" && path.startsWith("/api/conversations/")) {
     if (deleteFails) return codedRefusal("INTERNAL");
-    const id = Number(path.slice("/api/conversations/".length));
+    const id = path.slice("/api/conversations/".length);
     if (!conversations.some((row) => row.id === id)) return codedRefusal("NOT_FOUND");
     conversations = conversations.filter((row) => row.id !== id);
     return new Response(null, { status: 204 });
@@ -119,7 +123,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
       pinFailures -= 1;
       return codedRefusal("INTERNAL");
     }
-    const id = Number(path.slice("/api/conversations/".length));
+    const id = path.slice("/api/conversations/".length);
     const row = conversations.find((listed) => listed.id === id);
     if (row === undefined) return codedRefusal("NOT_FOUND");
     const { pinned } = JSON.parse(String(init.body)) as { pinned: boolean };
@@ -141,10 +145,10 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     // A visitor's question is filed nowhere, as the server has it.
     if (history !== undefined) return answerStream(null, question);
     conversations = [
-      summary({ id: 9, created_at: "2026-09-29T09:00:00Z", title: question }),
+      summary({ id: ID_9, created_at: "2026-09-29T09:00:00Z", title: question }),
       ...conversations,
     ];
-    return answerStream(9, question);
+    return answerStream(ID_9, question);
   }
   return codedRefusal("NOT_FOUND");
 }
@@ -241,7 +245,7 @@ function deleting(title: string) {
 }
 
 const OTHER = summary({
-  id: 8,
+  id: ID_8,
   created_at: "2026-09-27T10:00:00Z",
   title: "Quando scadono le tasse?",
 });
@@ -269,7 +273,7 @@ describe("the chat page's address", () => {
     /** The server refuses the delete. */
     failing?: boolean;
     /** Deleted on the server, from another tab, after this page listed it. */
-    deletedElsewhere?: number;
+    deletedElsewhere?: string;
     /** A sidebar row that must be gone afterwards. */
     gone?: string;
     /** A sidebar row that must still be there afterwards. */
@@ -279,10 +283,15 @@ describe("the chat page's address", () => {
   }
 
   it.each<Case>([
-    { name: "opening a new conversation", from: "/c/7", step: openNewConversation, lands: "/" },
+    {
+      name: "opening a new conversation",
+      from: `/c/${ID_7}`,
+      step: openNewConversation,
+      lands: "/",
+    },
     {
       name: "leaving a conversation before it loaded",
-      from: "/c/7",
+      from: `/c/${ID_7}`,
       step: openNewConversation,
       lands: "/",
       early: true,
@@ -291,40 +300,40 @@ describe("the chat page's address", () => {
       name: "asking on / moves to /c/9",
       from: "/",
       step: askFromTheFrontDoor,
-      lands: "/c/9",
+      lands: `/c/${ID_9}`,
       // A page rebuilt by the move would read the conversation it is still
       // writing, and drop the answer on screen for what the server has so far.
-      unrequested: "GET /api/conversations/9",
+      unrequested: `GET /api/conversations/${ID_9}`,
     },
     {
       name: "deleting the open conversation",
-      from: "/c/7",
+      from: `/c/${ID_7}`,
       step: deleting(STORED.title),
       lands: "/",
-      gone: "/c/7",
+      gone: `/c/${ID_7}`,
     },
     {
       name: "deleting another conversation",
-      from: "/c/7",
+      from: `/c/${ID_7}`,
       step: deleting(OTHER.title),
-      lands: "/c/7",
-      gone: "/c/8",
+      lands: `/c/${ID_7}`,
+      gone: `/c/${ID_8}`,
     },
     {
       name: "a delete the server refuses",
-      from: "/c/7",
+      from: `/c/${ID_7}`,
       step: deleting(STORED.title),
-      lands: "/c/7",
+      lands: `/c/${ID_7}`,
       failing: true,
-      kept: "/c/7",
+      kept: `/c/${ID_7}`,
     },
     {
       name: "deleting a conversation another tab deleted",
-      from: "/c/7",
+      from: `/c/${ID_7}`,
       step: deleting(STORED.title),
       lands: "/",
-      deletedElsewhere: 7,
-      gone: "/c/7",
+      deletedElsewhere: ID_7,
+      gone: `/c/${ID_7}`,
     },
   ])("$name lands on $lands, and stays there", async (scenario) => {
     const { from, step, lands, early, failing, deletedElsewhere, gone, kept, unrequested } =
@@ -401,10 +410,10 @@ describe("the chat page's address", () => {
   });
 
   it.each([
-    ["one gone, as not available", "/c/99", false, i18n.t("sidebar.unreadable")],
+    ["one gone, as not available", `/c/${uuidOf(99)}`, false, i18n.t("sidebar.unreadable")],
     [
       "one that failed to load, by why, with its reference",
-      "/c/7",
+      `/c/${ID_7}`,
       true,
       `${i18n.t("errors.INTERNAL")}INTERNAL · rif. ${REQUEST_ID}`,
     ],
@@ -468,12 +477,12 @@ describe("pinning from the sidebar", () => {
     unmount();
 
     expect(requested.filter((line) => line.startsWith("PATCH"))).toEqual([
-      "PATCH /api/conversations/8",
-      "PATCH /api/conversations/8",
+      `PATCH /api/conversations/${ID_8}`,
+      `PATCH /api/conversations/${ID_8}`,
     ]);
-    expect(pinned).toEqual(["/c/8"]);
+    expect(pinned).toEqual([`/c/${ID_8}`]);
     expect(focusedOnUnpin).toBe(i18n.t("sidebar.unpin", { title }));
-    expect(recent).toEqual(["/c/7", "/c/8"]);
+    expect(recent).toEqual([`/c/${ID_7}`, `/c/${ID_8}`]);
     expect(fixed).toBeNull();
   });
 
@@ -494,7 +503,7 @@ describe("pinning from the sidebar", () => {
     unmount();
 
     expect(waiting).toBeNull();
-    expect(pinned).toEqual(["/c/8"]);
+    expect(pinned).toEqual([`/c/${ID_8}`]);
   });
 
   it("says a failed pin in a toast naming the conversation, whose «Riprova» pins it", async () => {
@@ -516,7 +525,7 @@ describe("pinning from the sidebar", () => {
 
     expect(said).toContain(i18n.t("sidebar.pinFailed"));
     expect(said).toContain(title);
-    expect(pinned).toEqual(["/c/8"]);
+    expect(pinned).toEqual([`/c/${ID_8}`]);
   });
 
   it("hands the focus to «Nuova conversazione» when the row was deleted in another tab", async () => {
@@ -534,7 +543,7 @@ describe("pinning from the sidebar", () => {
     const focused = document.activeElement?.textContent;
     unmount();
 
-    expect(rows).toEqual(["/c/7"]);
+    expect(rows).toEqual([`/c/${ID_7}`]);
     expect(focused).toBe(i18n.t("sidebar.new"));
   });
 });
@@ -726,14 +735,17 @@ describe("a visitor's addresses", () => {
     });
   });
 
-  it.each(["/c/7", "/staff", "/staff/programmes"])("sends %s to the login page", async (path) => {
-    const { unmount, path: where } = page(path, null);
-    await settle();
-    const landed = where();
-    unmount();
+  it.each([`/c/${ID_7}`, "/staff", "/staff/programmes"])(
+    "sends %s to the login page",
+    async (path) => {
+      const { unmount, path: where } = page(path, null);
+      await settle();
+      const landed = where();
+      unmount();
 
-    expect(landed).toBe("/login");
-  });
+      expect(landed).toBe("/login");
+    },
+  );
 });
 
 /** Lets a test change who is signed in under a mounted page, as `recheck` does. */

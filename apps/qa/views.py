@@ -63,6 +63,7 @@ from config.errors import ErrorCode, error_body, fail
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Mapping
+    from uuid import UUID
 
     from rest_framework.request import Request
 
@@ -136,7 +137,7 @@ class _EventStream:
     """
 
     def __init__(
-        self, first: Event, rest: Generator[Event, None, None], answer_pk: int | None
+        self, first: Event, rest: Generator[Event, None, None], answer_pk: UUID | None
     ) -> None:
         self._first = first
         self._rest = rest
@@ -252,7 +253,12 @@ class AskView(APIView):
             # The cast is the one apps/accounts/views.py explains: pyright has
             # no django-stubs plugin, so `request.user` is the abstract base to it.
             conversation = open_conversation(cast("User", request.user), validated["conversation"])
-            history = recent_turns(conversation)
+            try:
+                history = recent_turns(conversation)
+            # Deleted after the serializer found it: the refusal of an unknown
+            # id, as below.
+            except ConversationGoneError:
+                fail(ErrorCode.CONVERSATION_GONE)
             conversation_id = conversation.pk
             # Every edition until the caller's own scope is computed from their
             # programme, which is `#36` (docs/data-model.md).

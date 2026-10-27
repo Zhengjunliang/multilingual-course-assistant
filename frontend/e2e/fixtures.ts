@@ -18,6 +18,7 @@ import type {
 } from "@/api/catalog";
 import type { AnswerEvent, Citation, RouteDecision } from "@/api/contract";
 import type { ConversationDetail } from "@/api/conversations";
+import { uuidOf } from "@/test/conversations";
 
 // --- who is calling ------------------------------------------------------------
 
@@ -102,7 +103,7 @@ function stream(
   answer: string,
   route: RouteDecision,
   citation: Citation,
-  conversation: number | null,
+  conversation: string | null,
 ): AnswerEvent[] {
   const half = Math.floor(answer.length / 2);
   return [
@@ -123,15 +124,15 @@ function stream(
   ];
 }
 
-export const campusStream = (conversation: number | null) =>
+export const campusStream = (conversation: string | null) =>
   stream(CAMPUS_QUESTION, CAMPUS_ANSWER, CAMPUS_ROUTE, WEB_CITATION, conversation);
 
-export const slidesStream = (conversation: number | null) =>
+export const slidesStream = (conversation: string | null) =>
   stream(SLIDES_QUESTION, SLIDES_ANSWER, SLIDES_ROUTE, SLIDES_CITATION, conversation);
 
-/** The campus exchange, stored: what `/c/7` reopens. */
+/** The campus exchange, stored: what `/c/<id>` reopens. */
 export const CONVERSATION: ConversationDetail = {
-  id: 7,
+  id: uuidOf(7),
   locale: "it",
   created_at: "2026-10-08T10:00:00Z",
   last_message_at: "2026-10-08T10:00:02Z",
@@ -142,7 +143,7 @@ export const CONVERSATION: ConversationDetail = {
   last_source: { courses: [], web: true },
   messages: [
     {
-      id: 1,
+      id: uuidOf(1),
       role: "user",
       text: CAMPUS_QUESTION,
       locale: "it",
@@ -153,7 +154,7 @@ export const CONVERSATION: ConversationDetail = {
       created_at: "2026-10-08T10:00:00Z",
     },
     {
-      id: 2,
+      id: uuidOf(2),
       role: "assistant",
       text: `${CAMPUS_ANSWER} ${WEB_CITATION.marker}`,
       locale: "it",

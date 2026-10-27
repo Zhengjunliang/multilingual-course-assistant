@@ -4,6 +4,7 @@
  */
 
 import type { ErrorBody } from "@/api/errors";
+import { uuidOf } from "@/test/conversations";
 import en from "../src/i18n/en.json" with { type: "json" };
 import it from "../src/i18n/it.json" with { type: "json" };
 import { expect, test } from "./api";
@@ -55,7 +56,7 @@ test.describe("a signed-in student", () => {
   test.beforeEach(({ api }) => api.signIn(STUDENT));
 
   test("asks about the campus and gets an answer with its source", async ({ page, api }) => {
-    api.answer(campusStream(7));
+    api.answer(campusStream(uuidOf(7)));
     await page.goto("/");
     await page.getByLabel(it.ask.label).fill(CAMPUS_QUESTION);
     await page.getByRole("button", { name: it.ask.submit }).click();
@@ -82,7 +83,7 @@ test.describe("a signed-in student", () => {
     page,
     api,
   }) => {
-    api.answer(slidesStream(8));
+    api.answer(slidesStream(uuidOf(8)));
     await page.goto("/");
     await page.getByLabel(it.ask.label).fill(SLIDES_QUESTION);
     await page.getByRole("button", { name: it.ask.submit }).click();
@@ -172,7 +173,7 @@ test.describe("the first question, sent from the entry", () => {
         );
       });
       await page.setViewportSize(viewport);
-      api.answer(campusStream(7));
+      api.answer(campusStream(uuidOf(7)));
       await page.goto("/");
       const field = page.getByLabel(it.ask.label);
       await field.fill(CAMPUS_QUESTION);

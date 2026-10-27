@@ -86,12 +86,19 @@ def turn(
     question: str = "Che cos'è un ORM?",
 ) -> None:
     """One exchange, `minute` minutes after `START`: the question, then its
-    answer with the excerpts it was given (none for a refusal)."""
+    answer with the excerpts it was given (none for a refusal), hung from the
+    thread as `record_exchange` hangs them."""
+    leaf = Conversation.objects.get(pk=conversation.pk).current_leaf_id
     asked = Message.objects.create(
-        conversation=conversation, role=Message.Role.USER, text=question, locale=locale
+        conversation=conversation,
+        parent_id=leaf,
+        role=Message.Role.USER,
+        text=question,
+        locale=locale,
     )
     answered = Message.objects.create(
         conversation=conversation,
+        parent=asked,
         role=Message.Role.ASSISTANT,
         text="…",
         locale=locale,
@@ -101,6 +108,7 @@ def turn(
     at = START + timedelta(minutes=minute)
     Message.objects.filter(pk=asked.pk).update(created_at=at)
     Message.objects.filter(pk=answered.pk).update(created_at=at + timedelta(seconds=1))
+    Conversation.objects.filter(pk=conversation.pk).update(current_leaf=answered)
 
 
 def started(minute: int, citations: list[dict[str, Any]] | None = None) -> Conversation:
@@ -195,7 +203,7 @@ def test_the_list_follows_the_last_message_and_so_does_its_time() -> None:
 
     body = rows()
 
-    assert [row["id"] for row in body] == [older.pk, newer.pk]
+    assert [row["id"] for row in body] == [str(older.pk), str(newer.pk)]
     assert datetime.fromisoformat(body[0]["last_message_at"]) == START + timedelta(
         minutes=20, seconds=1
     )
@@ -215,16 +223,16 @@ def test_pinning_puts_a_conversation_first_and_unpinning_returns_it_to_its_place
     pin(second, True)
 
     assert response.status_code == 200
-    assert response.json() == next(row for row in rows() if row["id"] == first.pk)
+    assert response.json() == next(row for row in rows() if row["id"] == str(first.pk))
     assert [(row["id"], row["pinned"]) for row in rows()] == [
-        (second.pk, True),
-        (first.pk, True),
-        (third.pk, False),
+        (str(second.pk), True),
+        (str(first.pk), True),
+        (str(third.pk), False),
     ]
 
     pin(first, False)
 
-    assert [row["id"] for row in rows()] == [second.pk, third.pk, first.pk]
+    assert [row["id"] for row in rows()] == [str(second.pk), str(third.pk), str(first.pk)]
     assert Conversation.objects.get(pk=second.pk).pinned
 
 

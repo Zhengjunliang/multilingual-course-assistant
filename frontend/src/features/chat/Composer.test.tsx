@@ -124,9 +124,11 @@ describe("the composer", () => {
 
   it("lets go of what is missing when the conversation changes under it", () => {
     // The key for a new conversation changes the page without leaving the field.
-    let switchTo: (conversation: number | null) => void = () => {};
+    let switchTo: (conversation: string | null) => void = () => {};
     function Switching() {
-      const [conversation, setConversation] = useState<number | null>(7);
+      const [conversation, setConversation] = useState<string | null>(
+        "00000000-0000-4000-8000-000000000007",
+      );
       switchTo = setConversation;
       return (
         <Composer

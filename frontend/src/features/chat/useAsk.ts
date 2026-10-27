@@ -83,7 +83,7 @@ export type Waiting =
 interface AskState {
   turns: Turn[];
   waiting: Waiting;
-  conversationId: number | null;
+  conversationId: string | null;
 }
 
 function blankTurn(key: string, question: string): Turn {
@@ -181,7 +181,7 @@ export function useAsk(visitor: boolean) {
    * this one is what goes on the wire. They are written together, once, when
    * `start` arrives.
    */
-  const opened = useRef<number | null>(null);
+  const opened = useRef<string | null>(null);
 
   // Leaving the page must stop generation, not merely stop listening to it: the
   // server is suspended on a yield holding its one engine slot until the
@@ -282,7 +282,7 @@ export function useAsk(visitor: boolean) {
 async function run(
   question: string,
   history: HistoryTurn[] | null,
-  opened: { current: number | null },
+  opened: { current: string | null },
   signal: AbortSignal,
   patch: (change: Partial<Turn>) => void,
   settle: (waiting: Waiting) => void,

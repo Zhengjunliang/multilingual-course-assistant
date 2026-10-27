@@ -6,7 +6,7 @@ This file owns the website's relational schema: its entities and relationships, 
 
 ## Entities and relationships
 
-✅ `User` exists in `apps/accounts/models.py`, `Conversation` and `Message` in `apps/qa/models.py`, `DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`, `Syllabus` and `ReadingItem` in `apps/catalog/models.py`, and `RoleAssignment` in `apps/roles/models.py`. 🔜 M5: every other entity below. `CourseEdition` is the centre: it owns the content, scopes a teacher, and is what a slides chunk's `course` and `academic_year` name. Rows with user-visible text carry `locale` — programme and course names, and `ReadingItem`, where it is the book's language; relation tables and `CourseMaterial` do not, since a file's language is recorded per chunk, and neither does `Syllabus`, whose sections are all in the edition's `syllabus_locale` ([decisions.md](decisions.md), 2026-09-25, *The data model is decided on paper before roles are built on it*, point 6). Of a conversation only `Conversation.pinned` is set by its owner; what its sidebar row shows besides, its title and that title's language, its last message's time and what its last answer drew on, is derived from its `Message` rows when the list is read, never stored ([api.md](api.md)).
+✅ `User` exists in `apps/accounts/models.py`, `Conversation` and `Message` in `apps/qa/models.py`, `DegreeProgramme`, `Course`, `CourseEdition`, `CurriculumEntry`, `Syllabus` and `ReadingItem` in `apps/catalog/models.py`, and `RoleAssignment` in `apps/roles/models.py`. 🔜 M5: every other entity below. `CourseEdition` is the centre: it owns the content, scopes a teacher, and is what a slides chunk's `course` and `academic_year` name. Rows with user-visible text carry `locale` — programme and course names, and `ReadingItem`, where it is the book's language; relation tables and `CourseMaterial` do not, since a file's language is recorded per chunk, and neither does `Syllabus`, whose sections are all in the edition's `syllabus_locale` ([decisions.md](decisions.md), 2026-09-25, *The data model is decided on paper before roles are built on it*, point 6). Of a conversation only `Conversation.pinned` is set by its owner; what its sidebar row shows besides, its title and that title's language, its last message's time and what its last answer drew on, is derived from its `Message` rows when the list is read, never stored ([api.md](api.md)). A conversation and a message are keyed by a random version 4 UUID; each `Message` names its `parent`, the message it follows, and each `Conversation` its `current_leaf`, the message its thread ends at, so a thread is the path from the first question to that leaf ([decisions.md](decisions.md), 2026-10-27, *A conversation and its messages are named by random UUIDs, and a thread is a chain of parents*).
 
 ```mermaid
 erDiagram
@@ -23,6 +23,8 @@ erDiagram
     User ||--o{ CourseMaterial : "uploaded by"
     User ||--o{ Conversation : owns
     Conversation ||--o{ Message : holds
+    Message |o--o{ Message : "parent of"
+    Conversation |o--o| Message : "current leaf"
 ```
 
 ## Scope invariants

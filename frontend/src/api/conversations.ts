@@ -33,7 +33,8 @@ export interface ConversationSource {
  * messages server-side.
  */
 export interface ConversationSummary {
-  id: number;
+  /** A random UUID: it names one conversation and counts none. */
+  id: string;
   locale: string;
   created_at: string;
   /** The row's time, and what the list is ordered by. */
@@ -48,7 +49,7 @@ export interface ConversationSummary {
 }
 
 export interface StoredMessage {
-  id: number;
+  id: string;
   role: "user" | "assistant";
   text: string;
   locale: string;
@@ -72,19 +73,25 @@ export function listConversations(): Promise<ConversationSummary[]> {
   return request<ConversationSummary[]>("/api/conversations");
 }
 
-export function readConversation(id: number): Promise<ConversationDetail> {
-  return request<ConversationDetail>(`/api/conversations/${id}`);
+/** The id comes from an address the reader can type, so it is encoded as a path segment. */
+function conversationPath(id: string): string {
+  return `/api/conversations/${encodeURIComponent(id)}`;
+}
+
+/** The thread root to leaf, as the server walks it; its order is the chain's, not the clock's. */
+export function readConversation(id: string): Promise<ConversationDetail> {
+  return request<ConversationDetail>(conversationPath(id));
 }
 
 /** Pins or unpins it; the server answers with its row as the list shows it. */
-export function pinConversation(id: number, pinned: boolean): Promise<ConversationSummary> {
-  return request<ConversationSummary>(`/api/conversations/${id}`, {
+export function pinConversation(id: string, pinned: boolean): Promise<ConversationSummary> {
+  return request<ConversationSummary>(conversationPath(id), {
     method: "PATCH",
     body: JSON.stringify({ pinned }),
   });
 }
 
 /** Deletes the conversation and its messages for good; the server answers 204. */
-export function deleteConversation(id: number): Promise<void> {
-  return request<void>(`/api/conversations/${id}`, { method: "DELETE" });
+export function deleteConversation(id: string): Promise<void> {
+  return request<void>(conversationPath(id), { method: "DELETE" });
 }

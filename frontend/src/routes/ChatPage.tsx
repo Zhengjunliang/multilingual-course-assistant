@@ -70,7 +70,7 @@ export default function ChatPage() {
   const loaded = useRef<string | null>(null);
   // The navigation that last opened what the page holds.
   const visited = useRef(visit);
-  const previousId = useRef<number | null>(null);
+  const previousId = useRef<string | null>(null);
   const bottom = useRef<HTMLDivElement | null>(null);
 
   const refused = useCallback(
@@ -106,7 +106,7 @@ export default function ChatPage() {
     }
     // A reply is used only while the URL still names it: a reader who moved on
     // before it arrived would otherwise be pulled back into the old thread.
-    readConversation(Number(wanted))
+    readConversation(wanted)
       .then((conversation) => {
         if (loaded.current === wanted) adopt(conversation);
       })
@@ -130,7 +130,7 @@ export default function ChatPage() {
     const before = previousId.current;
     previousId.current = ask.conversationId;
     if (before !== null || ask.conversationId === null || conversationId !== undefined) return;
-    loaded.current = String(ask.conversationId);
+    loaded.current = ask.conversationId;
     void navigate(`/c/${ask.conversationId}`, { replace: true });
     refreshConversations();
   }, [ask.conversationId, conversationId, navigate, refreshConversations]);

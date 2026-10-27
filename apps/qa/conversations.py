@@ -2,7 +2,8 @@
 
 Every query the answer path makes is in this module, and it makes them for one
 reason each: find or start the thread, slice the history the prompt gets, write
-the two rows, settle the assistant row when the stream ends. HTTP is not
+the two rows, settle the assistant row when the stream ends. `thread` is how a
+conversation is read in order, here and in the detail the sidebar opens. HTTP is not
 mentioned here and neither is the engine — the view calls these in order, and
 what crosses into `rag/` is `Turn`, two strings on a frozen model.
 
@@ -25,12 +26,57 @@ from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from rag.answer import Turn
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from uuid import UUID
+
     from apps.accounts.models import User
     from apps.qa.contract import StartEvent
 
 
 class ConversationGoneError(Exception):
-    """The conversation was deleted while its question waited for the engine."""
+    """The conversation was deleted while it was being read, or while its
+    question waited for the engine."""
+
+
+class BrokenThreadError(Exception):
+    """A conversation's chain of parents does not lead from its leaf to a root.
+
+    Only `record_exchange` writes the chain, so this is a defect or a row
+    changed by hand, never something a reader did: it is left to surface as a
+    500, which the error handler logs (config/errors.py).
+    """
+
+
+def thread(leaf_id: UUID | None, messages: Iterable[Message]) -> list[Message]:
+    """The path from the root to `leaf_id` among `messages`, oldest first.
+
+    `messages` is every row of one conversation, read in one query, and the
+    walk follows `parent_id` through a dict, so it costs no query per step. A
+    conversation holds tens of rows, which is what makes walking them in Python
+    the simple choice; one holding thousands would take a recursive query.
+
+    No leaf is a conversation nothing has been written to: an empty thread. A
+    leaf with no messages at all is a conversation deleted between the query
+    that read its row and the one that read its messages, so
+    `ConversationGoneError`. Anything else that does not lead back to a root —
+    a parent missing from `messages`, or a cycle — is `BrokenThreadError`.
+    """
+    if leaf_id is None:
+        return []
+    by_id = {message.pk: message for message in messages}
+    if not by_id:
+        raise ConversationGoneError(leaf_id)
+    path: list[Message] = []
+    node: UUID | None = leaf_id
+    while node is not None:
+        # Popped, so a row met twice — a cycle — is missing the second time.
+        message = by_id.pop(node, None)
+        if message is None:
+            raise BrokenThreadError(node)
+        path.append(message)
+        node = message.parent_id
+    path.reverse()
+    return path
 
 
 def open_conversation(owner: User, existing: Conversation | None) -> Conversation:
@@ -54,7 +100,10 @@ def open_conversation(owner: User, existing: Conversation | None) -> Conversatio
 
 
 def recent_turns(conversation: Conversation) -> list[Turn]:
-    """The last few completed exchanges, oldest first.
+    """The last few completed exchanges of the thread, oldest first.
+
+    The thread ends at the leaf `conversation` was read with, so the history is
+    the conversation as the question's sender last saw it.
 
     An unfinished answer is included deliberately. It is what the student
     actually saw — a stream that died halfway is still on their screen — so
@@ -66,12 +115,9 @@ def recent_turns(conversation: Conversation) -> list[Turn]:
     rather than paired with the next answer, which belongs to a different
     question.
     """
-    recent = list(
-        Message.objects.filter(conversation=conversation).order_by("-created_at", "-id")[
-            : HISTORY_WINDOW_TURNS * 2
-        ]
-    )
-    recent.reverse()
+    recent = thread(
+        conversation.current_leaf_id, Message.objects.filter(conversation=conversation)
+    )[-HISTORY_WINDOW_TURNS * 2 :]
 
     turns: list[Turn] = []
     asked: Message | None = None
@@ -84,12 +130,19 @@ def recent_turns(conversation: Conversation) -> list[Turn]:
     return turns
 
 
-def record_exchange(conversation: Conversation, start: StartEvent) -> int:
+def record_exchange(conversation: Conversation, start: StartEvent) -> UUID:
     """Write the question and the empty answer; return the answer row's id.
 
     Only the id travels onward. The stream that fills the row in runs for tens
     of seconds, and a model instance held across it would be a snapshot going
     steadily more stale — `settle` writes by primary key for that reason.
+
+    The question hangs from the leaf the locked row holds, not the one
+    `conversation` was read with: a question that waited for the engine holds
+    a copy older than an exchange another tab wrote meanwhile, and hung from
+    that copy's leaf it would fork the thread. The answer hangs from the
+    question and becomes the leaf, in the same lock, so every parent is a row
+    of the same conversation.
 
     `citations`, `route` and `search_ms` are stored now rather than at the end
     because now is when they exist: they arrive in the `start` event, which is
@@ -105,10 +158,12 @@ def record_exchange(conversation: Conversation, start: StartEvent) -> int:
     removes them with the conversation.
     """
     with transaction.atomic():
-        if Conversation.objects.select_for_update().filter(pk=conversation.pk).first() is None:
+        locked = Conversation.objects.select_for_update().filter(pk=conversation.pk).first()
+        if locked is None:
             raise ConversationGoneError(conversation.pk)
-        Message.objects.create(
+        question = Message.objects.create(
             conversation=conversation,
+            parent_id=locked.current_leaf_id,
             role=Message.Role.USER,
             text=start.question,
             locale=start.locale,
@@ -116,6 +171,7 @@ def record_exchange(conversation: Conversation, start: StartEvent) -> int:
         )
         answer = Message.objects.create(
             conversation=conversation,
+            parent=question,
             role=Message.Role.ASSISTANT,
             text="",
             locale=start.locale,
@@ -124,9 +180,10 @@ def record_exchange(conversation: Conversation, start: StartEvent) -> int:
             route=start.route.model_dump(mode="json"),
             search_ms=start.search_ms,
         )
+        Conversation.objects.filter(pk=conversation.pk).update(current_leaf=answer)
     return answer.pk
 
 
-def settle(answer_pk: int, text: str, *, complete: bool) -> None:
+def settle(answer_pk: UUID, text: str, *, complete: bool) -> None:
     """Fill in the answer row once the stream has stopped, however it stopped."""
     Message.objects.filter(pk=answer_pk).update(text=text, complete=complete)

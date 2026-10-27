@@ -33,7 +33,8 @@ async function collect<T>(source: AsyncGenerator<T>): Promise<T[]> {
 // its route and citations as `{...}` and `[...]`, which is not JSON. The field
 // names below are the ones the docstring lists, in its order.
 const START_FRAME =
-  'event: start\ndata: {"question": "What is an ORM?", "conversation_id": 7, ' +
+  'event: start\ndata: {"question": "What is an ORM?", ' +
+  '"conversation_id": "3f1c9a52-6b0e-4d7a-9c1e-2a5b8d4f0e17", ' +
   '"locale": "en", "route": {"target": "slides", "query": "ORM", "fresh": false, ' +
   '"reason": "course material"}, "citations": []}\n\n';
 const TOKEN_FRAME = 'event: token\ndata: {"text": "An ORM "}\n\n';
@@ -104,7 +105,7 @@ describe("readAnswerEvents", () => {
       name: "start",
       data: {
         question: "What is an ORM?",
-        conversation_id: 7,
+        conversation_id: "3f1c9a52-6b0e-4d7a-9c1e-2a5b8d4f0e17",
         locale: "en",
         route: { target: "slides", query: "ORM", fresh: false, reason: "course material" },
         citations: [],

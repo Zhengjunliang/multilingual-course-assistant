@@ -7,6 +7,14 @@
 
 import type { ConversationSummary } from "@/api/conversations";
 
+/**
+ * A fixed UUID ending in `n`, the shape every conversation and message id
+ * has, kept readable: `uuidOf(7)` is told from `uuidOf(8)` at a glance.
+ */
+export function uuidOf(n: number): string {
+  return `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+}
+
 export function summary(
   row: Pick<ConversationSummary, "id" | "title"> & Partial<ConversationSummary>,
 ): ConversationSummary {

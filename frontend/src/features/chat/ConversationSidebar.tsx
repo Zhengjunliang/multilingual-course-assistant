@@ -54,15 +54,15 @@ interface ConversationSidebarProps {
    * confirmation says the answer stops, which it does when the layout leaves
    * the deleted conversation.
    */
-  busy: number | null;
+  busy: string | null;
   /**
    * Deletes a conversation and resolves to `null` once the server did, else
    * to why it did not. The layout route (routes/ShellLayout.tsx) owns the
    * URL, so leaving a deleted conversation is its job, not this one's.
    */
-  onDelete: (id: number) => Promise<ErrorText | null>;
+  onDelete: (id: string) => Promise<ErrorText | null>;
   /** Pins or unpins a conversation and resolves to whether the server did. */
-  onPin: (id: number, pinned: boolean, title: string, retry: () => void) => Promise<boolean>;
+  onPin: (id: string, pinned: boolean, title: string, retry: () => void) => Promise<boolean>;
   /** Which mount this is, and what the shell lets it do (ChatShell.tsx). */
   controls: SidebarControls;
   /**
