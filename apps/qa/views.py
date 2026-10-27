@@ -162,10 +162,17 @@ class _EventStream:
                 elif isinstance(event, EndEvent):
                     complete = True
                 yield sse_event(event)
-        except EngineUnavailableError:
+        except Exception as exc:
             # In the place `end` would have taken. The engine's message names
-            # what is down and goes to the log, with its cause (#14).
-            failure = ErrorEvent.model_validate(error_body(ErrorCode.ENGINE_DOWN))
+            # what is down and goes to the log, with its cause (#14); anything
+            # else is a defect, whose traceback would otherwise reach the
+            # server's console without the request's id.
+            code = (
+                ErrorCode.ENGINE_DOWN
+                if isinstance(exc, EngineUnavailableError)
+                else ErrorCode.INTERNAL
+            )
+            failure = ErrorEvent.model_validate(error_body(code))
             logger.exception(
                 "the stream ended in %s: %s", failure.error.code, failure.error.message
             )

@@ -63,6 +63,7 @@ from rag import index as rag_index
 from rag import search as rag_search
 from rag.chunk import Chunk
 from rag.index import WEB_COLLECTION, ensure_collection, index_chunks, open_client
+from rag.llm import ChatStreamer
 from rag.llm import Message as ChatMessage
 
 pytestmark = pytest.mark.django_db
@@ -173,10 +174,26 @@ def install_engine(
     return engine
 
 
-def install_dead_generation(client: QdrantClient) -> None:
+@dataclasses.dataclass
+class StreamerThatFails:
+    """A generation endpoint that sends a token and then fails with `failure`.
+
+    openai's `Stream` reads the response without wrapping what httpx raises, so
+    a model server that drops the connection mid-answer arrives as httpx's own
+    exception, not as an `APIError`.
+    """
+
+    failure: Exception
+
+    def stream(self, messages: Sequence[ChatMessage]) -> Iterator[str]:
+        yield "Half an answer"
+        raise self.failure
+
+
+def install_dead_generation(client: QdrantClient, streamer: ChatStreamer | None = None) -> None:
     """An engine whose generation endpoint dies once the stream has begun."""
     engine = install_engine(client, SLIDES_ROUTE)
-    engine_module._HOLDER.engine = dataclasses.replace(engine, streamer=DeadStreamer())
+    engine_module._HOLDER.engine = dataclasses.replace(engine, streamer=streamer or DeadStreamer())
 
 
 def install_refusing_router(client: QdrantClient) -> None:
@@ -529,6 +546,37 @@ def test_a_failure_inside_the_stream_is_one_line_under_the_requests_id(
     assert error["request_id"] == request_id
     assert LLM_DOWN in caplog.text
     assert "model server" not in json.dumps(error)
+
+
+@pytest.mark.parametrize(
+    ("failure", "code"),
+    [
+        (httpx.RemoteProtocolError("peer closed connection"), "ENGINE_DOWN"),
+        (RuntimeError("a defect"), "INTERNAL"),
+    ],
+    ids=["model-server-gone", "defect"],
+)
+def test_a_failure_after_the_first_token_still_ends_the_stream_in_one_line(
+    index: QdrantClient, caplog: pytest.LogCaptureFixture, failure: Exception, code: str
+) -> None:
+    """Whatever stops an answer midway ends it with the `error` event and one
+    line under the request's id, the traceback on it; nothing escapes to the
+    server's console without the id."""
+    install_dead_generation(index, StreamerThatFails(failure))
+    caplog.handler.addFilter(RequestIdFilter())
+
+    with caplog.at_level(logging.WARNING):
+        response = ask()
+        stream = events(response)
+
+    [line] = caplog.records
+    assert (line.levelno, getattr(line, "request_id", None)) == (
+        logging.ERROR,
+        response["X-Request-ID"],
+    )
+    assert line.exc_info is not None
+    assert [name for name, _ in stream][-2:] == ["token", "error"]
+    assert stream[-1][1]["error"]["code"] == code
 
 
 def test_an_unbuilt_index_becomes_503(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:

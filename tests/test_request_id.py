@@ -16,10 +16,13 @@ from typing import TYPE_CHECKING
 import pytest
 from django.conf import settings
 from django.http import HttpResponse
+from django.test import override_settings
 
 from config.request_id import NO_REQUEST, RequestIdFilter, RequestIdMiddleware, current
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from django.http import HttpRequest
     from django.test import Client, RequestFactory
 
@@ -85,6 +88,25 @@ def test_no_id_outlives_its_request(rf: RequestFactory) -> None:
     # The view did run under an id, and a request that raises still lets it go.
     assert TRACE_ID.match(str(raised.value))
     assert current() == NO_REQUEST
+
+
+def test_a_failed_response_no_view_logged_carries_its_id(
+    client: Client, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Django logs a 4xx or 5xx response only once the whole middleware chain
+    has returned (`BaseHandler.get_response`), after the id is gone. Here the
+    503 of a frontend that was never built (config/views.py), which no `/api/`
+    handler logs."""
+    caplog.handler.addFilter(RequestIdFilter())
+    with (
+        override_settings(SPA_DIST=tmp_path),
+        caplog.at_level(logging.WARNING, logger="django.request"),
+    ):
+        response = client.get("/")
+
+    lines = [record for record in caplog.records if record.name == "django.request"]
+    assert response.status_code == 503
+    assert [getattr(record, "request_id", None) for record in lines] == [response["X-Request-ID"]]
 
 
 def test_the_console_prints_the_id_and_a_dash_outside_a_request() -> None:

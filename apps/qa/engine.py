@@ -149,6 +149,7 @@ class Engine:
         # Lazy on purpose: `rag/` imports the OpenAI SDK and qdrant-client inside
         # the functions that need them, and Django's startup should not pay for
         # them either.
+        from httpx import TransportError
         from openai import APIError
         from pydantic import ValidationError
         from qdrant_client.http.exceptions import ResponseHandlingException
@@ -228,9 +229,11 @@ class Engine:
             # refusal inside `rag.answer`, which arrives here as one token.
             for delta in answer(question, hits, self.streamer, answer_locale, history):
                 yield TokenEvent(text=delta)
-        except APIError as exc:
+        except (APIError, TransportError) as exc:
             # Unlike `complete_json`, which swallows a dead endpoint into a
-            # fallback, the streaming path raises.
+            # fallback, the streaming path raises. openai wraps what httpx raises
+            # while it sends the request, not while it reads the stream, so a
+            # model server that drops the connection mid-answer is httpx's own.
             raise EngineUnavailableError(LLM_DOWN) from exc
 
         yield EndEvent()

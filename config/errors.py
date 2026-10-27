@@ -39,6 +39,7 @@ from http import HTTPStatus
 from string import Formatter
 from typing import TYPE_CHECKING, Any, Literal, NoReturn
 
+from django.core.exceptions import BadRequest, SuspiciousOperation
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import Http404
@@ -353,8 +354,13 @@ def django_field_error(exc: DjangoValidationError) -> ValidationError:
 # What every `/api/` error is read as, by its class; the first row that
 # matches wins, so a subclass comes before its base. Django's `Http404` and
 # `PermissionDenied` are here as they are, rather than turned into DRF's first.
+# Django reads a body it will not parse, past `DATA_UPLOAD_MAX_NUMBER_FIELDS`
+# or `DATA_UPLOAD_MAX_MEMORY_SIZE`, as a `SuspiciousOperation`, which it would
+# answer with a 400 itself.
 EXCEPTION_MAP: tuple[tuple[type[Exception], ErrorCode], ...] = (
     (exceptions.ParseError, ErrorCode.MALFORMED_REQUEST),
+    (SuspiciousOperation, ErrorCode.MALFORMED_REQUEST),
+    (BadRequest, ErrorCode.MALFORMED_REQUEST),
     (exceptions.ValidationError, ErrorCode.INVALID_ARGUMENT),
     (exceptions.NotAuthenticated, ErrorCode.UNAUTHENTICATED),
     (exceptions.AuthenticationFailed, ErrorCode.UNAUTHENTICATED),

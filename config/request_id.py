@@ -20,6 +20,8 @@ import secrets
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
+from django.utils.log import log_response
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -48,6 +50,20 @@ class RequestIdMiddleware:
         token = _current.set(request_id)
         try:
             response = self.get_response(request)
+            if response.status_code >= 400:
+                # Django logs a failed response itself, but only once the whole
+                # middleware chain has returned (`BaseHandler.get_response`),
+                # after the reset below; logged here, the line carries the id,
+                # and Django skips a response already logged. An `/api/` refusal
+                # has been, by its handler (config/errors.py). The stubs narrow
+                # `response` to `HttpResponse`; Django passes this same one.
+                log_response(
+                    "%s: %s",
+                    response.reason_phrase,
+                    request.path,
+                    response=response,  # pyright: ignore[reportArgumentType]
+                    request=request,
+                )
         finally:
             # Without the reset, the next request this thread serves would log
             # under this id until its own middleware ran.

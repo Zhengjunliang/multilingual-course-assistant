@@ -13,8 +13,15 @@ import json
 import logging
 import pkgutil
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlencode
 
 import pytest
+from django.conf import settings
+from django.core.exceptions import (
+    BadRequest,
+    SuspiciousOperation,
+    TooManyFieldsSent,
+)
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import Http404
@@ -47,6 +54,8 @@ if TYPE_CHECKING:
 # One of each class `EXCEPTION_MAP` names, as the API meets it.
 RAISED: dict[type[Exception], Exception] = {
     exceptions.ParseError: exceptions.ParseError(),
+    SuspiciousOperation: TooManyFieldsSent(),
+    BadRequest: BadRequest(),
     exceptions.ValidationError: exceptions.ValidationError({"title": ["Required."]}),
     exceptions.NotAuthenticated: exceptions.NotAuthenticated(),
     exceptions.AuthenticationFailed: exceptions.AuthenticationFailed(),
@@ -105,6 +114,29 @@ def test_the_message_is_the_codes_never_the_exceptions() -> None:
     response = answered(raising(exceptions.PermissionDenied("Only the dean may do this.")))
 
     assert error_of(response)["message"] == "The signed-in user may not do this."
+
+
+def test_the_message_stays_english_whatever_language_the_caller_asks_for() -> None:
+    """DRF's own sentences are translated, and Italian is the site's default
+    language; the body's message is the code's English one all the same."""
+    response = APIClient().get("/api/conversations", HTTP_ACCEPT_LANGUAGE="it")
+
+    assert error_of(response)["message"] == SPEC[ErrorCode.UNAUTHENTICATED].message
+
+
+def test_a_body_django_will_not_parse_is_malformed_not_a_500() -> None:
+    """Past `DATA_UPLOAD_MAX_NUMBER_FIELDS` Django raises `TooManyFieldsSent`, a
+    `SuspiciousOperation`, and the CSRF check reads a form body before anything
+    else runs, the throttle included."""
+    client = APIClient(enforce_csrf_checks=True)
+    client.cookies["csrftoken"] = "a" * 32
+    fields = {f"f{n}": "x" for n in range(settings.DATA_UPLOAD_MAX_NUMBER_FIELDS + 1)}
+
+    response = client.post(
+        "/api/auth/login", urlencode(fields), content_type="application/x-www-form-urlencoded"
+    )
+
+    assert (response.status_code, refused(response)) == (400, ("MALFORMED_REQUEST", {}))
 
 
 def test_an_exception_nothing_names_is_a_500_whose_traceback_is_logged(
