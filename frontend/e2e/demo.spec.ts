@@ -3,6 +3,7 @@
  * order it is shown, run on every pull request so the demo cannot break unseen.
  */
 
+import type { ErrorBody } from "@/api/errors";
 import en from "../src/i18n/en.json" with { type: "json" };
 import it from "../src/i18n/it.json" with { type: "json" };
 import { expect, test } from "./api";
@@ -23,6 +24,30 @@ test.describe("a visitor whose browser asks for English", () => {
 
     await expect(page.getByRole("heading", { name: en.entry.caption })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  });
+
+  test("chooses Italian, and a refused sign-in reads in Italian, not in the server's English", async ({
+    page,
+    api,
+  }) => {
+    const error: ErrorBody = {
+      code: "WRONG_CREDENTIALS",
+      // The server's sentence, which is also the English page's (config/errors.py).
+      message: en.errors.WRONG_CREDENTIALS,
+      data: {},
+      fields: [],
+      request_id: "4bf92f3577b34da6a3ce929d0e0e4736",
+    };
+    api.on("POST", "/api/auth/login", () => ({ status: 400, json: { error } }));
+    await page.goto("/login");
+    await page.getByRole("button", { name: en.account.language }).click();
+    await page.getByRole("menuitemradio", { name: /^Italiano/ }).click();
+    await page.getByLabel(it.auth.username).fill("ada");
+    await page.locator("#password").fill("wrong-password");
+    await page.getByRole("button", { name: it.auth.logIn }).click();
+
+    await expect(page.getByText(it.errors.WRONG_CREDENTIALS)).toBeVisible();
+    await expect(page.getByText(en.errors.WRONG_CREDENTIALS)).toHaveCount(0);
   });
 });
 
