@@ -28,7 +28,7 @@ export function retryText(retry: Retry, t: TFunction): string {
 }
 
 /** What the banner of an answer that stopped says. */
-export interface FailureText {
+interface FailureText {
   /** Why it stopped, in the interface's words for the error's code. */
   heading: string;
   /** For a signed-in reader with part of an answer: that the part is stored (docs/api.md). */

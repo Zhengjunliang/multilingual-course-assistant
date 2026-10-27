@@ -16,7 +16,7 @@
  * alone. `failure`: they cannot, and the page adds the code and the request id,
  * for a report.
  */
-export type ErrorKind = "fixable" | "failure";
+type ErrorKind = "fixable" | "failure";
 
 /** Each code with its HTTP status, its kind and the values its sentence fills in. */
 export const ERROR_CODES = {

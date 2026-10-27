@@ -18,10 +18,9 @@ import { ApiError, failureOf, failureOfEvent } from "@/api/http";
 import i18n, { UI_LOCALES, type UiLocale } from "@/i18n";
 import type { Sentence } from "@/lib/errorText";
 import { mount } from "@/test/mount";
+import { codedRefusal, REQUEST_ID as ID } from "@/test/refusal";
 import { TurnView } from "./TurnView";
 import type { Turn } from "./useAsk";
-
-const ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
 /** The browser's language, which the server's message follows: never the page's. */
 const BROWSER: Record<UiLocale, UiLocale> = { it: "en", en: "zh-hans", "zh-hans": "it" };
@@ -33,8 +32,7 @@ function body(code: ErrorCode, message: string, data: ErrorData = {}) {
 
 /** A 503 before the stream, read as `ask()` reads it. */
 function refused(code: ErrorCode, message: string, data: ErrorData = {}) {
-  const text = JSON.stringify({ error: body(code, message, data) });
-  return failureOf(new Response(text, { status: 503, headers: { "X-Request-ID": ID } }));
+  return failureOf(codedRefusal(code, { message, data }));
 }
 
 interface Case {

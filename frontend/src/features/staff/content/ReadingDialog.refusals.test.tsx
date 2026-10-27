@@ -16,6 +16,7 @@ import type { ErrorData, FieldViolation } from "@/api/errors";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n, { UI_LOCALES, type UiLocale } from "@/i18n";
 import { mount } from "@/test/mount";
+import { codedRefusal } from "@/test/refusal";
 import { ReadingDialog } from "./ReadingDialog";
 
 /** The browser's language, which the server's message follows: never the page's. */
@@ -54,17 +55,7 @@ afterEach(async () => {
 
 /** The coded refusal of one field, its message in the browser's language. */
 function refuse(violation: FieldViolation, message: string) {
-  const error = {
-    code: "INVALID_ARGUMENT",
-    message,
-    data: {},
-    fields: [violation],
-    request_id: null,
-  };
-  answer = new Response(JSON.stringify({ error }), {
-    status: 400,
-    headers: { "Content-Type": "application/json" },
-  });
+  answer = codedRefusal("INVALID_ARGUMENT", { fields: [violation], message });
 }
 
 function type(input: HTMLInputElement | undefined, value: string) {
