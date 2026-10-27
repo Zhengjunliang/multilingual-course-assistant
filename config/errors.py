@@ -47,7 +47,6 @@ from rest_framework import exceptions
 from rest_framework.exceptions import APIException, ErrorDetail, ValidationError
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
-from rest_framework.views import set_rollback
 
 from config.request_id import current
 
@@ -482,6 +481,10 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
         logger.error("%s %s %s %s: %s", *line, exc_info=exc)
     else:
         logger.warning("%s %s %s %s: %s", *line)
+
+    # Imported here: `rest_framework.views` reads `DEFAULT_AUTHENTICATION_CLASSES`
+    # as it loads, and the session authentication there refuses through this module.
+    from rest_framework.views import set_rollback
 
     set_rollback()
     response = Response(body, status=status, headers=headers)
