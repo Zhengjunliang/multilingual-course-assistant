@@ -2,12 +2,12 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate } from "react-router-dom";
 
-import { ApiError } from "@/api/http";
 import { useSession } from "@/auth/useSession";
 import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
 import { FieldError } from "@/components/ui/field";
 import { DEFAULT_UI_LOCALE, isUiLocale, type UiLocale } from "@/i18n";
+import { describeError, type ErrorText } from "@/lib/errorText";
 import { AuthButton, AuthLayout } from "./AuthLayout";
 import { useLanding } from "./landing";
 
@@ -21,17 +21,16 @@ export default function RegisterPage() {
   const { account, register } = useSession();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [failure, setFailure] = useState<string | null>(null);
-  const [fields, setFields] = useState<Record<string, string[]>>({});
+  const [failure, setFailure] = useState<ErrorText | null>(null);
   const landing = useLanding("/");
 
   // A refusal that names fields puts the focus in the first of them, once
   // its messages describe it, as the login page puts it in its password. A
   // failure no field carries is an alert instead.
   useEffect(() => {
-    const first = FIELDS.find((field) => (fields[field] ?? []).length > 0);
+    const first = FIELDS.find((field) => (failure?.fieldSentences[field] ?? []).length > 0);
     if (first !== undefined) document.getElementById(first)?.focus();
-  }, [fields]);
+  }, [failure]);
 
   if (account !== null && landing.phase === "idle") return <Navigate to="/" replace />;
 
@@ -43,34 +42,30 @@ export default function RegisterPage() {
     event.preventDefault();
     if (landing.phase !== "idle") return;
     setFailure(null);
-    setFields({});
     await landing.send(
       () => register(username, password, locale),
-      (error) => {
-        if (error instanceof ApiError) {
-          // Django's password validators say precisely what was wrong with a
-          // password, and repeating that next to the field is the whole value
-          // of having them; the password stays, since that is what they are
-          // about. A 429 arrives as a detail with no fields.
-          setFields(error.fields);
-          if (Object.keys(error.fields).length === 0) setFailure(error.detail);
-        } else {
-          setFailure(t("auth.failed"));
-        }
-      },
+      // Django's password validators say precisely what was wrong with a
+      // password, and repeating that next to the field is the whole value of
+      // having them; the password stays, since that is what they are about.
+      (error) => setFailure(describeError(error, { shownFields: FIELDS })),
     );
   };
 
-  const messagesFor = (field: string) => fields[field] ?? [];
-  const refused = (field: string) => messagesFor(field).length > 0;
+  // Rendered here rather than when the refusal arrived, so a change of
+  // language rewords it.
+  const sentencesFor = (field: string) => failure?.fieldSentences[field] ?? [];
+  const refused = (field: string) => sentencesFor(field).length > 0;
   const messages = (field: string) =>
     refused(field) && (
       <div id={about(field)} className="flex flex-col gap-hair">
-        {messagesFor(field).map((message) => (
-          <FieldError key={message}>{message}</FieldError>
+        {sentencesFor(field).map((sentence) => (
+          <FieldError key={JSON.stringify(sentence)}>{t(sentence.key, sentence.values)}</FieldError>
         ))}
       </div>
     );
+  // A refusal no field carries, a 429, is an alert; so is one to report,
+  // whose code and request id no field's message has room for.
+  const alert = failure !== null && (failure.reference !== null || !FIELDS.some(refused));
 
   return (
     <AuthLayout
@@ -119,7 +114,16 @@ export default function RegisterPage() {
           {messages("password")}
         </div>
 
-        {failure !== null && <FieldError role="alert">{failure}</FieldError>}
+        {alert && (
+          <FieldError
+            role="alert"
+            reference={
+              failure.reference ? t(failure.reference.key, failure.reference.values) : undefined
+            }
+          >
+            {t(failure.sentence.key, failure.sentence.values)}
+          </FieldError>
+        )}
         <AuthButton phase={landing.phase}>{t("auth.register")}</AuthButton>
       </form>
     </AuthLayout>

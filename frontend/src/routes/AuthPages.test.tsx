@@ -104,7 +104,7 @@ describe("a sign-in", () => {
       value: field?.value,
       focused: document.activeElement === field,
       invalid: field?.getAttribute("aria-invalid"),
-      says: described?.textContent?.endsWith(i18n.t("auth.failed")),
+      says: described?.textContent?.startsWith(i18n.t("errors.NETWORK")),
     };
     unmount();
 
@@ -199,6 +199,7 @@ describe("a registration", () => {
       error: new ApiError({
         status: 429,
         code: "RESOURCE_EXHAUSTED",
+        data: { retry_after_seconds: 30 },
         legacyText: "Troppi tentativi.",
       }),
       after: { focused: "", invalid: null, alert: "Troppi tentativi." },

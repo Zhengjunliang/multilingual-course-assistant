@@ -49,7 +49,7 @@ describe("describeError", () => {
     });
   });
 
-  it("puts each shown field's sentence beside it, in a field's own words where it has them", () => {
+  it("puts each shown field's sentences beside it, in a field's own words where it has them", () => {
     const error = new ApiError({
       status: 400,
       code: "INVALID_ARGUMENT",
@@ -64,8 +64,11 @@ describe("describeError", () => {
     expect(describeError(error, { shownFields: ["username", "password"] })).toEqual({
       sentence: { key: "errors.INVALID_ARGUMENT", values: {} },
       fieldSentences: {
-        username: { key: "errors.field.username.ALREADY_EXISTS", values: {} },
-        password: { key: "errors.field.TOO_SHORT", values: { min_length: 8 } },
+        username: [{ key: "errors.field.username.ALREADY_EXISTS", values: {} }],
+        password: [
+          { key: "errors.field.TOO_SHORT", values: { min_length: 8 } },
+          { key: "errors.field.TOO_COMMON", values: {} },
+        ],
       },
       reference: null,
     });
@@ -108,7 +111,7 @@ describe("describeError", () => {
       describeError(field, { shownFields: ["title"] }).fieldSentences,
       describeError(whole),
     ]).toEqual([
-      { title: { key: "errors.field.INVALID", values: {} } },
+      { title: [{ key: "errors.field.INVALID", values: {} }] },
       {
         sentence: { key: "errors.INTERNAL", values: {} },
         fieldSentences: {},
@@ -134,7 +137,7 @@ describe("describeError", () => {
     ]).toEqual([
       {
         sentence: { key: "errors.legacy", values: { text: "Wrong." } },
-        fieldSentences: { password: { key: "errors.legacy", values: { text: "Too common." } } },
+        fieldSentences: { password: [{ key: "errors.legacy", values: { text: "Too common." } }] },
         reference: null,
       },
       { key: "errors.legacy", values: { text: "Gone." } },
