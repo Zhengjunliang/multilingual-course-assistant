@@ -47,7 +47,7 @@ function strays(key: string, sentence: string, carried: readonly string[] = []):
 }
 
 describe.each(UI_LOCALES)("the %s error sentences", (locale) => {
-  const { field, reference, legacy, ...codes } = CATALOGUES[locale].errors;
+  const { field, reference, ...codes } = CATALOGUES[locale].errors;
   const fieldEntries = Object.entries<string | Record<string, string>>(field);
   const reasons = fieldEntries.filter(
     (entry): entry is [string, string] => typeof entry[1] === "string",
@@ -92,7 +92,6 @@ describe.each(UI_LOCALES)("the %s error sentences", (locale) => {
       ...Object.entries(reference).flatMap(([name, sentence]) =>
         strays(`reference.${name}`, sentence, ["code", "id"]),
       ),
-      ...strays("legacy", legacy, ["text"]),
       ...overrides.flatMap(([name, sentences]) =>
         Object.entries(sentences).flatMap(([reason, sentence]) =>
           strays(`${name}.${reason}`, sentence, REASON_DATA[reason]),

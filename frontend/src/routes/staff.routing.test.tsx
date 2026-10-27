@@ -23,6 +23,7 @@ import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
 import { summary } from "@/test/conversations";
 import { type Mounted, mount } from "@/test/mount";
+import { codedRefusal, REQUEST_ID } from "@/test/refusal";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
 const B047: Programme = {
@@ -238,7 +239,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   }
   if (method === "DELETE" && path.startsWith("/api/conversations/")) {
     stoppedAtDelete = stopped;
-    if (deleteRefused) return json({ detail: "Server error." }, 500);
+    if (deleteRefused) return codedRefusal("INTERNAL");
     const id = Number(path.slice("/api/conversations/".length));
     conversations = conversations.filter((listed) => listed.id !== id);
     return new Response(null, { status: 204 });
@@ -246,7 +247,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   if (path === "/api/catalog/programmes") {
     if (failures > 0) {
       failures -= 1;
-      return json({ detail: { message: "Server error.", code: "error" } }, 500);
+      return codedRefusal("INTERNAL");
     }
     return json(scope);
   }
@@ -262,7 +263,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return new Response(null, { status: 204 });
   }
   if (lost && path.startsWith("/api/catalog/editions/5")) {
-    return json({ detail: { message: "Not found.", code: "not_found" } }, 404);
+    return codedRefusal("NOT_FOUND");
   }
   // Every edition's syllabus and books are empty: the pages around them are what this file asks.
   if (/^\/api\/catalog\/editions\/\d+\/syllabus$/.test(path)) {
@@ -285,7 +286,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     const secretariat = programme.secretariat.filter((m) => !revoked.has(m.username));
     return json({ ...programme, secretariat });
   }
-  return json({ detail: { message: "Not found.", code: "not_found" } }, 404);
+  return codedRefusal("NOT_FOUND");
 }
 
 /** The session, which a visitor's sign-in fills with `signsInAs`. */
@@ -1037,7 +1038,7 @@ describe("a read that fails", () => {
 
     expect([said, reference, chip, trail, title]).toEqual([
       `${i18n.t("staff.failure.title")}${i18n.t("errors.INTERNAL")}`,
-      "INTERNAL",
+      `INTERNAL · rif. ${REQUEST_ID}`,
       null,
       ["Corsi di laurea (current)"],
       "Corsi di laurea",

@@ -66,14 +66,6 @@ describe("what is said about the turn being answered", () => {
     );
   });
 
-  it("says the server's own words for a refusal that came with no code", () => {
-    // Transitional (#186): the body from before `{"error": ...}`.
-    const error = new ApiError({ status: 503, code: "ENGINE_DOWN", legacyText: "Server error." });
-    const refused = turn({ answer: "", failure: { kind: "failed", error } });
-
-    expect(spokenNotice(refused, null, true, false, t)).toBe("Server error.");
-  });
-
   it("says nothing of a failure read back with a stored conversation", () => {
     const stored = turn({ failure: { kind: "interrupted" } });
 

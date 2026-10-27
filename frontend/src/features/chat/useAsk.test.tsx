@@ -9,7 +9,7 @@
  * and the thread itself lasts as long as the page. The hook is mounted for
  * real and the network faked at `fetch`, as the routing test does, because
  * the request body is the claim. A failure is kept as the coded error it
- * arrived as, whichever body shape the server sent it in (#186).
+ * arrived as (#186).
  */
 
 import { act } from "react";
@@ -181,18 +181,13 @@ function codedFrame(code: ErrorCode, data: ErrorData = {}): string {
   return `event: error\ndata: ${JSON.stringify({ error })}\n\n`;
 }
 
-/** Transitional (#186): a body from before it, as one `error` frame. */
-function oldFrame(body: Record<string, string>): string {
-  return `event: error\ndata: ${JSON.stringify(body)}\n\n`;
-}
-
 /** `fetch` answering every question with `status` and `body`, framed and with its request id. */
-function answering(status: number, body: string, headers: Record<string, string> = {}) {
+function answering(status: number, body: string) {
   const calls = vi.fn(
     async () =>
       new Response(body, {
         status,
-        headers: { "Content-Type": "text/event-stream", "X-Request-ID": ID, ...headers },
+        headers: { "Content-Type": "text/event-stream", "X-Request-ID": ID },
       }),
   );
   vi.stubGlobal("fetch", calls);
@@ -226,48 +221,35 @@ describe("a question that does not get its whole answer", () => {
     return { waiting, turn: turns[0] };
   }
 
-  it.each([
-    [
-      "the old body",
-      oldFrame({ detail: "The engine is busy.", reason: "busy" }),
-      { "Retry-After": "7" },
-    ],
-    ["the coded body", codedFrame("UNAVAILABLE", { retry_after_seconds: 7 }), {}],
-  ])(
-    "waits out a busy engine for the seconds %s names, twice, and then stops",
-    async (_, body, headers) => {
-      const calls = answering(503, body, headers);
-      const { unmount } = mount(<Probe visitor />);
+  it("waits out a busy engine for the seconds its refusal names, twice, and then stops", async () => {
+    const calls = answering(503, codedFrame("UNAVAILABLE", { retry_after_seconds: 7 }));
+    const { unmount } = mount(<Probe visitor />);
 
-      await act(async () => {
-        void hook.submit("Quando scadono le tasse?");
-      });
-      await wait(0);
-      const first = hook.waiting;
-      await wait(7000);
-      const second = hook.waiting;
-      await wait(7000);
-      const last = hook.waiting;
-      unmount();
+    await act(async () => {
+      void hook.submit("Quando scadono le tasse?");
+    });
+    await wait(0);
+    const first = hook.waiting;
+    await wait(7000);
+    const second = hook.waiting;
+    await wait(7000);
+    const last = hook.waiting;
+    unmount();
 
-      expect({ first, second, asked: calls.mock.calls.length }).toEqual({
-        first: { phase: "retrying", seconds: 7, attempt: 1 },
-        second: { phase: "retrying", seconds: 7, attempt: 2 },
-        asked: 3,
-      });
-      expect(last).toMatchObject({
-        phase: "stopped",
-        canRetry: true,
-        failure: { kind: "failed", error: { code: "UNAVAILABLE", requestId: ID } },
-      });
-    },
-  );
+    expect({ first, second, asked: calls.mock.calls.length }).toEqual({
+      first: { phase: "retrying", seconds: 7, attempt: 1 },
+      second: { phase: "retrying", seconds: 7, attempt: 2 },
+      asked: 3,
+    });
+    expect(last).toMatchObject({
+      phase: "stopped",
+      canRetry: true,
+      failure: { kind: "failed", error: { code: "UNAVAILABLE", requestId: ID } },
+    });
+  });
 
-  it.each([
-    ["the old body", oldFrame({ detail: "Qdrant is not running.", reason: "unavailable" })],
-    ["the coded body", codedFrame("ENGINE_DOWN")],
-  ])("does not ask an engine that is down again, from %s", async (_, body) => {
-    const calls = answering(503, body);
+  it("does not ask an engine that is down again", async () => {
+    const calls = answering(503, codedFrame("ENGINE_DOWN"));
 
     const { waiting } = await ask();
 
@@ -294,16 +276,11 @@ describe("a question that does not get its whole answer", () => {
   });
 
   it.each([
-    [
-      "the old event",
-      oldFrame({ detail: "The model stopped answering." }),
-      { code: "ENGINE_DOWN", legacyText: "The model stopped answering." },
-    ],
-    ["the coded event", codedFrame("ENGINE_DOWN"), { code: "ENGINE_DOWN", legacyText: null }],
-    ["an event it cannot read", oldFrame({}), { code: "BAD_RESPONSE", legacyText: null }],
+    ["the coded event", codedFrame("ENGINE_DOWN"), "ENGINE_DOWN"],
+    ["an event it cannot read", 'event: error\ndata: {"detail": "…"}\n\n', "BAD_RESPONSE"],
   ])(
     "keeps the part an error inside the stream cut short, and the error from %s",
-    async (_, frame, read) => {
+    async (_, frame, code) => {
       answering(200, START_FRAME + TOKEN_FRAME + frame);
 
       const { waiting, turn } = await ask();
@@ -312,7 +289,7 @@ describe("a question that does not get its whole answer", () => {
       expect(waiting).toMatchObject({
         phase: "stopped",
         canRetry: false,
-        failure: { kind: "failed", error: { status: 200, requestId: ID, ...read } },
+        failure: { kind: "failed", error: { status: 200, requestId: ID, code } },
       });
     },
   );

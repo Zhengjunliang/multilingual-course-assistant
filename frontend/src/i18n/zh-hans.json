@@ -166,7 +166,6 @@
       "withId": "{{code}} · 编号 {{id}}",
       "codeOnly": "{{code}}"
     },
-    "legacy": "{{text}}",
     "field": {
       "REQUIRED": "请填写此项。",
       "INVALID": "该值无效。",
