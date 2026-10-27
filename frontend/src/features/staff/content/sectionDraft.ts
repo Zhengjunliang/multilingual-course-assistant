@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 
 import { type SyllabusSection, type SyllabusSectionKey, writeSyllabus } from "@/api/catalog";
 import { onApple } from "@/features/chat/shortcuts";
+import type { ErrorText } from "@/lib/errorText";
 import { useFailure } from "../context";
 import { isForbidden, isNotFound } from "../errors";
 
@@ -59,7 +60,7 @@ export function useSectionDraft({
   const [running, setRunning] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [forbidden, setForbidden] = useState(false);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<ErrorText | null>(null);
   const refocus = useRef(false);
   const unsaved = draft !== null && draft.trim() !== (read ?? text).trim();
 

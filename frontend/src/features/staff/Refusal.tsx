@@ -1,6 +1,7 @@
 /**
  * What a staff page shows when its object cannot be read, and what a dialog
- * shows when a write it offered is refused for a missing permission.
+ * shows when a write it offered is refused, for a missing permission or
+ * otherwise.
  *
  * Outside the caller's scope the server answers 404, as if the object did not
  * exist, and the page says the same: "not found", never "not allowed", which
@@ -13,9 +14,10 @@
  * A page that cannot be read is the status panel every such screen is
  * (components/StatusPanel.tsx), with a lock in its disc rather than the
  * cat: the page is out of the reader's reach, which is not the same as an
- * address the application does not have. Its code is on a chip; the ways on
- * are the reader's own start and a new conversation, or, for a failure that
- * may pass, reading the page again and the start. A part of a page read on
+ * address the application does not have. Its 404 is on a chip; a failure that
+ * may pass says why instead (lib/errorText.ts). The ways on are the reader's
+ * own start and a new conversation, or, for a failure that may pass, reading
+ * the page again and the start. A part of a page read on
  * its own, an edition's syllabus or books, says where it would be that it
  * did not load, with the button that reads it again, and the rest of the
  * page stands.
@@ -26,10 +28,10 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import type { Permission } from "@/api/catalog";
-import { ApiError } from "@/api/http";
 import { StatusPanel } from "@/components/StatusPanel";
 import { Banner } from "@/components/ui/banner";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { describeError, type ErrorText } from "@/lib/errorText";
 import { isNotFound } from "./errors";
 
 export interface Back {
@@ -76,22 +78,24 @@ interface LoadFailureProps {
 
 /**
  * A page whose data did not load: not found for a 404; otherwise the
- * warning's panel, with the status the server answered where there was one,
- * and the button that reads the page again first, since what failed — the
- * network, the server — may answer the next time.
+ * warning's panel, its heading saying what failed and its sentence why, with
+ * the reference of a failure the reader can only report, and the button that
+ * reads the page again first, since what failed — the network, the server —
+ * may answer the next time.
  */
 export function LoadFailure({ error, back, onRetry }: LoadFailureProps) {
   const { t } = useTranslation();
   if (isNotFound(error)) return <NotFound back={back} />;
+  const { sentence, reference } = describeError(error);
   return (
     <div className="flex justify-center py-room">
       <StatusPanel
         icon={CircleAlert}
         tone="warn"
         alert
-        code={error instanceof ApiError ? String(error.status) : undefined}
         heading={t("staff.failure.title")}
-        body={t("staff.failure.body")}
+        body={t(sentence.key, sentence.values)}
+        reference={reference === null ? undefined : t(reference.key, reference.values)}
       >
         {onRetry !== undefined && (
           <Button type="button" onClick={onRetry}>
@@ -142,5 +146,22 @@ export function Forbidden({ permission }: { permission: Permission }) {
     >
       {cannot === undefined ? undefined : t(cannot)}
     </Banner>
+  );
+}
+
+/**
+ * A write refused for a reason no field and no permission explains, above the
+ * dialog's buttons: why, and under it the reference of a failure the reader
+ * can only report.
+ */
+export function WriteFailure({ text }: { text: ErrorText }) {
+  const { t } = useTranslation();
+  return (
+    <div role="alert" className="flex flex-col">
+      <p className="text-body text-warn-ink">{t(text.sentence.key, text.sentence.values)}</p>
+      {text.reference !== null && (
+        <p className="text-caption text-muted">{t(text.reference.key, text.reference.values)}</p>
+      )}
+    </div>
   );
 }

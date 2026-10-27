@@ -25,6 +25,7 @@ import { type SyllabusSectionKey, setSyllabusLocale } from "@/api/catalog";
 import { Select } from "@/components/ui/field";
 import { SectionTabs } from "@/components/ui/section-tabs";
 import { endonym, isUiLocale, UI_LOCALES, type UiLocale } from "@/i18n";
+import type { ErrorText } from "@/lib/errorText";
 import { useFailure } from "../context";
 import { isNotFound } from "../errors";
 import { PartFailure } from "../Refusal";
@@ -51,7 +52,7 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
   /** The latest language chosen, and the queue its request waits in. */
   const chosen = useRef<UiLocale | null>(null);
   const sending = useRef(Promise.resolve());
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<ErrorText | null>(null);
   /** The sections whose box holds text not saved. */
   const [unsaved, setUnsaved] = useState<ReadonlySet<SyllabusSectionKey>>(() => new Set());
   const mark = useCallback((section: SyllabusSectionKey, value: boolean) => {
@@ -87,13 +88,15 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
         if (chosen.current !== next) return;
         // The edition left the reader's reach: the page reads again, and says so.
         if (isNotFound(error)) await reloadPage();
-        else setRefusal(fail(error));
+        else setRefusal(fail(error, { shownFields: ["locale"] }));
       } finally {
         if (chosen.current === next) setChoosing(null);
       }
     });
   };
 
+  // The language's refusal is said under its select: the field's, else the request's.
+  const refused = refusal?.fieldSentences.locale?.[0] ?? refusal?.sentence;
   const language = editable ? (
     <Select
       id={`syllabus-${edition}-locale`}
@@ -102,7 +105,10 @@ export function SyllabusPanel({ edition, syllabus, editable, reloadPage }: Sylla
       onChange={(event) => {
         if (isUiLocale(event.target.value)) choose(event.target.value);
       }}
-      error={refusal ?? undefined}
+      error={refused === undefined ? undefined : t(refused.key, refused.values)}
+      reference={
+        refusal?.reference ? t(refusal.reference.key, refusal.reference.values) : undefined
+      }
       options={UI_LOCALES.map((option) => ({
         value: option,
         label: endonym(option),

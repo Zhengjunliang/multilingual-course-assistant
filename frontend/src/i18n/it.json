@@ -414,7 +414,6 @@
     "retry": "Riprova",
     "failure": {
       "title": "Impossibile aprire questa pagina",
-      "body": "Il server non ha risposto come doveva. Riprova tra poco; se succede ancora, torna al tuo punto di partenza.",
       "part": "Questa parte della pagina non si è caricata."
     }
   },

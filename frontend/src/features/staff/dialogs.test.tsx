@@ -43,6 +43,8 @@ function json(body: unknown, status: number): Response {
   });
 }
 
+const ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+
 const REFUSED = {
   noSuchUser: () => json({ username: [{ message: "No such user.", code: "no_such_user" }] }, 400),
   alreadyHeld: () => json({ username: [{ message: "Already held.", code: "already_held" }] }, 400),
@@ -52,7 +54,7 @@ const REFUSED = {
 };
 
 function coded(status: number, code: string, fields: unknown[] = []): Response {
-  const error = { code, message: "Server's words.", data: {}, fields, request_id: "0".repeat(32) };
+  const error = { code, message: "Server's words.", data: {}, fields, request_id: ID };
   return json({ error }, status);
 }
 
@@ -236,18 +238,20 @@ describe("assigning a member", () => {
 
     expect([seen.closed, seen.invalid, seen.focusedAfter]).toEqual([0, "true", true]);
     expect(seen.text).toContain(sentence);
+    // The reader can put it right: no code, no reference.
+    expect(seen.text).not.toMatch(/rif\.|INVALID_ARGUMENT|ROLE_ALREADY_HELD/);
   });
 
   it.each([
-    ["old", REFUSED.broken],
-    ["coded", CODED.broken],
+    ["old", REFUSED.broken, "INTERNAL"],
+    ["coded", CODED.broken, `INTERNAL · rif. ${ID}`],
   ])(
-    "says a server error from the %s body in the catalogue's words, blaming no field",
-    async (_, refusal) => {
+    "says a server error from the %s body in the catalogue's words, blaming no field, with its reference",
+    async (_, refusal, reference) => {
       const seen = await assign(EDITION, refusal);
 
       expect([seen.closed, seen.invalid, seen.focusedAfter]).toEqual([0, null, true]);
-      expect(seen.text).toContain("Qualcosa è andato storto. Riprova tra poco.");
+      expect(seen.text).toContain(`Qualcosa è andato storto. Riprova tra poco.${reference}`);
       expect(seen.text).not.toMatch(/Server/);
     },
   );

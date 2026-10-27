@@ -23,9 +23,10 @@ import { toast } from "sonner";
 
 import { type MemberScope, removeMember } from "@/api/catalog";
 import { AlertDialog } from "@/components/ui/alert-dialog";
+import type { ErrorText } from "@/lib/errorText";
 import { useFailure } from "./context";
 import { grantPermission, isForbidden, isNotFound } from "./errors";
-import { Forbidden } from "./Refusal";
+import { Forbidden, WriteFailure } from "./Refusal";
 
 export interface Revoking {
   scope: MemberScope;
@@ -56,7 +57,7 @@ export function RevokeDialog({
   const { t } = useTranslation();
   const fail = useFailure();
   const [forbidden, setForbidden] = useState(false);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<ErrorText | null>(null);
 
   const confirm = async () => {
     if (revoking === null) return false;
@@ -100,11 +101,7 @@ export function RevokeDialog({
       onCloseAutoFocus={onCloseAutoFocus}
     >
       {forbidden && revoking !== null && <Forbidden permission={grantPermission(revoking.scope)} />}
-      {refusal !== null && (
-        <p role="alert" className="text-body text-warn-ink">
-          {refusal}
-        </p>
-      )}
+      {refusal !== null && <WriteFailure text={refusal} />}
     </AlertDialog>
   );
 }

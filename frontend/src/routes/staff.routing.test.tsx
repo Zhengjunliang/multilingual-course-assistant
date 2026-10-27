@@ -1015,15 +1015,16 @@ describe("a course, an edition, and a teacher's own courses", () => {
 });
 
 describe("a read that fails", () => {
-  it("offers to read again, and shows the page once the read succeeds", async () => {
+  it("says why, with the reference, offers to read again, and shows the page once the read succeeds", async () => {
     reader = ADMIN;
     // The shell's own read of the list, then the page's.
     failures = 2;
     const { container, unmount } = page("/staff/programmes");
     await settle();
     const said = text(container.querySelector('main [role="alert"]'));
-    // The chip after the disc.
-    const code = text(container.querySelector("main [data-status-panel] > span + span"));
+    // Under the words, outside what is read out; and no chip after the disc.
+    const reference = text(container.querySelector("main [data-status-panel] > p"));
+    const chip = container.querySelector("main [data-status-panel] > span + span");
     // A failed read is not a page that does not exist.
     const trail = crumbs(container);
     const retry = [...container.querySelectorAll<HTMLButtonElement>("main button")].find(
@@ -1034,9 +1035,10 @@ describe("a read that fails", () => {
     const title = text(container.querySelector("main h1"));
     unmount();
 
-    expect([said, code, trail, title]).toEqual([
-      `${i18n.t("staff.failure.title")}${i18n.t("staff.failure.body")}`,
-      "500",
+    expect([said, reference, chip, trail, title]).toEqual([
+      `${i18n.t("staff.failure.title")}${i18n.t("errors.INTERNAL")}`,
+      "INTERNAL",
+      null,
       ["Corsi di laurea (current)"],
       "Corsi di laurea",
     ]);

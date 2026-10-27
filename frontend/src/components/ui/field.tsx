@@ -177,9 +177,20 @@ interface SelectProps extends Omit<ComponentProps<"select">, "id" | "children"> 
   hint?: string;
   /** What was refused and how to put it right. */
   error?: string;
+  /** The refusal's reference, for a failure the reader can only report (`FieldError`). */
+  reference?: string;
 }
 
-export function Select({ id, label, options, hint, error, className, ...select }: SelectProps) {
+export function Select({
+  id,
+  label,
+  options,
+  hint,
+  error,
+  reference,
+  className,
+  ...select
+}: SelectProps) {
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
   const describedBy = [
@@ -210,7 +221,11 @@ export function Select({ id, label, options, hint, error, className, ...select }
         </select>
         <ChevronDown aria-hidden className="pointer-events-none absolute right-snug size-icon" />
       </div>
-      {error !== undefined && <FieldError id={errorId}>{error}</FieldError>}
+      {error !== undefined && (
+        <FieldError id={errorId} reference={reference}>
+          {error}
+        </FieldError>
+      )}
       {hint !== undefined && (
         <p id={hintId} className="text-caption text-muted">
           {hint}

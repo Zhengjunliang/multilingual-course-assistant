@@ -28,11 +28,11 @@ import { addMember, type MemberScope } from "@/api/catalog";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
-import { describeError } from "@/lib/errorText";
+import type { ErrorText, Sentence } from "@/lib/errorText";
 import { useFailure } from "./context";
 import { grantPermission, isForbidden, isHeldAlready, isNotFound } from "./errors";
 import { shownName } from "./people";
-import { Forbidden } from "./Refusal";
+import { Forbidden, WriteFailure } from "./Refusal";
 
 interface AssignDialogProps {
   /** Where to assign; null while the dialog is closed. */
@@ -61,9 +61,9 @@ export function AssignDialog({
   const input = useRef<HTMLInputElement>(null);
   const [username, setUsername] = useState("");
   const [running, setRunning] = useState(false);
-  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<Sentence | null>(null);
   const [forbidden, setForbidden] = useState(false);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<ErrorText | null>(null);
   const teacher = scope?.kind !== "programme";
 
   const close = () => {
@@ -79,7 +79,7 @@ export function AssignDialog({
     const name = username.trim();
     if (scope === null || running) return;
     if (name === "") {
-      setFieldError(t("staff.assign.empty"));
+      setFieldError({ key: "staff.assign.empty", values: {} });
       input.current?.focus();
       return;
     }
@@ -100,11 +100,11 @@ export function AssignDialog({
         close();
         return;
       }
-      const said = describeError(error, { shownFields: ["username"] });
+      const said = fail(error, { shownFields: ["username"] });
       const atName = isHeldAlready(error) ? said.sentence : said.fieldSentences.username?.[0];
-      if (atName !== undefined) setFieldError(t(atName.key, atName.values));
+      if (atName !== undefined) setFieldError(atName);
       else if (isForbidden(error)) setForbidden(true);
-      else setRefusal(fail(error));
+      else setRefusal(said);
       input.current?.focus();
     } finally {
       setRunning(false);
@@ -143,7 +143,7 @@ export function AssignDialog({
         id={fieldId}
         label={t("staff.assign.username")}
         hint={t("staff.assign.hint")}
-        error={fieldError ?? undefined}
+        error={fieldError === null ? undefined : t(fieldError.key, fieldError.values)}
         announce
         // Where a reader expects to type the moment the dialog opens.
         autoFocus
@@ -159,11 +159,7 @@ export function AssignDialog({
         className="font-mono"
       />
       {forbidden && scope !== null && <Forbidden permission={grantPermission(scope)} />}
-      {refusal !== null && (
-        <p role="alert" className="text-body text-warn-ink">
-          {refusal}
-        </p>
-      )}
+      {refusal !== null && <WriteFailure text={refusal} />}
     </Dialog>
   );
 }

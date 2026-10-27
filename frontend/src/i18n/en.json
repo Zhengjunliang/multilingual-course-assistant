@@ -414,7 +414,6 @@
     "retry": "Try again",
     "failure": {
       "title": "This page could not be opened",
-      "body": "The server did not answer as it should. Try again in a moment; if it happens again, go back to where you started.",
       "part": "This part of the page did not load."
     }
   },

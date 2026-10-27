@@ -29,7 +29,7 @@ import { Empty } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import { onApple } from "@/features/chat/shortcuts";
 import type { UiLocale } from "@/i18n";
-import { Forbidden } from "../Refusal";
+import { Forbidden, WriteFailure } from "../Refusal";
 import { MarkdownArea } from "./MarkdownArea";
 import { SyllabusMarkdown } from "./SyllabusMarkdown";
 import { useSectionDraft, WRITING } from "./sectionDraft";
@@ -96,11 +96,7 @@ export function SectionText({
   const refused = (
     <>
       {forbidden && <Forbidden permission="edition.edit_content" />}
-      {refusal !== null && (
-        <p role="alert" className="text-body text-warn-ink">
-          {refusal}
-        </p>
-      )}
+      {refusal !== null && <WriteFailure text={refusal} />}
     </>
   );
 

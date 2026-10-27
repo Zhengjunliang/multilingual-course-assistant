@@ -4,7 +4,8 @@
  * (#190): the cat in the pose for it, or an icon where the screen is a staff
  * object that cannot be read (#194: a lock, the page is out of reach rather
  * than lost), in a tinted disc, the warning's when something broke; a chip
- * with the code, where there is one (404); a heading, one sentence, and a
+ * with the code, where there is one (404); a heading, one sentence, the
+ * reference of a failure the reader can only report in small print, and a
  * primary and a secondary way on. A page that broke may fold the error's
  * technical details under them, for whoever reports it, closed until asked
  * for.
@@ -44,6 +45,12 @@ type StatusPanelProps = Visual & {
   body: string;
   /** A status code shown on a chip, such as "404". */
   code?: string;
+  /**
+   * For a failure the reader can only report: its code and request id, in
+   * `text-caption` and `muted` under the sentence, outside the live region
+   * (lib/errorText.ts).
+   */
+  reference?: string;
   /** `warn` when something broke. */
   tone?: "accent" | "warn";
   /** The error, folded under a summary the caller names. */
@@ -60,6 +67,7 @@ export function StatusPanel({
   heading,
   body,
   code,
+  reference,
   tone = "accent",
   details,
   alert = false,
@@ -94,6 +102,7 @@ export function StatusPanel({
         </h1>
         <p className="text-body text-muted">{body}</p>
       </div>
+      {reference !== undefined && <p className="text-caption text-muted">{reference}</p>}
       <div className="mt-tight flex flex-wrap justify-center gap-tight">{children}</div>
       {details !== undefined && (
         <details className="w-full rounded-control border border-line border-dashed px-snug py-tight text-left text-caption text-muted">

@@ -1,30 +1,28 @@
 /**
  * What every staff page shares: a loader for the page's data, and the one way
- * a refusal becomes a sentence.
+ * a refusal is read.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import { isSessionLost } from "@/api/http";
 import { useSession } from "@/auth/useSession";
-import { describeError } from "@/lib/errorText";
+import { type DescribeOptions, describeError, type ErrorText } from "@/lib/errorText";
 
 /**
- * The sentence for a refusal of the whole request, for an event handler to
- * show. A lost session is forgotten on the spot, and `RequireSession` sends
- * the reader to sign in.
+ * What a refusal says (lib/errorText.ts), for an event handler to keep and
+ * the view to word as it draws, so a language switch rewords it. A lost
+ * session is forgotten on the spot, and `RequireSession` sends the reader to
+ * sign in.
  */
-export function useFailure(): (error: unknown) => string {
-  const { t } = useTranslation();
+export function useFailure(): (error: unknown, options?: DescribeOptions) => ErrorText {
   const { forget } = useSession();
   return useCallback(
-    (error: unknown) => {
+    (error: unknown, options?: DescribeOptions) => {
       if (isSessionLost(error)) forget();
-      const { sentence } = describeError(error);
-      return t(sentence.key, sentence.values);
+      return describeError(error, options);
     },
-    [forget, t],
+    [forget],
   );
 }
 
