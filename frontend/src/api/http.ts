@@ -13,7 +13,6 @@
  * than omitting it: an empty string is a mismatch rather than an absence.
  */
 
-import type { StaffErrorCode } from "./catalog";
 import {
   ERROR_CODES,
   type ErrorCode,
@@ -188,10 +187,29 @@ function codedError(status: number, body: Json, headerId: string | null): ApiErr
 // the codes they will answer with, until every endpoint does.
 
 /**
- * The staff endpoints' codes (config/exceptions.py, apps/catalog/errors.py):
- * each names a whole request's code, or a field's reason. `already_held` was a
- * username field's, but the name was fine: the user holds the role already,
- * a 409 `ROLE_ALREADY_HELD` with no field in the coded body.
+ * The codes the staff endpoints' envelope carried, `{"message", "code"}`:
+ * their own two, and the DRF ones their pages had words for.
+ */
+export type StaffErrorCode =
+  | "no_such_user"
+  | "already_held"
+  | "required"
+  | "blank"
+  | "not_authenticated"
+  | "permission_denied"
+  | "not_found"
+  | "max_length"
+  | "invalid"
+  | "invalid_choice"
+  | "min_value"
+  | "max_value"
+  | "unique";
+
+/**
+ * Each staff code, read as a whole request's code or a field's reason.
+ * `already_held` was a username field's, but the name was fine: the user
+ * holds the role already, a 409 `ROLE_ALREADY_HELD` with no field in the
+ * coded body.
  */
 const LEGACY_CODES: Record<StaffErrorCode, { code: ErrorCode } | { reason: FieldReason }> = {
   no_such_user: { reason: "NO_SUCH_USER" },

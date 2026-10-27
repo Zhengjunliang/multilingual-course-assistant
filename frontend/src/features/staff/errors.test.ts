@@ -1,7 +1,7 @@
 /**
  * What a staff page tells apart in a refusal, read by its code from either
  * body the server may send: the coded `{"error": ...}`, and the staff
- * endpoints' `{"message", "code"}` from before it (config/exceptions.py).
+ * endpoints' `{"message", "code"}` from before it.
  */
 
 import { describe, expect, it } from "vitest";

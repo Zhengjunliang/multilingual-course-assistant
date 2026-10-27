@@ -3,17 +3,16 @@
  * sent (#186).
  *
  * The coded body, `{"error": {...}}`, is read as it is; the shapes from before
- * it — DRF's plain sentences, and the staff endpoints' `{"message", "code"}`
- * (config/exceptions.py) — are read into the codes they will answer with. Both
+ * it — DRF's plain sentences, and the staff endpoints' `{"message", "code"}` —
+ * are read into the codes they answer with now. Both
  * come through `request()`, so both are read here, off a stand-in `fetch`: a
  * `GET` touches no cookie and needs no document.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { StaffErrorCode } from "@/api/catalog";
 import type { ErrorCode, FieldReason } from "@/api/errors";
-import { ApiError, isSessionLost, request } from "@/api/http";
+import { ApiError, isSessionLost, request, type StaffErrorCode } from "@/api/http";
 
 const ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
@@ -150,7 +149,7 @@ describe("a refusal in the old body shape", () => {
     });
   });
 
-  // The staff endpoints' 13 codes (apps/catalog/errors.py), each with the code
+  // The staff endpoints' 13 codes (`StaffErrorCode`), each with the code
   // and the field reasons it becomes; `Record` makes a code left out fail `tsc`.
   const STAFF: Record<StaffErrorCode, [ErrorCode, FieldReason[]]> = {
     no_such_user: ["INVALID_ARGUMENT", ["NO_SUCH_USER"]],

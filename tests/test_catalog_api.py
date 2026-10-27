@@ -2,7 +2,7 @@
 
 What each caller gets is gathered into one mapping and compared whole, so a
 failure shows exactly which caller got what; a refusal is compared by the code
-it carries (config/exceptions.py), which is what a page reads. A case that writes runs inside a
+it carries (config/errors.py), which is what a page reads. A case that writes runs inside a
 transaction rolled back after it, so every case starts from the same world
 without building it again. Every caller logs in through `force_login`,
 which costs no password hash, and the session is real. `APIClient` skips the
@@ -18,6 +18,7 @@ import pytest
 from django.db import connection, transaction
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
+from test_error_contract import refused
 from test_roles import everyone, label, world
 
 from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
@@ -51,9 +52,8 @@ def as_user(user: User | None) -> APIClient:
 
 
 def code_of(response: HttpResponseBase) -> str:
-    """The code of a refusal of the whole request, in the coded body or the staff envelope."""
-    body = response.json()  # pyright: ignore[reportAttributeAccessIssue]
-    return body["error"]["code"] if "error" in body else body["detail"]["code"]
+    """The code of a refusal of the whole request."""
+    return refused(response)[0]
 
 
 def row_label(row: dict[str, Any]) -> str:
@@ -151,8 +151,8 @@ def test_each_caller_lists_their_own_scope() -> None:
             {"B047": (assigns, *b047), "L031": (assigns, *l031)},
         ),
         # A disabled account has no session, whatever it held.
-        "inactive": (403, 403, [403]),
-        "anonymous": (403, 403, [403]),
+        "inactive": (401, 401, [401]),
+        "anonymous": (401, 401, [401]),
     }
     assert unlike_the_list == {}
     # Whoever lists an edition sees the same teachers on it.
@@ -194,7 +194,7 @@ def test_each_caller_reads_courses_and_study_plans() -> None:
             for key, r in answers.items()
         }
 
-    hidden, refused = dict.fromkeys(urls, 404), dict.fromkeys(urls, 403)
+    hidden, signed_out = dict.fromkeys(urls, 404), dict.fromkeys(urls, 401)
     b047_plan, l031_plan = ["B000001", "B000002", "B028451"], ["B000001", "B003725"]
     b047_staff = {"PPM": 200, "shared": 200, "IA": 404, "B047 plan": b047_plan, "L031 plan": 404}
     assert seen == {
@@ -219,8 +219,8 @@ def test_each_caller_reads_courses_and_study_plans() -> None:
             "B047 plan": b047_plan,
             "L031 plan": l031_plan,
         },
-        "inactive": refused,
-        "anonymous": refused,
+        "inactive": signed_out,
+        "anonymous": signed_out,
     }
 
     b047 = {"code": "B047", "name": "Ingegneria Informatica", "locale": "it"}
@@ -301,7 +301,7 @@ def test_a_write_without_the_csrf_token_is_refused() -> None:
 
     response = client.post(teachers(w.ppm_new), {"username": "student"})
 
-    assert (response.status_code, code_of(response)) == (403, "permission_denied")
+    assert (response.status_code, code_of(response)) == (403, "PERMISSION_DENIED")
     assert not RoleAssignment.objects.filter(user=w.student).exists()
 
 
@@ -531,46 +531,36 @@ def test_staff_requests_that_change_nothing(
         for case, (user, method, path, body) in requests.items():
             response = getattr(as_user(user), method)(path, body)
             if response.status_code == 400:
-                seen[case] = (400, response.json())
+                seen[case] = (400, refused(response))
             else:
                 seen[case] = (response.status_code, code_of(response))
 
     assert seen == {
-        "other programme's secretariat assigns in PPM": (404, "not_found"),
-        "teacher assigns a teacher": (403, "permission_denied"),
-        "teacher assigns on another course": (404, "not_found"),
-        "student assigns": (404, "not_found"),
-        "anonymous assigns": (403, "not_authenticated"),
-        "student names nobody": (404, "not_found"),
-        "teacher names nobody": (403, "permission_denied"),
-        # A field's refusal, in the same envelope DRF gives it, each message with its code.
-        "secretariat names nobody": (
-            400,
-            {"username": [{"message": "No such user.", "code": "no_such_user"}]},
-        ),
-        "secretariat grants what is held": (
-            400,
-            {
-                "username": [
-                    {"message": "This user already holds this role here.", "code": "already_held"}
-                ]
-            },
-        ),
-        "secretariat assigns secretariat": (403, "permission_denied"),
-        "teacher assigns secretariat": (404, "not_found"),
-        "other programme's secretariat assigns secretariat": (404, "not_found"),
-        "other programme's secretariat revokes": (404, "not_found"),
-        "teacher revokes": (403, "permission_denied"),
-        "secretariat revokes a non-member": (404, "not_found"),
-        "secretariat revokes their own row": (403, "permission_denied"),
-        "other programme's secretariat revokes secretariat": (404, "not_found"),
-        "teacher revokes secretariat": (404, "not_found"),
-        "teacher reads the teachers": (405, "method_not_allowed"),
-        "student reads the teachers": (405, "method_not_allowed"),
-        "secretariat reads the secretariat": (405, "method_not_allowed"),
-        "GET on a member": (405, "method_not_allowed"),
-        "DELETE on the collection": (405, "method_not_allowed"),
-        "OPTIONS on the collection": (405, "method_not_allowed"),
+        "other programme's secretariat assigns in PPM": (404, "NOT_FOUND"),
+        "teacher assigns a teacher": (403, "PERMISSION_DENIED"),
+        "teacher assigns on another course": (404, "NOT_FOUND"),
+        "student assigns": (404, "NOT_FOUND"),
+        "anonymous assigns": (401, "UNAUTHENTICATED"),
+        "student names nobody": (404, "NOT_FOUND"),
+        "teacher names nobody": (403, "PERMISSION_DENIED"),
+        # A name no account has is the field's; a role held already is no field's.
+        "secretariat names nobody": (400, ("INVALID_ARGUMENT", {"username": ["NO_SUCH_USER"]})),
+        "secretariat grants what is held": (409, "ROLE_ALREADY_HELD"),
+        "secretariat assigns secretariat": (403, "PERMISSION_DENIED"),
+        "teacher assigns secretariat": (404, "NOT_FOUND"),
+        "other programme's secretariat assigns secretariat": (404, "NOT_FOUND"),
+        "other programme's secretariat revokes": (404, "NOT_FOUND"),
+        "teacher revokes": (403, "PERMISSION_DENIED"),
+        "secretariat revokes a non-member": (404, "NOT_FOUND"),
+        "secretariat revokes their own row": (403, "PERMISSION_DENIED"),
+        "other programme's secretariat revokes secretariat": (404, "NOT_FOUND"),
+        "teacher revokes secretariat": (404, "NOT_FOUND"),
+        "teacher reads the teachers": (405, "METHOD_NOT_ALLOWED"),
+        "student reads the teachers": (405, "METHOD_NOT_ALLOWED"),
+        "secretariat reads the secretariat": (405, "METHOD_NOT_ALLOWED"),
+        "GET on a member": (405, "METHOD_NOT_ALLOWED"),
+        "DELETE on the collection": (405, "METHOD_NOT_ALLOWED"),
+        "OPTIONS on the collection": (405, "METHOD_NOT_ALLOWED"),
         # No route matches, so Django answers before any view, with no code.
         "a programme code with a NUL byte": (404, "NOT_FOUND"),
         "a username with a NUL byte": (404, "NOT_FOUND"),

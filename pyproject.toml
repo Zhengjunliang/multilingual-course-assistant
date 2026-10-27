@@ -119,6 +119,7 @@ select = [
     "PLC", "PLE", "PLW", # pylint convention/error/warning (PLR left out: opinionated)
     "G",   # logging format strings
     "LOG", # logging misuse
+    "TID251", # banned APIs, below
 ]
 # Lazy imports are a deliberate pattern here: docling drags torch along and costs
 # seconds, so it is imported inside the functions that actually need it (see
@@ -131,11 +132,25 @@ ignore = ["PLC0415"]
 # type-checking block and the model fails to build.
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
+# An /api/ error is raised by its code (#186): `fail()` for the request,
+# `field_error()` for a field (config/errors.py). These would answer with a
+# sentence of their own; `serializers.ValidationError` is the same class as
+# DRF's, imported through another module. Django's own `ValidationError` stays:
+# the admin's forms and the models' validators raise it, and no `/api/` view.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"rest_framework.exceptions".msg = "refuse with config.errors.fail() or field_error()"
+"rest_framework.serializers.ValidationError".msg = "refuse with config.errors.field_error()"
+"django.http.Http404".msg = "refuse with config.errors.fail(ErrorCode.NOT_FOUND)"
+"django.core.exceptions.PermissionDenied".msg = "refuse with config.errors.fail()"
+
 [tool.ruff.lint.per-file-ignores]
 # assert is the tool in tests; the smoke tests exist to spawn subprocesses; and a
 # test that logs in has to write the password down somewhere (S105) — reading it
 # from the environment would only mean a credential that CI has to be given.
-"tests/**" = ["S101", "S105", "S603"]
+# TID251: a test raises DRF's and Django's exceptions to see how they are answered.
+"tests/**" = ["S101", "S105", "S603", "TID251"]
+# The one module that turns those exceptions into codes.
+"config/errors.py" = ["TID251"]
 # The check chain exists to run subprocesses, from a fixed table in its own source.
 "scripts/**" = ["S603"]
 # Written by makemigrations, not by hand. E501: the long lines are Django's own

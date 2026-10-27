@@ -8,8 +8,10 @@ view answered, are answered in the same body (config/views.py).
 
 from __future__ import annotations
 
+import importlib
 import json
 import logging
+import pkgutil
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -21,9 +23,11 @@ from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework.views import APIView
 from test_error_contract import refused
 
+import apps
 from config.errors import (
     CHALLENGE,
     EXCEPTION_MAP,
+    FIELD_MAP,
     SPEC,
     THROTTLE_WINDOW_SECONDS,
     ErrorCode,
@@ -34,7 +38,7 @@ from config.errors import (
 from config.views import server_error
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from django.test import RequestFactory
     from rest_framework.request import Request
@@ -261,3 +265,49 @@ def test_a_500_no_view_answered_is_the_coded_body_under_api_only(rf: RequestFact
 
     assert (api.status_code, json.loads(api.content)["error"]["code"]) == (500, "INTERNAL")
     assert (page.status_code, page["Content-Type"].split(";")[0]) == (500, "text/html")
+
+
+def serializer_codes() -> dict[str, set[str]]:
+    """Every code a field of an `apps/` serializer may reject with, and where."""
+    for module in pkgutil.walk_packages(apps.__path__, "apps."):
+        if not {"migrations", "management"} & set(module.name.split(".")):
+            importlib.import_module(module.name)
+
+    def subclasses(cls: type) -> Iterator[type]:
+        for each in cls.__subclasses__():
+            yield each
+            yield from subclasses(each)
+
+    codes: dict[str, set[str]] = {}
+
+    def walk(field: object, where: str) -> None:
+        if getattr(field, "read_only", False):
+            return
+        for code in getattr(field, "error_messages", {}):
+            codes.setdefault(code, set()).add(where)
+        for validator in getattr(field, "validators", []):
+            if code := getattr(validator, "code", None):
+                codes.setdefault(code, set()).add(where)
+        if (child := getattr(field, "child", None)) is not None:
+            walk(child, f"{where}.child")
+        if isinstance(field, serializers.Serializer):
+            for name, each in field.fields.items():
+                walk(each, f"{where}.{name}")
+
+    for cls in set(subclasses(serializers.BaseSerializer)):
+        if cls.__module__.startswith("apps."):
+            walk(cls(), f"{cls.__module__}.{cls.__name__}")
+    return codes
+
+
+def test_every_code_a_serializer_may_reject_with_is_a_reason() -> None:
+    """Read from the serializers themselves, so a field added tomorrow is checked too.
+
+    A validator that is a function carries no code of its own (apps/catalog/models.py,
+    `validate_book_language`), nor does DRF's `UniqueValidator`; the API tests send
+    what each refuses (tests/test_content_api.py, tests/test_accounts_api.py).
+    """
+    codes = serializer_codes()
+
+    assert codes
+    assert {code: sorted(where) for code, where in codes.items() if code not in FIELD_MAP} == {}

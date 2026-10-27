@@ -24,14 +24,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from apps.accounts.models import User
 from apps.catalog.editions import IS_CURRENT
-from apps.catalog.errors import StaffError
 from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
 from apps.roles.scopes import permissions_on
+from config.errors import FieldReason, field_error
 
 if TYPE_CHECKING:
     from apps.roles.models import RoleAssignment
@@ -136,9 +135,7 @@ class StaffMemberSerializer(serializers.Serializer):
         try:
             attrs["user"] = User.objects.get(username=attrs["username"])
         except User.DoesNotExist:
-            raise serializers.ValidationError(
-                {"username": [_("No such user.")]}, code=StaffError.NO_SUCH_USER
-            ) from None
+            raise field_error(FieldReason.NO_SUCH_USER, field="username") from None
         return attrs
 
 

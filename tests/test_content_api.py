@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from test_catalog_api import as_user, code_of, rolled_back
+from test_error_contract import refused
 from test_roles import world
 
 from apps.catalog.content_views import EditionReadingView
@@ -49,8 +50,7 @@ def answer(response: HttpResponseBase) -> tuple[int, Any]:
     if status < 300:
         return status, response.json()  # pyright: ignore[reportAttributeAccessIssue]
     if status == 400:
-        fields = response.json()  # pyright: ignore[reportAttributeAccessIssue]
-        return status, {field: [e["code"] for e in errors] for field, errors in fields.items()}
+        return status, refused(response)[1]
     return status, code_of(response)
 
 
@@ -89,10 +89,10 @@ def test_a_section_is_written_on_every_edition_of_a_course_one_teaches() -> None
         "teacher, the year assigned": written,
         "secretariat, an edition of their programme": written,
         "superuser": written,
-        "teacher, another course": (404, "not_found", []),
-        "secretariat, another programme's course": (404, "not_found", []),
-        "student": (404, "not_found", []),
-        "anonymous": (403, "not_authenticated", []),
+        "teacher, another course": (404, "NOT_FOUND", []),
+        "secretariat, another programme's course": (404, "NOT_FOUND", []),
+        "student": (404, "NOT_FOUND", []),
+        "anonymous": (401, "UNAUTHENTICATED", []),
     }
 
 
@@ -113,7 +113,7 @@ def test_a_section_is_replaced_and_cleared_in_place() -> None:
     assert replaced == (200, {"section": "prerequisiti", "text": PREREQUISITES})
     assert after_replace == [("contenuti", "Lezioni."), ("prerequisiti", PREREQUISITES)]
     assert (cleared, cleared_again) == ((204, None), (204, None))
-    assert missing == (400, {"text": ["required"]})
+    assert missing == (400, {"text": ["REQUIRED"]})
     assert sections(w.ppm_old) == [("prerequisiti", PREREQUISITES)]
 
 
@@ -141,7 +141,7 @@ def test_the_syllabus_reads_in_its_language_and_catalogue_order() -> None:
                 ],
             },
         ),
-        "student": (404, "not_found"),
+        "student": (404, "NOT_FOUND"),
     }
 
 
@@ -159,7 +159,7 @@ def test_the_syllabus_language_is_set_alone() -> None:
         200,
         {"locale": "en", "sections": [{"section": "altro", "text": "Nessuna nota."}]},
     )
-    assert unknown == (400, {"locale": ["invalid_choice"]})
+    assert unknown == (400, {"locale": ["INVALID"]})
     assert (w.ppm_old.syllabus_locale, sections(w.ppm_old)) == (
         "en",
         [("altro", "Nessuna nota.")],
@@ -212,21 +212,23 @@ def test_a_book_is_added_changed_and_removed_on_a_past_edition() -> None:
     [
         pytest.param(
             {},
-            {"title": ["required"], "authors": ["required"], "importance": ["required"]},
+            {"title": ["REQUIRED"], "authors": ["REQUIRED"], "importance": ["REQUIRED"]},
             id="empty",
         ),
-        pytest.param({**BOOK, "title": ""}, {"title": ["blank"]}, id="blank-title"),
-        pytest.param({**BOOK, "title": "x" * 301}, {"title": ["max_length"]}, id="long-title"),
-        pytest.param({**BOOK, "isbn": "9" * 18}, {"isbn": ["max_length"]}, id="long-isbn"),
-        pytest.param({**BOOK, "url": "a library"}, {"url": ["invalid"]}, id="not-a-link"),
-        pytest.param({**BOOK, "year": "soon"}, {"year": ["invalid"]}, id="not-a-year"),
-        pytest.param({**BOOK, "year": -1}, {"year": ["min_value"]}, id="negative-year"),
-        pytest.param({**BOOK, "year": 40000}, {"year": ["max_value"]}, id="year-too-large"),
+        pytest.param({**BOOK, "title": ""}, {"title": ["REQUIRED"]}, id="blank-title"),
+        pytest.param({**BOOK, "title": "x" * 301}, {"title": ["TOO_LONG"]}, id="long-title"),
+        pytest.param({**BOOK, "isbn": "9" * 18}, {"isbn": ["TOO_LONG"]}, id="long-isbn"),
+        pytest.param({**BOOK, "url": "a library"}, {"url": ["INVALID"]}, id="not-a-link"),
+        pytest.param({**BOOK, "year": "soon"}, {"year": ["INVALID"]}, id="not-a-year"),
+        pytest.param({**BOOK, "year": -1}, {"year": ["TOO_SMALL"]}, id="negative-year"),
+        pytest.param({**BOOK, "year": 40000}, {"year": ["TOO_LARGE"]}, id="year-too-large"),
         pytest.param(
-            {**BOOK, "importance": "essential"}, {"importance": ["invalid_choice"]}, id="importance"
+            {**BOOK, "importance": "essential"}, {"importance": ["INVALID"]}, id="importance"
         ),
-        pytest.param({**BOOK, "locale": "xx"}, {"locale": ["invalid_choice"]}, id="language"),
-        pytest.param({**BOOK, "authors": "Altri"}, {"title": ["unique"]}, id="title-listed"),
+        pytest.param({**BOOK, "locale": "xx"}, {"locale": ["INVALID"]}, id="language"),
+        pytest.param(
+            {**BOOK, "authors": "Altri"}, {"title": ["ALREADY_EXISTS"]}, id="title-listed"
+        ),
     ],
 )
 def test_a_book_is_refused_field_by_field(body: dict[str, object], codes: object) -> None:
@@ -258,9 +260,9 @@ def test_a_title_is_listed_once_per_edition_whatever_its_language() -> None:
     }
 
     assert seen == {
-        "the same title in another language": (400, {"title": ["unique"]}),
+        "the same title in another language": (400, {"title": ["ALREADY_EXISTS"]}),
         "the same title on another edition": 201,
-        "a book renamed to a title listed": (400, {"title": ["unique"]}),
+        "a book renamed to a title listed": (400, {"title": ["ALREADY_EXISTS"]}),
     }
 
 
@@ -282,7 +284,7 @@ def test_a_book_removed_while_it_is_changed_stays_removed(monkeypatch: pytest.Mo
     )
 
     assert (changed, ReadingItem.objects.filter(pk=book.pk).exists()) == (
-        (404, "not_found"),
+        (404, "NOT_FOUND"),
         False,
     )
 
@@ -301,9 +303,9 @@ def test_a_book_is_reached_through_its_own_edition_only() -> None:
     }
 
     assert seen == {
-        "change": (404, "not_found"),
-        "remove": (404, "not_found"),
-        "remove, by a teacher of PPM": (404, "not_found"),
-        "list, by a teacher of PPM": (404, "not_found"),
+        "change": (404, "NOT_FOUND"),
+        "remove": (404, "NOT_FOUND"),
+        "remove, by a teacher of PPM": (404, "NOT_FOUND"),
+        "list, by a teacher of PPM": (404, "NOT_FOUND"),
     }
     assert ReadingItem.objects.get(pk=ia_book.pk).year is None
