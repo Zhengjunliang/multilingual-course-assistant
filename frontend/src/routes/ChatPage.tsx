@@ -36,6 +36,7 @@ import { useSession } from "@/auth/useSession";
 import { Composer } from "@/features/chat/Composer";
 import { spokenNotice } from "@/features/chat/notice";
 import { TurnView } from "@/features/chat/TurnView";
+import { Unreadable } from "@/features/chat/Unreadable";
 import { useAsk } from "@/features/chat/useAsk";
 import { EntryScreen } from "@/features/entry/EntryScreen";
 import { Room } from "@/features/entry/Room";
@@ -52,7 +53,8 @@ export default function ChatPage() {
   const { account, forget, recheck } = useSession();
   const { refreshConversations, setBusy } = useShell();
 
-  const [unreadable, setUnreadable] = useState(false);
+  /** Why the conversation the URL names could not be read, if it could not. */
+  const [unreadable, setUnreadable] = useState<{ error: unknown } | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [hops, setHops] = useState(0);
   const [travelFrom, setTravelFrom] = useState<{ top: number } | null>(null);
@@ -93,7 +95,7 @@ export default function ChatPage() {
     visited.current = visit;
     if (loaded.current === wanted && !again) return;
     loaded.current = wanted;
-    setUnreadable(false);
+    setUnreadable(null);
 
     if (wanted === null) {
       reset();
@@ -111,10 +113,11 @@ export default function ChatPage() {
       .catch((error: unknown) => {
         if (loaded.current !== wanted) return;
         refused(error);
-        // Deleted, or never this reader's. What the page held before must go
-        // with it, or a question asked here would land in that conversation.
+        // Deleted, never this reader's, or not read at all. What the page held
+        // before must go with it, or a question asked here would land in that
+        // conversation.
         reset();
-        setUnreadable(true);
+        setUnreadable({ error });
       });
   }, [conversationId, visit, adopt, reset, refused]);
 
@@ -173,7 +176,7 @@ export default function ChatPage() {
   // Before the first question the page is a front door: the cat, the caption
   // and the composer together in the middle of the screen. After it, the
   // composer parks at the foot and the thread owns the space.
-  const empty = turns.length === 0 && !unreadable;
+  const empty = turns.length === 0 && unreadable === null;
   const entry = empty || leaving;
 
   const last = turns.at(-1);
@@ -241,7 +244,7 @@ export default function ChatPage() {
           <EntryScreen visitor={visitor} hops={hops} landed={landed} />
         ) : (
           <div className="mx-auto flex max-w-3xl flex-col gap-room">
-            {unreadable && <p className="text-body text-muted">{t("sidebar.unreadable")}</p>}
+            {unreadable !== null && <Unreadable error={unreadable.error} />}
             {turns.map((turn, position) => {
               // Only the last turn can be the one being answered; every
               // earlier one is settled, whether it settled a second ago or
@@ -267,9 +270,9 @@ export default function ChatPage() {
       <p role="status" className="sr-only">
         {said}
       </p>
-      {/* No composer under "not available": a question here would start a
-          conversation the URL does not name. The sidebar offers a new one. */}
-      {!unreadable && composer}
+      {/* No composer under a conversation that could not be read: a question
+          here would start one the URL does not name. The sidebar offers a new one. */}
+      {unreadable === null && composer}
     </div>
   );
 }

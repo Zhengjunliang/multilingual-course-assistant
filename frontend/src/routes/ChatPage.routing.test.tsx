@@ -22,7 +22,7 @@ import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
 import { summary } from "@/test/conversations";
 import { type Mounted, mount } from "@/test/mount";
-import { codedRefusal } from "@/test/refusal";
+import { codedRefusal, REQUEST_ID } from "@/test/refusal";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
 const STORED_ROW = summary({
@@ -65,6 +65,8 @@ let conversations: ConversationSummary[] = [];
 let deleteFails = false;
 /** Whether `GET /api/conversations` fails, as a dropped connection would. */
 let listFails = false;
+/** Whether reading conversation 7 fails, as a server error would. */
+let readFails = false;
 /** How many `PATCH`es fail before one goes through, as a server error would. */
 let pinFailures = 0;
 /** Whether `POST /api/ask` is refused, as a server error would. */
@@ -102,7 +104,9 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   if (method === "GET" && path === "/api/conversations") {
     return listFails ? codedRefusal("INTERNAL") : json(conversations);
   }
-  if (method === "GET" && path === "/api/conversations/7") return json(STORED);
+  if (method === "GET" && path === "/api/conversations/7") {
+    return readFails ? codedRefusal("INTERNAL") : json(STORED);
+  }
   if (method === "DELETE" && path.startsWith("/api/conversations/")) {
     if (deleteFails) return codedRefusal("INTERNAL");
     const id = Number(path.slice("/api/conversations/".length));
@@ -247,6 +251,7 @@ describe("the chat page's address", () => {
     conversations = [STORED_ROW, OTHER];
     deleteFails = false;
     askFails = false;
+    readFails = false;
     vi.stubGlobal("fetch", fakeApi);
   });
 
@@ -394,6 +399,28 @@ describe("the chat page's address", () => {
 
     expect({ receding, after }).toEqual({ receding: true, after: false });
   });
+
+  it.each([
+    ["one gone, as not available", "/c/99", false, i18n.t("sidebar.unreadable")],
+    [
+      "one that failed to load, by why, with its reference",
+      "/c/7",
+      true,
+      `${i18n.t("errors.INTERNAL")}INTERNAL · rif. ${REQUEST_ID}`,
+    ],
+  ])(
+    "says of a conversation it cannot open %s, offering no composer",
+    async (_, path, fails, said) => {
+      readFails = fails;
+      const { container, unmount } = page(path);
+      await settle();
+      const text = container.querySelector("main")?.textContent;
+      const composer = container.querySelector("#question");
+      unmount();
+
+      expect({ text, composer }).toEqual({ text: said, composer: null });
+    },
+  );
 });
 
 describe("pinning from the sidebar", () => {
