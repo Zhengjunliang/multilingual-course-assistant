@@ -156,7 +156,7 @@
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
     "ROLE_ALREADY_HELD": "This user already holds this role here.",
     "RESOURCE_EXHAUSTED": "Too many requests. Try again in {{retry_after_seconds}} seconds.",
-    "UNAVAILABLE": "The service is answering other questions. Trying again shortly.",
+    "UNAVAILABLE": "The service is busy answering other questions. Try again in a moment.",
     "ENGINE_DOWN": "The answering service is not available. Try again later.",
     "INTERNAL": "Something went wrong. Try again in a moment.",
     "NETWORK": "The server cannot be reached. Check your connection and try again.",

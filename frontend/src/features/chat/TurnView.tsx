@@ -174,10 +174,18 @@ export const TurnView = memo(function TurnView({
 
           {/* An answer cut short keeps what it had written (docs/api.md): a
               signed-in reader's is stored as far as it got, which the banner
-              says when there is something to keep. */}
+              says when there is something to keep. A failure the reader can
+              only report adds its code and request id on a line of its own. */}
           {failed !== null && (
             <Banner tone="warn" icon={TriangleAlert} heading={failed.heading}>
-              {failed.kept}
+              {failed.kept === undefined && failed.reference === undefined ? undefined : (
+                <>
+                  {failed.kept}
+                  {failed.reference !== undefined && (
+                    <span className="block">{failed.reference}</span>
+                  )}
+                </>
+              )}
             </Banner>
           )}
         </div>

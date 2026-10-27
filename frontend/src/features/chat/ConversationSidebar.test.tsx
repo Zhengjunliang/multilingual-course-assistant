@@ -3,7 +3,8 @@
 /**
  * The sidebar's states and its delete action, where the page cannot show
  * them: rows on their way, no conversations at all, a search that finds
- * nothing, and where focus goes when a deletion is cancelled.
+ * nothing, where focus goes when a deletion is cancelled, and what a refused
+ * one says.
  *
  * Deleting through the dialog, and where the page goes afterwards, is asserted
  * on the whole application: in routes/ChatPage.routing.test.tsx, and with an
@@ -15,8 +16,10 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import type { ConversationSummary } from "@/api/conversations";
+import { ApiError } from "@/api/http";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
+import { describeError, type ErrorText } from "@/lib/errorText";
 import { summary } from "@/test/conversations";
 import { mount } from "@/test/mount";
 import { ConversationSidebar } from "./ConversationSidebar";
@@ -29,7 +32,10 @@ const FEES = summary({
 });
 const ROWS: ConversationSummary[] = [ORM, FEES];
 
-function sidebar(conversations: ConversationSummary[] | null) {
+function sidebar(
+  conversations: ConversationSummary[] | null,
+  onDelete: (id: number) => Promise<ErrorText | null> = async () => null,
+) {
   return mount(
     <MemoryRouter>
       <SessionContext
@@ -47,7 +53,7 @@ function sidebar(conversations: ConversationSummary[] | null) {
           conversations={conversations}
           busy={null}
           onPin={async () => true}
-          onDelete={async () => true}
+          onDelete={onDelete}
           controls={{
             placement: "column",
             onNavigate: () => {},
@@ -260,5 +266,29 @@ describe("the conversation sidebar", () => {
     unmount();
 
     expect(back).toBe(true);
+  });
+
+  it.each([
+    [
+      "a refusal the reader can act on, by its reason alone",
+      new ApiError({ status: 403, code: "PERMISSION_DENIED" }),
+      `${i18n.t("sidebar.deleteFailed")} ${i18n.t("errors.PERMISSION_DENIED")}`,
+    ],
+    [
+      "a failure to report, with its code",
+      new TypeError("Failed to fetch"),
+      `${i18n.t("sidebar.deleteFailed")} ${i18n.t("errors.NETWORK")}NETWORK`,
+    ],
+  ])("says what failed and then why, for %s", async (_, error, said) => {
+    const { unmount } = sidebar(ROWS, async () => describeError(error));
+    act(() => deleteButton("Che cos'è un ORM?")?.click());
+    const confirm = [
+      ...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+    ].find((button) => button.textContent === i18n.t("sidebar.deleteConfirm"));
+    await act(async () => confirm?.click());
+    const text = document.body.querySelector('[role="alertdialog"] [role="alert"]')?.textContent;
+    unmount();
+
+    expect(text).toBe(said);
   });
 });

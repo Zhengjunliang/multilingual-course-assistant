@@ -24,7 +24,9 @@
  * answered and cannot be dismissed meanwhile (ui/alert-dialog.tsx): closing it
  * first would say "deleted" about a conversation that may still be there.
  * Never disabled, not even while this conversation's answer is being written:
- * the confirmation says that answer stops (DESIGN.md, "Do's and Don'ts").
+ * the confirmation says that answer stops (DESIGN.md, "Do's and Don'ts"). A
+ * refusal says what failed, the deletion, and then why, in the interface's
+ * words for its code (lib/errorText.ts).
  */
 
 import { Trash2 } from "lucide-react";
@@ -37,6 +39,7 @@ import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Count } from "@/components/ui/count";
 import { Empty } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { ErrorText } from "@/lib/errorText";
 import { ConversationRow } from "./ConversationRow";
 import { titleMatches } from "./rows";
 
@@ -53,8 +56,11 @@ interface ConversationListProps {
    * failure offers to try again.
    */
   onPin: (id: number, pinned: boolean, title: string, retry: () => void) => Promise<boolean>;
-  /** Resolves to whether the server deleted it (routes/ShellLayout.tsx leaves it). */
-  onDelete: (id: number) => Promise<boolean>;
+  /**
+   * Resolves to `null` once the server has deleted it (routes/ShellLayout.tsx
+   * leaves it), else to why it did not.
+   */
+  onDelete: (id: number) => Promise<ErrorText | null>;
   onNavigate?: () => void;
   /** Where focus goes once a deletion, here or in another tab, has taken the button it was on away. */
   focusAfterDelete: RefObject<HTMLElement | null>;
@@ -75,7 +81,7 @@ export function ConversationList({
 }: ConversationListProps) {
   const { t, i18n } = useTranslation();
   const [pending, setPending] = useState<ConversationSummary | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<ErrorText | null>(null);
   // The row being pinned or unpinned and where it is going, until the list
   // that has moved it arrives.
   const [moving, setMoving] = useState<{ id: number; pinned: boolean } | null>(null);
@@ -114,10 +120,10 @@ export function ConversationList({
 
   const confirm = async () => {
     if (pending === null) return false;
-    setFailed(false);
-    const deleted = await onDelete(pending.id);
-    setFailed(!deleted);
-    return deleted;
+    setFailed(null);
+    const refusal = await onDelete(pending.id);
+    setFailed(refusal);
+    return refusal === null;
   };
 
   const rows = (group: readonly ConversationSummary[]) => (
@@ -132,7 +138,7 @@ export function ConversationList({
           onPin={() => void pin(conversation)}
           onDelete={(button) => {
             askedFrom.current = button;
-            setFailed(false);
+            setFailed(null);
             setPending(conversation);
           }}
           pinRef={(button) => {
@@ -213,7 +219,7 @@ export function ConversationList({
         onOpenChange={(open) => {
           if (open) return;
           setPending(null);
-          setFailed(false);
+          setFailed(null);
         }}
         heading={t("sidebar.deleteTitle")}
         icon={Trash2}
@@ -236,13 +242,20 @@ export function ConversationList({
           back?.focus();
         }}
       >
-        {failed && (
-          <p
+        {failed !== null && (
+          <div
             role="alert"
-            className="rounded-control border border-warn-line bg-warn px-snug py-tight text-body text-warn-ink"
+            className="flex flex-col rounded-control border border-warn-line bg-warn px-snug py-tight"
           >
-            {t("sidebar.deleteFailed")}
-          </p>
+            <p className="text-body text-warn-ink">
+              {t("sidebar.deleteFailed")} {t(failed.sentence.key, failed.sentence.values)}
+            </p>
+            {failed.reference !== null && (
+              <p className="text-caption text-muted">
+                {t(failed.reference.key, failed.reference.values)}
+              </p>
+            )}
+          </div>
         )}
       </AlertDialog>
     </>
