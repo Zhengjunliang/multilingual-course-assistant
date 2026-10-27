@@ -29,7 +29,14 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { useFailure } from "./context";
-import { fieldErrorKey, grantPermission, isForbidden, isNotFound } from "./errors";
+import {
+  errorKey,
+  fieldErrorKey,
+  grantPermission,
+  isForbidden,
+  isHeldAlready,
+  isNotFound,
+} from "./errors";
 import { shownName } from "./people";
 import { Forbidden } from "./Refusal";
 
@@ -94,7 +101,7 @@ export function AssignDialog({
       });
       close();
     } catch (error) {
-      const field = fieldErrorKey(error, "username");
+      const field = isHeldAlready(error) ? errorKey(error) : fieldErrorKey(error, "username");
       if (isNotFound(error)) {
         await onChanged();
         close();

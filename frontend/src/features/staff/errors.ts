@@ -1,60 +1,58 @@
 /**
  * A staff endpoint's refusal, turned into the catalogue key of its sentence.
  *
- * The server names each refusal with a code (config/exceptions.py); the page
- * has words for the codes of `StaffErrorCode` and one general sentence for any
- * other, since DRF's codes are not a closed set. `SENTENCE` has a key for every
- * code of the type, so a code added to the contract fails `tsc` here until it
- * has words.
+ * The page reads a refusal by its code (api/errors.ts) and has words for the
+ * codes a staff page meets; any other code reads as one general sentence.
  */
 
-import type { MemberScope, Permission, StaffErrorCode } from "@/api/catalog";
-import { ApiError } from "@/api/http";
+import type { MemberScope, Permission } from "@/api/catalog";
+import type { FieldReason } from "@/api/errors";
+import { type ApiCode, ApiError } from "@/api/http";
 
-const SENTENCE: Record<StaffErrorCode, `staff.error.${StaffErrorCode}`> = {
-  no_such_user: "staff.error.no_such_user",
-  already_held: "staff.error.already_held",
-  required: "staff.error.required",
-  blank: "staff.error.blank",
-  not_authenticated: "staff.error.not_authenticated",
-  permission_denied: "staff.error.permission_denied",
-  not_found: "staff.error.not_found",
-  max_length: "staff.error.max_length",
-  invalid: "staff.error.invalid",
-  invalid_choice: "staff.error.invalid_choice",
-  min_value: "staff.error.min_value",
-  max_value: "staff.error.max_value",
-  unique: "staff.error.unique",
+const SENTENCE: Partial<Record<ApiCode, string>> = {
+  ROLE_ALREADY_HELD: "staff.error.already_held",
+  UNAUTHENTICATED: "staff.error.not_authenticated",
+  PERMISSION_DENIED: "staff.error.permission_denied",
+  NOT_FOUND: "staff.error.not_found",
+};
+
+const FIELD_SENTENCE: Partial<Record<FieldReason, string>> = {
+  REQUIRED: "staff.error.required",
+  INVALID: "staff.error.invalid",
+  TOO_LONG: "staff.error.max_length",
+  TOO_SMALL: "staff.error.min_value",
+  TOO_LARGE: "staff.error.max_value",
+  ALREADY_EXISTS: "staff.error.unique",
+  NO_SUCH_USER: "staff.error.no_such_user",
 };
 
 export const UNKNOWN = "staff.error.unknown";
 
 /** Every key a refusal can be shown with. */
-export const ERROR_KEYS: readonly string[] = [...Object.values(SENTENCE), UNKNOWN];
-
-function sentenceOf(code: string | null | undefined): string {
-  return code != null && code in SENTENCE ? SENTENCE[code as StaffErrorCode] : UNKNOWN;
-}
+export const ERROR_KEYS: readonly string[] = [
+  ...Object.values(SENTENCE),
+  ...Object.values(FIELD_SENTENCE),
+  UNKNOWN,
+];
 
 /** The sentence for a refusal of the whole request. */
 export function errorKey(error: unknown): string {
-  return sentenceOf(error instanceof ApiError ? error.code : null);
+  return (error instanceof ApiError ? SENTENCE[error.code] : undefined) ?? UNKNOWN;
 }
 
 /** The sentence for a refusal of one field, or null when that field was not refused. */
 export function fieldErrorKey(error: unknown, field: string): string | null {
   if (!(error instanceof ApiError)) return null;
-  const code = error.fieldCodes[field]?.[0];
-  return code === undefined ? null : sentenceOf(code);
+  const violation = error.violations.find((each) => each.field === field);
+  return violation === undefined ? null : (FIELD_SENTENCE[violation.reason] ?? UNKNOWN);
 }
 
 /**
- * Whether the session is gone. Only this 403 sends the reader to sign in; any
- * other 403 is a refusal shown where it happened. The chat keeps its own rule,
- * `ApiError.isRefused`, since its endpoints give no codes.
+ * Whether the user named holds the role already. No field is wrong, but a
+ * name is what the reader changes, so the dialog says it at the name.
  */
-export function isSessionLost(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 403 && error.code === "not_authenticated";
+export function isHeldAlready(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "ROLE_ALREADY_HELD";
 }
 
 export function isNotFound(error: unknown): boolean {
@@ -67,7 +65,7 @@ export function isNotFound(error: unknown): boolean {
  * role changed. Not a lost session.
  */
 export function isForbidden(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 403 && error.code === "permission_denied";
+  return error instanceof ApiError && error.code === "PERMISSION_DENIED";
 }
 
 /** The permission adding or removing a member of `scope` needs (apps/roles/registry.py). */

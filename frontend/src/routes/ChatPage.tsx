@@ -30,8 +30,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
-import { isRefusal } from "@/api/client";
 import { readConversation } from "@/api/conversations";
+import { isSessionLost } from "@/api/http";
 import { useSession } from "@/auth/useSession";
 import { Composer } from "@/features/chat/Composer";
 import { spokenNotice } from "@/features/chat/notice";
@@ -74,9 +74,9 @@ export default function ChatPage() {
   const refused = useCallback(
     (error: unknown) => {
       // A session that ended somewhere else — logged out in another tab, server
-      // restarted — surfaces as a 403 on the next call. Dropping the account
+      // restarted — is refused on the next call. Dropping the account
       // here is what puts the login page in front of the reader.
-      if (isRefusal(error)) forget();
+      if (isSessionLost(error)) forget();
     },
     [forget],
   );

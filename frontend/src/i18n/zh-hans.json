@@ -166,6 +166,11 @@
     "NETWORK": "无法连接服务器，请检查网络后再试。",
     "BAD_RESPONSE": "服务器的回应异常，请稍后再试。",
     "STREAM_INTERRUPTED": "回答在结束之前中断了。",
+    "reference": {
+      "withId": "{{code}} · 编号 {{id}}",
+      "codeOnly": "{{code}}"
+    },
+    "legacy": "{{text}}",
     "field": {
       "REQUIRED": "请填写此项。",
       "INVALID": "该值无效。",

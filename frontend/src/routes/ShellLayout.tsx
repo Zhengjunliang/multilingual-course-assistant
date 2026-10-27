@@ -20,10 +20,9 @@ import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { listProgrammes, type Programme } from "@/api/catalog";
-import { isRefusal } from "@/api/client";
 import type { ConversationSummary } from "@/api/conversations";
 import { deleteConversation, listConversations, pinConversation } from "@/api/conversations";
-import { ApiError } from "@/api/http";
+import { ApiError, isSessionLost } from "@/api/http";
 import { isStaff } from "@/auth/staff";
 import { useSession } from "@/auth/useSession";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -31,7 +30,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { ChatShell, type SidebarControls } from "@/features/chat/ChatShell";
 import { ConversationSidebar } from "@/features/chat/ConversationSidebar";
 import { SidebarRail } from "@/features/chat/SidebarRail";
-import { isSessionLost } from "@/features/staff/errors";
 import { managementItems } from "@/features/staff/landing";
 import { ICON, ManagementNav } from "@/features/staff/ManagementNav";
 import { NO_TRAIL, type Shell, ShellContext, type Trail } from "./shell";
@@ -54,9 +52,9 @@ export default function ShellLayout() {
 
   const refused = useCallback(
     (error: unknown) => {
-      // A session that ended somewhere else surfaces as a 403 on the next
+      // A session that ended somewhere else is refused on the next
       // call; dropping the account is what puts the login page in front.
-      if (isRefusal(error)) forget();
+      if (isSessionLost(error)) forget();
     },
     [forget],
   );

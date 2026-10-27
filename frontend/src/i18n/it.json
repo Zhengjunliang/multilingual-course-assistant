@@ -166,6 +166,11 @@
     "NETWORK": "Il server non risponde. Controlla la connessione e riprova.",
     "BAD_RESPONSE": "Il server ha risposto in modo inatteso. Riprova tra poco.",
     "STREAM_INTERRUPTED": "La risposta si è interrotta prima della fine.",
+    "reference": {
+      "withId": "{{code}} · rif. {{id}}",
+      "codeOnly": "{{code}}"
+    },
+    "legacy": "{{text}}",
     "field": {
       "REQUIRED": "Compila questo campo.",
       "INVALID": "Questo valore non è valido.",
