@@ -83,13 +83,15 @@ class Conversation(models.Model):
     # (LibreChat and LobeChat do the same; docs/api.md).
     pinned = models.BooleanField(default=False, verbose_name=_("pinned"))
     # Empty until the first exchange is written, and moved by every exchange
-    # after it, under the row lock (`record_exchange`). A deleted leaf leaves it
-    # empty rather than taking the conversation with it.
+    # after it, under the row lock (`record_exchange`). Restricted, because
+    # every message of the thread has the leaf among its replies (`parent`
+    # cascades): a message is refused deletion unless its conversation goes in
+    # the same deletion, so no thread is left with rows and no end.
     current_leaf = models.ForeignKey(
         "Message",
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.RESTRICT,
         related_name="+",
         verbose_name=_("current leaf"),
     )
@@ -147,9 +149,9 @@ class Message(models.Model):
         related_name="messages",
         verbose_name=_("conversation"),
     )
-    # A message removed takes everything after it in the thread along, so the
-    # admin deletes none on its own (apps/qa/admin.py); a conversation is
-    # deleted whole.
+    # A message removed would take everything after it in the thread along,
+    # the leaf included, which `Conversation.current_leaf` refuses: a
+    # conversation is deleted whole.
     parent = models.ForeignKey(
         "self",
         null=True,
