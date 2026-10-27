@@ -84,9 +84,10 @@ class Conversation(models.Model):
     pinned = models.BooleanField(default=False, verbose_name=_("pinned"))
     # Empty until the first exchange is written, and moved by every exchange
     # after it, under the row lock (`record_exchange`). Restricted, because
-    # every message of the thread has the leaf among its replies (`parent`
-    # cascades): a message is refused deletion unless its conversation goes in
-    # the same deletion, so no thread is left with rows and no end.
+    # every message of the thread is the leaf or has it among its replies
+    # (`parent` cascades): a message is refused deletion unless its
+    # conversation goes in the same deletion, so no thread is left with rows
+    # and no end.
     current_leaf = models.ForeignKey(
         "Message",
         null=True,
