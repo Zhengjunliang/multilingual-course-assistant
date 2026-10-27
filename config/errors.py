@@ -21,24 +21,41 @@ The body `error_body` builds::
 
 `request_id` is the request's own (config/request_id.py), so the id a page
 shows beside an unexpected error finds the server's lines for that request.
+
+A view refuses with `fail(code)`, or a serializer with `field_error(reason)`;
+DRF's and Django's own exceptions are read by their class (`EXCEPTION_MAP`).
+`api_exception_handler`, DRF's `EXCEPTION_HANDLER`, answers each of them in
+that body and writes one log line for it.
 """
 
 from __future__ import annotations
 
 import json
+import logging
+import math
 from dataclasses import dataclass
 from enum import StrEnum
 from http import HTTPStatus
 from string import Formatter
 from typing import TYPE_CHECKING, Any, Literal, NoReturn
 
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import Http404
 from pydantic import BaseModel, ConfigDict
+from rest_framework import exceptions
 from rest_framework.exceptions import APIException, ErrorDetail, ValidationError
+from rest_framework.response import Response
+from rest_framework.settings import api_settings
+from rest_framework.views import set_rollback
 
 from config.request_id import current
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping, Sequence
+
+# Every refusal is a line here: a WARNING, an ERROR with its traceback for a 5xx.
+logger = logging.getLogger(__name__)
 
 # The values a sentence fills in: numbers stay numbers, for the page to format
 # in its own language.
@@ -311,3 +328,161 @@ def field_error(
     _check_data(reason, data, FIELD_SPEC[reason])
     detail = [ErrorDetail(str(reason), code=encode_field_code(reason, data))]
     return ValidationError(detail if field is None else {field: detail})
+
+
+def django_field_error(exc: DjangoValidationError) -> ValidationError:
+    """Django's rejections of one value, for `validate_<field>`: each by its code and parameters.
+
+    Django's validators say why by `code` and the values their message names by
+    `params` (`password_too_short` with `min_length`), which is what a reason
+    and its data are; a code no row names reads as `INVALID` in the handler.
+    """
+    details = []
+    for error in exc.error_list:
+        reason = FIELD_MAP.get(error.code or "")
+        params = error.params or {}
+        if reason is None:
+            details.append(ErrorDetail(str(FieldReason.INVALID), code=error.code or "invalid"))
+            continue
+        data = {key: params[key] for key in FIELD_SPEC[reason] if key in params}
+        details.append(ErrorDetail(str(reason), code=encode_field_code(reason, data)))
+    return ValidationError(details)
+
+
+# What every `/api/` error is read as, by its class; the first row that
+# matches wins, so a subclass comes before its base. Django's `Http404` and
+# `PermissionDenied` are here as they are, rather than turned into DRF's first.
+EXCEPTION_MAP: tuple[tuple[type[Exception], ErrorCode], ...] = (
+    (exceptions.ParseError, ErrorCode.MALFORMED_REQUEST),
+    (exceptions.ValidationError, ErrorCode.INVALID_ARGUMENT),
+    (exceptions.NotAuthenticated, ErrorCode.UNAUTHENTICATED),
+    (exceptions.AuthenticationFailed, ErrorCode.UNAUTHENTICATED),
+    (exceptions.PermissionDenied, ErrorCode.PERMISSION_DENIED),
+    (DjangoPermissionDenied, ErrorCode.PERMISSION_DENIED),
+    (exceptions.NotFound, ErrorCode.NOT_FOUND),
+    (Http404, ErrorCode.NOT_FOUND),
+    (exceptions.MethodNotAllowed, ErrorCode.METHOD_NOT_ALLOWED),
+    (exceptions.NotAcceptable, ErrorCode.NOT_ACCEPTABLE),
+    (exceptions.UnsupportedMediaType, ErrorCode.UNSUPPORTED_MEDIA_TYPE),
+    (exceptions.Throttled, ErrorCode.RESOURCE_EXHAUSTED),
+)
+
+# A throttle that cannot say how long to wait: every rate is per minute
+# (config/settings.py, `DEFAULT_THROTTLE_RATES`), so a minute is its window.
+THROTTLE_WINDOW_SECONDS = 60
+
+# The challenge a 401 carries (RFC 9110, 11.6.1). The credential is the session
+# cookie, which no browser prompts for, unlike `Basic`.
+CHALLENGE = 'Session realm="api"'
+
+# The name of the pattern that catches every `/api/` path no view has
+# (config/urls.py), logged as "unmatched" rather than as whatever was asked for.
+UNMATCHED = "api-unmatched"
+
+# The field attribute each reason's value is read from, when DRF's own code
+# carried none.
+_FIELD_ATTRIBUTE = {
+    FieldReason.TOO_LONG: "max_length",
+    FieldReason.TOO_SHORT: "min_length",
+    FieldReason.TOO_SMALL: "min_value",
+    FieldReason.TOO_LARGE: "max_value",
+}
+
+
+def _code_of(exc: Exception) -> ErrorCode:
+    if isinstance(exc, ApiFailure):
+        return exc.code
+    return next((code for kind, code in EXCEPTION_MAP if isinstance(exc, kind)), ErrorCode.INTERNAL)
+
+
+def _data_of(exc: Exception, code: ErrorCode) -> ErrorData:
+    if isinstance(exc, ApiFailure):
+        return exc.data
+    if code is ErrorCode.RESOURCE_EXHAUSTED:
+        wait = getattr(exc, "wait", None)
+        return {"retry_after_seconds": THROTTLE_WINDOW_SECONDS if wait is None else math.ceil(wait)}
+    return {}
+
+
+def _field_at(serializer: object, path: str) -> object:
+    """The serializer field `path` names, through nested serializers and lists, if any does."""
+    field = serializer
+    for name in path.split("."):
+        field = getattr(field, "child", field)
+        if name.isdigit():
+            continue
+        fields = getattr(field, "fields", None)
+        field = fields.get(name) if fields is not None else None
+        if field is None:
+            return None
+    return field
+
+
+def _violation(leaf: object, path: str | None, serializer: object) -> FieldViolation:
+    """One rejected field, read from DRF's error; a code no row names reads as `INVALID`."""
+    name, data = decode_field_code(getattr(leaf, "code", None) or "invalid")
+    reason = FIELD_MAP.get(name) or (FieldReason(name) if name in FieldReason else None)
+    if reason is not None and not data and reason in _FIELD_ATTRIBUTE and path is not None:
+        value = getattr(_field_at(serializer, path), _FIELD_ATTRIBUTE[reason], None)
+        if value is not None:
+            data = {_FIELD_ATTRIBUTE[reason]: value if isinstance(value, int) else str(value)}
+    if reason is None or data.keys() != FIELD_SPEC[reason]:
+        logger.warning("field %s: %r with %s read as INVALID", path, name, sorted(data))
+        return FieldViolation(field=path, reason=FieldReason.INVALID, data={})
+    return FieldViolation(field=path, reason=reason, data=data)
+
+
+def _violations(detail: object, path: str | None, serializer: object) -> list[FieldViolation]:
+    """Every rejected field under `detail`, by dotted path; `non_field_errors` is the object's."""
+    if isinstance(detail, dict):
+        found: list[FieldViolation] = []
+        for key, value in detail.items():
+            name = None if key == api_settings.NON_FIELD_ERRORS_KEY else str(key)
+            joined = path if name is None else name if path is None else f"{path}.{name}"
+            found += _violations(value, joined, serializer)
+        return found
+    if isinstance(detail, list):
+        found = []
+        for index, item in enumerate(detail):
+            nested = isinstance(item, dict | list)
+            where = (str(index) if path is None else f"{path}.{index}") if nested else path
+            found += _violations(item, where, serializer)
+        return found
+    return [_violation(detail, path, serializer)]
+
+
+def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response:
+    """Every error of an `/api/` view, answered with one coded body (`EXCEPTION_HANDLER`).
+
+    The status is the code's, and the message its template: what the
+    exception says is never read, so no sentence of DRF's, Django's or this
+    project's reaches the body. An exception nothing names is `INTERNAL`, a
+    500, in development too: the traceback is in the log line.
+    """
+    code = _code_of(exc)
+    data = _data_of(exc, code)
+    fields: list[FieldViolation] = []
+    if isinstance(exc, exceptions.ValidationError):
+        fields = _violations(exc.detail, None, getattr(exc.detail, "serializer", None))
+    status = SPEC[code].status
+    headers: dict[str, str] = {}
+    if code is ErrorCode.UNAUTHENTICATED:
+        headers["WWW-Authenticate"] = CHALLENGE
+    if "retry_after_seconds" in data:
+        headers["Retry-After"] = str(data["retry_after_seconds"])
+
+    body = error_body(code, data, fields)
+    request = context.get("request")
+    match = getattr(request, "resolver_match", None)
+    route = "unmatched" if match is None or match.url_name == UNMATCHED else match.route
+    line = (getattr(request, "method", "-"), route, int(status), code, body["error"]["message"])
+    if status >= HTTPStatus.INTERNAL_SERVER_ERROR:
+        logger.error("%s %s %s %s: %s", *line, exc_info=exc)
+    else:
+        logger.warning("%s %s %s %s: %s", *line)
+
+    set_rollback()
+    response = Response(body, status=status, headers=headers)
+    # Logged above, with the code: Django's own line would repeat it, with the raw path.
+    response._has_been_logged = True  # pyright: ignore[reportAttributeAccessIssue]
+    return response

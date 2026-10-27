@@ -4,10 +4,10 @@ tests/test_route_permissions.py checks that every route declares who may call
 it; this file records what the declarations add up to. A row is a method of a
 DRF route, as the URL tree resolves them, asked about one fixed object; a
 column is a caller of `world()` (tests/test_roles.py), and `anonymous`. A cell
-is what the caller got: `deny` (403), `hide` (404), or `allow`, which counts a
-400 or a 409 too: the request reached the handler, and a body the handler
-refuses is not an access refused. Any other status is a finding of its own, a
-401 included: the SPA reads a refusal as a 403 (frontend/src/api/http.ts).
+is what the caller got: `deny` (401 for a caller not signed in, 403 for one
+who is), `hide` (404), or `allow`, which counts a 400 or a 409 too: the request
+reached the handler, and a body the handler refuses is not an access refused.
+Any other status is a finding of its own.
 
 A change of access, on purpose or not, shows up as a diff of the file. After an
 intended one, rewrite the file and review the diff with the change:
@@ -103,7 +103,7 @@ def api_rows() -> list[Row]:
 
 
 def verdict(status: int) -> str | None:
-    if status == 403:
+    if status in (401, 403):
         return "deny"
     if status == 404:
         return "hide"

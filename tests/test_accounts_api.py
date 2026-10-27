@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from rest_framework.test import APIClient
+from test_error_contract import refused
 
 from apps.accounts.models import User
 from apps.catalog.models import Course, CourseEdition, DegreeProgramme
@@ -163,7 +164,8 @@ def test_a_password_django_rejects_is_refused(student: User) -> None:
     )
 
     assert response.status_code == 400
-    assert "password" in response.json()
+    # Each rule broken is a reason of its own, which the page words.
+    assert refused(response) == ("INVALID_ARGUMENT", {"password": ["TOO_COMMON"]})
     assert not User.objects.filter(username="ada").exists()
 
 
@@ -175,7 +177,7 @@ def test_a_username_already_taken_is_refused(student: User) -> None:
     )
 
     assert response.status_code == 400
-    assert "username" in response.json()
+    assert refused(response) == ("INVALID_ARGUMENT", {"username": ["ALREADY_EXISTS"]})
 
 
 def test_logging_in_starts_a_session(student: User) -> None:
@@ -199,7 +201,11 @@ def test_wrong_credentials_do_not_reveal_whether_the_account_exists(student: Use
     )
 
     assert wrong_password.status_code == no_such_user.status_code == 400
-    assert wrong_password.json() == no_such_user.json()
+    bodies = [response.json()["error"] for response in (wrong_password, no_such_user)]
+    for body in bodies:
+        del body["request_id"]
+    assert bodies[0] == bodies[1]
+    assert refused(wrong_password) == ("WRONG_CREDENTIALS", {})
 
 
 def test_logging_out_ends_the_session(student: User) -> None:
@@ -223,7 +229,7 @@ def test_a_language_the_project_does_not_serve_is_refused(student: User) -> None
     response = logged_in().patch(ME_URL, {"locale": "xx"}, format="json")
 
     assert response.status_code == 400
-    assert "locale" in response.json()
+    assert refused(response) == ("INVALID_ARGUMENT", {"locale": ["INVALID"]})
 
 
 @pytest.mark.parametrize(
@@ -290,7 +296,7 @@ def test_a_question_without_the_csrf_token_is_refused(student: User, logged_in: 
     response = client.post(ASK_URL, body, format="json")
 
     assert response.status_code == 403
-    assert "CSRF" in response.json()["detail"]
+    assert refused(response) == ("PERMISSION_DENIED", {})
     assert engine_module._HOLDER.engine is None
 
 
@@ -313,7 +319,7 @@ def test_the_csrf_token_from_the_cookie_gets_a_request_through(
     response = client.post(ASK_URL, {"question": "   "}, format="json", HTTP_X_CSRFTOKEN=token)
 
     assert response.status_code == 400
-    assert "question" in response.json()
+    assert refused(response) == ("INVALID_ARGUMENT", {"question": ["REQUIRED"]})
 
 
 SIGN_INS = [

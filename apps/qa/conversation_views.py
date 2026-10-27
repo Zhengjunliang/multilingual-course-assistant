@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING, Any
 from django.db import transaction
 from django.db.models import JSONField, OuterRef, Subquery
 from django.db.models.functions import Left
-from rest_framework.exceptions import NotFound
 from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveDestroyAPIView
 from rest_framework.parsers import JSONParser
 from rest_framework.permissions import IsAuthenticated
@@ -38,6 +37,7 @@ from apps.qa.serializers import (
     PinSerializer,
     slides_courses,
 )
+from config.errors import ErrorCode, fail
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -182,7 +182,7 @@ class ConversationDetailView(RetrieveDestroyAPIView):
         # tab since `get_object` read it is a 404 here, not an error on a row
         # that is gone.
         if not Conversation.objects.filter(pk=conversation.pk).update(pinned=pinned):
-            raise NotFound
+            fail(ErrorCode.NOT_FOUND)
         conversation.pinned = pinned
         return Response(
             ConversationSerializer(conversation, context=row_context(self, [conversation])).data

@@ -11,11 +11,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypedDict
 
-from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from rest_framework.exceptions import NotAuthenticated
 
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
+from config.errors import ErrorCode, FieldReason, fail, field_error
 from rag.answer import Turn
 from rag.chunk import normalize_locale
 
@@ -97,7 +96,7 @@ class AskRequest(serializers.Serializer):
         try:
             return normalize_locale(value)
         except ValueError as exc:
-            raise serializers.ValidationError(str(exc)) from exc
+            raise field_error(FieldReason.INVALID) from exc
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Take the history from where the caller keeps it, and refuse the other source.
@@ -107,19 +106,19 @@ class AskRequest(serializers.Serializer):
         the stored one, which a client-sent copy could only contradict: a 400.
         A request without a session that sends no history, or names a stored
         conversation, is shaped the way a signed-in client shapes its own; it
-        is one whose session ended in another tab or ran out. It gets the 403
-        such a client acts on by asking its reader to sign in again
-        (frontend/src/api/client.ts, `isRefusal`), as it did before anonymous
-        questions existed, once its fields are valid and before the engine
-        runs: answered as a visitor, it would render the reply as its own and
-        lose it on its next call.
+        is one whose session ended in another tab or ran out. It gets the
+        `UNAUTHENTICATED` such a client acts on by asking its reader to sign in
+        again (frontend/src/api/http.ts, `isSessionLost`), as it did before
+        anonymous questions existed, once its fields are valid and before the
+        engine runs: answered as a visitor, it would render the reply as its own
+        and lose it on its next call.
 
         For a logged-in caller, the conversation id becomes the row, or a
         refusal. One message for "no such conversation" and for "that one is
         not yours", because they must not be distinguishable: a client that
         could tell them apart could count how many conversations exist and whose
-        they are. What is left is a request for something the caller has no way
-        to name, which is what a 400 says.
+        they are. What is left is a conversation the caller cannot reach,
+        `CONVERSATION_GONE`.
 
         The lookup only runs when an id was actually sent. That is what keeps
         the everyday first question of a conversation — and every test in
@@ -129,21 +128,19 @@ class AskRequest(serializers.Serializer):
         attrs["conversation"] = None
         if not request.user.is_authenticated:
             if "history" not in attrs or attrs.get("conversation_id") is not None:
-                raise NotAuthenticated
+                fail(ErrorCode.UNAUTHENTICATED)
             attrs["history"] = [Turn(**turn) for turn in attrs["history"]]
             return attrs
 
         if "history" in attrs:
-            raise serializers.ValidationError(
-                {"history": _("With an account, send the conversation_id instead.")}
-            )
+            raise field_error(FieldReason.INVALID, field="history")
         conversation_id = attrs.get("conversation_id")
         if conversation_id is None:
             return attrs
 
         conversation = Conversation.objects.filter(pk=conversation_id, owner=request.user).first()
         if conversation is None:
-            raise serializers.ValidationError({"conversation_id": _("No such conversation.")})
+            fail(ErrorCode.CONVERSATION_GONE)
         attrs["conversation"] = conversation
         return attrs
 

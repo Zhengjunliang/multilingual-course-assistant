@@ -174,6 +174,8 @@ REST_FRAMEWORK = {
     # so the identity is REMOTE_ADDR and only REMOTE_ADDR.
     "NUM_PROXIES": 0,
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    # One coded body for every error (#186), whose status is the code's.
+    "EXCEPTION_HANDLER": "config.errors.api_exception_handler",
 }
 
 # What is deliberately absent: a global cap. Every rate above is per caller,

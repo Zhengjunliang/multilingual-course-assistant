@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.http import FileResponse, Http404
+from django.http import FileResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from apps.qa.sources import source_pdf
+from config.errors import ErrorCode, fail
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -42,12 +43,12 @@ class SourceView(APIView):
     def get(self, request: Request, sha256: str) -> FileResponse:
         path = source_pdf(sha256)
         if path is None:
-            raise Http404
+            fail(ErrorCode.NOT_FOUND)
         try:
             handle = path.open("rb")
         except OSError:
             # Gone or locked since `source_pdf` looked: a miss like any other.
-            raise Http404 from None
+            fail(ErrorCode.NOT_FOUND)
         response = FileResponse(
             handle,
             content_type="application/pdf",

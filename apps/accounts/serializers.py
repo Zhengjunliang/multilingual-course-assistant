@@ -17,11 +17,11 @@ from typing import TYPE_CHECKING, Any
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from apps.accounts.models import User
 from apps.roles.scopes import role_scopes
+from config.errors import ErrorCode, django_field_error, fail
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -80,12 +80,13 @@ class RegisterSerializer(serializers.ModelSerializer[User]):
 
         Bridged by hand because the two frameworks raise different exceptions
         with the same name: Django's would escape as a 500, and only DRF's
-        becomes the 400 that tells the caller which rule they broke.
+        becomes the 400 that tells the caller which rule they broke, each by
+        its code (config/errors.py).
         """
         try:
             validate_password(value)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(list(exc.messages)) from exc
+            raise django_field_error(exc) from exc
         return value
 
     def create(self, validated_data: dict[str, Any]) -> User:
@@ -108,6 +109,6 @@ class LoginSerializer(serializers.Serializer):
             # One message for a wrong password and for a username that was never
             # registered. Telling them apart hands out an account-enumeration
             # oracle, and the caller cannot act on the difference anyway.
-            raise serializers.ValidationError(_("Wrong username or password."))
+            fail(ErrorCode.WRONG_CREDENTIALS)
         attrs["user"] = user
         return attrs

@@ -47,6 +47,7 @@ from qdrant_client import QdrantClient, models
 from qdrant_client.http.exceptions import ResponseHandlingException
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 from test_agent import ScriptedCompleter
+from test_error_contract import refused
 from test_index import StubDense, StubSparse, make_chunk
 
 from apps.accounts.models import User
@@ -403,14 +404,16 @@ def test_a_blank_question_is_rejected(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
     response = ask("   ")
     assert response.status_code == 400
-    assert "question" in response.json()
+    assert refused(response) == ("INVALID_ARGUMENT", {"question": ["REQUIRED"]})
 
 
 def test_a_question_over_the_length_cap_is_rejected(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
     response = ask("a" * (MAX_QUESTION_CHARS + 1))
     assert response.status_code == 400
-    assert "question" in response.json()
+    assert refused(response) == ("INVALID_ARGUMENT", {"question": ["TOO_LONG"]})
+    # The cap the page's sentence names, read off the serializer's field.
+    assert response.json()["error"]["fields"][0]["data"] == {"max_length": MAX_QUESTION_CHARS}
 
 
 def test_a_regional_locale_tag_is_normalised(index: QdrantClient) -> None:
@@ -441,7 +444,7 @@ def test_a_blank_locale_is_rejected_rather_than_defaulted(index: QdrantClient) -
     install_engine(index, SLIDES_ROUTE)
     response = ask(locale="")
     assert response.status_code == 400
-    assert "locale" in response.json()
+    assert refused(response) == ("INVALID_ARGUMENT", {"locale": ["REQUIRED"]})
 
 
 def test_a_locale_that_is_not_a_subtag_is_rejected(index: QdrantClient) -> None:
@@ -450,7 +453,7 @@ def test_a_locale_that_is_not_a_subtag_is_rejected(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
     response = ask(locale="english")
     assert response.status_code == 400
-    assert "locale" in response.json()
+    assert refused(response) == ("INVALID_ARGUMENT", {"locale": ["INVALID"]})
 
 
 def test_a_client_asking_for_the_stream_is_not_refused(index: QdrantClient) -> None:
@@ -472,7 +475,11 @@ def test_an_error_body_is_framed_for_a_client_reading_the_stream(index: QdrantCl
     assert response.headers["Content-Type"].startswith(SSE_MEDIA_TYPE)
     framed = response.content.decode()
     assert framed.startswith("event: error\ndata: ")
-    assert "question" in json.loads(framed.removeprefix("event: error\ndata: "))
+    error = json.loads(framed.removeprefix("event: error\ndata: "))["error"]
+    assert (error["code"], [each["field"] for each in error["fields"]]) == (
+        "INVALID_ARGUMENT",
+        ["question"],
+    )
 
 
 def test_a_generation_failure_ends_the_stream_without_an_end_event(index: QdrantClient) -> None:
@@ -531,7 +538,11 @@ def unparsable_reply() -> ValidationError:
     ids=["unreachable", "schema-drift"],
 )
 def test_an_index_server_that_fails_is_a_503_only_when_unreachable(
-    index: QdrantClient, monkeypatch: pytest.MonkeyPatch, source: Exception, is_503: bool
+    index: QdrantClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    source: Exception,
+    is_503: bool,
 ) -> None:
     """qdrant-client raises one exception class for both: a stopped Qdrant
     service is an outage the caller can wait out, while a reply the client
@@ -545,8 +556,12 @@ def test_an_index_server_that_fails_is_a_503_only_when_unreachable(
     monkeypatch.setattr(index, "collection_exists", fail)
 
     if not is_503:
-        with pytest.raises(ResponseHandlingException):
-            ask()
+        with caplog.at_level("ERROR", logger="config.errors"):
+            response = ask()
+        assert (response.status_code, refused(response)) == (500, ("INTERNAL", {}))
+        [line] = [record for record in caplog.records if record.name == "config.errors"]
+        assert line.exc_info is not None
+        assert line.exc_info[0] is ResponseHandlingException
         return
     response = ask()
     assert response.status_code == 503
@@ -921,15 +936,16 @@ def test_somebody_elses_conversation_is_refused(index: QdrantClient) -> None:
 
     response = ask(conversation_id=theirs.pk)
 
-    assert response.status_code == 400
-    assert "conversation_id" in response.json()
+    assert (response.status_code, refused(response)) == (404, ("CONVERSATION_GONE", {}))
     assert not Message.objects.exists()
 
 
 def test_a_conversation_that_never_existed_is_refused(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
 
-    assert ask(conversation_id=4321).status_code == 400
+    response = ask(conversation_id=4321)
+
+    assert (response.status_code, refused(response)) == (404, ("CONVERSATION_GONE", {}))
 
 
 def test_the_sidebar_lists_a_students_own_conversations(index: QdrantClient) -> None:
@@ -1026,8 +1042,8 @@ class DeletingCompleter:
 def test_a_conversation_deleted_while_its_question_waits_is_refused(
     index: QdrantClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Refused before anything is written, in the serializer's shape for an
-    unknown id, and with the answer slot freed by the view itself.
+    """Refused before anything is written, as the serializer refuses an unknown
+    id, and with the answer slot freed by the view itself.
 
     The test keeps a reference to the engine's generator. Without it, CPython
     would collect the abandoned generator as the request ends and run its
@@ -1047,8 +1063,7 @@ def test_a_conversation_deleted_while_its_question_waits_is_refused(
 
     response = ask(conversation_id=mine.pk)
 
-    assert response.status_code == 400
-    assert response.json() == {"conversation_id": ["No such conversation."]}
+    assert (response.status_code, refused(response)) == (404, ("CONVERSATION_GONE", {}))
     assert len(kept) == 1
     assert engine_module._HOLDER.lock.locked() is False
     assert not Message.objects.exists()
@@ -1138,7 +1153,9 @@ def test_an_anonymous_history_out_of_bounds_is_refused(
     response = ask(anonymous=True, history=history)
 
     assert response.status_code == 400
-    assert "history" in response.json()
+    code, fields = refused(response)
+    assert code == "INVALID_ARGUMENT"
+    assert {str(field).split(".")[0] for field in fields} == {"history"}
     assert engine.completer.questions == []  # pyright: ignore[reportAttributeAccessIssue]
 
 
@@ -1164,7 +1181,7 @@ def test_a_request_shaped_for_a_session_that_has_none_is_refused_as_one_that_end
 ) -> None:
     """No history, or a conversation's id, is what a signed-in client sends;
     arriving without a session, it is one whose session ended in another tab
-    or ran out. It gets the 403 that client acts on, before anything runs,
+    or ran out. It gets the 401 that client acts on, before anything runs,
     rather than an answer as a visitor that it would render as its own and
     then lose."""
     engine = install_engine(index, WEB_ROUTE)
@@ -1176,7 +1193,7 @@ def test_a_request_shaped_for_a_session_that_has_none_is_refused_as_one_that_end
         else ask(anonymous=True)
     )
 
-    assert response.status_code == 403
+    assert (response.status_code, refused(response)) == (401, ("UNAUTHENTICATED", {}))
     assert engine.completer.questions == []  # pyright: ignore[reportAttributeAccessIssue]
     assert not Message.objects.exists()
 
@@ -1189,5 +1206,5 @@ def test_a_logged_in_question_cannot_bring_its_own_history(index: QdrantClient) 
     response = ask(history=[])
 
     assert response.status_code == 400
-    assert "history" in response.json()
+    assert refused(response) == ("INVALID_ARGUMENT", {"history": ["INVALID"]})
     assert not Conversation.objects.exists()
