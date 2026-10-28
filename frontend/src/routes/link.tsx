@@ -7,14 +7,17 @@
  * log holds it; the page sends it in a body. Opening the page looks the link
  * up, which leaves it usable. A dead link, used, expired, revoked or never
  * made, is one `LINK_EXPIRED`, the server telling none of these apart, and so
- * is an address with no token.
+ * is an address with no token. A lookup that failed otherwise, refused for
+ * too many attempts or never answered, says why and offers to look again.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { RotateCw } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 
 import { ApiError } from "@/api/http";
+import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { describeError, type ErrorText } from "@/lib/errorText";
 
@@ -34,6 +37,8 @@ export interface HandedLink<T> {
   target: T | null;
   /** Why the page cannot use it; `null` while it is looked up, and while it can. */
   failure: ErrorText | null;
+  /** Looks the link up again; `null` unless the lookup failed with the link not known dead. */
+  retry: (() => void) | null;
   /** The link died while the page held it: a send it refused. */
   died: () => void;
 }
@@ -46,38 +51,65 @@ export function useLink<T>(lookUp: (token: string) => Promise<T>): HandedLink<T>
     failure: null,
   });
 
-  useEffect(() => {
+  // The lookup whose answer counts: a newer one, or the page leaving, voids the rest.
+  const latest = useRef(0);
+
+  const look = useCallback(() => {
+    latest.current += 1;
+    const mine = latest.current;
     if (token === "") {
       setState({ target: null, failure: DEAD });
       return;
     }
-    let live = true;
+    setState({ target: null, failure: null });
     lookUp(token).then(
       (target) => {
-        if (live) setState({ target, failure: null });
+        if (latest.current === mine) setState({ target, failure: null });
       },
       (error: unknown) => {
-        if (live) setState({ target: null, failure: describeError(error) });
+        if (latest.current === mine)
+          setState({ target: null, failure: isDeadLink(error) ? DEAD : describeError(error) });
       },
     );
-    return () => {
-      live = false;
-    };
   }, [token, lookUp]);
 
+  useEffect(() => {
+    look();
+    return () => {
+      latest.current += 1;
+    };
+  }, [look]);
+
   const died = useCallback(() => setState({ target: null, failure: DEAD }), []);
-  return { token, ...state, died };
+  const retry = state.failure !== null && state.failure !== DEAD ? look : null;
+  return { token, ...state, retry, died };
 }
 
-/** Why the page cannot use its link: dead, or not looked up at all. */
-export function LinkFailure({ failure }: { failure: ErrorText }) {
+/** Why the page cannot use its link: dead, or not looked up at all, which `onRetry` asks again. */
+export function LinkFailure({
+  failure,
+  onRetry,
+}: {
+  failure: ErrorText;
+  onRetry: (() => void) | null;
+}) {
   const { t } = useTranslation();
   return (
-    <FieldError
-      role="alert"
-      reference={failure.reference ? t(failure.reference.key, failure.reference.values) : undefined}
-    >
-      {t(failure.sentence.key, failure.sentence.values)}
-    </FieldError>
+    <>
+      <FieldError
+        role="alert"
+        reference={
+          failure.reference ? t(failure.reference.key, failure.reference.values) : undefined
+        }
+      >
+        {t(failure.sentence.key, failure.sentence.values)}
+      </FieldError>
+      {onRetry !== null && (
+        <Button type="button" variant="outline" onClick={onRetry}>
+          <RotateCw aria-hidden className="size-icon" />
+          {t("auth.retry")}
+        </Button>
+      )}
+    </>
   );
 }

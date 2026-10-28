@@ -13,14 +13,14 @@ Every endpoint needs a session except `GET /api/auth/me`, `login`, `register`, `
 | `POST /api/auth/login` | username + password → session cookie |
 | `POST /api/auth/logout` | end the session (204) |
 | `POST /api/auth/register` | open self-registration, logged in on success (201); `username`, `password` and `locale` are the fields it reads, and the account it makes is a student's whatever else the body holds |
-| `POST /api/auth/password` | `{"password", "new_password"}` → 204: the password changes, this session stays signed in under a new key, and every other session of the account ends |
+| `POST /api/auth/password` | `{"password", "new_password"}` → 204: the password changes, this session stays signed in under a new key, every other session of the account ends, and a reset link made for it is voided |
 | `GET /api/auth/sessions` | the account's live sessions, the last used first: a bare array of `{"id", "current", "user_agent", "ip", "authenticated_at", "last_activity"}`, where `current` marks the one asking |
 | `POST /api/auth/sessions/end` | `{"password", "session"}` → 204: ends the session whose `id` is `session`, or with `"others"` every one but the caller's |
 | `POST /api/auth/me/delete` | `{"password"}` → 204: deletes the account and its conversations, and signs out every session of it |
 | `POST /api/auth/reset/lookup` | `{"token"}` → `{"username"}`: the account a reset link resets, for the page to name; the link stays as it is |
-| `POST /api/auth/reset` | `{"token", "new_password"}` → 204: sets the account's password, ends every session of it and voids the link; nobody is signed in by it |
+| `POST /api/auth/reset` | `{"token", "new_password"}` → 204: sets the account's password, ends every session of it, the caller's included, and voids the link; nobody is signed in by it |
 | `POST /api/auth/invitation/lookup` | `{"token"}` → `{"role", "edition", "programme"}`: what an invitation makes its holder, its scope named as the invitation lists name it (section *Catalogue API*) and the other one `null`; the invitation stays as it is |
-| `POST /api/auth/invitation/accept` | signed in, `{"token"}` → 200; signed out, `{"token", "username", "password", "locale"}` → 201, an account made as `register` makes one, and signed in. Either way the account is granted the role, the invitation is used up, and the answer is `me`'s |
+| `POST /api/auth/invitation/accept` | the body says which account accepts: `{"token"}` → 200, the account signed in, or 401 `UNAUTHENTICATED` with none; `{"token", "username", "password", "locale"}` → 201, an account made as `register` makes one, and signed in, whoever was before. Either way the account is granted the role, the invitation is used up, and the answer is `me`'s |
 
 `me` answers 200 when nobody is logged in: "who am I" has an answer for a stranger too, and the page asks it before anything else. Elsewhere a request that needs a session and has none is a 401 `UNAUTHENTICATED`, and a failed CSRF check a 403 `CSRF_FAILED` (section *Errors*). Throttling is per endpoint (`ask` 4/min per account or, anonymous, per address; `auth` 5/min, per address on `login`, `register`, `reset/lookup`, `reset`, `invitation/lookup` and `invitation/accept` and per account on `password`, `sessions/end` and `me/delete`) with no global cap; the reasons are next to the rates in [config/settings.py](../config/settings.py).
 

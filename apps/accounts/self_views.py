@@ -26,7 +26,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.events import AuthEvent, auth_event
-from apps.accounts.models import AccountSession
+from apps.accounts.models import AccountSession, ResetLink
 from apps.accounts.passwords import set_password_checked
 from apps.accounts.reauth import require_password
 from apps.accounts.serializers import (
@@ -65,6 +65,10 @@ class PasswordView(APIView):
         except DjangoValidationError as exc:
             raise django_field_error(exc, field="new_password") from exc
         user.save(update_fields=["password"])
+        # A reset link made for the account dies with the password it was
+        # made to replace, as Django's own reset tokens do (outside the
+        # repository): its owner has one they know again.
+        ResetLink.objects.filter(user=user).delete()
         # Keeps this session signed in under the new password, with a new key;
         # the others no longer match it, and are deleted below rather than
         # left in the list until they are next used.

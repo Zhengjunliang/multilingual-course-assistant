@@ -11,10 +11,10 @@ enough for a secret nobody chose, which no guessing reaches. Not Django's
 `PasswordResetTokenGenerator`, which stores nothing: its links stay valid
 until the password changes, so a newer link could not void the one before.
 
-A link that does not work, its token unknown, used, replaced by a newer link
-or past its time, is one 404 `LINK_EXPIRED` whichever: the holder does the
-same thing for each, asks for a new one, and a caller trying tokens learns
-nothing from the answer.
+A link that does not work, its token unknown, used, replaced by a newer link,
+voided by a password change or past its time, is one 404 `LINK_EXPIRED`
+whichever: the holder does the same thing for each, asks for a new one, and a
+caller trying tokens learns nothing from the answer.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ import secrets
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from django.contrib.auth import logout
 from django.db import transaction
 from django.utils import timezone
 
@@ -109,5 +110,11 @@ def reset_password(token: str, password: str, request: Request) -> None:
         set_password_checked(user, password)
         user.save(update_fields=["password"])
         link.delete()
+        # A holder signed in as the account itself is signed out here, once
+        # the password is accepted, for the reason `delete_own_account` gives
+        # (apps/accounts/services.py): the request's own session is one of
+        # the rows ended below.
+        if request.user.pk == user.pk:
+            logout(request)
         ended = end_sessions(user)
     auth_event(AuthEvent.PASSWORD_RESET, request, user, sessions=ended)

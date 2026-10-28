@@ -12,7 +12,7 @@
  * working, and is said at the field.
  */
 
-import { act, type ReactNode } from "react";
+import { act, type ReactNode, useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -82,6 +82,31 @@ async function settle() {
   }
 }
 
+/** The session as the page reads it, which `forget` empties as the real one does. */
+function Session(props: {
+  account: Account | null;
+  logOut: () => Promise<void>;
+  recheck: () => Promise<void>;
+  children: ReactNode;
+}) {
+  const [account, setAccount] = useState(props.account);
+  return (
+    <SessionContext
+      value={{
+        account,
+        logIn: async () => {},
+        register: async () => {},
+        logOut: props.logOut,
+        chooseLocale: async () => {},
+        forget: () => setAccount(null),
+        recheck: props.recheck,
+      }}
+    >
+      {props.children}
+    </SessionContext>
+  );
+}
+
 function open(path: string, session: { account?: Account | null; recheck?: () => Promise<void> }) {
   const recheck = vi.fn(session.recheck ?? (async () => {}));
   const logOut = vi.fn(async () => {});
@@ -97,19 +122,9 @@ function open(path: string, session: { account?: Account | null; recheck?: () =>
     { initialEntries: [path] },
   );
   const mounted = mount(
-    <SessionContext
-      value={{
-        account: session.account ?? null,
-        logIn: async () => {},
-        register: async () => {},
-        logOut,
-        chooseLocale: async () => {},
-        forget: () => {},
-        recheck,
-      }}
-    >
+    <Session account={session.account ?? null} logOut={logOut} recheck={recheck}>
       <RouterProvider router={router} />
-    </SessionContext>,
+    </Session>,
   );
   return {
     ...mounted,
@@ -156,6 +171,13 @@ afterEach(async () => {
   await act(() => i18n.changeLanguage("it"));
 });
 
+/** The button that looks a link up again, if the page offers it. */
+function retryButton(container: HTMLElement): HTMLButtonElement | undefined {
+  return [...container.querySelectorAll("button")].find(
+    (button) => button.textContent === i18n.t("auth.retry"),
+  );
+}
+
 describe("a dead link", () => {
   it.each([
     { page: "/reset", lookup: "/api/auth/reset/lookup" },
@@ -167,6 +189,7 @@ describe("a dead link", () => {
     const dead = {
       alert: opened.container.querySelector("[role=alert]")?.textContent,
       form: opened.container.querySelector("form") !== null,
+      retry: retryButton(opened.container) !== undefined,
       sent,
     };
     opened.unmount();
@@ -174,9 +197,44 @@ describe("a dead link", () => {
     expect(dead).toEqual({
       alert: i18n.t("errors.LINK_EXPIRED"),
       form: false,
+      retry: false,
       sent: [{ to: lookup, body: { token: TOKEN } }],
     });
   });
+
+  it.each([
+    { page: "/reset", lookup: "/api/auth/reset/lookup", target: { username: READER.username } },
+    { page: "/invite", lookup: "/api/auth/invitation/lookup", target: TEACHER },
+  ])(
+    "not one on $page, its lookup refused for too many attempts: asked again on request",
+    async ({ page, lookup, target }) => {
+      answers[lookup] = () =>
+        codedRefusal("RESOURCE_EXHAUSTED", { data: { retry_after_seconds: 30 } });
+      const opened = open(`${page}#${TOKEN}`, {});
+      await settle();
+      const refused = {
+        said: opened.container.querySelector("[role=alert]") !== null,
+        form: opened.container.querySelector("form") !== null,
+      };
+      answers[lookup] = () => json(target);
+      act(() => retryButton(opened.container)?.click());
+      await settle();
+      const after = {
+        refused,
+        form: opened.container.querySelector("form") !== null,
+        retry: retryButton(opened.container) !== undefined,
+        sent: sent.length,
+      };
+      opened.unmount();
+
+      expect(after).toEqual({
+        refused: { said: true, form: false },
+        form: true,
+        retry: false,
+        sent: 2,
+      });
+    },
+  );
 
   it.each(["/reset", "/invite"])("with no token on %s: said, and nothing asked", async (page) => {
     const opened = open(page, {});
@@ -329,6 +387,25 @@ describe("an invitation", () => {
       offered: { as: i18n.t("auth.acceptAs", { username: READER.username }), fields: 0 },
       sent: { to: "/api/auth/invitation/accept", body: { token: TOKEN } },
       path: "/staff/editions/5",
+    });
+  });
+
+  it("signed in, the session ended meanwhile: said, and an account to make is offered", async () => {
+    answers["/api/auth/invitation/accept"] = refusal("UNAUTHENTICATED");
+    const opened = open(`/invite#${TOKEN}`, { account: READER });
+    await settle();
+    await send(opened.container);
+    const after = {
+      said: opened.container.querySelector('[role="alert"]')?.textContent,
+      username: opened.container.querySelector("#username") !== null,
+      path: opened.path(),
+    };
+    opened.unmount();
+
+    expect(after).toEqual({
+      said: i18n.t("errors.UNAUTHENTICATED"),
+      username: true,
+      path: "/invite",
     });
   });
 
