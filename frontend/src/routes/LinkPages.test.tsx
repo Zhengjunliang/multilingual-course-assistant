@@ -85,6 +85,7 @@ async function settle() {
 /** The session as the page reads it, which `forget` empties as the real one does. */
 function Session(props: {
   account: Account | null;
+  onForget: () => void;
   logOut: () => Promise<void>;
   recheck: () => Promise<void>;
   children: ReactNode;
@@ -98,7 +99,10 @@ function Session(props: {
         register: async () => {},
         logOut: props.logOut,
         chooseLocale: async () => {},
-        forget: () => setAccount(null),
+        forget: () => {
+          props.onForget();
+          setAccount(null);
+        },
         recheck: props.recheck,
       }}
     >
@@ -110,6 +114,7 @@ function Session(props: {
 function open(path: string, session: { account?: Account | null; recheck?: () => Promise<void> }) {
   const recheck = vi.fn(session.recheck ?? (async () => {}));
   const logOut = vi.fn(async () => {});
+  const forget = vi.fn();
   const marker = (id: string): ReactNode => <p id={id} />;
   const router = createMemoryRouter(
     [
@@ -122,7 +127,7 @@ function open(path: string, session: { account?: Account | null; recheck?: () =>
     { initialEntries: [path] },
   );
   const mounted = mount(
-    <Session account={session.account ?? null} logOut={logOut} recheck={recheck}>
+    <Session account={session.account ?? null} onForget={forget} logOut={logOut} recheck={recheck}>
       <RouterProvider router={router} />
     </Session>,
   );
@@ -130,6 +135,7 @@ function open(path: string, session: { account?: Account | null; recheck?: () =>
     ...mounted,
     recheck,
     logOut,
+    forget,
     path: () => router.state.location.pathname,
   };
 }
@@ -272,31 +278,49 @@ describe("a dead link", () => {
 });
 
 describe("a reset link", () => {
-  it("names its account, sends the new password, and goes on to the login", async () => {
-    const opened = open(`/reset#${TOKEN}`, {});
-    await settle();
-    const username = opened.container.querySelector<HTMLInputElement>("#username");
-    const named = { value: username?.value, readOnly: username?.readOnly };
-    type(
-      opened.container.querySelector<HTMLInputElement>("#new_password"),
-      "cavallo batteria graffetta",
-    );
-    await send(opened.container);
-    const after = { named, sent, path: opened.path() };
-    opened.unmount();
+  it.each([
+    { signedIn: "nobody", account: null, forgotten: 0 },
+    // Its session ended with every other of the account.
+    {
+      signedIn: "the link's account",
+      account: { ...READER, username: "demo-forgetful" },
+      forgotten: 1,
+    },
+    { signedIn: "another account", account: READER, forgotten: 0 },
+  ])(
+    "signed in as $signedIn: names its account, sends the new password, and goes on to the login",
+    async ({ account, forgotten }) => {
+      const opened = open(`/reset#${TOKEN}`, { account });
+      await settle();
+      const username = opened.container.querySelector<HTMLInputElement>("#username");
+      const named = { value: username?.value, readOnly: username?.readOnly };
+      type(
+        opened.container.querySelector<HTMLInputElement>("#new_password"),
+        "cavallo batteria graffetta",
+      );
+      await send(opened.container);
+      const after = {
+        named,
+        sent,
+        path: opened.path(),
+        forgotten: opened.forget.mock.calls.length,
+      };
+      opened.unmount();
 
-    expect(after).toEqual({
-      named: { value: "demo-forgetful", readOnly: true },
-      sent: [
-        { to: "/api/auth/reset/lookup", body: { token: TOKEN } },
-        {
-          to: "/api/auth/reset",
-          body: { token: TOKEN, new_password: "cavallo batteria graffetta" },
-        },
-      ],
-      path: "/login",
-    });
-  });
+      expect(after).toEqual({
+        forgotten,
+        named: { value: "demo-forgetful", readOnly: true },
+        sent: [
+          { to: "/api/auth/reset/lookup", body: { token: TOKEN } },
+          {
+            to: "/api/auth/reset",
+            body: { token: TOKEN, new_password: "cavallo batteria graffetta" },
+          },
+        ],
+        path: "/login",
+      });
+    },
+  );
 
   it("refused a weak password: said at the field, and the link still works", async () => {
     answers["/api/auth/reset"] = refusal("INVALID_ARGUMENT", [
@@ -372,7 +396,7 @@ describe("an invitation", () => {
     },
   );
 
-  it("signed in: accepted as the account, with the token alone", async () => {
+  it("signed in: accepted as the account, named by its id", async () => {
     const opened = open(`/invite#${TOKEN}`, { account: READER });
     await settle();
     const offered = {
@@ -385,7 +409,7 @@ describe("an invitation", () => {
 
     expect(after).toEqual({
       offered: { as: i18n.t("auth.acceptAs", { username: READER.username }), fields: 0 },
-      sent: { to: "/api/auth/invitation/accept", body: { token: TOKEN } },
+      sent: { to: "/api/auth/invitation/accept", body: { token: TOKEN, account: READER.id } },
       path: "/staff/editions/5",
     });
   });

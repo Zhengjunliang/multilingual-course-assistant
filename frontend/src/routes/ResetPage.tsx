@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { lookUpResetLink, resetPassword } from "@/api/account";
+import { useSession } from "@/auth/useSession";
 import { useFormRefusal } from "@/components/FormRefusal";
 import { LineField } from "@/components/LineField";
 import { PasswordField } from "@/components/PasswordField";
@@ -25,6 +26,7 @@ const FIELDS = ["new_password"];
  */
 export default function ResetPage() {
   const { t } = useTranslation();
+  const { account, forget } = useSession();
   const link = useLink(lookUpResetLink);
   const [password, setPassword] = useState("");
   const [failure, setFailure] = useState<ErrorText | null>(null);
@@ -36,7 +38,11 @@ export default function ResetPage() {
     if (landing.phase !== "idle") return;
     setFailure(null);
     await landing.send(
-      () => resetPassword(link.token, password),
+      async () => {
+        await resetPassword(link.token, password);
+        // The account's own session, if the page runs in one, ended with the rest.
+        if (account?.username === link.target?.username) forget();
+      },
       (error) => {
         if (isDeadLink(error)) link.died();
         else setFailure(describeError(error, { shownFields: FIELDS }));
