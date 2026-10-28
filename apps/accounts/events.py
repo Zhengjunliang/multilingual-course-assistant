@@ -8,8 +8,10 @@ session that ran out. Registering has no signal, so `RegisterView` calls
 `auth_event` itself, as apps/accounts/services.py does for an account it
 deactivates, reactivates or deletes, apps/accounts/self_views.py for a
 password changed or a session ended, apps/accounts/reauth.py for a password
-mistyped to confirm one, and apps/accounts/middleware.py for why a session ran
-out, before the logout it signals. Nothing else writes to this logger.
+mistyped to confirm one, and apps/accounts/middleware.py for why it ends a
+session, before the logout it signals. A session past the deadline Django
+keeps for it is never loaded again, so it signs nobody out and leaves no
+line. Nothing else writes to this logger.
 
 A line is the event's name and `key=value` pairs, each value in its `repr`: a
 username typed at a failed login is the caller's own text, and quoted it
