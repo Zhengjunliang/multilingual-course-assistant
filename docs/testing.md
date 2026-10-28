@@ -1,6 +1,51 @@
 # Testing
 
-This file owns four things: when a test may be deleted, which tests stay whatever those criteria say, where a regression test goes, and what a test may fake. How the suite runs is the `tests` step of [scripts/check.py](../scripts/check.py); what each test checks is the test's own business.
+This file owns the rules of the test suite: which layer tests what, when a test is admitted, how long a layer may take, what a flaky test is, what coverage means and how the suite is reviewed, when a test may be deleted, which tests stay whatever those criteria say, where a regression test goes, and what a test may fake. How the suite runs is the steps of [scripts/check.py](../scripts/check.py) and the jobs of [.github/workflows/ci.yml](../.github/workflows/ci.yml); what each test checks is the test's own business.
+
+A rule whose guard is not named is kept by `review`: the reading of a pull request before it is merged.
+
+## Which layer tests what
+
+One behaviour is tested in one layer, the one whose seam it belongs to: a rule of the server in pytest, the interface's logic in vitest, and in a browser only what needs a real browser to be seen. Same-kind applications and the large Django projects write the same rule: a test sits as far out as its behaviour is visible, and the browser keeps what only the assembled system shows (outside the repository: Onyx's `backend/tests/README.md`, Dify's `web/docs/test.md`, Sentry's and Zulip's testing documentation).
+
+| Layer | Owns | Leaves to another layer | Example |
+| ----- | ---- | ----------------------- | ------- |
+| pytest, `tests/` | The server's rules: permissions, error codes, the scope invariants, the API contract and its TypeScript mirrors, the pipeline | How a page shows any of it | [tests/test_access_matrix.py](../tests/test_access_matrix.py): what each kind of caller gets from every API route |
+| vitest, `frontend/src/**/*.test.{ts,tsx}` | The interface's logic and state, tested at page level: what a page shows for each answer the API can give, and what it sends | The server's rules, which its fixtures assume; a component on its own, unless a page test cannot reach its logic | [ChatPage.routing.test.tsx](../frontend/src/routes/ChatPage.routing.test.tsx) |
+| Browser floors, [frontend/e2e/](../frontend/e2e/) | What only a real browser measures, on every screen: accessibility, reduced motion, type, the byte budget of the first screen; and the demo path on recorded answers | The server, whose answers [frontend/e2e/api.ts](../frontend/e2e/api.ts) records | [frontend/e2e/a11y.spec.ts](../frontend/e2e/a11y.spec.ts) |
+
+A component test that repeats what a page test of the same behaviour checks meets criterion (c) below.
+
+## Before adding a test
+
+- **Only logic gets a test**: state, data, permissions, validation, API contracts. A change to style, copy or layout gets none and is looked at instead. The browser floors are no exception to this: they check invariants of every screen rather than one change's look, and a new screen joins them as a row of [frontend/e2e/screens.ts](../frontend/e2e/screens.ts), not as a new test.
+- **Extend before adding.** Search first, by the unit's name, the text on screen or the error code, and extend the test that covers the behaviour, as a new row of its table where it has one. Every new test function costs every later run its time (Open WebUI's regression contract, outside the repository).
+- **The deletion criteria hold for a new test**: one that would meet any of (a)–(d) below is not written.
+- **The requirement wins.** A test that contradicts the issue or the spec it implements is reported, never changed to agree with the code.
+- **A new browser test passes five runs in a row**, `npx playwright test <file> --repeat-each=5` from `frontend/`, before it is committed; one failure in five is a failing test (Open WebUI's contract). Those five runs happen once, when the test is accepted, and never in the chain.
+
+## Time caps
+
+Every check says where it runs: the commit hooks of `.pre-commit-config.yaml`, the chain of [scripts/check.py](../scripts/check.py), CI only, or by hand. A browser suite runs only in the last two, so the local loop never waits for a browser. The caps are the commit hooks at 6 s for a commit, a pull request green within two minutes of its push with every job of the workflow included, and 15 billed CI minutes for a run. A check that would push a layer past its cap is paid for by removing another, or it is not added.
+
+Each CI job and step has a `timeout-minutes` about twice its measured median, rounded up to minutes, and a comment beside it giving the measurement: a suite that needs longer has grown a regression to look at, not to wait for. Guard: those `timeout-minutes`.
+
+## Coverage
+
+Coverage is a diagnostic signal, not a target (Dify's `web/docs/test.md`, outside the repository). `fail_under` in `pyproject.toml` is a floor that catches a large untested addition; it is never raised for its own sake, and no test is written to move it. The frontend's coverage, `npm run test:coverage --prefix frontend`, is read by hand and gates nothing. Guard: `fail_under`, for the floor.
+
+## The review at a milestone's end
+
+By hand, once at the end of each milestone, never in the chain:
+
+1. **pytest, per test.** `uv run pytest --cov --cov-context=test`, then `uv run coverage json --show-contexts -o htmlcov/contexts.json`. A test whose covered lines are all covered by another test is a candidate.
+2. **vitest, per file**, since vitest records no coverage per test. Run each test file alone, `npx vitest run <file> --coverage --coverage.reportsDirectory=coverage/<name>` from `frontend/`; a file whose covered lines another file covers is a candidate, and the tests inside one file are read for repeats.
+3. **The browser floors**: a test whose behaviour a lower layer can see is a candidate.
+4. **Triage.** Each candidate gets a verdict, delete, merge or keep, and the criterion of the next section or the layer rule above that decides it. Line coverage does not drop, or each line lost is explained, such as a line only a test asserting on its own mock ever ran.
+
+## Flaky tests
+
+A test that fails with no change to the code is a wrong test: it is fixed or deleted when it is seen, never retried, skipped or set aside in a quarantine. The browser suite runs with `retries: 0` ([frontend/playwright.config.ts](../frontend/playwright.config.ts)), since a retry reports a race as a pass; Open WebUI and Dify run their browser suites the same way, and Zulip treats a nondeterministic failure as an urgent bug (outside the repository). A browser test waits for what the page or the server states, through an assertion that retries by itself such as `toBeVisible`, never for a fixed time. Guard: `retries: 0`.
 
 ## When a test may be deleted
 
@@ -35,7 +80,7 @@ One overlap is kept on purpose: `tests/test_smoke.py::test_django_system_checks_
 
 ## Where a regression test goes
 
-A fix brings the test that was red before it, and the commit says it was. The test goes in the test file of the unit the fix protects, never in a file of its own: a new row of the parametrised table that covers the behaviour when there is one, with an `id` that names the input (`id="zero-width-space"`), otherwise a test named for the behaviour that broke. The issue number goes in the commit (`Closes #158`), not in the id or the name: a failure has to say what broke, criterion (d), and a number says only where to read about it.
+The fix of a logic defect brings the test that was red before it, and the commit says it was; a fix of style, copy or layout brings none (section "Before adding a test"). The test goes in the test file of the unit the fix protects, never in a file of its own: a new row of the parametrised table that covers the behaviour when there is one, with an `id` that names the input (`id="zero-width-space"`), otherwise a test named for the behaviour that broke. The issue number goes in the commit (`Closes #158`), not in the id or the name: a failure has to say what broke, criterion (d), and a number says only where to read about it.
 
 ## What a test may fake
 
