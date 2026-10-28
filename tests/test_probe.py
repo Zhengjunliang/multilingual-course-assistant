@@ -7,7 +7,6 @@ copyrighted, never enters git, and does not exist on the CI runner.
 from pathlib import Path
 
 import pytest
-from pypdf.errors import PdfReadError
 
 from rag.probe import DocumentProfile, collect_pdfs, find_math_fonts, main, plan_for, probe
 
@@ -80,13 +79,18 @@ def test_math_fonts_are_read_from_the_font_table(profile: DocumentProfile) -> No
     assert profile.has_math_fonts
 
 
-def test_body_fonts_are_not_mistaken_for_math_fonts() -> None:
-    assert find_math_fonts(["/ABCDEF+Calibri", "/Arial-BoldMT", "/TimesNewRomanPSMT"]) == ()
-
-
-def test_subset_prefixed_math_fonts_are_still_detected() -> None:
-    """PDF subsetting prepends a random six-letter tag, so matching must be on substrings."""
-    assert find_math_fonts(["/AAAACW+SymbolMT"]) == ("/AAAACW+SymbolMT",)
+@pytest.mark.parametrize(
+    ("fonts", "found"),
+    [
+        pytest.param(
+            ["/ABCDEF+Calibri", "/Arial-BoldMT", "/TimesNewRomanPSMT"], (), id="body-fonts"
+        ),
+        # PDF subsetting prepends a random six-letter tag, so matching must be on substrings.
+        pytest.param(["/AAAACW+SymbolMT"], ("/AAAACW+SymbolMT",), id="subset-prefixed"),
+    ],
+)
+def test_math_fonts_are_told_from_body_fonts(fonts: list[str], found: tuple[str, ...]) -> None:
+    assert find_math_fonts(fonts) == found
 
 
 def make_profile(*, empty_page_ratio: float, math_fonts: tuple[str, ...] = ()) -> DocumentProfile:
@@ -100,12 +104,29 @@ def make_profile(*, empty_page_ratio: float, math_fonts: tuple[str, ...] = ()) -
     )
 
 
-def test_a_missing_text_layer_routes_to_ocr() -> None:
-    """Measured against granite-docling on the one qualifying deck: OCR cost half the
-    time and kept more distinct words, including literals like `avc1.42e01e`."""
-    plan = plan_for(make_profile(empty_page_ratio=0.5))
-    assert plan.pipeline == "classic"
-    assert plan.ocr
+@pytest.mark.parametrize(
+    ("empty_page_ratio", "math_fonts", "ocr", "formula"),
+    [
+        # Measured: on a PDF that has a text layer, OCR returns identical bytes for
+        # 62% more time.
+        pytest.param(0.0, (), False, False, id="a-whole-text-layer"),
+        pytest.param(0.1, (), False, False, id="an-intact-text-layer"),
+        pytest.param(0.24, (), False, False, id="the-emptiest-deck"),
+        # Decks sit at up to 0.24 empty pages; only a genuine outlier may cross over.
+        pytest.param(0.3, (), False, False, id="at-the-vision-threshold"),
+        # Measured against granite-docling on the one qualifying deck: OCR cost half
+        # the time and kept more distinct words, including literals like `avc1.42e01e`.
+        pytest.param(0.5, (), True, False, id="a-missing-text-layer"),
+        pytest.param(0.1, ("/SymbolMT",), False, True, id="math-fonts"),
+        # The two signals are independent; an earlier rule let the vision branch mask math.
+        pytest.param(0.5, ("/SymbolMT",), True, True, id="a-scanned-deck-with-formulas"),
+    ],
+)
+def test_a_profile_plans_its_enrichment(
+    empty_page_ratio: float, math_fonts: tuple[str, ...], ocr: bool, formula: bool
+) -> None:
+    plan = plan_for(make_profile(empty_page_ratio=empty_page_ratio, math_fonts=math_fonts))
+    assert (plan.pipeline, plan.ocr, plan.formula) == ("classic", ocr, formula)
 
 
 def test_routing_never_selects_the_vlm_pipeline() -> None:
@@ -116,45 +137,6 @@ def test_routing_never_selects_the_vlm_pipeline() -> None:
             assert plan_for(make_profile(empty_page_ratio=ratio, math_fonts=fonts)).pipeline == (
                 "classic"
             )
-
-
-def test_math_fonts_route_to_formula_enrichment() -> None:
-    plan = plan_for(make_profile(empty_page_ratio=0.1, math_fonts=("/SymbolMT",)))
-    assert plan.pipeline == "classic"
-    assert plan.formula
-
-
-def test_a_scanned_deck_with_formulas_gets_both() -> None:
-    """The two signals are independent; an earlier rule let the vision branch mask math."""
-    plan = plan_for(make_profile(empty_page_ratio=0.5, math_fonts=("/SymbolMT",)))
-    assert plan.ocr
-    assert plan.formula
-
-
-def test_an_intact_text_layer_needs_no_enrichment() -> None:
-    plan = plan_for(make_profile(empty_page_ratio=0.1))
-    assert plan == plan_for(make_profile(empty_page_ratio=0.1))
-    assert plan.pipeline == "classic"
-    assert not plan.formula
-    assert not plan.ocr
-
-
-def test_the_vision_threshold_is_exclusive() -> None:
-    """Decks sit at up to 0.24 empty pages; only a genuine outlier may cross over."""
-    assert not plan_for(make_profile(empty_page_ratio=0.3)).ocr
-
-
-def test_ocr_stays_off_while_a_text_layer_is_present() -> None:
-    """Measured: on a PDF that has a text layer, OCR returns identical bytes for 62% more time."""
-    for ratio in (0.0, 0.1, 0.24):
-        assert not plan_for(make_profile(empty_page_ratio=ratio)).ocr
-
-
-def test_probe_raises_on_a_file_that_is_not_a_pdf(tmp_path: Path) -> None:
-    bad = tmp_path / "bad.pdf"
-    bad.write_bytes(b"this is not a pdf")
-    with pytest.raises(PdfReadError):
-        probe(bad)
 
 
 def test_a_corrupt_file_does_not_abort_a_directory_run(

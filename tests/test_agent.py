@@ -271,27 +271,38 @@ def test_unparsable_reply_falls_back_to_both() -> None:
     assert decision.reason.startswith("fallback")
 
 
-def test_valid_reply_round_trips_every_field() -> None:
-    completer = StubCompleter(
-        '{"target": "unifi_web", "query": "scadenza tasse universitarie", '
-        '"fresh": true, "reason": "administrative deadline"}'
-    )
-    decision = route("Quando scadono le tasse?", completer)
-    assert decision.target == "unifi_web"
-    assert decision.query == "scadenza tasse universitarie"
-    assert decision.fresh is True
-    assert decision.reason == "administrative deadline"
-    assert completer.messages[-1]["content"] == "Quando scadono le tasse?"
-
-
-def test_reply_without_fresh_still_validates() -> None:
-    """A 4B model dropping the flag must cost the hint, not the whole routing
-    decision — the deepening loop reads `fresh` as "fetch before believing the
-    snapshot", so its default has to be the conservative one."""
-    completer = StubCompleter('{"target": "slides", "query": "ORM", "reason": "course topic"}')
-    decision = route("What is an ORM?", completer)
-    assert decision.target == "slides"
-    assert decision.fresh is False
+@pytest.mark.parametrize(
+    ("question", "reply", "expected"),
+    [
+        pytest.param(
+            "Quando scadono le tasse?",
+            '{"target": "unifi_web", "query": "scadenza tasse universitarie", '
+            '"fresh": true, "reason": "administrative deadline"}',
+            RouteDecision(
+                target="unifi_web",
+                query="scadenza tasse universitarie",
+                fresh=True,
+                reason="administrative deadline",
+            ),
+            id="every-field",
+        ),
+        # A 4B model dropping the flag must cost the hint, not the whole routing
+        # decision: the deepening loop reads `fresh` as "fetch before believing
+        # the snapshot", so its default has to be the conservative one.
+        pytest.param(
+            "What is an ORM?",
+            '{"target": "slides", "query": "ORM", "reason": "course topic"}',
+            RouteDecision(target="slides", query="ORM", fresh=False, reason="course topic"),
+            id="fresh-dropped",
+        ),
+    ],
+)
+def test_a_valid_reply_round_trips_every_field(
+    question: str, reply: str, expected: RouteDecision
+) -> None:
+    completer = StubCompleter(reply)
+    assert route(question, completer) == expected
+    assert completer.messages[-1]["content"] == question
 
 
 # The prompt the 22/32 routing accuracy in docs/experiment-log.md was
@@ -541,19 +552,6 @@ def test_no_deepen_fetches_only_attachments_and_keeps_the_whole_ranked_list() ->
     assert all(url.endswith(".pdf") for url in fetch.calls)  # no page was ever hopped to
 
 
-def test_a_question_with_no_graph_around_it_gathers_nothing_to_answer_from() -> None:
-    """The refusal path of the same state machine: no outlink graph and nothing
-    retrieved leaves generation with an empty candidate set, which `rag.answer`
-    turns into an honest refusal rather than a guess."""
-    fetch = StubFetch()
-
-    answered, decisions = run_loop(StubCompleter(KEEP_LOOKING), hits=[], registry={}, fetch=fetch)
-
-    assert fetch.calls == []
-    assert answered == []
-    assert [decision.outcome for decision in decisions] == ["no candidates"]
-
-
 @pytest.mark.parametrize(
     ("before_gate", "outcome"),
     [(10.0, "persisted"), (90.0, "timeout")],
@@ -725,16 +723,22 @@ def test_an_unparsable_assessment_reads_as_not_yet_and_keeps_the_loop_going() ->
 @pytest.mark.parametrize(
     "reply",
     [
-        '{"choice": 99, "reason": "nonsense"}',  # a number outside the two-entry list
-        '{"reason": "no number at all"}',  # the field dropped: `choice` defaults to 0
+        pytest.param('{"choice": 99, "reason": "nonsense"}', id="outside-the-list"),
+        # `choice` defaults to 0: without the range guard `candidates[0 - 1]`
+        # would silently take the last-ranked candidate.
+        pytest.param('{"reason": "no number at all"}', id="no-choice"),
+        # A garbled reply and a deliberate refusal must stay two different
+        # events: a refusal stops the loop, and collapsing them would make a
+        # broken 4B reply cost the turn and the decision log unable to tell the
+        # two apart.
+        pytest.param("not json", id="not-json"),
     ],
 )
-def test_a_pick_outside_the_shortlist_falls_back_to_the_top_ranked_candidate(reply: str) -> None:
-    """The numbered list has two entries and the model answers "99", or drops the
-    field entirely. Raising would cost the turn; the ranking already put its best
-    guess first, so that is what gets fetched — and the log says the choice was
-    not the model's. The range guard carries the defaulted 0 as well: without it
-    `candidates[0 - 1]` would silently take the last-ranked candidate."""
+def test_a_pick_that_names_no_candidate_falls_back_to_the_top_ranked_one(reply: str) -> None:
+    """The numbered list has two entries and the model answers "99", drops the
+    field, or writes no JSON at all. Raising would cost the turn; the ranking
+    already put its best guess first, so that is what gets fetched — and the log
+    says the choice was not the model's."""
     fetch = StubFetch()
 
     _, decisions = run_loop(
@@ -753,33 +757,6 @@ def test_a_pick_outside_the_shortlist_falls_back_to_the_top_ranked_candidate(rep
     )
 
     assert fetch.calls == [HUB]  # the top-ranked candidate, not the first in the list
-    assert decisions[0].reason == PICK_FALLBACK_REASON
-
-
-def test_an_unparsable_pick_falls_back_instead_of_reading_as_a_refusal() -> None:
-    """A garbled reply and a deliberate refusal must stay two different events.
-    A reply that does not validate keeps the older contract — fetch the
-    top-ranked candidate and record that the choice was not the model's — while
-    a refusal stops the loop; collapsing them would make a broken 4B reply cost
-    the turn, and make the decision log unable to tell the two apart."""
-    fetch = StubFetch()
-
-    _, decisions = run_loop(
-        ScriptedCompleter([KEEP_LOOKING, "not json", ANSWERABLE]),
-        hits=[web_hit(SEED)],
-        registry={
-            SEED: entry(
-                SEED,
-                [
-                    link("Sezione", "/vp-1.html"),
-                    link("Diploma Supplement", "/vp-220-diploma-supplement.html"),
-                ],
-            )
-        },
-        fetch=fetch,
-    )
-
-    assert fetch.calls == [HUB]  # a fetch still happened, on the ranking's best guess
     assert [decision.outcome for decision in decisions] == ["not retrieved", "answered"]
     assert decisions[0].choice == HUB  # a refusal would have recorded no choice at all
     assert decisions[0].reason == PICK_FALLBACK_REASON

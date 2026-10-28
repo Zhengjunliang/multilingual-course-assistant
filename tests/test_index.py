@@ -219,21 +219,23 @@ def hashes_by_source(client: QdrantClient) -> dict[str, set[str]]:
     return result
 
 
-def test_web_reingest_leaves_no_stale_version_of_the_same_source(client: QdrantClient) -> None:
-    """Same URL, same source, new content: the old version's hash must be gone
-    (a count-based check would pass even while stale chunks survive)."""
+@pytest.mark.parametrize(
+    ("source", "kept"),
+    [
+        # Same source, new content: the old version's hash must be gone (a
+        # count-based check would pass even while stale chunks survive).
+        pytest.param("crawl", {"crawl": {"bb" * 32}}, id="same-source"),
+        # Crawl then live: both versions coexist and the crawl hash is unchanged,
+        # the eval-isolation rule (docs/architecture.md) on the write path.
+        pytest.param("live", {"crawl": {"aa" * 32}, "live": {"bb" * 32}}, id="live-beside-crawl"),
+    ],
+)
+def test_reingesting_a_page_replaces_only_its_own_source_version(
+    client: QdrantClient, source: str, kept: dict[str, set[str]]
+) -> None:
     index_chunks(client, [make_web_chunk("aa" * 32, "crawl")], StubDense(), StubSparse())
-    index_chunks(client, [make_web_chunk("bb" * 32, "crawl")], StubDense(), StubSparse())
-    assert hashes_by_source(client) == {"crawl": {"bb" * 32}}
-
-
-def test_live_ingest_never_touches_the_crawl_snapshot_version(client: QdrantClient) -> None:
-    """Same URL ingested as crawl then as live: both versions coexist and the
-    crawl hash is unchanged — the eval-isolation rule (docs/architecture.md) on the
-    write path."""
-    index_chunks(client, [make_web_chunk("aa" * 32, "crawl")], StubDense(), StubSparse())
-    index_chunks(client, [make_web_chunk("cc" * 32, "live")], StubDense(), StubSparse())
-    assert hashes_by_source(client) == {"crawl": {"aa" * 32}, "live": {"cc" * 32}}
+    index_chunks(client, [make_web_chunk("bb" * 32, source)], StubDense(), StubSparse())
+    assert hashes_by_source(client) == kept
 
 
 def make_run_chunk(content_hash: str, source: str, run_id: str, url: str) -> Chunk:

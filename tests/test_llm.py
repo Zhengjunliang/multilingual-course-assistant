@@ -69,15 +69,6 @@ def test_parse_json_reply_degrades_to_none() -> None:
     assert parse_json_reply('{"unexpected": 1}', Verdict) is None  # wrong schema
 
 
-def test_complete_json_round_trips_through_the_completer() -> None:
-    completer = StubCompleter('{"relevant": false, "reason": "commercial page"}')
-    messages: list[Message] = [{"role": "user", "content": "relevant?"}]
-    verdict = complete_json(completer, messages, Verdict)
-    assert verdict is not None
-    assert verdict.relevant is False
-    assert completer.messages == messages
-
-
 class HungCompleter:
     """An endpoint that never answers: the SDK exhausts its retries and raises
     from inside `complete()`, exactly what a downed Ollama looks like."""

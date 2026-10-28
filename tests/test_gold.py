@@ -283,46 +283,40 @@ def record_search_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, objec
     return calls
 
 
-def test_cli_pins_retrieval_to_the_crawl_snapshot_by_default(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    ("flags", "pinned"),
+    [
+        # A live increment written between two runs must never move a gate
+        # number (the eval-isolation rule, docs/architecture.md).
+        pytest.param([], ("crawl", None), id="the-crawl-snapshot-by-default"),
+        # Autogrow acceptance opens the filter explicitly, and `--snapshot`
+        # narrows to one ingest run; both reach `search` unchanged.
+        pytest.param(
+            ["--snapshot", "run-x", "--ingest-source", "live"], ("live", "run-x"), id="as-told"
+        ),
+        # The rule's explicit release for the acceptance run: the condition is
+        # dropped rather than pointed at "live", because a question may be
+        # answered by either version of a page and the exam scores what the
+        # assistant can actually retrieve.
+        pytest.param(["--live", "on"], (None, None), id="live-on-drops-it"),
+    ],
+)
+def test_cli_reads_the_crawl_snapshot_unless_told_otherwise(
+    flags: list[str],
+    pinned: tuple[str | None, str | None],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Eval reads the frozen crawl snapshot unless told otherwise: a live
-    increment written between two runs must never move a gate number (the eval-isolation
-    rule, docs/architecture.md)."""
     calls = record_search_calls(monkeypatch)
     gold_file = tmp_path / "campus.jsonl"
     gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
 
-    main([str(gold_file), "--qdrant", str(tmp_path / "qdrant"), "--no-rerank"])
+    main([str(gold_file), "--qdrant", str(tmp_path / "qdrant"), "--no-rerank", *flags])
     capsys.readouterr()
-    assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [("crawl", None)]
+    assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [pinned]
     # The edition is pinned the same way, so a switch cannot move a gate number.
     assert [call["scope"] for call in calls] == [EVAL_SCOPE]
-
-
-def test_cli_forwards_snapshot_and_ingest_source_to_search(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Autogrow acceptance opens the filter explicitly, and `--snapshot` narrows
-    to one ingest run; both reach `search` unchanged."""
-    calls = record_search_calls(monkeypatch)
-    gold_file = tmp_path / "campus.jsonl"
-    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
-
-    main(
-        [
-            str(gold_file),
-            "--qdrant",
-            str(tmp_path / "qdrant"),
-            "--no-rerank",
-            "--snapshot",
-            "run-x",
-            "--ingest-source",
-            "live",
-        ]
-    )
-    capsys.readouterr()
-    assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [("live", "run-x")]
 
 
 @pytest.fixture
@@ -382,24 +376,6 @@ def test_live_off_keeps_the_crawl_filter_and_never_touches_the_live_module(
     main([str(gold_file), "--qdrant", str(tmp_path / "qdrant"), "--no-rerank", "--live", "off"])
     capsys.readouterr()
     assert [call["ingest_source"] for call in calls] == ["crawl"]
-
-
-def test_live_on_opens_the_read_side_filter(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """The eval-isolation rule's explicit release (docs/architecture.md) for the
-    acceptance run: the condition is dropped rather than pointed at "live",
-    because a question may be answered by either
-    version of a page and the exam scores what the assistant can actually
-    retrieve. The filter still travels through `search()`'s prefetch branches —
-    a top-level filter is silently ignored under fusion."""
-    calls = record_search_calls(monkeypatch)
-    gold_file = tmp_path / "autogrow.jsonl"
-    gold_file.write_text(make_campus_question().model_dump_json() + "\n", encoding="utf-8")
-
-    main([str(gold_file), "--qdrant", str(tmp_path / "qdrant"), "--no-rerank", "--live", "on"])
-    capsys.readouterr()
-    assert [(call["ingest_source"], call["ingest_run_id"]) for call in calls] == [(None, None)]
 
 
 def test_live_on_says_which_ingest_source_it_overrode(
