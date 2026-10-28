@@ -8,7 +8,7 @@
     "registerTitle": "注册账号",
     "username": "用户名",
     "password": "密码",
-    "passwordHint": "至少 8 个字符。",
+    "passwordHint": "至少 15 个字符。几个词连在一起就好记。",
     "showPassword": "显示密码",
     "capsLock": "大写锁定已打开",
     "logIn": "登录",
