@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Account } from "@/api/account";
 import { type ManagedUser, USER_PAGE_SIZE } from "@/api/admin";
+import type { Invitation } from "@/api/catalog";
 import type { ErrorCode } from "@/api/errors";
 import { SessionContext } from "@/auth/SessionProvider";
 import { Toaster } from "@/components/ui/sonner";
@@ -70,6 +71,45 @@ let asked: string[] = [];
 /** What the server answers the next request to `METHOD path`, in place of doing it. */
 let refusals: Record<string, ErrorCode> = {};
 
+/** A date and time as the page prints it, in the zone the test runs in. */
+function printed(at: string): string {
+  return new Intl.DateTimeFormat("it", { dateStyle: "medium", timeStyle: "short" }).format(
+    new Date(at),
+  );
+}
+
+const LATER = printed("2099-01-01T00:00:00Z");
+const EARLIER = printed("2026-10-01T09:30:00Z");
+
+/** Every scope's invitations: a teacher's still good, and secretariat staff's expired. */
+const INVITED: Invitation[] = [
+  {
+    id: 7,
+    role: "teacher",
+    edition: {
+      id: 5,
+      course: { code: "B028451", name: "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE", locale: "it" },
+      academic_year: "2025-2026",
+    },
+    programme: null,
+    created_by: "demo-secretariat",
+    created_at: "2026-10-27T09:30:00Z",
+    expires_at: "2099-01-01T00:00:00Z",
+  },
+  {
+    id: 8,
+    role: "secretariat",
+    edition: null,
+    programme: { code: "B047", name: "INGEGNERIA INFORMATICA", locale: "it" },
+    created_by: "demo-admin",
+    created_at: "2026-10-01T09:30:00Z",
+    expires_at: "2026-10-04T09:30:00Z",
+  },
+];
+
+/** The invitations the server holds now. */
+let invited: Invitation[] = [];
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -106,6 +146,14 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return codedRefusal(refusal);
   }
   if (key === "GET /api/admin/users") return listed(url);
+  if (key === "GET /api/catalog/invitations") return json(invited);
+  const revoked = /^\/api\/catalog\/(?:editions|programmes)\/\w+\/invitations\/(\d+)$/.exec(
+    url.pathname,
+  );
+  if (method === "DELETE" && revoked !== null) {
+    invited = invited.filter((each) => each.id !== Number(revoked[1]));
+    return new Response(null, { status: 204 });
+  }
   const [, id, action] = /^\/api\/admin\/users\/(\d+)(?:\/(.+))?$/.exec(url.pathname) ?? [];
   const target = accounts.find((each) => each.id === Number(id));
   if (target === undefined) return codedRefusal("NOT_FOUND");
@@ -171,13 +219,21 @@ function value(cell: Element | undefined): Element | null {
 
 /** What an element says, its parts apart: "demo-admin tu", not "demo-admintu". */
 function words(element: Element): string {
-  const parts = [...element.children];
-  return parts.length === 0 ? (element.textContent ?? "") : parts.map(words).join(" ");
+  if (element.children.length === 0) return element.textContent ?? "";
+  return [...element.childNodes]
+    .map((node) => (node instanceof Element ? words(node) : (node.textContent ?? "").trim()))
+    .filter((part) => part !== "")
+    .join(" ");
+}
+
+/** The rows of the accounts' tab, the first. */
+function accountRows(container: HTMLElement) {
+  return [...(container.querySelector('[role="tabpanel"]')?.querySelectorAll("tbody tr") ?? [])];
 }
 
 /** Each row as the reader sees it: its cells, each a line per part, and whether it has a menu. */
 function rows(container: HTMLElement) {
-  return [...container.querySelectorAll("tbody tr")].map((row) => ({
+  return accountRows(container).map((row) => ({
     cells: [...row.querySelectorAll("td")].slice(0, 4).map((cell) => {
       const shown = value(cell);
       if (shown === null) return [];
@@ -193,9 +249,7 @@ function stateOf(container: HTMLElement, username: string) {
 }
 
 function row(container: HTMLElement, username: string) {
-  return [...container.querySelectorAll("tbody tr")].find((each) =>
-    each.textContent?.includes(username),
-  );
+  return accountRows(container).find((each) => each.textContent?.includes(username));
 }
 
 /** Opens the row's menu: Radix opens it on pointerdown (components/AccountMenu.test.tsx). */
@@ -253,6 +307,7 @@ beforeEach(() => {
   accounts = [ROOT, TEACHER, GONE, STUDENT].map((each) => structuredClone(each));
   asked = [];
   refusals = {};
+  invited = [...INVITED];
   vi.stubGlobal("fetch", fakeApi);
 });
 
@@ -479,6 +534,67 @@ describe("a change to an account", () => {
     expect(seen).toEqual({
       reads: ["GET /api/admin/users", "GET /api/admin/users?page=2", "GET /api/admin/users"],
       page: undefined,
+    });
+  });
+});
+
+describe("every scope's invitations", () => {
+  /** The rows of the invitations' tab: each cell's text, and where the scope leads. */
+  function invitationRows(container: HTMLElement) {
+    const panel = container.querySelectorAll('[role="tabpanel"]')[1];
+    return [...(panel?.querySelectorAll("tbody tr") ?? [])].map((each) => ({
+      cells: [...each.querySelectorAll("td")].slice(0, 3).map((cell) => {
+        const shown = value(cell);
+        return shown === null ? "" : words(shown);
+      }),
+      to: each.querySelector("a")?.getAttribute("href"),
+    }));
+  }
+
+  it("names each one's role and scope, who made it and when, and when it stops working", async () => {
+    const { container, unmount } = await page();
+    const seen = {
+      tab: [...container.querySelectorAll('[role="tab"]')].map((tab) => words(tab)),
+      rows: invitationRows(container),
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      tab: ["Account 4", "Inviti in sospeso 2"],
+      rows: [
+        {
+          cells: [
+            "Docente PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026",
+            `demo-secretariat ${LAST}`,
+            LATER,
+          ],
+          to: "/staff/editions/5",
+        },
+        {
+          cells: ["Segreteria INGEGNERIA INFORMATICA", `demo-admin ${EARLIER}`, "Scaduto"],
+          to: "/staff/programmes/B047",
+        },
+      ],
+    });
+  });
+
+  it("revokes one under its own scope, after asking, and reads the list again", async () => {
+    const { container, unmount } = await page();
+    const panel = container.querySelectorAll('[role="tabpanel"]')[1];
+    const revoke = panel?.querySelectorAll<HTMLButtonElement>("[data-revoke-invitation]")[1];
+    act(() => revoke?.click());
+    await confirm("Revoca");
+    const seen = {
+      sent: asked.filter((each) => each.startsWith("DELETE")),
+      reads: asked.filter((each) => each === "GET /api/catalog/invitations").length,
+      rows: invitationRows(container).map((each) => each.to),
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      sent: ["DELETE /api/catalog/programmes/B047/invitations/8"],
+      reads: 2,
+      rows: ["/staff/editions/5"],
     });
   });
 });

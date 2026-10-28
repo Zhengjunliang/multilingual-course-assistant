@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { routes } from "@/App";
 import type { Account } from "@/api/account";
-import type { Course, Edition, Programme, StudyPlanCourse } from "@/api/catalog";
+import type { Course, Edition, Invitation, Programme, StudyPlanCourse } from "@/api/catalog";
 import type { ConversationSummary } from "@/api/conversations";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
@@ -178,6 +178,50 @@ let held: Promise<void> | null = null;
 let lost = false;
 /** PPM's editions older than EDITIONS, which a case adds to the list. */
 let earlier: Edition[] = [];
+/** The invitations not accepted yet, of every scope. */
+let invitations: Invitation[] = [];
+/** Whether the next invitation revoked was accepted elsewhere first, and is gone. */
+let acceptedElsewhere = false;
+
+/** An invitation to `scope` (`editions/5`, `programmes/B047`), made by `by`. */
+function invitation(id: number, scope: string, by: string): Invitation {
+  const edition = scope === "editions/5";
+  return {
+    id,
+    role: edition ? "teacher" : "secretariat",
+    edition: edition
+      ? {
+          id: 5,
+          course: { code: PPM.code, name: PPM.name, locale: "it" },
+          academic_year: "2025-2026",
+        }
+      : null,
+    programme: edition ? null : NAME_B047,
+    created_by: by,
+    created_at: "2026-10-28T10:00:00Z",
+    expires_at: "2099-01-01T00:00:00Z",
+  };
+}
+
+/** A scope's invitations, as the server keeps them (apps/catalog/invitation_views.py). */
+function invitationsAt(method: string, scope: string, id: string | undefined): Response {
+  const at = (each: Invitation) =>
+    (each.edition === null
+      ? `programmes/${each.programme?.code}`
+      : `editions/${each.edition.id}`) === scope;
+  if (method === "POST") {
+    const made = invitation(100 + invitations.length, scope, reader?.username ?? "");
+    invitations.push(made);
+    return json({ ...made, token: "tok-en_9" }, 201);
+  }
+  if (method === "DELETE") {
+    const known = invitations.some((each) => each.id === Number(id));
+    invitations = invitations.filter((each) => each.id !== Number(id));
+    if (!known || acceptedElsewhere) return codedRefusal("NOT_FOUND");
+    return new Response(null, { status: 204 });
+  }
+  return json(invitations.filter(at));
+}
 
 /** An edition as the server would answer it now. */
 function served(e: Edition): Edition {
@@ -244,6 +288,10 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     conversations = conversations.filter((listed) => listed.id !== id);
     return new Response(null, { status: 204 });
   }
+  const invited = /^\/api\/catalog\/(editions\/\d+|programmes\/\w+)\/invitations(?:\/(\d+))?$/.exec(
+    path,
+  );
+  if (invited !== null) return invitationsAt(method, invited[1] ?? "", invited[2]);
   if (path === "/api/catalog/programmes") {
     if (failures > 0) {
       failures -= 1;
@@ -403,6 +451,8 @@ beforeEach(() => {
   held = null;
   lost = false;
   earlier = [];
+  invitations = [];
+  acceptedElsewhere = false;
   // Each test is a tab of its own: no row noted by another (features/staff/openedRow.ts).
   sessionStorage.clear();
   vi.stubGlobal("fetch", fakeApi);
@@ -1174,6 +1224,128 @@ describe("a write from a page", () => {
       toast: true,
       focused: "Assegna segreteria",
       again: false,
+    });
+  });
+});
+
+describe("invitations on a scope's page", () => {
+  it.each([
+    {
+      at: "/staff/editions/5",
+      who: SECRETARIAT,
+      tab: "Docenti",
+      button: "Invita docente",
+      scope: "editions/5",
+      object: "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026",
+    },
+    {
+      at: "/staff/programmes/B047",
+      who: ADMIN,
+      tab: "Segreteria didattica",
+      button: "Invita in segreteria",
+      scope: "programmes/B047",
+      object: "INGEGNERIA INFORMATICA · B047",
+    },
+  ])("$button makes a link shown once, then listed under the staff", async (row) => {
+    reader = row.who;
+    const { container, unmount } = page(row.at);
+    await settle();
+    showTab(container, row.tab);
+    const button = container.querySelector<HTMLButtonElement>("main [data-invite]");
+    act(() => {
+      button?.focus();
+      button?.click();
+    });
+    await settle();
+    const dialog = document.body.querySelector('[role="dialog"]');
+    const shown = {
+      label: text(button),
+      object: dialog?.querySelector("p")?.textContent,
+      link: dialog?.querySelector<HTMLInputElement>("input")?.value,
+    };
+    const done = [...(dialog?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find(
+      (candidate) => candidate.textContent === "Fatto",
+    );
+    act(() => done?.click());
+    await settle();
+    const section = [...container.querySelectorAll("main section")].find(
+      (candidate) => candidate.querySelector("h2")?.textContent === "Inviti in sospeso",
+    );
+    const seen = {
+      ...shown,
+      sent: asked.filter((each) => each.startsWith("POST /api/catalog")),
+      listed: text(section?.querySelector("h2")?.parentElement),
+      by: section?.querySelector("tbody td span")?.textContent,
+      focused: document.activeElement === button,
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      label: row.button,
+      object: row.object,
+      link: `${window.location.origin}/invite#tok-en_9`,
+      sent: [`POST /api/catalog/${row.scope}/invitations`],
+      listed: "Inviti in sospeso1",
+      by: row.who.username,
+      focused: true,
+    });
+  });
+
+  it("is offered to no one who may not grant the role, who asks for no invitations", async () => {
+    reader = TEACHER;
+    invitations = [invitation(1, "editions/5", "demo-secretariat")];
+    const { container, unmount } = page("/staff/editions/5");
+    await settle();
+    const seen = {
+      invite: container.querySelector("main [data-invite]"),
+      asked: asked.filter((each) => each.includes("/invitations")),
+      listed: (container.textContent ?? "").includes("Inviti in sospeso"),
+    };
+    unmount();
+
+    expect(seen).toEqual({ invite: null, asked: [], listed: false });
+  });
+
+  it.each([
+    { case: "revoked", elsewhere: false, toast: "Invito revocato", reads: 1 },
+    // An invitation accepted is a new teacher: the page reads again.
+    {
+      case: "accepted elsewhere first",
+      elsewhere: true,
+      toast: "L'invito non c'era più: era già stato accettato o revocato altrove.",
+      reads: 2,
+    },
+  ])("asks before revoking one, and lists it no more: $case", async (row) => {
+    reader = SECRETARIAT;
+    invitations = [invitation(1, "editions/5", "demo-colleague")];
+    acceptedElsewhere = row.elsewhere;
+    const { container, unmount } = page("/staff/editions/5");
+    await settle();
+    act(() => container.querySelector<HTMLButtonElement>("main [data-revoke-invitation]")?.click());
+    const question = document.body.querySelector('[role="alertdialog"]');
+    const asks = question?.querySelector("p")?.textContent;
+    const confirm = [...(question?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find(
+      (candidate) => candidate.textContent === "Revoca",
+    );
+    act(() => confirm?.click());
+    await settle();
+    const seen = {
+      asks,
+      sent: asked.filter((each) => each.startsWith("DELETE")),
+      listed: (container.textContent ?? "").includes("Inviti in sospeso"),
+      toast: (document.body.textContent ?? "").includes(row.toast),
+      reads: asked.filter((each) => each === "GET /api/catalog/editions/5").length,
+      focused: document.activeElement === container.querySelector("main [data-invite]"),
+    };
+    unmount();
+
+    expect(seen).toEqual({
+      asks: expect.stringContaining("demo-colleague"),
+      sent: ["DELETE /api/catalog/editions/5/invitations/1"],
+      listed: false,
+      toast: true,
+      reads: row.reads,
+      focused: true,
     });
   });
 });

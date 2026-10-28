@@ -507,7 +507,8 @@
       "link": {
         "action": "密码链接",
         "title": "密码链接"
-      }
+      },
+      "views": "账号视图"
     },
     "link": {
       "label": "链接",
@@ -515,6 +516,26 @@
       "copied": "已复制",
       "done": "完成",
       "once": "只能用一次，有效期至 {{date}}。它不会再次显示：现在复制并亲手交给对方。"
+    },
+    "invitations": {
+      "title": "待接受的邀请",
+      "teacher": "邀请老师",
+      "secretariat": "邀请加入秘书处",
+      "link": "邀请链接",
+      "for": "用于",
+      "by": "创建者",
+      "expires": "到期",
+      "expired": "已过期",
+      "none": "没有待接受的邀请。",
+      "gone": "这个邀请已经不在了：它已在别处被接受或撤销。",
+      "failed": "邀请未创建",
+      "revoke": {
+        "action": "撤销",
+        "label": "撤销 {{username}} 于 {{date}} 创建的邀请",
+        "title": "撤销这个邀请？",
+        "body": "<person>{{username}}</person> 于 {{date}} 创建的链接将失效。",
+        "done": "邀请已撤销"
+      }
     },
     "retry": "重试",
     "failure": {

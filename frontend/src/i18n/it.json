@@ -507,7 +507,8 @@
       "link": {
         "action": "Link per la password",
         "title": "Link per la password"
-      }
+      },
+      "views": "Viste degli account"
     },
     "link": {
       "label": "Link",
@@ -515,6 +516,26 @@
       "copied": "Copiato",
       "done": "Fatto",
       "once": "Vale una volta, fino al {{date}}. Non verrà mostrato di nuovo: copialo ora e consegnalo a mano."
+    },
+    "invitations": {
+      "title": "Inviti in sospeso",
+      "teacher": "Invita docente",
+      "secretariat": "Invita in segreteria",
+      "link": "Link d'invito",
+      "for": "Per",
+      "by": "Creato da",
+      "expires": "Scade",
+      "expired": "Scaduto",
+      "none": "Nessun invito in sospeso.",
+      "gone": "L'invito non c'era più: era già stato accettato o revocato altrove.",
+      "failed": "Invito non creato",
+      "revoke": {
+        "action": "Revoca",
+        "label": "Revoca l'invito di {{username}} del {{date}}",
+        "title": "Revocare l'invito?",
+        "body": "Il link creato da <person>{{username}}</person> il {{date}} smette di funzionare.",
+        "done": "Invito revocato"
+      }
     },
     "retry": "Riprova",
     "failure": {
