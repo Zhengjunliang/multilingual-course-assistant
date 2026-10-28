@@ -104,7 +104,7 @@ Every error of an `/api/` path answers one body, built by `api_exception_handler
 ```json
 {"error": {"code": "INVALID_ARGUMENT", "message": "The request has fields that were rejected.",
            "data": {},
-           "fields": [{"field": "password", "reason": "TOO_SHORT", "data": {"min_length": 8}}],
+           "fields": [{"field": "password", "reason": "TOO_SHORT", "data": {"min_length": 15}}],
            "request_id": "4bf92f3577b34da6a3ce929d0e0e4736"}}
 ```
 
@@ -142,12 +142,12 @@ Every error of an `/api/` path answers one body, built by `api_exception_handler
 | ------ | ----- | ------ |
 | `REQUIRED` | missing, blank or null | |
 | `INVALID` | not a value the field takes, or a code no reason names | |
-| `TOO_LONG` | longer than the field takes | `max_length` |
+| `TOO_LONG` | longer than the field takes, a password included | `max_length` |
 | `TOO_SHORT` | shorter than the field takes, a password included | `min_length` |
 | `TOO_SMALL` | below the field's least value | `min_value` |
 | `TOO_LARGE` | above the field's greatest value | `max_value` |
 | `ALREADY_EXISTS` | another row holds the value: a username, a book's title in its edition | |
 | `NO_SUCH_USER` | no account has the username | |
 | `TOO_COMMON` | a password on Django's list of common ones | |
-| `ENTIRELY_NUMERIC` | a password of digits only | |
+| `BREACHED` | a password Pwned Passwords holds as seen in a breach (outside the repository) | |
 | `TOO_SIMILAR` | a password too close to the account's username or name | |

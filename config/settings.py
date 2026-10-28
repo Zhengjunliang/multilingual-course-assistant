@@ -198,18 +198,34 @@ QA_RETRIEVAL = "apps.qa.engine.build_retrieval"
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
+# Length and a blocklist, and no rule on what a password is made of: NIST SP
+# 800-63B-4 §3.1.1.2 and ASVS 6.2.5 forbid composition rules, which is why
+# Django's NumericPasswordValidator is not here. 15 characters because a
+# password is the only factor here (NIST: "SHALL ... a minimum of 15" for a
+# single-factor password; ASVS 6.2.1 recommends 15). 128 at most: ASVS 6.2.9
+# asks that 64 be allowed, and a bound keeps the cost of hashing what a caller
+# sends under control; LibreChat stops at 128 too (outside the repository). The
+# breached-password check (ASVS 6.2.12) sends Pwned Passwords the first five
+# characters of the password's SHA-1, never the password, and falls back to
+# Django's common-password list when that service cannot be reached; the
+# common list stays as well, since it costs no request.
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 15},
+    },
+    {
+        "NAME": "apps.accounts.validators.MaximumLengthValidator",
+        "OPTIONS": {"max_length": 128},
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+        "NAME": "pwned_passwords_django.validators.PwnedPasswordsValidator",
     },
 ]
 

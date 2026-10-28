@@ -1,14 +1,18 @@
 """The site the browser journeys run against (frontend/playwright.journeys.config.ts):
 config/settings.py with the retrieval swapped for stubs, a database of its own,
-and rate limits a whole suite from one address fits under.
+rate limits a whole suite from one address fits under, and no request to
+Pwned Passwords.
 
 The limits themselves are tested where they are cheap to drive,
 tests/test_accounts_api.py and tests/test_qa_api.py; here they would only turn a
-setup that logs in twice and a run repeated five times into 429s.
+setup that logs in twice and a run repeated five times into 429s. The
+breached-password check is tested there too, against a fake range
+(tests/conftest.py); here every registration and the demo's seeding would send
+it out of the machine.
 """
 
 from config.settings import *  # noqa: F403
-from config.settings import DATABASES, REST_FRAMEWORK
+from config.settings import AUTH_PASSWORD_VALIDATORS, DATABASES, REST_FRAMEWORK
 
 QA_RETRIEVAL = "tests.journeys.retrieval.build_retrieval"
 
@@ -20,3 +24,9 @@ REST_FRAMEWORK = {
     **REST_FRAMEWORK,
     "DEFAULT_THROTTLE_RATES": {"ask": "1000/min", "auth": "1000/min"},
 }
+
+AUTH_PASSWORD_VALIDATORS = [
+    validator
+    for validator in AUTH_PASSWORD_VALIDATORS
+    if not validator["NAME"].startswith("pwned_passwords_django.")
+]

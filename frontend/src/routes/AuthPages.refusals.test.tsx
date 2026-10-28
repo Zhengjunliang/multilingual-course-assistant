@@ -106,9 +106,10 @@ const CASES: Case[] = [
   },
   onField("username", "ALREADY_EXISTS", "errors.field.username.ALREADY_EXISTS"),
   onField("username", "INVALID", "errors.field.username.INVALID"),
-  onField("password", "TOO_SHORT", "errors.field.TOO_SHORT", { min_length: 8 }),
+  onField("password", "TOO_SHORT", "errors.field.TOO_SHORT", { min_length: 15 }),
+  onField("password", "TOO_LONG", "errors.field.TOO_LONG", { max_length: 128 }),
   onField("password", "TOO_COMMON", "errors.field.TOO_COMMON"),
-  onField("password", "ENTIRELY_NUMERIC", "errors.field.ENTIRELY_NUMERIC"),
+  onField("password", "BREACHED", "errors.field.BREACHED"),
   onField("password", "TOO_SIMILAR", "errors.field.TOO_SIMILAR"),
 ];
 

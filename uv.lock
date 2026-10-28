@@ -969,6 +969,7 @@ dependencies = [
     { name = "onnxruntime" },
     { name = "openai" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "pwned-passwords-django" },
     { name = "py-rust-stemmers" },
     { name = "pydantic-settings" },
     { name = "pypdf" },
@@ -1012,6 +1013,7 @@ requires-dist = [
     { name = "onnxruntime", specifier = "==1.28.0" },
     { name = "openai", specifier = ">=2.53.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
+    { name = "pwned-passwords-django", specifier = ">=5.2.0" },
     { name = "py-rust-stemmers", specifier = "==0.1.8" },
     { name = "pydantic-settings", specifier = ">=2" },
     { name = "pypdf", specifier = ">=6.21.2" },
@@ -1367,6 +1369,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ca/c6/32b0835dbc2122617902b649d76a91c1e75406e76bf3d595b0c3bb5ffad6/psycopg_binary-3.3.4-cp312-cp312-musllinux_1_2_riscv64.whl", hash = "sha256:773d573e11f437ce0bdb95b7c18dc58390494f96d43f8b45b9760436114f7652", size = 3926197, upload-time = "2026-05-01T23:28:55.55Z" },
     { url = "https://files.pythonhosted.org/packages/cd/68/d190ef0c0c5b16ded07831dabc8ddd412f4cdab07ec6e30ed38d9bda0e1f/psycopg_binary-3.3.4-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:71e55ccbdfae79a2ed9c6369c3008a3025817ff9d7e27b32a2d84e2a4267e66e", size = 4236627, upload-time = "2026-05-01T23:29:05.336Z" },
     { url = "https://files.pythonhosted.org/packages/25/8f/81dcbc2e8454b74d14881275ea45f00791052dac531a9fa8be1730d1685b/psycopg_binary-3.3.4-cp312-cp312-win_amd64.whl", hash = "sha256:494ca54901be8cf9eb7e02c25b731f2317c378efa44f43e8f9bd0e1184ae7be4", size = 3560782, upload-time = "2026-05-01T23:29:11.967Z" },
+]
+
+[[package]]
+name = "pwned-passwords-django"
+version = "5.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ae/f5/242f5ceb391832d284c815135f99872ad2f109aaa8b398bcf9cbe3665bd6/pwned_passwords_django-5.2.0.tar.gz", hash = "sha256:dfa7c4fc8879396b8304759260c5fb8b6055c07ed9241010e5bc319f195d5197", size = 43089, upload-time = "2025-04-06T07:58:17.973Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/9b/dbbeb3e72501190584847e5d6b119b5e4f1e15b11a804c4e2ccbca438f2f/pwned_passwords_django-5.2.0-py3-none-any.whl", hash = "sha256:a8666fb427479796ee9940e92df834a188ca7246905e4b9dc7be6248415ff5df", size = 11712, upload-time = "2025-04-06T07:58:16.599Z" },
 ]
 
 [[package]]

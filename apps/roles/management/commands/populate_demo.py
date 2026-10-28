@@ -33,10 +33,11 @@ on one holding rows of its own:
   `DEMO_PASSWORD`, so switching `demo-admin` off is how a site others can reach
   keeps the superuser's door shut. An account outside `demo-` is never touched.
 - Passwords: with `DEMO_PASSWORD` set (config/env.py), every declared account
-  gets it, on every run. Without it a new account gets no usable password, and a
-  declared account that already has a usable one stops the run: anyone may
-  register, so a stranger could have taken `demo-admin` first, and this command
-  would make them the superuser.
+  gets it, on every run, once the password rules accept it for that account.
+  Without it a new account gets no usable password, and a declared account
+  that already has a usable one stops the run: anyone may register, so a
+  stranger could have taken `demo-admin` first, and this command would make
+  them the superuser.
 
 It all runs in one transaction, so a run that stops leaves nothing behind. Role
 rows written here go through neither apps/roles/grants.py nor the admin, so the
@@ -55,6 +56,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from apps.accounts.models import User
+from apps.accounts.passwords import set_password_checked
 from apps.catalog.models import (
     CodeSource,
     Course,
@@ -217,8 +219,15 @@ class Command(BaseCommand):
         if password is not None:
             # A new hash would end the account's sessions (Django ties each
             # session to it), so a run with the same password leaves it alone.
+            # Checked by the rules a registration meets, with this account: a
+            # demo account open to others is the last one to get a weak one.
             if not user.check_password(password):
-                user.set_password(password)
+                try:
+                    set_password_checked(user, password)
+                except ValidationError as exc:
+                    raise CommandError(
+                        f"DEMO_PASSWORD is refused for {username}: {' '.join(exc.messages)}"
+                    ) from exc
         elif user.pk is None:
             user.set_unusable_password()
         elif user.has_usable_password():
