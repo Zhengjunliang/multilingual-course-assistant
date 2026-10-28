@@ -1,10 +1,12 @@
-"""Deactivating, reactivating and deleting an account: the rules, the writes, the lines logged.
+"""Deactivating, reactivating, signing out and deleting an account: the rules, the writes,
+the lines logged.
 
 Every door that changes an account's access comes through here, `/admin/`
-(apps/accounts/admin.py) as much as the SPA's, so a rule holds whichever one
-is used. A broken rule is an `AccountRuleError` naming it, and each door turns
-it into a refusal of its own, the API's through `refuse`; `refusal` lets a
-door ask first, and not offer what would be refused.
+(apps/accounts/admin.py) as much as the site's (apps/accounts/manage_views.py),
+so a rule holds whichever one is used. A broken rule is an `AccountRuleError`
+naming it, and each door turns it into a refusal of its own, the API's
+through `refuse`; `refusal` lets a door ask first, and not offer what would
+be refused.
 
 An inactive account's session reads as nobody's, but would read as the
 account's again the day it is reactivated: deactivating ends every session of
@@ -36,6 +38,9 @@ from config.errors import ErrorCode, fail
 if TYPE_CHECKING:
     from django.http import HttpRequest
     from rest_framework.request import Request
+
+    # The request a change arrives with, from either door, or none from a shell.
+    type Caller = HttpRequest | Request | None
 
 
 class AccountRule(StrEnum):
@@ -72,8 +77,8 @@ def refuse(rule: AccountRule) -> NoReturn:
 def refusal(actor: User, user: User, *, delete: bool = False) -> AccountRule | None:
     """The rule `actor` breaks by taking `user`'s access away, None when none.
 
-    Taking it away is deactivating the account or demoting it from
-    superuser, and with `delete`, deleting it.
+    Taking it away is deactivating the account, signing it out everywhere or
+    demoting it from superuser, and with `delete`, deleting it.
     """
     if user.pk == actor.pk:
         return AccountRule.SELF_NOT_ALLOWED
@@ -82,7 +87,7 @@ def refusal(actor: User, user: User, *, delete: bool = False) -> AccountRule | N
     return None
 
 
-def deactivate(actor: User, user: User, request: HttpRequest | None) -> None:
+def deactivate(actor: User, user: User, request: Caller) -> None:
     """Deactivates `user` and ends its sessions; `AccountRuleError` when a rule forbids it."""
     if rule := refusal(actor, user):
         raise AccountRuleError(rule)
@@ -92,7 +97,7 @@ def deactivate(actor: User, user: User, request: HttpRequest | None) -> None:
     auth_event(AuthEvent.DEACTIVATE, request, user, by=actor.get_username(), sessions=ended)
 
 
-def activate(actor: User, user: User, request: HttpRequest | None) -> None:
+def activate(actor: User, user: User, request: Caller) -> None:
     """Reactivates `user`, which signs in afresh: no session from before survives."""
     user.is_active = True
     user.save(update_fields=["is_active"])
@@ -100,7 +105,15 @@ def activate(actor: User, user: User, request: HttpRequest | None) -> None:
     auth_event(AuthEvent.ACTIVATE, request, user, by=actor.get_username())
 
 
-def delete_account(actor: User, user: User, request: HttpRequest | None) -> None:
+def sign_out(actor: User, user: User, request: Caller) -> None:
+    """Ends every session of `user`, which stays active; `AccountRuleError` when forbidden."""
+    if rule := refusal(actor, user):
+        raise AccountRuleError(rule)
+    ended = end_sessions(user)
+    auth_event(AuthEvent.SESSIONS_ENDED, request, user, by=actor.get_username(), ended=ended)
+
+
+def delete_account(actor: User, user: User, request: Caller) -> None:
     """Deletes `user` and all it owns; `AccountRuleError` when a rule forbids it."""
     if rule := refusal(actor, user, delete=True):
         raise AccountRuleError(rule)

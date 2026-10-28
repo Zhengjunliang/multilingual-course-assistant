@@ -64,10 +64,12 @@ def targets(
 
     PPM's current edition, which its teachers and B047's secretariat may act
     on, with one section of its syllabus and a book of its reading list; B047;
-    a conversation of the student's; the deck of the `deck` fixture.
+    the student's account, and a conversation of theirs; the deck of the
+    `deck` fixture.
     """
     edition = {"pk": w.ppm_old.pk}
     programme = {"code": w.b047.code}
+    account = {"pk": w.student.pk}
     return {
         "catalog:programme": programme,
         "catalog:programme-courses": programme,
@@ -81,6 +83,10 @@ def targets(
         "catalog:edition-syllabus-section": {**edition, "section": "prerequisiti"},
         "catalog:edition-readings": edition,
         "catalog:edition-reading": {**edition, "item": book.pk},
+        "manage:user": account,
+        "manage:user-activate": account,
+        "manage:user-deactivate": account,
+        "manage:user-sessions-end": account,
         "qa:conversation": {"pk": conversation.pk},
         "qa:source": {"sha256": SHA},
     }

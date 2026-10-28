@@ -302,21 +302,27 @@ def test_logging_in_starts_a_session(password: str) -> None:
 
 
 def test_wrong_credentials_do_not_reveal_whether_the_account_exists(student: User) -> None:
-    """Two different mistakes, one answer. A message that distinguished them
+    """Three different mistakes, one answer. A message that distinguished them
     would be an account-enumeration oracle offered to anyone with a word list,
-    and the caller cannot act on the difference anyway."""
+    and the caller cannot act on the difference anyway. A deactivated account
+    is one of them (AC-A2): its owner learns nothing a stranger would not."""
+    User.objects.create_user(username="former", password=PASSWORD, is_active=False)
     wrong_password = APIClient().post(
         LOGIN_URL, {"username": USERNAME, "password": "not-the-password"}, format="json"
     )
     no_such_user = APIClient().post(
         LOGIN_URL, {"username": "nobody", "password": PASSWORD}, format="json"
     )
+    deactivated = APIClient().post(
+        LOGIN_URL, {"username": "former", "password": PASSWORD}, format="json"
+    )
 
-    assert wrong_password.status_code == no_such_user.status_code == 400
-    bodies = [response.json()["error"] for response in (wrong_password, no_such_user)]
+    responses = (wrong_password, no_such_user, deactivated)
+    assert [response.status_code for response in responses] == [400] * 3
+    bodies = [response.json()["error"] for response in responses]
     for body in bodies:
         del body["request_id"]
-    assert bodies[0] == bodies[1]
+    assert bodies[0] == bodies[1] == bodies[2]
     assert refused(wrong_password) == ("WRONG_CREDENTIALS", {})
 
 

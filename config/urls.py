@@ -29,6 +29,7 @@ from config.views import ApiNotFound, spa
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.accounts.urls")),
+    path("api/admin/", include("apps.accounts.manage_urls")),
     path("api/catalog/", include("apps.catalog.urls")),
     path("api/", include("apps.qa.urls")),
     re_path(r"^api/", ApiNotFound.as_view(), name=UNMATCHED),
