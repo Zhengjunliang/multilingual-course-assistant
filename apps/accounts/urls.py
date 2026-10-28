@@ -2,6 +2,7 @@
 
 from django.urls import path
 
+from apps.accounts.self_views import EndSessionsView, PasswordView, SessionsView
 from apps.accounts.views import LoginView, LogoutView, RegisterView, SessionView
 
 app_name = "accounts"
@@ -14,4 +15,7 @@ urlpatterns = [
     path("login", LoginView.as_view(), name="login"),
     path("logout", LogoutView.as_view(), name="logout"),
     path("register", RegisterView.as_view(), name="register"),
+    path("password", PasswordView.as_view(), name="password"),
+    path("sessions", SessionsView.as_view(), name="sessions"),
+    path("sessions/end", EndSessionsView.as_view(), name="sessions-end"),
 ]

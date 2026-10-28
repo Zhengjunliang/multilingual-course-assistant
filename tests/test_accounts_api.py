@@ -29,7 +29,10 @@ from config.request_id import RequestIdFilter
 from rag.chunk import normalize_locale
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pytest_django import Settings
+    from rest_framework.response import Response
 
 pytestmark = pytest.mark.django_db
 
@@ -37,6 +40,8 @@ ME_URL = "/api/auth/me"
 LOGIN_URL = "/api/auth/login"
 LOGOUT_URL = "/api/auth/logout"
 REGISTER_URL = "/api/auth/register"
+PASSWORD_URL = "/api/auth/password"
+SESSIONS_END_URL = "/api/auth/sessions/end"
 ASK_URL = "/api/ask"
 
 USERNAME = "student"
@@ -161,6 +166,27 @@ LEAKED = "a-made-up-password-only-the-fake-range-holds"
 RULES_USERNAME = "analytical-engine"
 
 
+def register_with(password: str) -> Response:
+    body = {"username": RULES_USERNAME, "password": password}
+    return APIClient().post(REGISTER_URL, body, format="json")
+
+
+def change_to(password: str) -> Response:
+    user = User.objects.create_user(username=RULES_USERNAME, password=PASSWORD)
+    client = APIClient()
+    client.force_login(user)
+    return client.post(
+        PASSWORD_URL, {"password": PASSWORD, "new_password": password}, format="json"
+    )
+
+
+@pytest.mark.parametrize(
+    ("set_password", "field"),
+    [
+        pytest.param(register_with, "password", id="register"),
+        pytest.param(change_to, "new_password", id="change"),
+    ],
+)
 @pytest.mark.parametrize(
     ("password", "refusals"),
     [
@@ -178,21 +204,25 @@ RULES_USERNAME = "analytical-engine"
     ],
 )
 def test_a_new_password_is_held_to_the_rules(
-    leaked_passwords: set[str], password: str, refusals: list[tuple[str, dict[str, int]]]
+    leaked_passwords: set[str],
+    set_password: Callable[[str], Response],
+    field: str,
+    password: str,
+    refusals: list[tuple[str, dict[str, int]]],
 ) -> None:
     """`AUTH_PASSWORD_VALIDATORS` is configured but reaches nothing on its own —
-    something has to call it, and the two frameworks' `ValidationError` classes
-    are different, so the call is a bridge that can be dropped. Each rule broken
-    is a reason of its own, with the bound it names, which the page words."""
+    something has to call it, on every path that sets a password, and the two
+    frameworks' `ValidationError` classes are different, so the call is a
+    bridge that can be dropped. Each rule broken is a reason of its own, with
+    the bound it names, which the page words."""
     leaked_passwords.add(LEAKED)
-    response = APIClient().post(
-        REGISTER_URL, {"username": RULES_USERNAME, "password": password}, format="json"
-    )
+    response = set_password(password)
 
-    fields = response.json()["error"]["fields"] if response.status_code == 400 else []
-    seen = [(field["field"], field["reason"], field.get("data", {})) for field in fields]
-    assert seen == [("password", reason, data) for reason, data in refusals]
-    assert User.objects.filter(username=RULES_USERNAME).exists() == (not refusals)
+    fields = response.data["error"]["fields"] if response.status_code == 400 else []
+    seen = [(each["field"], each["reason"], each.get("data", {})) for each in fields]
+    assert seen == [(field, reason, data) for reason, data in refusals]
+    account = User.objects.filter(username=RULES_USERNAME).first()
+    assert (account is not None and account.check_password(password)) == (not refusals)
 
 
 def test_a_username_already_taken_is_refused(student: User) -> None:
@@ -472,15 +502,30 @@ def test_signing_in_with_the_csrf_token_from_the_cookie_works(
     assert response.json()["authenticated"] is True
 
 
-def test_the_auth_bucket_refuses_a_sixth_attempt_in_a_minute() -> None:
+@pytest.mark.parametrize(
+    ("signed_in", "url", "body"),
+    [
+        pytest.param(False, LOGIN_URL, {"username": "nobody", "password": "guess"}, id="login"),
+        # A password confirmed before a change is guessed as easily, counted
+        # per account (apps/accounts/reauth.py).
+        pytest.param(
+            True,
+            PASSWORD_URL,
+            {"password": "guess", "new_password": "lamp-orbit-quietly-87"},
+            id="change-password",
+        ),
+        pytest.param(
+            True, SESSIONS_END_URL, {"password": "guess", "session": "others"}, id="end-sessions"
+        ),
+    ],
+)
+def test_the_auth_bucket_refuses_a_sixth_attempt_in_a_minute(
+    student: User, signed_in: bool, url: str, body: dict[str, str]
+) -> None:
     """A password guess costs the server nothing, which is the problem: without
     a limit the only bound on guessing is the attacker's bandwidth."""
-    codes = [
-        APIClient()
-        .post(LOGIN_URL, {"username": "nobody", "password": "guess"}, format="json")
-        .status_code
-        for _ in range(6)
-    ]
+    client = logged_in() if signed_in else APIClient()
+    codes = [client.post(url, body, format="json").status_code for _ in range(6)]
 
     assert codes[:5] == [400] * 5
     assert codes[5] == 429

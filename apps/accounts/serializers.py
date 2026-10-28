@@ -16,8 +16,9 @@ from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from apps.accounts.models import User
+from apps.accounts.models import AccountSession, User
 from apps.accounts.passwords import set_password_checked
+from apps.accounts.sessions import public_id
 from apps.roles.scopes import role_scopes
 from config.errors import ErrorCode, django_field_error, fail
 
@@ -118,3 +119,43 @@ class LoginSerializer(serializers.Serializer):
             fail(ErrorCode.WRONG_CREDENTIALS)
         attrs["user"] = user
         return attrs
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    """The password as it is, confirming who asks, and the one to replace it.
+
+    Checked in the view and not here: the current password first, so the
+    rules on the new one answer nobody but the account's owner.
+    """
+
+    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    new_password = serializers.CharField(write_only=True, style={"input_type": "password"})
+
+
+class EndSessionsSerializer(serializers.Serializer):
+    """The password, confirming who asks, and which session to end.
+
+    `session` is the `id` a row of the list carries, or `others` for every
+    session of the account but the caller's.
+    """
+
+    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    session = serializers.CharField()
+
+
+class AccountSessionSerializer(serializers.ModelSerializer[AccountSession]):
+    """A row of the device list; `current` is the session the list was asked from."""
+
+    id = serializers.SerializerMethodField()
+    current = serializers.SerializerMethodField()
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        model = AccountSession
+        fields = ("id", "current", "user_agent", "ip", "authenticated_at", "last_activity")
+        read_only_fields = fields
+
+    def get_id(self, session: AccountSession) -> str:
+        return public_id(session.session_key)
+
+    def get_current(self, session: AccountSession) -> bool:
+        return session.session_key == self.context["current"]

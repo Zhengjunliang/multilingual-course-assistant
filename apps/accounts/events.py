@@ -6,7 +6,10 @@ off Django's own signals (apps/accounts/apps.py), not off this app's views:
 `/admin/login/` passes through no view here, and neither will the logout of a
 session that ran out. Registering has no signal, so `RegisterView` calls
 `auth_event` itself, as apps/accounts/services.py does for an account it
-deactivates, reactivates or deletes. Nothing else writes to this logger.
+deactivates, reactivates or deletes, apps/accounts/self_views.py for a
+password changed or a session ended, apps/accounts/reauth.py for a password
+mistyped to confirm one, and apps/accounts/middleware.py for why a session ran
+out, before the logout it signals. Nothing else writes to this logger.
 
 A line is the event's name and `key=value` pairs, each value in its `repr`: a
 username typed at a failed login is the caller's own text, and quoted it
@@ -40,6 +43,10 @@ class AuthEvent(StrEnum):
     DEACTIVATE = "deactivate"
     ACTIVATE = "activate"
     DELETE = "delete"
+    EXPIRED = "expired"
+    PASSWORD_CHANGED = "password_changed"
+    REAUTH_FAILED = "reauth_failed"
+    SESSIONS_ENDED = "sessions_ended"
 
 
 def auth_event(

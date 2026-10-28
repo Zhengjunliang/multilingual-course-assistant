@@ -63,6 +63,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # After authentication, whose user it reads; it may sign that user out.
+    "apps.accounts.middleware.SessionLifetimeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -118,6 +120,25 @@ AUTH_USER_MODEL = "accounts.User"
 # account: see apps/accounts/sessions.py. `django.contrib.sessions` stays
 # installed for `clearsessions`, which purges through this setting.
 SESSION_ENGINE = "apps.accounts.sessions"
+
+# How long a signed-in session lives, by tier: (idle, absolute) in seconds,
+# enforced by apps/accounts/middleware.py. NIST SP 800-63B-4 sets the limits
+# by assurance level (outside the repository): at AAL1 an overall limit of at
+# most 30 days and no idle limit required (§2.1.3); at AAL2 24 hours overall
+# and 1 hour idle (§2.2.3). Students ask questions and keep their
+# conversations, an AAL1 risk, and stay signed in across a week of lectures.
+# Staff, the superusers and whoever holds a role, change other people's
+# courses and roles, and are held to AAL2's limits though they sign in with a
+# password alone (no second factor: docs/security.md). ASVS 7.1.1 asks for this
+# reasoning; 7.1.2: an account may hold any number of sessions at once, each
+# listed and ended by its owner (apps/accounts/self_views.py).
+SESSION_LIFETIMES = {
+    "student": (7 * 24 * 3600, 14 * 24 * 3600),
+    "staff": (3600, 24 * 3600),
+}
+# The cookie's own lifetime, the longest a session can live: the server ends
+# one sooner by its tier's limits.
+SESSION_COOKIE_AGE = 14 * 24 * 3600
 
 # ModelBackend first. A login records the backend that authenticated the user,
 # but the test client's force_login() takes the first backend that has a
