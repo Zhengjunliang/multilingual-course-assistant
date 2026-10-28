@@ -179,6 +179,9 @@ describe("assigning a member", () => {
       submitOff: button("Assegna")?.disabled ?? null,
       sent,
       text: body(),
+      // What a screen reader reads after the title, while the dialog is open.
+      described: document.getElementById(dialog()?.getAttribute("aria-describedby") ?? "")
+        ?.textContent,
     };
     unmount();
     return seen;
@@ -207,6 +210,7 @@ describe("assigning a member", () => {
       true,
     ]);
     expect(seen.text).toContain("Inserisci un nome utente.");
+    expect(seen.described).toBe("PPM · 2025-2026");
   });
 
   it.each([

@@ -14,24 +14,15 @@ function refused(code: ErrorCode) {
   return failureOf(codedRefusal(code));
 }
 
+// What each one does read is the dialogs' (dialogs.test.tsx): here, what each
+// must not take for its own.
 describe("a staff refusal", () => {
-  it("reads a role held already", async () => {
-    expect(isHeldAlready(await refused("ROLE_ALREADY_HELD"))).toBe(true);
-  });
-
-  it("reads the object gone", async () => {
-    expect(isNotFound(await refused("NOT_FOUND"))).toBe(true);
-  });
-
   it("does not take a conversation gone for a staff object gone", async () => {
     expect(isNotFound(await refused("CONVERSATION_GONE"))).toBe(false);
   });
 
-  it.each([
-    ["a refused permission", "PERMISSION_DENIED", true],
-    ["the session ended", "UNAUTHENTICATED", false],
-  ] as const)("offers the permission's own notice only for %s", async (_, code, forbidden) => {
-    expect(isForbidden(await refused(code))).toBe(forbidden);
+  it("does not take the session ended for a refused permission", async () => {
+    expect(isForbidden(await refused("UNAUTHENTICATED"))).toBe(false);
   });
 
   it("reads none of them from what is not an answer of the server", () => {

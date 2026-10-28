@@ -209,34 +209,32 @@ describe("the answer's language", () => {
   });
 });
 
+/** A question a busy server refused, waiting to be asked again: nothing searched yet. */
+const waiting = () =>
+  view(
+    turn({ route: null, searchMs: null, citations: [], answer: "", complete: false }),
+    false,
+    true,
+    false,
+    RETRY,
+  );
+
 describe("the cat beside the answer", () => {
-  const poseIn = (html: string) => /data-pose="(\w+)"/.exec(html)?.[1];
-
-  it("thinks until the first word arrives", () => {
-    expect(poseIn(view(turn({ answer: "", complete: false }), false, true))).toBe("thinking");
-  });
-
-  it("keeps thinking while a busy refusal is waited out, when no search is counted", () => {
-    const html = view(
-      turn({ route: null, searchMs: null, citations: [], answer: "", complete: false }),
-      false,
-      true,
-      false,
-      RETRY,
-    );
-
-    expect(poseIn(html)).toBe("thinking");
-    expect(html).not.toContain("Ricerca in corso");
-  });
-
-  it("is just there once the answer is", () => {
-    expect(poseIn(view(turn()))).toBe("avatar");
-  });
-
-  it("apologises for an answer that failed", () => {
-    const failed = turn({ complete: false, failure: { kind: "interrupted" } });
-
-    expect(poseIn(view(failed))).toBe("error");
+  it.each<[string, () => string, string]>([
+    [
+      "thinks until the first word arrives",
+      () => view(turn({ answer: "", complete: false }), false, true),
+      "thinking",
+    ],
+    ["keeps thinking while a busy refusal is waited out", waiting, "thinking"],
+    ["is just there once the answer is", () => view(turn()), "avatar"],
+    [
+      "apologises for an answer that failed",
+      () => view(turn({ complete: false, failure: { kind: "interrupted" } })),
+      "error",
+    ],
+  ])("%s", (_, html, pose) => {
+    expect(/data-pose="(\w+)"/.exec(html())?.[1]).toBe(pose);
   });
 });
 
@@ -332,39 +330,36 @@ describe("a pill in the answer", () => {
     ]);
   });
 
-  it("cited by excerpt number, previews and opens that excerpt, not its page's first", () => {
+  it.each<[string, string, unknown[]]>([
     // #182: asked when the winter exam session is, the answer cited two
     // excerpts of one page by number, and both pills showed the first.
-    vi.useFakeTimers();
-    const { container, unmount } = mounted(
-      turn({
-        answer:
-          "La sessione 2025-26 inizia il 19 gennaio [Excerpt 3], quella 2026-27 il 18 gennaio [Excerpt 4].",
-        citations: CALENDAR,
-      }),
-    );
-    const pills = [...container.querySelectorAll<HTMLAnchorElement>("a[data-pill]")].map(opened);
-    unmount();
-
-    expect(pills).toEqual([
-      { at: expect.stringContaining("Sessione invernale 2025-26"), shows: [CALENDAR_TEXTS[2]] },
-      { at: expect.stringContaining("Sessione invernale 2026-27"), shows: [CALENDAR_TEXTS[3]] },
-    ]);
-  });
-
-  it("merged over two excerpts of one page, previews the page once, at the first number it names", () => {
+    [
+      "cited by excerpt number, previews and opens that excerpt, not its page's first",
+      "La sessione 2025-26 inizia il 19 gennaio [Excerpt 3], quella 2026-27 il 18 gennaio [Excerpt 4].",
+      [
+        { at: expect.stringContaining("Sessione invernale 2025-26"), shows: [CALENDAR_TEXTS[2]] },
+        { at: expect.stringContaining("Sessione invernale 2026-27"), shows: [CALENDAR_TEXTS[3]] },
+      ],
+    ],
     // One card entry per page, as «+N» counts them: a run of five excerpts of
     // two pages made a card taller than the window.
+    [
+      "merged over two excerpts of one page, previews the page once, at the first number it names",
+      "Le sessioni invernali [Excerpt 4][Excerpt 3].",
+      [{ at: expect.stringContaining("Sessione invernale 2026-27"), shows: [CALENDAR_TEXTS[3]] }],
+    ],
+    [
+      "cited by the page's marker, previews and opens the page's first excerpt",
+      `Le date sono nel calendario ${CALENDAR_MARKER}.`,
+      [{ at: expect.stringContaining("Pausa pasquale"), shows: [CALENDAR_TEXTS[0]] }],
+    ],
+  ])("%s", (_, answer, expected) => {
     vi.useFakeTimers();
-    const { container, unmount } = mounted(
-      turn({ answer: "Le sessioni invernali [Excerpt 4][Excerpt 3].", citations: CALENDAR }),
-    );
+    const { container, unmount } = mounted(turn({ answer, citations: CALENDAR }));
     const pills = [...container.querySelectorAll<HTMLAnchorElement>("a[data-pill]")].map(opened);
     unmount();
 
-    expect(pills).toEqual([
-      { at: expect.stringContaining("Sessione invernale 2026-27"), shows: [CALENDAR_TEXTS[3]] },
-    ]);
+    expect(pills).toEqual(expected);
   });
 
   it("shows its source's kind, and keeps its fill and stays out of the accent in every state", () => {
@@ -452,19 +447,6 @@ describe("a pill in the answer", () => {
 
     expect({ opened, closed }).toEqual({ opened: true, closed: true });
   });
-
-  it("cited by the page's marker, previews and opens the page's first excerpt", () => {
-    vi.useFakeTimers();
-    const { container, unmount } = mounted(
-      turn({ answer: `Le date sono nel calendario ${CALENDAR_MARKER}.`, citations: CALENDAR }),
-    );
-    const pills = [...container.querySelectorAll<HTMLAnchorElement>("a[data-pill]")].map(opened);
-    unmount();
-
-    expect(pills).toEqual([
-      { at: expect.stringContaining("Pausa pasquale"), shows: [CALENDAR_TEXTS[0]] },
-    ]);
-  });
 });
 
 describe("the row under the answer", () => {
@@ -506,20 +488,22 @@ describe("the row under the answer", () => {
     expect(text).not.toContain("non citata");
   });
 
-  it("lists every source as one when the answer cited none of them", () => {
-    const { container, unmount } = mounted(turn({ answer: "La scadenza è il 30 settembre." }));
-    const open = sourcesButton(container);
+  it.each<[string, Partial<Turn>]>([
+    ["when the answer cited none of them", { answer: "La scadenza è il 30 settembre." }],
+    ["under an answer that did not finish", { complete: false, failure: { kind: "interrupted" } }],
+  ])("lists every source as one, with no heading, %s", (_, overrides) => {
+    const { container, unmount } = mounted(turn(overrides));
 
-    act(() => open?.click());
+    act(() => sourcesButton(container)?.click());
     const panel = document.body.querySelector('[role="dialog"]');
-    const lists = [...(panel?.querySelectorAll("ol") ?? [])].map(
-      (list) => list.querySelectorAll("a").length,
-    );
-    const text = panel?.textContent ?? "";
+    const seen = {
+      lists: panel?.querySelectorAll("ol").length,
+      rows: panel?.querySelectorAll("li").length,
+      headings: panel?.querySelectorAll("h3").length,
+    };
     unmount();
 
-    expect(lists).toEqual([3]);
-    expect(text).not.toContain("Altre consultate"); // spellchecker:disable-line
+    expect(seen).toEqual({ lists: 1, rows: 3, headings: 0 });
   });
 
   it("shows an Italian question's language on its bubble and an English slide's on its row", () => {
@@ -569,22 +553,6 @@ describe("the row under the answer", () => {
     expect(all).toEqual({ headings: ["Citate nella risposta1", `${others}2`], rows: 3 });
     expect(web_).toEqual({ headings: [`${others}1`], rows: 1 });
     expect(slides).toEqual({ headings: ["Citate nella risposta1", `${others}1`], rows: 2 });
-  });
-
-  it("lists every source as one, with no heading, under an answer that did not finish", () => {
-    const { container, unmount } = mounted(
-      turn({ complete: false, failure: { kind: "interrupted" } }),
-    );
-
-    act(() => sourcesButton(container)?.click());
-    const panel = document.body.querySelector('[role="dialog"]');
-    const seen = {
-      headings: panel?.querySelectorAll("h3").length,
-      rows: panel?.querySelectorAll("li").length,
-    };
-    unmount();
-
-    expect(seen).toEqual({ headings: 0, rows: 3 });
   });
 
   it("marks a row's pills while the row has the focus, and lets go when the panel closes", () => {
@@ -727,17 +695,19 @@ describe("a turn that did not get all the way", () => {
     return seen;
   }
 
-  it("says in a warning banner that the answer stopped, and that what was written is kept", () => {
-    expect(banner(cut).text).toBe(
-      "La risposta si è interrotta prima della fine.Quello che vedi è stato salvato così com'è.",
-    );
-  });
+  const stopped = "La risposta si è interrotta prima della fine.";
 
-  it("promises nothing kept when nothing was written, or for a visitor, whose turn is stored nowhere", () => {
-    const heading = "La risposta si è interrotta prima della fine.";
-
-    expect(banner({ ...cut, answer: "" }).text).toBe(heading);
-    expect(banner(cut, { visitor: true }).text).toBe(heading);
+  it.each<[string, Turn, boolean, string]>([
+    [
+      "that what was written is kept",
+      cut,
+      false,
+      `${stopped}Quello che vedi è stato salvato così com'è.`,
+    ],
+    ["nothing kept when nothing was written", { ...cut, answer: "" }, false, stopped],
+    ["nothing kept for a visitor, whose turn is stored nowhere", cut, true, stopped],
+  ])("says in a warning banner that the answer stopped, and %s", (_, of, visitor, text) => {
+    expect(banner(of, { visitor }).text).toBe(text);
   });
 
   it("leaves announcing it to the page's live region, which is there before it happens", () => {
@@ -747,17 +717,13 @@ describe("a turn that did not get all the way", () => {
   });
 
   it("says, while a busy server is waited out, how long until the next try and which it is", () => {
-    const html = view(
-      turn({ route: null, searchMs: null, citations: [], answer: "", complete: false }),
-      false,
-      true,
-      false,
-      RETRY,
-    );
+    const html = waiting();
 
     expect(html).toContain("C&#x27;è un&#x27;altra domanda in corso.");
     expect(html).toContain("Riprovo tra 5 secondi (1 di 2).");
     expect(html).not.toContain('role="status"');
+    // No search is counted while it waits.
+    expect(html).not.toContain("Ricerca in corso");
   });
 });
 

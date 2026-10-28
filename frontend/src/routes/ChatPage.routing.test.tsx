@@ -765,12 +765,19 @@ describe("a visitor's addresses", () => {
       await settle();
       const seen = {
         heading: container.querySelector("h1")?.textContent,
+        // The same panel as the error screens (RouteError.test.tsx), with the way back.
+        back: container.querySelector('[data-status-panel] a[href="/"]')?.textContent,
         path: path(),
         read: requested.filter((request) => request.startsWith("GET /api/conversations/")),
       };
       unmount();
 
-      expect(seen).toEqual({ heading: i18n.t("notFound.title"), path: "/c/7", read: [] });
+      expect(seen).toEqual({
+        heading: i18n.t("notFound.title"),
+        back: i18n.t("notFound.home"),
+        path: "/c/7",
+        read: [],
+      });
     },
   );
 });
