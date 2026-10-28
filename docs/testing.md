@@ -29,7 +29,7 @@ A component test that repeats what a page test of the same behaviour checks meet
 
 Every check says where it runs: the commit hooks of `.pre-commit-config.yaml`, the chain of [scripts/check.py](../scripts/check.py), CI only, or by hand. A browser suite runs only in the last two, so the local loop never waits for a browser. The caps are the commit hooks at 6 s for a commit, a pull request green within two minutes of its push with every job of the workflow included, and 15 billed CI minutes for a run. A check that would push a layer past its cap is paid for by removing another, or it is not added.
 
-Each CI job and step has a `timeout-minutes` about twice its measured median, rounded up to minutes, and a comment beside it giving the measurement: a suite that needs longer has grown a regression to look at, not to wait for. The chain's pytest prints its ten slowest tests (`--durations` in the `tests` step), so a slow test is seen in the run that brings it. Guard: those `timeout-minutes`.
+Each CI job has a `timeout-minutes` about twice its measured median, rounded up to minutes, and a comment beside it giving the measurement: a suite that needs longer has grown a regression to look at, not to wait for. `hooks` and `tests` cap their main step the same way, since that step's time is not touched by the network the job's setup waits on. The chain's pytest prints its ten slowest tests (`--durations` in the `tests` step), so a slow test is seen in the run that brings it. Guard: those `timeout-minutes`.
 
 ## Coverage
 
