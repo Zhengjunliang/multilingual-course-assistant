@@ -161,13 +161,26 @@ def test_me_marks_the_superuser() -> None:
 
 def test_registering_creates_an_account_and_signs_it_in() -> None:
     """One form, not two: the alternative is asking for the same two fields
-    again on a login page immediately afterwards."""
+    again on a login page immediately afterwards. What it makes is a student,
+    whatever else the body names: registration is open to anyone, so a field
+    it let through would be a door to staff rights."""
     client = APIClient()
-    response = client.post(REGISTER_URL, {"username": "ada", "password": PASSWORD}, format="json")
+    body = {
+        "username": "ada",
+        "password": PASSWORD,
+        "is_superuser": True,
+        "is_staff": True,
+        "roles": [{"role": Role.SECRETARIAT, "programme": "B046"}],
+    }
+    response = client.post(REGISTER_URL, body, format="json")
 
     assert response.status_code == 201
-    assert User.objects.filter(username="ada").exists()
-    assert client.get(ME_URL).json()["authenticated"] is True
+    ada = User.objects.get(username="ada")
+    held = RoleAssignment.objects.filter(user=ada).exists()
+    assert (ada.is_superuser, ada.is_staff, held) == (False, False, False)
+    me = client.get(ME_URL).json()
+    assert me["authenticated"] is True
+    assert (me["user"]["is_superuser"], me["user"]["roles"]) == (False, [])
 
 
 def test_a_registered_password_is_stored_hashed() -> None:
