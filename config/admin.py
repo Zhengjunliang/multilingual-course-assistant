@@ -9,13 +9,19 @@ answered by one backend; the admin is the superuser's*, point 3).
 `is_staff` stays in the test rather than being replaced by `is_superuser`:
 Django's admin login form refuses a user who is not staff, and a superuser
 created by `createsuperuser` is both.
+
+The admin's own form for the caller's password answers 403: a password is
+changed through `POST /api/auth/password` (apps/accounts/self_views.py), which
+asks for the current one at the login's rate and logs the change, and which
+Django's form would bypass on both counts.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -28,3 +34,6 @@ class SuperuserAdminSite(admin.AdminSite):
         # Past the first test the caller is an active staff account, so the
         # cast only tells pyright what `AUTH_USER_MODEL` is (apps/accounts/views.py).
         return super().has_permission(request) and cast("User", request.user).is_superuser
+
+    def password_change(self, request: HttpRequest, extra_context: Any = None) -> NoReturn:
+        raise PermissionDenied

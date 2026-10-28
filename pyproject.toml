@@ -153,9 +153,10 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 "tests/**" = ["S101", "S105", "S603", "TID251"]
 # The one module that turns those exceptions into codes.
 "config/errors.py" = ["TID251"]
-# The admin answers with its own pages, never under `/api/`: a model admin
-# refuses with Django's `PermissionDenied`, as Django's own do.
+# The admin answers with its own pages, never under `/api/`: a model admin, and
+# the site, refuse with Django's `PermissionDenied`, as Django's own do.
 "apps/*/admin.py" = ["TID251"]
+"config/admin.py" = ["TID251"]
 # S105 reads the event names (`PASSWORD_CHANGED`) as passwords; no password
 # reaches the authentication log by design (its docstring).
 "apps/accounts/events.py" = ["S105"]
