@@ -57,6 +57,7 @@ dev = [
     "pytest",
     "pytest-cov>=7.1.0",
     "pytest-django",
+    "pytest-xdist>=3.8.0",
 ]
 
 [tool.uv]

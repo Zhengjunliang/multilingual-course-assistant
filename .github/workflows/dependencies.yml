@@ -102,7 +102,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # No `cache: npm` here, unlike ci.yml's check job: with the install
+          # No `cache: npm` here, unlike ci.yml's static job: with the install
           # gone, nothing in this job reads npm's download cache. `npm audit`
           # asks the registry's advisory endpoint directly, so restoring and
           # then saving a cache would be pure overhead. setup-node itself stays
@@ -112,7 +112,7 @@ jobs:
       - name: Audit frontend dependencies
         # No `npm ci`: `npm audit` builds its tree from package-lock.json alone,
         # so installing first only bought an unused node_modules and the minute
-        # it took to write one. ci.yml's check job is where an install is real.
+        # it took to write one. ci.yml's static job is where an install is real.
         #
         # --omit=dev: only what ships to a browser. The build toolchain's own
         # advisories are a steady drip that would turn this audit into noise

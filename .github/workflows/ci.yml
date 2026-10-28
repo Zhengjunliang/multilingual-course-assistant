@@ -10,7 +10,7 @@ name: CI
 #
 # What replaced that saving is worth more: a path filter is an event-level
 # switch, so a filtered-out commit starts no workflow and therefore reports no
-# status at all. With `check` and `hooks` required on main, a documentation-only pull
+# status at all. With the chain's jobs required on main, a documentation-only pull
 # request would then wait forever for a status that never arrives. Filter and
 # required checks cannot both be had; this repository now has the checks.
 on:
@@ -25,14 +25,30 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# The credentials and the database of every job that loads Django's settings,
+# which refuse to load without a key and a password. Not secrets: this key only
+# ever signs throwaway CI sessions, and its length is not arbitrary — `check
+# --deploy` rejects anything under 50 characters. The mode (DEBUG, TLS) is not
+# here: it travels with the steps of scripts/check.py.
+env:
+  DJANGO_SECRET_KEY: ci-only-key-never-used-outside-this-runner-and-not-a-secret
+  DJANGO_DB_NAME: mca
+  DJANGO_DB_USER: mca
+  DJANGO_DB_PASSWORD: ci-only-password
+  DJANGO_DB_HOST: localhost
+  DJANGO_DB_PORT: "5432"
+
+# The chain runs in three jobs side by side — `hooks`, `static`, `tests` — and
+# each calls its steps of scripts/check.py by name; tests/test_check_script.py
+# reads the three as one chain, and fails if a step of theirs runs anything
+# else, goes missing, repeats or changes places. They are split by what they
+# need installed, so that no step waits for another it does not depend on.
 jobs:
-  # The head of the chain, in a job of its own so that it runs beside `check`
-  # rather than ahead of it: the hooks need neither torch nor PostgreSQL, so
-  # `--only-dev` installs pre-commit and nothing heavy, and the path a pull
-  # request waits on does not get longer.
+  # The head of the chain: the hooks need neither torch nor PostgreSQL, so
+  # `--only-dev` installs pre-commit and nothing heavy.
   hooks:
     runs-on: ubuntu-latest
-    # Caps as `check` below: the job's catches a hung run, the step's is the budget.
+    # Caps as in `tests` below: the job's catches a hung run, the step's is the budget.
     # This job's first cold run took 47 s; a minute above the step's cap.
     timeout-minutes: 3
     steps:
@@ -67,8 +83,6 @@ jobs:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.python-version', '.pre-commit-config.yaml') }}
 
-      # A step of scripts/check.py called by name, like every step of `check`
-      # below; tests/test_check_script.py reads both jobs as one chain.
       # About twice a cold cache, which builds every hook environment,
       # actionlint's with Go among them: 34 s with the workflow linters, 20 s
       # before them, rounded up to minutes. Warm, its median measured 3.5 s.
@@ -76,21 +90,61 @@ jobs:
         timeout-minutes: 2
         run: uv run --only-dev --locked python scripts/check.py hooks
 
-  check:
+  # The frontend's gates and its build, pyright, and the deployment checks,
+  # which read the build (staticfiles.W004): what needs every package and Node,
+  # but no database, since none of these steps opens one.
+  static:
     runs-on: ubuntu-latest
-    # About twice this job's run with a cold uv cache, 138 s, rounded up to
-    # minutes; the CPU torch makes the Install step 4 s. It catches a hung run:
+    # About twice the old single job's run with a cold uv cache, 138 s, rounded
+    # up to minutes; it catches a hung run.
+    timeout-minutes: 5
+    steps:
+      # As in `hooks`, the token is not left in .git/config: nothing here needs it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+          # One key for the jobs that install everything, which `tests` saves
+          # and this job only restores: each entry is about 2.65 GB, against
+          # the repository's 10 GB of cache. The name is the one the entry had
+          # before the chain was split, so the split started warm.
+          cache-suffix: check
+          save-cache: false
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend install
+        run: npm ci
+        working-directory: frontend
+
+      # Every check below is a step of scripts/check.py, called by name: what
+      # each one runs, in which order and why, is written there once. DEBUG off
+      # and the TLS flag travel with the steps too.
+      - name: Frontend lint, types, catalogues, contrast, tests and build
+        run: uv run python scripts/check.py frontend
+
+      - name: Types
+        run: uv run python scripts/check.py types
+
+      - name: System and deployment checks
+        run: uv run python scripts/check.py deploy
+
+  # pytest, the last step of the chain, beside the rest of it.
+  tests:
+    runs-on: ubuntu-latest
+    # As `static`: about twice a cold-cache run, a guard against a hung job;
     # the budget is the cap on the tests step, which network time does not touch.
     timeout-minutes: 5
-    env:
-      # Not a secret: this key only ever signs throwaway CI sessions. Its length
-      # is not arbitrary — `check --deploy` rejects anything under 50 characters.
-      DJANGO_SECRET_KEY: ci-only-key-never-used-outside-this-runner-and-not-a-secret
-      DJANGO_DB_NAME: mca
-      DJANGO_DB_USER: mca
-      DJANGO_DB_PASSWORD: ci-only-password
-      DJANGO_DB_HOST: localhost
-      DJANGO_DB_PORT: "5432"
     services:
       # Migrations and the model tests need a real PostgreSQL; the version
       # tracks docker-compose.yml so CI tests what the developer runs.
@@ -116,37 +170,13 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: true
-          # A key of its own and saved from main only, as in `hooks`.
+          # The key `static` restores, saved here and from main only, as in
+          # `hooks`. No Node: no test runs it.
           cache-suffix: check
           save-cache: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install dependencies
         run: uv sync --locked
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: frontend/.nvmrc
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Frontend install
-        run: npm ci
-        working-directory: frontend
-
-      # Every check below is a step of scripts/check.py, called by name: what
-      # each one runs, in which order and why, is written there once. DEBUG off
-      # and the TLS flag travel with the steps too; this job sets only the
-      # credentials and the database. tests/test_check_script.py fails if a
-      # step of this job or of `hooks` runs anything else, goes missing,
-      # repeats or changes places.
-      - name: Frontend lint, types, catalogues, contrast, tests and build
-        run: uv run python scripts/check.py frontend
-
-      - name: Types
-        run: uv run python scripts/check.py types
-
-      - name: System and deployment checks
-        run: uv run python scripts/check.py deploy
 
       # About twice its measured median of 54.5 s, rounded up to minutes: a suite
       # that needs longer has grown a regression to look at, not to wait for.

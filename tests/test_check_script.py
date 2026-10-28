@@ -26,10 +26,11 @@ WORKFLOW = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "c
 
 # The jobs that run the chain, in chain order, each with the one prefix its
 # calls use. Between them they call every step exactly once. `hooks` installs
-# only the dev group, so it never pays for the torch download `check` needs.
+# only the dev group, so it never pays for the torch download the others need.
 CHAIN_JOBS = {
     "hooks": "uv run --only-dev --locked python scripts/check.py",
-    "check": "uv run python scripts/check.py",
+    "static": "uv run python scripts/check.py",
+    "tests": "uv run python scripts/check.py",
 }
 # What a chain job may do besides calling the chain: get the tools it needs.
 SETUP_RUNS = frozenset({"uv sync --locked", "npm ci"})
@@ -285,35 +286,41 @@ def _workflow(
     runs: list[str],
     job_env: tuple[str, ...] = (),
     extra: str = "",
-    top: str = "",
+    workflow_env: tuple[str, ...] = (),
     job_extra: str = "",
     hooks: list[str] | None = None,
     hooks_extra: str = "",
+    tests: list[str] | None = None,
     audit: str = "      - run: uvx pip-audit\n",
 ) -> str:
-    """Chain jobs shaped like the real ones, and a third job outside the chain."""
-    env = "".join(f"      {line}\n" for line in ("DJANGO_SECRET_KEY: k", *job_env))
-    check_head = (
-        f"{job_extra}    env:\n{env}"
-        "    services:\n      postgres:\n        env:\n          POSTGRES_DB: mca\n"
-    )
+    """Chain jobs shaped like the real ones, and a fourth job outside the chain.
+
+    `runs` and the arguments without a job's name in theirs shape `static`, the
+    job most of the steps run in."""
+    env = "".join(f"  {line}\n" for line in ("DJANGO_SECRET_KEY: k", *workflow_env))
+    static_env = "".join(f"      {line}\n" for line in job_env)
+    static_head = job_extra + (f"    env:\n{static_env}" if job_env else "")
+    tests_head = "    services:\n      postgres:\n        env:\n          POSTGRES_DB: mca\n"
     return (
-        f"{top}jobs:\n"
+        f"env:\n{env}jobs:\n"
         + _job("hooks", HOOKS_CALLS if hooks is None else hooks, head=hooks_extra)
-        + _job("check", runs, head=check_head, extra=extra)
+        + _job("static", runs, head=static_head, extra=extra)
+        + _job("tests", TESTS_RUNS if tests is None else tests, head=tests_head)
         + f"  audit:\n    steps:\n{audit}"
     )
 
 
 STEPS = [step.name for step in check.STEPS]
 HOOKS_CALLS = [f"{CHAIN_JOBS['hooks']} {name}" for name in STEPS[:1]]
-CALLS = [f"{CHAIN_JOBS['check']} {name}" for name in STEPS[1:]]
+CALLS = [f"{CHAIN_JOBS['static']} {name}" for name in STEPS[1:-1]]
 IN_ORDER = ["uv sync --locked", "npm ci", *CALLS]
+TESTS_RUNS = ["uv sync --locked", f"{CHAIN_JOBS['tests']} {STEPS[-1]}"]
 
 
-def test_the_hooks_job_runs_the_head_of_the_chain() -> None:
-    """The synthetic split below gives `hooks` the first step and `check` the rest."""
-    assert STEPS[0] == "hooks"
+def test_the_synthetic_split_follows_the_chain() -> None:
+    """The synthetic split below gives `hooks` the first step, `tests` the last
+    and `static` the ones between."""
+    assert (STEPS[0], STEPS[-1]) == ("hooks", "tests")
 
 
 def test_the_synthetic_workflow_is_in_step_with_the_chain() -> None:
@@ -344,7 +351,7 @@ def test_a_comment_naming_the_chain_is_not_a_call() -> None:
             id="steps-reordered",
         ),
         pytest.param(
-            _workflow([f"{CHAIN_JOBS['check']} {STEPS[0]}", *IN_ORDER]),
+            _workflow([f"{CHAIN_JOBS['static']} {STEPS[0]}", *IN_ORDER]),
             "the chain is",
             id="a-step-called-twice",
         ),
@@ -360,9 +367,14 @@ def test_a_comment_naming_the_chain_is_not_a_call() -> None:
             id="a-dash-with-extra-spaces",
         ),
         pytest.param(
-            _workflow(IN_ORDER, hooks=[f"{CHAIN_JOBS['check']} {STEPS[0]}"]),
+            _workflow(IN_ORDER, hooks=[f"{CHAIN_JOBS['static']} {STEPS[0]}"]),
             "the hooks job runs something that is not a step",
             id="the-hooks-job-installs-everything",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER, tests=["uv sync --locked", "uv run pytest"]),
+            "the tests job runs something that is not a step",
+            id="the-tests-job-runs-pytest-itself",
         ),
         pytest.param(
             _workflow(IN_ORDER, audit=f"      - run: {CALLS[-1]}\n"),
@@ -401,12 +413,12 @@ def test_a_comment_naming_the_chain_is_not_a_call() -> None:
         ),
         pytest.param(
             _workflow(IN_ORDER, job_extra="    continue-on-error: true\n"),
-            "the check job has `continue-on-error:`",
+            "the static job has `continue-on-error:`",
             id="a-job-allowed-to-fail",
         ),
         pytest.param(
             _workflow(IN_ORDER, job_extra="    if: false\n"),
-            "the check job has `if:`",
+            "the static job has `if:`",
             id="a-job-skipped",
         ),
         pytest.param(
@@ -433,11 +445,11 @@ def test_a_comment_naming_the_chain_is_not_a_call() -> None:
         ),
         pytest.param(
             _workflow(IN_ORDER, job_env=('DJANGO_DEBUG: "false"',)),
-            "the check job sets DJANGO_DEBUG",
+            "the static job sets DJANGO_DEBUG",
             id="the-mode-in-the-job",
         ),
         pytest.param(
-            _workflow(IN_ORDER, top='env:\n  DJANGO_DEBUG: "false"\n'),
+            _workflow(IN_ORDER, workflow_env=('DJANGO_DEBUG: "false"',)),
             "the workflow sets DJANGO_DEBUG",
             id="the-mode-in-the-workflow",
         ),
