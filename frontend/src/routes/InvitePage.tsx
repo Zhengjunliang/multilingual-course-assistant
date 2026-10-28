@@ -119,7 +119,7 @@ export default function InvitePage() {
         )
       }
     >
-      {link.failure !== null && <LinkFailure failure={link.failure} />}
+      {link.failure !== null && <LinkFailure failure={link.failure} onRetry={link.retry} />}
       {grant !== null && (
         <form className="flex flex-col gap-room" onSubmit={(event) => void onSubmit(event)}>
           <div className="flex flex-col items-center gap-tight text-center">

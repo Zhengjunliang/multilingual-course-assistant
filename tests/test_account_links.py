@@ -14,7 +14,7 @@ import contextlib
 import hashlib
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -23,6 +23,7 @@ from django.db import connection
 from django.test import Client
 from django.utils import timezone
 from rest_framework.test import APIClient
+from test_account_sessions import age
 from test_catalog_api import as_user
 from test_error_contract import refused
 from test_roles import World, label, world
@@ -162,6 +163,14 @@ def unknown(root: User, ada: User) -> str:
     return "a-token-no-link-was-made-with"
 
 
+def voided_by_a_password_change(root: User, ada: User) -> str:
+    """Its owner has a password they know again."""
+    token = make_link(root, ada)
+    body = {"password": PASSWORD, "new_password": PASSWORD + "!"}
+    assert signed_in(ada).post("/api/auth/password", body, content_type=JSON).status_code == 204
+    return token
+
+
 @pytest.mark.parametrize(
     "token_of",
     [
@@ -169,6 +178,7 @@ def unknown(root: User, ada: User) -> str:
         pytest.param(expired, id="expired"),
         pytest.param(replaced, id="replaced-by-a-newer-one"),
         pytest.param(unknown, id="unknown"),
+        pytest.param(voided_by_a_password_change, id="its-owner-changed-the-password"),
     ],
 )
 @pytest.mark.parametrize(
@@ -216,6 +226,20 @@ def test_a_reset_link_sets_the_password_once_and_signs_the_account_out_everywher
     ]
 
 
+def test_the_owner_resetting_from_a_session_of_their_own_is_signed_out_there_too(
+    root: User, ada: User
+) -> None:
+    """A session the request refreshes on its way in (apps/accounts/middleware.py)
+    would otherwise be saved on the way out, over the row the reset deleted."""
+    own = signed_in(ada)
+    age(own, seen=timedelta(minutes=2))
+    token = make_link(root, ada)
+
+    reset = own.post(RESET_URL, {"token": token, "new_password": NEW_PASSWORD}, content_type=JSON)
+
+    assert (reset.status_code, signed_in_still(own)) == (204, [False])
+
+
 def test_a_password_the_rules_refuse_leaves_the_link_and_the_sessions_as_they_were(
     root: User, ada: User
 ) -> None:
@@ -252,9 +276,10 @@ def an_invitations_life(root: User, ada: User) -> str:
     holder = Client()
     holder.post(INVITATION_URL, {"token": token}, content_type=JSON)
     # Refused, accepted, then refused as dead to the account it made.
-    for password in ("too-short", NEW_PASSWORD, NEW_PASSWORD):
+    for password in ("too-short", NEW_PASSWORD):
         body = {"token": token, "username": "grace", "password": password}
         holder.post(ACCEPT_URL, body, content_type=JSON)
+    holder.post(ACCEPT_URL, {"token": token}, content_type=JSON)
     return token
 
 
@@ -520,28 +545,56 @@ def test_accepting_makes_an_account_staff_of_the_scope_and_signs_it_in(
     ],
 )
 def test_an_account_signed_in_accepts_as_itself(who: str, status: int, code: str | None) -> None:
-    """Whatever account the body names: signed in, none is made. The session
-    that gains the role is given a new key, and stays signed in."""
+    """The token alone. The session that gains the role is given a new key,
+    and stays signed in."""
     w = world()
     token = to_teach(w)
     user: User = getattr(w, who)
     client = as_user(user)
     key = client.cookies[settings.SESSION_COOKIE_NAME].value
-    body = {"token": token, "username": "grace", "password": NEW_PASSWORD}
 
-    response = client.post(ACCEPT_URL, body, format="json")
+    response = client.post(ACCEPT_URL, {"token": token}, format="json")
 
     assert response.status_code == status
     rotated = client.cookies[settings.SESSION_COOKIE_NAME].value != key
     assert (rotated, client.get(ME_URL).json()["authenticated"]) == (code is None, True)
     assert RoleAssignment.objects.filter(user=user, role="teacher", edition=w.ppm_old).exists()
-    assert not User.objects.filter(username="grace").exists()
     if code is not None:
         assert refused(response) == (code, {})
         assert Invitation.objects.exists()
         return
     assert {"role": "teacher", "edition": w.ppm_old.pk} in response.json()["user"]["roles"]
     assert not Invitation.objects.exists()
+
+
+def test_the_token_alone_with_no_session_is_refused_as_signed_out() -> None:
+    """A page that took itself for signed in, its session ended meanwhile: told
+    so, it offers to make an account instead, and the link stays."""
+    w = world()
+    token = to_teach(w)
+
+    response = APIClient().post(ACCEPT_URL, {"token": token}, format="json")
+
+    assert (response.status_code, refused(response)) == (401, ("UNAUTHENTICATED", {}))
+    assert Invitation.objects.exists()
+
+
+def test_an_account_named_while_signed_in_is_made_and_signed_in_as_registering_does() -> None:
+    """A page that took itself for signed out, another window having signed in
+    meanwhile: the account typed is the one that accepts."""
+    w = world()
+    token = to_teach(w)
+    client = as_user(w.student)
+    body = {"token": token, "username": "grace", "password": NEW_PASSWORD}
+
+    response = client.post(ACCEPT_URL, body, format="json")
+
+    assert (response.status_code, client.get(ME_URL).json()["user"]["username"]) == (201, "grace")
+    teaching = RoleAssignment.objects.filter(role="teacher", edition=w.ppm_old)
+    assert (
+        teaching.filter(user__username="grace").exists(),
+        teaching.filter(user=w.student).exists(),
+    ) == (True, False)
 
 
 @pytest.mark.parametrize(

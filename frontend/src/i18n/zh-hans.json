@@ -19,6 +19,7 @@
     "forgotTitle": "忘记密码",
     "forgotBody": "请向管理员索取设置新密码的链接：只能用一次，24 小时内有效。",
     "backToLogIn": "返回登录",
+    "retry": "重试",
     "resetTitle": "设置新密码",
     "currentPassword": "当前密码",
     "newPassword": "新密码",

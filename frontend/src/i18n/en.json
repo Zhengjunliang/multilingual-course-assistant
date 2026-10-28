@@ -19,6 +19,7 @@
     "forgotTitle": "Forgotten password",
     "forgotBody": "Ask the administrator for a link to choose a new one: it works once, for 24 hours.",
     "backToLogIn": "Back to sign in",
+    "retry": "Try again",
     "resetTitle": "Choose a new password",
     "currentPassword": "Current password",
     "newPassword": "New password",

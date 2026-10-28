@@ -19,6 +19,7 @@
     "forgotTitle": "Password dimenticata",
     "forgotBody": "Chiedi all'amministratore un link per sceglierne una nuova: vale una volta sola, per 24 ore.",
     "backToLogIn": "Torna all'accesso",
+    "retry": "Riprova",
     "resetTitle": "Scegli una nuova password",
     "currentPassword": "Password attuale",
     "newPassword": "Nuova password",

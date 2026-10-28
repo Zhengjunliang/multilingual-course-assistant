@@ -30,7 +30,7 @@ from apps.accounts.serializers import (
 from apps.accounts.views import AddressRateThrottle, session_body
 from apps.catalog.invitation_serializers import InvitationGrantSerializer
 from apps.roles.invitations import accept, invitation_for
-from config.errors import django_field_error
+from config.errors import ErrorCode, django_field_error, fail
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -84,29 +84,34 @@ class InvitationLookupView(_LinkView):
 class InvitationAcceptView(_LinkView):
     """`POST`: accepts an invitation, as the account signed in (200) or as one it makes (201).
 
-    Signed in, the body is the token alone. Signed out, it names the account
-    to make as registering does, and its fields are checked before the
+    The body says which, not the session, which may have changed since the
+    page last read it. The token alone accepts as the account signed in, and
+    with none is refused as signed out. A body naming an account makes it as
+    registering does, whoever is signed in, its fields checked before the
     invitation is looked at, so a username taken or a password refused leaves
     the link working; the account made is signed in, as registering signs one
     in. Either way the answer is `me`'s, now naming the role.
     """
 
     def post(self, request: Request) -> Response:
+        if set(request.data) - {"token"}:
+            serializer = InvitedAccountSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            made = serializer.validated_data["user"]
+            accept(serializer.validated_data["token"], made, request)
+            # The backend `RegisterView` names, for the reason it gives; a
+            # session of another account is signed over, as registering does.
+            login(request, made, backend="django.contrib.auth.backends.ModelBackend")
+            return Response(session_body(made), status=status.HTTP_201_CREATED)
         # `isinstance` for the reason `SessionView.get` gives (apps/accounts/views.py).
-        if not isinstance(request.user, AnonymousUser):
-            link = LinkSerializer(data=request.data)
-            link.is_valid(raise_exception=True)
-            user = cast("User", request.user)
-            accept(link.validated_data["token"], user, request)
-            # A new key for a session that now holds a role, as the OWASP
-            # Session Management Cheat Sheet asks on any change of privilege
-            # (outside the repository); it stays signed in.
-            request.session.cycle_key()
-            return Response(session_body(user))
-        serializer = InvitedAccountSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data["user"]
-        accept(serializer.validated_data["token"], user, request)
-        # The backend `RegisterView` names, for the reason it gives.
-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-        return Response(session_body(user), status=status.HTTP_201_CREATED)
+        if isinstance(request.user, AnonymousUser):
+            fail(ErrorCode.UNAUTHENTICATED)
+        link = LinkSerializer(data=request.data)
+        link.is_valid(raise_exception=True)
+        user = cast("User", request.user)
+        accept(link.validated_data["token"], user, request)
+        # A new key for a session that now holds a role, as the OWASP
+        # Session Management Cheat Sheet asks on any change of privilege
+        # (outside the repository); it stays signed in.
+        request.session.cycle_key()
+        return Response(session_body(user))

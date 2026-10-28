@@ -55,7 +55,7 @@ export default function ResetPage() {
         </Link>
       }
     >
-      {link.failure !== null && <LinkFailure failure={link.failure} />}
+      {link.failure !== null && <LinkFailure failure={link.failure} onRetry={link.retry} />}
       {link.target !== null && (
         <form className="flex flex-col gap-room" onSubmit={(event) => void onSubmit(event)}>
           <LineField
