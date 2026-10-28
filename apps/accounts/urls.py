@@ -2,7 +2,12 @@
 
 from django.urls import path
 
-from apps.accounts.self_views import EndSessionsView, PasswordView, SessionsView
+from apps.accounts.self_views import (
+    DeleteAccountView,
+    EndSessionsView,
+    PasswordView,
+    SessionsView,
+)
 from apps.accounts.views import LoginView, LogoutView, RegisterView, SessionView
 
 app_name = "accounts"
@@ -12,6 +17,7 @@ urlpatterns = [
     # only redirects when nothing resolves, and it could not rescue a POST
     # anyway, since the 301 it issues drops the body.
     path("me", SessionView.as_view(), name="me"),
+    path("me/delete", DeleteAccountView.as_view(), name="me-delete"),
     path("login", LoginView.as_view(), name="login"),
     path("logout", LogoutView.as_view(), name="logout"),
     path("register", RegisterView.as_view(), name="register"),

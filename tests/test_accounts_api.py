@@ -45,6 +45,7 @@ LOGOUT_URL = "/api/auth/logout"
 REGISTER_URL = "/api/auth/register"
 PASSWORD_URL = "/api/auth/password"
 SESSIONS_END_URL = "/api/auth/sessions/end"
+DELETE_URL = "/api/auth/me/delete"
 ASK_URL = "/api/ask"
 
 USERNAME = "student"
@@ -580,6 +581,7 @@ def test_signing_in_with_the_csrf_token_from_the_cookie_works(
         pytest.param(
             True, SESSIONS_END_URL, {"password": "guess", "session": "others"}, id="end-sessions"
         ),
+        pytest.param(True, DELETE_URL, {"password": "guess"}, id="delete-account"),
     ],
 )
 def test_the_auth_bucket_refuses_a_sixth_attempt_in_a_minute(

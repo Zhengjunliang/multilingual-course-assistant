@@ -81,6 +81,10 @@ class ErrorCode(StrEnum):
     NOT_ACCEPTABLE = "NOT_ACCEPTABLE"
     UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
     ROLE_ALREADY_HELD = "ROLE_ALREADY_HELD"
+    SELF_NOT_ALLOWED = "SELF_NOT_ALLOWED"
+    ACCOUNT_STILL_ACTIVE = "ACCOUNT_STILL_ACTIVE"
+    ROLES_HELD = "ROLES_HELD"
+    LAST_SUPERUSER = "LAST_SUPERUSER"
     RESOURCE_EXHAUSTED = "RESOURCE_EXHAUSTED"
     UNAVAILABLE = "UNAVAILABLE"
     ENGINE_DOWN = "ENGINE_DOWN"
@@ -160,6 +164,21 @@ SPEC: dict[ErrorCode, Spec] = {
     # A conflict with no field to correct; a taken username is a field's (ALREADY_EXISTS).
     ErrorCode.ROLE_ALREADY_HELD: Spec(
         HTTPStatus.CONFLICT, "fixable", "The user holds this role on this scope already."
+    ),
+    # The rules of apps/accounts/services.py, one code each: what the reader
+    # does first differs, from asking for their roles to be revoked to naming
+    # another superuser.
+    ErrorCode.SELF_NOT_ALLOWED: Spec(
+        HTTPStatus.CONFLICT, "fixable", "The account is the caller's own."
+    ),
+    ErrorCode.ACCOUNT_STILL_ACTIVE: Spec(
+        HTTPStatus.CONFLICT, "fixable", "The account is active; it is deactivated first."
+    ),
+    ErrorCode.ROLES_HELD: Spec(
+        HTTPStatus.CONFLICT, "fixable", "The account holds a staff role; it is revoked first."
+    ),
+    ErrorCode.LAST_SUPERUSER: Spec(
+        HTTPStatus.CONFLICT, "fixable", "The account is the last active superuser."
     ),
     ErrorCode.RESOURCE_EXHAUSTED: Spec(
         HTTPStatus.TOO_MANY_REQUESTS,

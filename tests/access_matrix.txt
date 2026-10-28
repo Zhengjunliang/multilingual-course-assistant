@@ -3,6 +3,7 @@ POST accounts:login                         allow      allow    allow       allo
 POST accounts:logout                        allow      allow    allow       allow             allow allow   allow deny     deny
 GET accounts:me                             allow      allow    allow       allow             allow allow   allow allow    allow
 PATCH accounts:me                           allow      allow    allow       allow             allow allow   allow deny     deny
+POST accounts:me-delete                     allow      allow    allow       allow             allow allow   allow deny     deny
 POST accounts:password                      allow      allow    allow       allow             allow allow   allow deny     deny
 POST accounts:register                      allow      allow    allow       allow             allow allow   allow allow    allow
 GET accounts:sessions                       allow      allow    allow       allow             allow allow   allow deny     deny
