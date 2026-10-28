@@ -25,9 +25,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: CI,
   // None anywhere: a retry reports a race as a pass, and a flaky test is fixed
-  // or deleted (docs/testing.md, section "Flaky tests"). The one CI retry this
-  // replaced went unused: no `browser` job from 2026-10-05 to 2026-10-28, 49
-  // runs, reported a flaky test.
+  // or deleted (docs/testing.md, section "Flaky tests"). Measured before it was
+  // set: 49 `browser` runs, 2026-10-05 to 2026-10-28, with one retry allowed,
+  // reported no flaky test.
   retries: 0,
   reporter: CI ? [["github"], ["list"]] : "list",
   use: {
