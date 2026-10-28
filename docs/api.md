@@ -12,9 +12,14 @@ Every endpoint needs a session except `GET /api/auth/me`, `login`, `register` an
 | `PATCH /api/auth/me` | change the interface language (`locale` is the only writable field) |
 | `POST /api/auth/login` | username + password → session cookie |
 | `POST /api/auth/logout` | end the session (204) |
-| `POST /api/auth/register` | open self-registration, logged in on success (201) |
+| `POST /api/auth/register` | open self-registration, logged in on success (201); `username`, `password` and `locale` are the fields it reads, and the account it makes is a student's whatever else the body holds |
+| `POST /api/auth/password` | `{"password", "new_password"}` → 204: the password changes, this session stays signed in under a new key, and every other session of the account ends |
+| `GET /api/auth/sessions` | the account's live sessions, the last used first: a bare array of `{"id", "current", "user_agent", "ip", "authenticated_at", "last_activity"}`, where `current` marks the one asking |
+| `POST /api/auth/sessions/end` | `{"password", "session"}` → 204: ends the session whose `id` is `session`, or with `"others"` every one but the caller's |
 
-`me` answers 200 when nobody is logged in: "who am I" has an answer for a stranger too, and the page asks it before anything else. Elsewhere a request that needs a session and has none is a 401 `UNAUTHENTICATED`, and a failed CSRF check a 403 `CSRF_FAILED` (section *Errors*). Throttling is per endpoint (`ask` 4/min per account or, anonymous, per address; `auth` 5/min per address) with no global cap; the reasons are next to the rates in [config/settings.py](../config/settings.py).
+`me` answers 200 when nobody is logged in: "who am I" has an answer for a stranger too, and the page asks it before anything else. Elsewhere a request that needs a session and has none is a 401 `UNAUTHENTICATED`, and a failed CSRF check a 403 `CSRF_FAILED` (section *Errors*). Throttling is per endpoint (`ask` 4/min per account or, anonymous, per address; `auth` 5/min, per address on `login` and `register` and per account on `password` and `sessions/end`) with no global cap; the reasons are next to the rates in [config/settings.py](../config/settings.py).
+
+A session lives by its account's tier, a staff one (a superuser or the holder of a role) 1 hour idle and 24 hours in all, a student's 7 days idle and 14 in all, and the first request past either limit finds its caller signed out, answered as a stranger is ([apps/accounts/middleware.py](../apps/accounts/middleware.py); [decisions.md](decisions.md), 2026-10-27, *Signing in stays a server-side session, which lives by its account's tier*). A session's `id` is a digest of its key, so the key, which is the cookie, never leaves the server; the caller's own session is listed but not ended here, and an `id` naming it is the 404 `NOT_FOUND` of an `id` naming no session of the account, since signing out is how it ends. The two changes ask for the current password, and a wrong one is a 400 `WRONG_CREDENTIALS`, as at login ([apps/accounts/self_views.py](../apps/accounts/self_views.py)).
 
 ## Question-answering API
 
@@ -122,9 +127,9 @@ Every error of an `/api/` path answers one body, built by `api_exception_handler
 | Code | Status | Kind | Means | `data` |
 | ---- | ------ | ---- | ----- | ------ |
 | `INVALID_ARGUMENT` | 400 | fixable | fields were rejected, each named in `fields` | |
-| `MALFORMED_REQUEST` | 400 | failure | the request cannot be read: a body that is not JSON or a form past one of Django's `DATA_UPLOAD_MAX_*` limits, a `Host` the site does not serve, a session another request ended | |
+| `MALFORMED_REQUEST` | 400 | failure | the request cannot be read: a body that is not JSON or a form past one of Django's `DATA_UPLOAD_MAX_*` limits, a `Host` the site does not serve | |
 | `WRONG_CREDENTIALS` | 400 | fixable | the login's username or password is wrong; not a 401, on which the page signs its reader out | |
-| `UNAUTHENTICATED` | 401 | fixable | the request needs a session and has none | |
+| `UNAUTHENTICATED` | 401 | fixable | the request needs a session and has none: never had one, past its tier's limits, or ended by another request while it ran | |
 | `PERMISSION_DENIED` | 403 | fixable | the signed-in user lacks the permission | |
 | `CSRF_FAILED` | 403 | failure | the CSRF token is missing or does not match; reloading the page fixes it | |
 | `NOT_FOUND` | 404 | fixable | no such object within the caller's scope, or no route for the path | |
