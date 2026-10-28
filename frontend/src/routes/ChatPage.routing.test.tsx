@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { routes } from "@/App";
 import type { Account } from "@/api/account";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
-import { SessionContext } from "@/auth/SessionProvider";
+import { SessionContext, SessionProvider } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
 import { summary, uuidOf } from "@/test/conversations";
 import { type Mounted, mount } from "@/test/mount";
@@ -79,6 +79,12 @@ let askFails = false;
 let requested: string[] = [];
 /** How many times the page asked the session provider who is signed in. */
 let rechecked = 0;
+/**
+ * Whether the server still holds the reader's session, for the tests that
+ * mount the real provider. Without one it refuses everything but `me` and the
+ * sign-out as unauthenticated.
+ */
+let signedIn = true;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -105,6 +111,14 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   const path = String(input);
   const method = init.method ?? "GET";
   requested.push(`${method} ${path}`);
+  if (path === "/api/auth/me") {
+    return json({ authenticated: signedIn, user: signedIn ? STUDENT : null });
+  }
+  if (method === "POST" && path === "/api/auth/logout") {
+    signedIn = false;
+    return new Response(null, { status: 204 });
+  }
+  if (!signedIn) return codedRefusal("UNAUTHENTICATED");
   if (method === "GET" && path === "/api/conversations") {
     return listFails ? codedRefusal("INTERNAL") : json(conversations);
   }
@@ -209,14 +223,19 @@ function openNewConversation(container: HTMLElement) {
   act(() => container.querySelector<HTMLAnchorElement>('a[href="/"]')?.click());
 }
 
-/** Types a question into the composer under the entry and presses send. */
-function askFromTheFrontDoor(container: HTMLElement) {
+/** Types into the composer: React hears the value set past its own setter. */
+function typeInto(container: HTMLElement, text: string) {
   const field = container.querySelector<HTMLTextAreaElement>("#question");
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
   act(() => {
-    setter?.call(field, "Quali sono le scadenze per l'iscrizione?");
+    setter?.call(field, text);
     field?.dispatchEvent(new Event("input", { bubbles: true }));
   });
+}
+
+/** Types a question into the composer under the entry and presses send. */
+function askFromTheFrontDoor(container: HTMLElement) {
+  typeInto(container, "Quali sono le scadenze per l'iscrizione?");
   act(() => container.querySelector<HTMLButtonElement>("button[type='submit']")?.click());
 }
 
@@ -254,6 +273,12 @@ const OTHER = summary({
   id: ID_8,
   created_at: "2026-09-27T10:00:00Z",
   title: "Quando scadono le tasse?",
+});
+
+// What a test types and does not send is kept for the tab (draft.ts), and
+// every test in this file runs in the same one.
+afterEach(() => {
+  sessionStorage.clear();
 });
 
 describe("the chat page's address", () => {
@@ -870,5 +895,108 @@ describe("another account signed in under the page", () => {
       signedIn: false,
       signedOut: false,
     });
+  });
+});
+
+/** The application as it runs, under the provider that asks the server who is signed in. */
+function app(path: string) {
+  const router = createMemoryRouter(routes, { initialEntries: [path] });
+  const mounted = mount(
+    <ThemeProvider>
+      <SessionProvider>
+        <RouterProvider router={router} />
+      </SessionProvider>
+    </ThemeProvider>,
+  );
+  return { ...mounted, path: () => router.state.location.pathname };
+}
+
+/**
+ * The tab comes back into view, and the provider asks the server who is signed
+ * in (SessionProvider.tsx): how this tab learns of a sign-out, or a sign-in, in
+ * another one.
+ */
+async function backToThisTab() {
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  act(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await settle();
+}
+
+const DRAFT = "E quando scade la seconda rata?";
+
+describe("a session that ends under the page", () => {
+  beforeEach(() => {
+    conversations = [STORED_ROW];
+    requested = [];
+    readFails = false;
+    askFails = false;
+    signedIn = true;
+    vi.stubGlobal("fetch", fakeApi);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    signedIn = true;
+    localStorage.clear();
+  });
+
+  const field = (container: HTMLElement) =>
+    container.querySelector<HTMLTextAreaElement>("#question");
+
+  it.each([
+    ["typed, when another tab signs out", () => backToThisTab()],
+    [
+      "sent, when the server refuses it",
+      async (container: HTMLElement) => {
+        act(() => container.querySelector<HTMLButtonElement>("button[type='submit']")?.click());
+        await settle();
+      },
+    ],
+  ])(
+    "keeps a question %s, through the login page, at the address it was typed at",
+    async (_, end) => {
+      const { container, unmount, path } = app(`/chat/${ID_7}`);
+      await settle();
+      typeInto(container, DRAFT);
+      signedIn = false;
+      await end(container);
+      const lost = path();
+      signedIn = true;
+      await backToThisTab();
+      const back = { path: path(), typed: field(container)?.value };
+      unmount();
+
+      expect({ lost, back }).toEqual({
+        lost: "/login",
+        back: { path: `/chat/${ID_7}`, typed: DRAFT },
+      });
+    },
+  );
+
+  it("forgets the question being typed when the reader signs out", async () => {
+    const { container, unmount, path } = app("/");
+    await settle();
+    typeInto(container, DRAFT);
+    const row = [...container.querySelectorAll('aside button[aria-haspopup="menu"]')].find(
+      (button) => button.textContent?.includes(STUDENT.username),
+    );
+    // Radix opens a menu on pointerdown, not on click (dropdown-menu.test.tsx).
+    act(() => {
+      row?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
+    });
+    const signOut = [...document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (item) => item.textContent === i18n.t("account.logOut"),
+    );
+    act(() => signOut?.click());
+    await settle();
+    const seen = { signedIn, path: path(), typed: field(container)?.value };
+    unmount();
+
+    // The front page, where a visitor gets a composer of their own: the
+    // same address as the draft, which is gone.
+    expect(seen).toEqual({ signedIn: false, path: "/", typed: "" });
   });
 });

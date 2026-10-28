@@ -72,10 +72,19 @@ export function isSessionLost(error: unknown): boolean {
   return error instanceof ApiError && error.code === "UNAUTHENTICATED";
 }
 
-export function csrfToken(): string | null {
-  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+function cookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
   const value = match?.[1];
   return value === undefined ? null : decodeURIComponent(value);
+}
+
+/**
+ * `__Host-csrftoken` behind TLS (config/settings.py says why), `csrftoken`
+ * elsewhere. The prefixed one first: a browser that met the site before it
+ * moved behind TLS may still hold the other, which Django no longer reads.
+ */
+export function csrfToken(): string | null {
+  return cookie("__Host-csrftoken") ?? cookie("csrftoken");
 }
 
 export function writeHeaders(): Record<string, string> {

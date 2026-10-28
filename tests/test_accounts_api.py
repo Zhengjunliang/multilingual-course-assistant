@@ -14,12 +14,15 @@ runtime proving that PBKDF2 is expensive.
 from __future__ import annotations
 
 import logging
+import runpy
 from typing import TYPE_CHECKING
 
 import pytest
 from rest_framework.test import APIClient
 from test_error_contract import refused
 
+import config.env
+import config.settings
 from apps.accounts.models import User
 from apps.catalog.models import Course, CourseEdition, DegreeProgramme
 from apps.qa import engine as engine_module
@@ -88,6 +91,40 @@ def test_me_issues_the_csrf_cookie() -> None:
     response = APIClient().get(ME_URL)
 
     assert "csrftoken" in response.cookies
+
+
+def test_the_deployed_cookies_are_ones_a_browser_takes_under_their_prefix(
+    student: User, settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Under `__Host-`, a cookie that is not Secure, on Path=/ and without a Domain is dropped.
+
+    Dropped by the browser without a word: nobody could sign in, and nothing
+    on the server would say why. The cookie settings are read from
+    config/settings.py run again as deployed, behind TLS with DEBUG off, the
+    block this test is about. The deletion counts too: one that is not Secure
+    is ignored, and signing out would leave the cookie behind.
+    """
+    deployed = config.env.env.model_copy(update={"django_debug": False, "django_behind_tls": True})
+    monkeypatch.setattr(config.env, "env", deployed)
+    for name, value in runpy.run_path(config.settings.__file__).items():
+        if name.startswith(("SESSION_COOKIE_", "CSRF_COOKIE_")):
+            setattr(settings, name, value)
+    client = APIClient()
+    login = {"username": USERNAME, "password": PASSWORD}
+
+    issued = [
+        client.get(ME_URL).cookies[settings.CSRF_COOKIE_NAME],
+        client.post(LOGIN_URL, login, format="json").cookies[settings.SESSION_COOKIE_NAME],
+        client.post(LOGOUT_URL).cookies[settings.SESSION_COOKIE_NAME],
+    ]
+
+    assert [
+        (cookie.key, cookie["secure"], cookie["path"], cookie["domain"]) for cookie in issued
+    ] == [
+        ("__Host-csrftoken", True, "/", ""),
+        ("__Host-sessionid", True, "/", ""),
+        ("__Host-sessionid", True, "/", ""),
+    ]
 
 
 def test_me_names_whoever_is_logged_in(student: User) -> None:

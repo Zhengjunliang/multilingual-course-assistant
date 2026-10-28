@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { readDraft, writeDraft } from "./draft";
 import type { Waiting } from "./useAsk";
 
 interface ComposerProps {
@@ -43,6 +44,11 @@ interface ComposerProps {
   travelFrom?: { top: number } | null;
   /** The entry has just been landed on from a sign-in form: the box rises into place. */
   rise?: boolean;
+  /**
+   * The address the reader is at, under which what they type is kept until it
+   * is sent (draft.ts) and from which the field starts; `null` keeps nothing.
+   */
+  draftAt?: string | null;
 }
 
 export function Composer({
@@ -53,9 +59,10 @@ export function Composer({
   placement = "foot",
   travelFrom = null,
   rise = false,
+  draftAt = null,
 }: ComposerProps) {
   const { t } = useTranslation();
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState(() => (draftAt === null ? "" : readDraft(draftAt)));
   const [travelling, setTravelling] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -63,6 +70,13 @@ export function Composer({
   // the page keeps it, and a composer mounted again after a conversation that
   // could not be read must not slide from there.
   const travelled = useRef(travelFrom);
+
+  // Kept with every keystroke rather than when the field is left: a session
+  // that ends takes the page away without the field ever being left. Sending
+  // empties the field, and the draft with it.
+  useEffect(() => {
+    if (draftAt !== null) writeDraft(draftAt, question);
+  }, [draftAt, question]);
 
   // Measured after the move and before it is painted: the distance from
   // where the field stands now to where it stood is where the box starts.
