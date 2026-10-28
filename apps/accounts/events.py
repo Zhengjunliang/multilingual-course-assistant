@@ -13,7 +13,8 @@ session, before the logout it signals. A session past the deadline Django
 keeps for it is never loaded again, so it signs nobody out and leaves no
 line. Nothing else writes to this logger.
 
-A line is the event's name and `key=value` pairs, each value in its `repr`: a
+A line is the event's name and `key=value` pairs, at INFO, or at WARNING for
+a failure, where a search for attacks starts. Each value is in its `repr`: a
 username typed at a failed login is the caller's own text, and quoted it
 cannot start a line of its own (a newline prints as `\\n`). The request's id
 comes from the console handler's filter (config/request_id.py), as on every
@@ -51,6 +52,9 @@ class AuthEvent(StrEnum):
     SESSIONS_ENDED = "sessions_ended"
 
 
+FAILURES = frozenset({AuthEvent.LOGIN_FAILED, AuthEvent.REAUTH_FAILED})
+
+
 def auth_event(
     event: AuthEvent,
     request: HttpRequest | Request | None,
@@ -69,7 +73,9 @@ def auth_event(
         parts["username"] = user.get_username()
     parts.update(fields)
     parts["ip"] = request.META.get("REMOTE_ADDR") if request is not None else None
-    log.info("%s %s", event.value, " ".join(f"{key}={value!r}" for key, value in parts.items()))
+    level = logging.WARNING if event in FAILURES else logging.INFO
+    pairs = " ".join(f"{key}={value!r}" for key, value in parts.items())
+    log.log(level, "%s %s", event.value, pairs)
 
 
 def logged_in(sender: object, request: HttpRequest, user: AbstractBaseUser, **_: Any) -> None:

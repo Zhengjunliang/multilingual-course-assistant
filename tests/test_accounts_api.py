@@ -393,10 +393,18 @@ def test_each_sign_in_and_out_leaves_one_line_naming_who_and_from_where(
 
     records = [record for record in caplog.records if record.name == "apps.accounts.events"]
     seen = [
-        (record.getMessage().split(" ", 1)[0], getattr(record, "request_id", None))
+        (
+            record.getMessage().split(" ", 1)[0],
+            record.levelname,
+            getattr(record, "request_id", None),
+        )
         for record in records
     ]
-    assert seen == [(event, response["X-Request-ID"]) for event, _ in lines]
+    # A failure is a WARNING, what a search for attacks starts from.
+    levels = {"login_failed": "WARNING"}
+    assert seen == [
+        (event, levels.get(event, "INFO"), response["X-Request-ID"]) for event, _ in lines
+    ]
     for record, (_, username) in zip(records, lines, strict=True):
         assert f"username={username!r}" in record.getMessage()
         assert "ip='127.0.0.1'" in record.getMessage()
