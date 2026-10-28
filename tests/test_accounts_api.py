@@ -231,6 +231,8 @@ def change_to(password: str) -> Response:
         pytest.param("804917365208431", [], id="fifteen-digits"),
         pytest.param("k" * 64, [], id="sixty-four-characters"),
         pytest.param("k7#q2-mVz9Lp4w!", [], id="fifteen-characters"),
+        # Kept as typed (ASVS 6.2.8): trimmed, this one would be too short.
+        pytest.param(" k7#q2-mVz9Lp4w ", [], id="spaces-around"),
         pytest.param(
             "k7#q2-mVz9Lp4w", [("TOO_SHORT", {"min_length": 15})], id="fourteen-characters"
         ),
@@ -273,9 +275,12 @@ def test_a_username_already_taken_is_refused(student: User) -> None:
     assert refused(response) == ("INVALID_ARGUMENT", {"username": ["ALREADY_EXISTS"]})
 
 
-def test_logging_in_starts_a_session(student: User) -> None:
+@pytest.mark.parametrize("password", [PASSWORD, f" {PASSWORD} "], ids=["plain", "spaces-around"])
+def test_logging_in_starts_a_session(password: str) -> None:
+    """With the password exactly as it was set, spaces included."""
+    User.objects.create_user(username=USERNAME, password=password)
     client = APIClient()
-    response = client.post(LOGIN_URL, {"username": USERNAME, "password": PASSWORD}, format="json")
+    response = client.post(LOGIN_URL, {"username": USERNAME, "password": password}, format="json")
 
     assert response.status_code == 200
     assert response.json()["user"]["username"] == USERNAME
