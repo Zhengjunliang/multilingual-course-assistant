@@ -117,6 +117,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return json({ authenticated: signedIn, user: signedIn ? (sessionOf ?? STUDENT) : null });
   }
   if (method === "POST" && path === "/api/auth/logout") {
+    if (!signedIn) return codedRefusal("UNAUTHENTICATED");
     signedIn = false;
     return new Response(null, { status: 204 });
   }
@@ -984,10 +985,16 @@ describe("a session that ends under the page", () => {
     },
   );
 
-  it("forgets the question being typed when the reader signs out", async () => {
+  // Signing out ends the draft, even a sign-out the server refuses because the
+  // session had ended: the reader asked for it, so the page signs out all the same.
+  it.each([
+    ["while the session lasts", true],
+    ["after it ended", false],
+  ])("forgets the question being typed when the reader signs out %s", async (_, lasting) => {
     const { container, unmount, path } = app("/");
     await settle();
     typeInto(container, DRAFT);
+    signedIn = lasting;
     const row = [...container.querySelectorAll('aside button[aria-haspopup="menu"]')].find(
       (button) => button.textContent?.includes(STUDENT.username),
     );
@@ -1000,11 +1007,13 @@ describe("a session that ends under the page", () => {
     );
     act(() => signOut?.click());
     await settle();
-    const seen = { signedIn, path: path(), typed: field(container)?.value };
+    const out = { signedIn, path: path(), typed: field(container)?.value };
+    // The same account, back at the address the draft was typed at.
+    signedIn = true;
+    await backToThisTab();
+    const back = field(container)?.value;
     unmount();
 
-    // The front page, where a visitor gets a composer of their own: the
-    // same address as the draft, which is gone.
-    expect(seen).toEqual({ signedIn: false, path: "/", typed: "" });
+    expect({ out, back }).toEqual({ out: { signedIn: false, path: "/", typed: "" }, back: "" });
   });
 });

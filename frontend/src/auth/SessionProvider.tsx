@@ -18,6 +18,7 @@ import { createContext, type ReactNode, useCallback, useEffect, useMemo, useStat
 
 import type { Account } from "@/api/account";
 import { logIn, logOut, readSession, register, setAccountLocale } from "@/api/account";
+import { isSessionLost } from "@/api/http";
 import { clearDraft } from "@/features/chat/draft";
 import { chooseUiLocale, type UiLocale } from "@/i18n";
 
@@ -96,9 +97,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       logOut: async () => {
         try {
           await logOut();
+        } catch (error) {
+          // A session that had ended is signed out already. Any other failure
+          // leaves it signed in on the server, and the page does not pretend.
+          if (!isSessionLost(error)) throw error;
         } finally {
           // The next reader of a shared screen does not find the question this
-          // one was typing (draft.ts), even when the session had ended before.
+          // one was typing (draft.ts), whatever the server answered.
           clearDraft();
         }
         forget();
