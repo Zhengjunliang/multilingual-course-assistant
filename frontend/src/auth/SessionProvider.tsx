@@ -18,6 +18,7 @@ import { createContext, type ReactNode, useCallback, useEffect, useMemo, useStat
 
 import type { Account } from "@/api/account";
 import { logIn, logOut, readSession, register, setAccountLocale } from "@/api/account";
+import { clearDraft } from "@/features/chat/draft";
 import { chooseUiLocale, type UiLocale } from "@/i18n";
 
 interface SessionValue {
@@ -94,6 +95,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
       logOut: async () => {
         await logOut();
+        // The next reader of a shared screen does not find the question this
+        // one was typing (draft.ts).
+        clearDraft();
         forget();
       },
       chooseLocale: async (locale) => {

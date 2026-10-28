@@ -1,15 +1,16 @@
 /**
- * A refused request, read into one coded `ApiError` (#186).
+ * A refused request, read into one coded `ApiError` (#186), and the CSRF
+ * token a write sends.
  *
  * The coded body, `{"error": {...}}`, is read as it is; any other body is one
  * the client cannot read. Every refusal comes through `request()`, so it is
  * read here, off a stand-in `fetch`: a `GET` touches no cookie and needs no
- * document.
+ * document. The token is read off a stand-in `document`'s cookies.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, isSessionLost, request } from "@/api/http";
+import { ApiError, isSessionLost, request, writeHeaders } from "@/api/http";
 
 const ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
@@ -125,5 +126,22 @@ describe("a lost session", () => {
 
   it("is not a failure that is not the server's answer", () => {
     expect(isSessionLost(new TypeError("Failed to fetch"))).toBe(false);
+  });
+});
+
+describe("the token a write carries", () => {
+  it.each([
+    ["the one Django sets without TLS", "csrftoken=plain", "plain"],
+    ["the one Django sets behind TLS", "__Host-csrftoken=hosted", "hosted"],
+    [
+      "the one behind TLS, beside one left from before",
+      "csrftoken=stale; __Host-csrftoken=hosted",
+      "hosted",
+    ],
+    ["none, when there is no token", "sessionid=x", undefined],
+  ])("is %s", (_, cookies, token) => {
+    vi.stubGlobal("document", { cookie: cookies });
+
+    expect(writeHeaders()["X-CSRFToken"]).toBe(token);
   });
 });

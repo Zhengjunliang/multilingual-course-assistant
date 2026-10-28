@@ -357,3 +357,16 @@ if not DEBUG and env.django_behind_tls:
     SECURE_HSTS_PRELOAD = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    # `__Host-`: a browser takes the cookie only when it is Secure, on Path=/
+    # and names no Domain, so no other host of the same site can plant or
+    # overwrite it (RFC 10017 §6.1.3.2, outside the repository). `check
+    # --deploy` sees none of that; tests/test_accounts_api.py does. Not the
+    # stricter `__Host-Http-` the RFC gives as its example: Django deletes a
+    # cookie without HttpOnly, a browser that knows that prefix ignores such a
+    # deletion, and signing out would leave the cookie behind. SameSite stays
+    # Django's Lax rather than the RFC's preferred Strict: Lax already keeps the
+    # cookies off cross-site writes, which the CSRF token refuses besides, and
+    # Strict would only drop them from a link followed here from another site,
+    # where `/admin/` would show its login form to a superuser signed in.
+    SESSION_COOKIE_NAME = "__Host-sessionid"
+    CSRF_COOKIE_NAME = "__Host-csrftoken"

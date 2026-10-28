@@ -210,9 +210,10 @@ export function useAsk(visitor: boolean) {
   }, []);
 
   // A visitor's history is taken before this question joins the thread, and
-  // once: a busy retry sends the same request again.
+  // once: a busy retry sends the same request again. Resolves to the refusal
+  // that ended the question, `null` when it was answered or stopped.
   const submit = useCallback(
-    async (question: string) => {
+    async (question: string): Promise<ApiError | null> => {
       abort.current?.abort();
       const controller = new AbortController();
       abort.current = controller;
@@ -235,9 +236,9 @@ export function useAsk(visitor: boolean) {
       for (let attempt = 0; ; attempt += 1) {
         try {
           await run(question, history, opened, controller.signal, patch, settle, setState);
-          return;
+          return null;
         } catch (error) {
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted) return null;
 
           // Whatever else threw is the connection, as far as the reader can
           // tell: the request never reached the server, or the stream broke off.
@@ -248,7 +249,7 @@ export function useAsk(visitor: boolean) {
             const failure: Failure = { kind: "failed", error: failed };
             patch({ failure });
             settle({ phase: "stopped", failure });
-            return;
+            return failed;
           }
 
           // The server's own hint, and there always is one on a 503 from this
@@ -259,7 +260,7 @@ export function useAsk(visitor: boolean) {
           try {
             await sleep(seconds, controller.signal);
           } catch {
-            return; // aborted while waiting out the queue
+            return null; // aborted while waiting out the queue
           }
           settle({ phase: "queued" });
         }

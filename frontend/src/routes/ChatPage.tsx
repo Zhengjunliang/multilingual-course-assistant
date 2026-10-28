@@ -35,6 +35,7 @@ import { readConversation } from "@/api/conversations";
 import { isSessionLost } from "@/api/http";
 import { useSession } from "@/auth/useSession";
 import { Composer } from "@/features/chat/Composer";
+import { writeDraft } from "@/features/chat/draft";
 import { spokenNotice } from "@/features/chat/notice";
 import { TurnView } from "@/features/chat/TurnView";
 import { Unreadable } from "@/features/chat/Unreadable";
@@ -49,7 +50,7 @@ import { useShell } from "./shell";
 export default function ChatPage() {
   const { t } = useTranslation();
   const { conversationId } = useParams();
-  const { key: visit } = useLocation();
+  const { key: visit, pathname } = useLocation();
   const navigate = useNavigate();
   const { account, forget, recheck } = useSession();
   const { refreshConversations, setBusy } = useShell();
@@ -156,12 +157,23 @@ export default function ChatPage() {
   // (`recede`, index.css), before the thread takes its place and the
   // composer travels to its foot (#177). With reduced motion the thread is
   // there at once.
+  //
+  // A question refused because the session ended goes back into the box, as
+  // kept for this address (draft.ts), before the login page takes over: it
+  // brings the reader back here, to ask it again.
   const onSubmit = (question: string) => {
     if (empty && !reduced) {
       setLeaving(true);
       setHops((count) => count + 1);
     }
-    void submit(question).then(visitor ? recheck : refreshConversations);
+    void submit(question).then((refusal) => {
+      if (isSessionLost(refusal)) {
+        writeDraft(pathname, question);
+        forget();
+      } else {
+        void (visitor ? recheck() : refreshConversations());
+      }
+    });
   };
 
   // The conversation an answer is being written into. `retrying` counts: the
@@ -205,6 +217,7 @@ export default function ChatPage() {
       placement={entry ? "hero" : "foot"}
       travelFrom={travelFrom}
       rise={landed}
+      draftAt={pathname}
     />
   );
 
