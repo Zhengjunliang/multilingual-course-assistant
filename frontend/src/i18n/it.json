@@ -255,7 +255,8 @@
       "programmes": "Corsi di laurea",
       "management": "Gestione",
       "programme": "Corso di laurea",
-      "mine": "I miei insegnamenti"
+      "mine": "I miei insegnamenti",
+      "users": "Account"
     },
     "programmes": {
       "title": "Corsi di laurea",
@@ -455,6 +456,65 @@
       "secretariat": "<person>{{username}}</person> non farà più parte della segreteria didattica di <programme>{{programme}}</programme>.",
       "done": "Ruolo revocato",
       "gone": "{{username}} non aveva più questo ruolo: era già stato revocato altrove."
+    },
+    "users": {
+      "title": "Account",
+      "count_one": "{{count}} account",
+      "count_other": "{{count}} account",
+      "state": "Stato",
+      "all": "Tutti",
+      "active": "Attivi",
+      "inactive": "Disattivati",
+      "search": "Cerca per nome utente",
+      "searchLabel": "Cerca un account",
+      "account": "Account",
+      "lastLogin": "Ultimo accesso",
+      "menu": "Azioni",
+      "joined": "dal {{date}}",
+      "never": "Mai",
+      "isActive": "Attivo",
+      "isInactive": "Disattivato",
+      "none": "Nessun account corrisponde.",
+      "actions": "Azioni per {{username}}",
+      "pages": "Pagine",
+      "page": "Pagina {{page}} di {{pages}}",
+      "previous": "Precedente",
+      "next": "Successiva",
+      "gone": "L'account {{username}} non c'è più: è stato eliminato altrove.",
+      "failed": "Operazione non riuscita",
+      "deactivate": {
+        "action": "Disattiva",
+        "title": "Disattivare l'account?",
+        "body": "<person>{{username}}</person> non potrà più accedere, e ogni sua sessione finisce subito.",
+        "done": "Account disattivato"
+      },
+      "activate": {
+        "action": "Riattiva",
+        "done": "Account riattivato"
+      },
+      "sessions": {
+        "action": "Disconnetti ovunque",
+        "title": "Disconnettere l'account ovunque?",
+        "body": "Ogni sessione di <person>{{username}}</person> finisce: dovrà accedere di nuovo.",
+        "done": "Disconnesso ovunque"
+      },
+      "delete": {
+        "action": "Elimina",
+        "title": "Eliminare l'account?",
+        "body": "<person>{{username}}</person> viene eliminato con le sue conversazioni, e non si può recuperare.",
+        "done": "Account eliminato"
+      },
+      "link": {
+        "action": "Link per la password",
+        "title": "Link per la password"
+      }
+    },
+    "link": {
+      "label": "Link",
+      "copy": "Copia",
+      "copied": "Copiato",
+      "done": "Fatto",
+      "once": "Vale una volta, fino al {{date}}. Non verrà mostrato di nuovo: copialo ora e consegnalo a mano."
     },
     "retry": "Riprova",
     "failure": {

@@ -255,7 +255,8 @@
       "programmes": "Degree programmes",
       "management": "Management",
       "programme": "Degree programme",
-      "mine": "My courses"
+      "mine": "My courses",
+      "users": "Accounts"
     },
     "programmes": {
       "title": "Degree programmes",
@@ -455,6 +456,65 @@
       "secretariat": "<person>{{username}}</person> will no longer be part of the teaching secretariat of <programme>{{programme}}</programme>.",
       "done": "Role revoked",
       "gone": "{{username}} no longer held this role: it had been revoked elsewhere."
+    },
+    "users": {
+      "title": "Accounts",
+      "count_one": "{{count}} account",
+      "count_other": "{{count}} accounts",
+      "state": "State",
+      "all": "All",
+      "active": "Active",
+      "inactive": "Deactivated",
+      "search": "Search by username",
+      "searchLabel": "Search an account",
+      "account": "Account",
+      "lastLogin": "Last sign-in",
+      "menu": "Actions",
+      "joined": "since {{date}}",
+      "never": "Never",
+      "isActive": "Active",
+      "isInactive": "Deactivated",
+      "none": "No account matches.",
+      "actions": "Actions for {{username}}",
+      "pages": "Pages",
+      "page": "Page {{page}} of {{pages}}",
+      "previous": "Previous",
+      "next": "Next",
+      "gone": "The account {{username}} is no longer there: it was deleted elsewhere.",
+      "failed": "The action did not go through",
+      "deactivate": {
+        "action": "Deactivate",
+        "title": "Deactivate the account?",
+        "body": "<person>{{username}}</person> can no longer sign in, and every one of its sessions ends now.",
+        "done": "Account deactivated"
+      },
+      "activate": {
+        "action": "Reactivate",
+        "done": "Account reactivated"
+      },
+      "sessions": {
+        "action": "Sign out everywhere",
+        "title": "Sign the account out everywhere?",
+        "body": "Every session of <person>{{username}}</person> ends: it will have to sign in again.",
+        "done": "Signed out everywhere"
+      },
+      "delete": {
+        "action": "Delete",
+        "title": "Delete the account?",
+        "body": "<person>{{username}}</person> is deleted with its conversations, and cannot be recovered.",
+        "done": "Account deleted"
+      },
+      "link": {
+        "action": "Password link",
+        "title": "Password link"
+      }
+    },
+    "link": {
+      "label": "Link",
+      "copy": "Copy",
+      "copied": "Copied",
+      "done": "Done",
+      "once": "Works once, until {{date}}. It will not be shown again: copy it now and hand it over yourself."
     },
     "retry": "Try again",
     "failure": {

@@ -24,16 +24,24 @@ import { AssignDialog } from "./AssignDialog";
 import { shownName } from "./people";
 import { RevokeDialog, type Revoking } from "./RevokeDialog";
 
-/** The handler that puts focus somewhere real when the dialog that held it closes. */
-function returnFocus(
+/** Puts focus on `trigger`, else on the first of `fallbacks` still on the page, else on its heading. */
+export function focusBack(
+  trigger: HTMLElement | undefined,
+  fallbacks: readonly (Element | null | undefined)[],
+) {
+  const heading = document.querySelector("main h1");
+  const target = [trigger, ...fallbacks, heading].find((element) => element?.isConnected);
+  if (target instanceof HTMLElement) target.focus();
+}
+
+/** The handler that puts focus somewhere real when the dialog that held it closes (`focusBack`). */
+export function returnFocus(
   trigger: () => HTMLElement | undefined,
   fallbacks: () => readonly (Element | null | undefined)[],
 ) {
   return (event: Event) => {
     event.preventDefault();
-    const heading = document.querySelector("main h1");
-    const target = [trigger(), ...fallbacks(), heading].find((element) => element?.isConnected);
-    if (target instanceof HTMLElement) target.focus();
+    focusBack(trigger(), fallbacks());
   };
 }
 

@@ -13,7 +13,7 @@
  * same items as icons.
  */
 
-import { BookOpen, GraduationCap, type LucideIcon } from "lucide-react";
+import { BookOpen, GraduationCap, type LucideIcon, UsersRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 
@@ -26,6 +26,7 @@ export const ICON: Record<ManagementKey, LucideIcon> = {
   programmes: GraduationCap,
   programme: GraduationCap,
   mine: BookOpen,
+  users: UsersRound,
 };
 
 /** Where the reader stands relative to an item, as `aria-current` says it. */

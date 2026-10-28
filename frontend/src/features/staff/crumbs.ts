@@ -13,10 +13,13 @@
  * teacher, who views no programme — an edition sits under the teacher's own
  * courses.
  *
+ * The accounts' page stands alone, under no programme.
+ *
  * The trail also names its area, the Gestione item it starts from, whose icon
  * leads the breadcrumb: "I miei insegnamenti" for a page reached through the
- * teacher's own courses, the programmes otherwise. A key and not the icon, so
- * the trail stays plain data (routes/shell.ts carries it as text).
+ * teacher's own courses, the accounts for theirs, the programmes otherwise.
+ * A key and not the icon, so the trail stays plain data (routes/shell.ts
+ * carries it as text).
  */
 
 import type { TFunction } from "i18next";
@@ -36,6 +39,7 @@ export type StaffPage =
   | { kind: "course"; course: Named; programme: ProgrammeName | null }
   | { kind: "edition"; course: Named; year: string; programme: ProgrammeName | null }
   | { kind: "mine" }
+  | { kind: "users" }
   | { kind: "notFound" };
 
 export function programmeLabel(programme: ProgrammeName): string {
@@ -79,6 +83,7 @@ export function area(page: StaffPage, root: ManagementKey | null): ManagementKey
     (page.kind === "edition" && page.programme === null) ||
     (page.kind === "notFound" && root === "mine");
   if (mine) return "mine";
+  if (page.kind === "users") return "users";
   return root === "programme" ? "programme" : "programmes";
 }
 
@@ -112,6 +117,8 @@ export function crumbs(page: StaffPage, root: ManagementKey | null, t: TFunction
       ];
     case "mine":
       return [{ label: t("staff.nav.mine") }];
+    case "users":
+      return [{ label: t("staff.nav.users") }];
     case "notFound":
       return [...(root === "mine" ? [mine] : []), { label: t("staff.refusal.notFound") }];
   }

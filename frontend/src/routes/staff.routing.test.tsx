@@ -413,7 +413,7 @@ afterEach(() => {
 });
 
 describe("the Gestione group and /staff", () => {
-  it.each<[string, Account, string[][], string]>([
+  it.each<[string, Account, (string | undefined)[][], string]>([
     ["a student", STUDENT, [], "/"],
     // Each item counts what its page lists: the editions taught, the one
     // programme's courses, the programmes.
@@ -430,7 +430,15 @@ describe("the Gestione group and /staff", () => {
       [["Corsi di laurea", "2", "/staff/programmes"]],
       "/staff/programmes",
     ],
-    ["the superuser", ADMIN, [["Corsi di laurea", "2", "/staff/programmes"]], "/staff/programmes"],
+    [
+      "the superuser",
+      ADMIN,
+      [
+        ["Corsi di laurea", "2", "/staff/programmes"],
+        ["Account", undefined, "/staff/users"],
+      ],
+      "/staff/programmes",
+    ],
     // The programme first, and `/staff` waits for the list to know it.
     [
       "secretariat staff who teach",

@@ -10,7 +10,8 @@
  * prototype's shape (its secretariat opens on its programme), carried over to
  * staff of several programmes (docs/decisions.md, 2026-10-05, *The staff
  * pages live in the chat shell*, point 1). A teacher also gets their own courses, after
- * any programme item, so an account that runs a programme lands on it.
+ * any programme item, so an account that runs a programme lands on it; the
+ * superuser gets the accounts last, the one item no programme leads to.
  * An edition's page counts as inside the programme item when there is one,
  * and inside the teacher's own courses otherwise.
  *
@@ -22,7 +23,7 @@ import type { Account } from "@/api/account";
 import type { Programme } from "@/api/catalog";
 import { teaches } from "@/auth/staff";
 
-export type ManagementKey = "programmes" | "programme" | "mine";
+export type ManagementKey = "programmes" | "programme" | "mine" | "users";
 
 export interface ManagementItem {
   key: ManagementKey;
@@ -32,13 +33,15 @@ export interface ManagementItem {
   /**
    * What the item's page lists, as its `Count` shows it: the programmes, the
    * one programme's courses, or the editions the account teaches. `null` while
-   * the superuser's list has not arrived.
+   * the superuser's list has not arrived, and for the accounts, which only
+   * their own page counts.
    */
   count: number | null;
 }
 
 const LIST = "/staff/programmes";
 const MINE = "/staff/mine";
+const USERS = "/staff/users";
 
 export function managementItems(
   account: Account,
@@ -70,6 +73,7 @@ export function managementItems(
     );
     items.push({ key: "mine", to: MINE, within: [MINE, ...editions], count: taught.size });
   }
+  if (account.is_superuser) items.push({ key: "users", to: USERS, within: [USERS], count: null });
   return items;
 }
 

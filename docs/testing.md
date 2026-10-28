@@ -71,6 +71,7 @@ Each of these is the only guard of what it protects. One that meets a criterion 
 | `rag/` runs without Django | `tests/test_smoke.py` |
 | The TypeScript mirror of `apps/qa/contract.py` | `tests/test_qa_contract.py` |
 | The TypeScript mirror of the catalogue serializers and the permission names | `tests/test_catalog_contract.py` |
+| The TypeScript mirror of the superusers' account serializers and their page size | `tests/test_admin_contract.py` |
 | Login, logout, sessions, CSRF and the login throttle | `tests/test_accounts_api.py`; `tests/test_account_sessions.py` for the session rows and the account changes that end them |
 | Migration drift, which no other step checks | `tests/test_accounts.py::test_no_pending_migrations` |
 | Every route says who may call it | `tests/test_route_permissions.py` |

@@ -10,13 +10,13 @@ import type { Page } from "@playwright/test";
 
 import it from "../src/i18n/it.json" with { type: "json" };
 import { type Api, expect } from "./api";
-import { CONVERSATION, COURSE, LINK_TOKEN, PROGRAMME, STAFF, STUDENT } from "./fixtures";
+import { ADMIN, CONVERSATION, COURSE, LINK_TOKEN, PROGRAMME, STAFF, STUDENT } from "./fixtures";
 
 export interface Screen {
   path: string;
   /** The address's fragment, `#` and all: the token of a link a page opens. */
   hash?: string;
-  as: "visitor" | "student" | "staff";
+  as: "visitor" | "student" | "staff" | "admin";
   /** An element only this screen, fully drawn, shows, by its role and its exact name. */
   mark: { role: "heading" | "button" | "link"; name: string };
 }
@@ -69,6 +69,7 @@ export const SCREENS: Screen[] = [
     mark: heading(it.staff.syllabus.section.obiettivi_formativi),
   },
   { path: "/staff/mine", as: "staff", mark: heading(it.staff.mine.title) },
+  { path: "/staff/users", as: "admin", mark: heading(it.staff.users.title) },
   { path: "/staff/nowhere", as: "staff", mark: heading(it.staff.refusal.notFound) },
   { path: "/nowhere", as: "visitor", mark: heading(it.notFound.title) },
 ];
@@ -94,6 +95,10 @@ export async function visit(page: Page, api: Api, screen: Screen): Promise<void>
   } else if (screen.as === "staff") {
     api.signIn(STAFF);
     api.catalog();
+  } else if (screen.as === "admin") {
+    api.signIn(ADMIN);
+    api.catalog();
+    api.users();
   }
   await page.goto(screen.path + (screen.hash ?? ""));
   const { role, name } = screen.mark;
