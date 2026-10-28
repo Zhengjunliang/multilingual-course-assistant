@@ -33,6 +33,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.events import AuthEvent, auth_event
 from apps.accounts.permissions import AllowAnyWithCsrf
 from apps.accounts.serializers import LoginSerializer, RegisterSerializer, UserSerializer
 
@@ -122,6 +123,8 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        # Django signals a login and not a registration (apps/accounts/events.py).
+        auth_event(AuthEvent.REGISTER, request, user)
         # Signed in on the way out. The alternative is a second form asking for
         # the two fields just typed. A user that did not come through
         # `authenticate` carries no backend, and with two configured `login`
