@@ -8,7 +8,14 @@ from apps.accounts.self_views import (
     PasswordView,
     SessionsView,
 )
-from apps.accounts.views import LoginView, LogoutView, RegisterView, SessionView
+from apps.accounts.views import (
+    LoginView,
+    LogoutView,
+    RegisterView,
+    ResetLookupView,
+    ResetView,
+    SessionView,
+)
 
 app_name = "accounts"
 
@@ -24,4 +31,6 @@ urlpatterns = [
     path("password", PasswordView.as_view(), name="password"),
     path("sessions", SessionsView.as_view(), name="sessions"),
     path("sessions/end", EndSessionsView.as_view(), name="sessions-end"),
+    path("reset/lookup", ResetLookupView.as_view(), name="reset-lookup"),
+    path("reset", ResetView.as_view(), name="reset"),
 ]

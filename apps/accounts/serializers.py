@@ -161,6 +161,18 @@ class DeleteAccountSerializer(serializers.Serializer):
     password = password_field()
 
 
+class LinkSerializer(serializers.Serializer):
+    """The token of a link (apps/accounts/links.py), as the page read it off the link."""
+
+    token = serializers.CharField()
+
+
+class PasswordResetSerializer(LinkSerializer):
+    """A reset link's token, and the password it sets."""
+
+    new_password = password_field()
+
+
 class AccountSessionSerializer(serializers.ModelSerializer[AccountSession]):
     """A row of the device list; `current` is the session the list was asked from."""
 

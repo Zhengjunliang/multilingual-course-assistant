@@ -44,3 +44,10 @@ class ManagedUserSerializer(serializers.ModelSerializer[User]):
             role_scope(row.role, row.edition_id, row.programme.code if row.programme else None)
             for row in getattr(user, ROLE_ROWS)
         ]
+
+
+class ResetLinkSerializer(serializers.Serializer):
+    """A reset link just made (apps/accounts/links.py): the one time its token is shown."""
+
+    token = serializers.CharField(read_only=True)
+    expires_at = serializers.DateTimeField(read_only=True)

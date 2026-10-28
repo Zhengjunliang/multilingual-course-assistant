@@ -1,4 +1,4 @@
-"""The project's user model, and the sessions signed in to it.
+"""The project's user model, the sessions signed in to it, and the link that resets its password.
 
 Swapped in before the first `migrate` on purpose: `contrib.auth` and `admin`
 declare their dependency on the user model through `swappable_dependency`, so a
@@ -56,3 +56,21 @@ class AccountSession(AbstractBaseSession):
     @classmethod
     def get_session_store_class(cls) -> type[SessionStore]:
         return SessionStore
+
+
+class ResetLink(models.Model):
+    """A link that sets its account's password once (apps/accounts/links.py).
+
+    One per account at most, so a new link replaces the one before it. The
+    token is kept as its digest alone, so a copy of the table resets nothing.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reset_link"
+    )
+    token_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+
+    def __str__(self) -> str:
+        # Never the digest: whatever prints a row has no use for it.
+        return f"reset link #{self.pk}"

@@ -1,13 +1,14 @@
 """The accounts, managed by a superuser from the site: listed, deactivated, reactivated,
-signed out, deleted.
+signed out, deleted, and given a link that resets the password.
 
 The site's door to what `/admin/` also does (apps/accounts/admin.py), and
 through the same rules: each change goes through apps/accounts/services.py,
 which refuses taking away the caller's own access and deleting an account
-still active, and logs what it did. Shaped as GitLab's user administration
-(outside the repository: its REST API documentation, "Users"): an action is a
-`POST` to a path of its own under the account, and deleting is the account's
-`DELETE`.
+still active, and logs what it did. A reset link, which `/admin/` does not
+make, comes from apps/accounts/links.py, and not for the caller's own
+account either. Shaped as GitLab's user administration (outside the
+repository: its REST API documentation, "Users"): an action is a `POST` to a
+path of its own under the account, and deleting is the account's `DELETE`.
 
 No password is asked again, as `/admin/` asks none: a superuser's session is
 held to staff's limits, an hour idle (apps/accounts/middleware.py), and each
@@ -28,8 +29,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts import services
-from apps.accounts.manage_serializers import ROLE_ROWS, ManagedUserSerializer
+from apps.accounts import links, services
+from apps.accounts.manage_serializers import (
+    ROLE_ROWS,
+    ManagedUserSerializer,
+    ResetLinkSerializer,
+)
 from apps.accounts.models import User
 from apps.accounts.permissions import IsSuperuser
 from apps.roles.models import RoleAssignment
@@ -131,3 +136,22 @@ class EndSessionsView(APIView):
 
     def post(self, request: Request, pk: int) -> Response:
         return change(request, pk, services.sign_out)
+
+
+class ResetLinkView(APIView):
+    """`POST`: a link that sets the account's password, voiding any before it (201).
+
+    The token is in this answer and nowhere else: the superuser hands the link
+    over, and a lost one is replaced by making another.
+    """
+
+    permission_classes = SUPERUSERS
+
+    def post(self, request: Request, pk: int) -> Response:
+        user = get_object_or_404(User, pk=pk)
+        try:
+            token, expires_at = links.make_reset_link(cast("User", request.user), user, request)
+        except services.AccountRuleError as exc:
+            services.refuse(exc.rule)
+        body = ResetLinkSerializer({"token": token, "expires_at": expires_at}).data
+        return Response(body, status=status.HTTP_201_CREATED)

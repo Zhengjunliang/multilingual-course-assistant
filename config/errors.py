@@ -77,6 +77,7 @@ class ErrorCode(StrEnum):
     CSRF_FAILED = "CSRF_FAILED"
     NOT_FOUND = "NOT_FOUND"
     CONVERSATION_GONE = "CONVERSATION_GONE"
+    LINK_EXPIRED = "LINK_EXPIRED"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_ACCEPTABLE = "NOT_ACCEPTABLE"
     UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
@@ -151,6 +152,11 @@ SPEC: dict[ErrorCode, Spec] = {
     # Apart from NOT_FOUND because the chat starts a new conversation on it.
     ErrorCode.CONVERSATION_GONE: Spec(
         HTTPStatus.NOT_FOUND, "fixable", "The conversation does not exist."
+    ),
+    # Apart from NOT_FOUND because the page asks for a new link on it, and one
+    # code whatever the reason: the holder does the same thing for each.
+    ErrorCode.LINK_EXPIRED: Spec(
+        HTTPStatus.NOT_FOUND, "fixable", "The link is unknown, used, replaced or expired."
     ),
     ErrorCode.METHOD_NOT_ALLOWED: Spec(
         HTTPStatus.METHOD_NOT_ALLOWED, "failure", "The method is not allowed here."

@@ -151,6 +151,7 @@
     "CSRF_FAILED": "页面已过期，请重新加载后再试。",
     "NOT_FOUND": "它已经不存在了。",
     "CONVERSATION_GONE": "这个对话已经不存在了，请开始新的对话。",
+    "LINK_EXPIRED": "这个链接已经失效，请向给你链接的人要一个新的。",
     "METHOD_NOT_ALLOWED": "$t(errors.INTERNAL)",
     "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",

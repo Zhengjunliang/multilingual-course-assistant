@@ -86,6 +86,7 @@ def targets(
         "manage:user": account,
         "manage:user-activate": account,
         "manage:user-deactivate": account,
+        "manage:user-reset-link": account,
         "manage:user-sessions-end": account,
         "qa:conversation": {"pk": conversation.pk},
         "qa:source": {"sha256": SHA},
