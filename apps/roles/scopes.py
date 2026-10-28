@@ -193,22 +193,28 @@ def held_on(user: Caller, scope: CourseEdition | DegreeProgramme) -> frozenset[P
     return frozenset() if row is None else permissions_on(caller, row)
 
 
-def role_scopes(user: User) -> list[dict[str, object]]:
-    """Where `user` holds a role, one entry per row, in one query.
+# The order a user's roles are listed in, wherever they are listed.
+ROLE_ORDER = ("role", "edition", "programme__code")
 
-    Each scope is named by the key a URL would name it with: an edition by its
+
+def role_scope(role: str, edition: int | None, programme: str | None) -> dict[str, object]:
+    """One role row as the API names it.
+
+    The scope is named by the key a URL would name it with: an edition by its
     id, a programme by its code. What the role allows there is not part of the
     entry; it is answered per scope, and the SPA never derives a permission
     from a role name.
     """
+    if role == Role.TEACHER:
+        return {"role": role, "edition": edition}
+    return {"role": role, "programme": programme}
+
+
+def role_scopes(user: User) -> list[dict[str, object]]:
+    """Where `user` holds a role, one entry per row, in one query."""
     rows = (
         RoleAssignment.objects.filter(user=user)
-        .order_by("role", "edition", "programme__code")
+        .order_by(*ROLE_ORDER)
         .values_list("role", "edition", "programme__code")
     )
-    return [
-        {"role": role, "edition": edition}
-        if role == Role.TEACHER
-        else {"role": role, "programme": programme}
-        for role, edition, programme in rows
-    ]
+    return [role_scope(role, edition, programme) for role, edition, programme in rows]

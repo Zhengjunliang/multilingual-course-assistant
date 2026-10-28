@@ -34,3 +34,16 @@ class AllowAnyWithCsrf(BasePermission):
         if not request.user.is_authenticated:
             CodedSessionAuthentication().enforce_csrf(request)
         return True
+
+
+class IsSuperuser(BasePermission):
+    """The caller is a superuser, and after `IsAuthenticated` an active one.
+
+    DRF's own `IsAdminUser` asks `is_staff`, which here only lets a superuser
+    through the admin's login form (config/admin.py) and never follows from a
+    role (docs/decisions.md, 2026-09-29, *Staff permissions are a registry in
+    code, answered by one backend; the admin is the superuser's*, point 3).
+    """
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return bool(getattr(request.user, "is_superuser", False))

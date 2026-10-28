@@ -22,6 +22,18 @@ Every endpoint needs a session except `GET /api/auth/me`, `login`, `register` an
 
 A session lives by its account's tier, a staff one (a superuser or the holder of a role) 1 hour idle and 24 hours in all, a student's 7 days idle and 14 in all, and the first request past either limit finds its caller signed out, answered as a stranger is ([apps/accounts/middleware.py](../apps/accounts/middleware.py); [decisions.md](decisions.md), 2026-10-27, *Signing in stays a server-side session, which lives by its account's tier*). A session's `id` is a digest of its key, so the key, which is the cookie, never leaves the server; the caller's own session is listed but not ended here, and an `id` naming it is the 404 `NOT_FOUND` of an `id` naming no session of the account, since signing out is how it ends. The three changes ask for the current password, and a wrong one is a 400 `WRONG_CREDENTIALS`, as at login ([apps/accounts/self_views.py](../apps/accounts/self_views.py)). An account that holds a staff role is not deleted, a 409 `ROLES_HELD`, until its roles are revoked, and neither is the last active superuser, a 409 `LAST_SUPERUSER` ([apps/accounts/services.py](../apps/accounts/services.py)).
 
+A superuser manages every account from the site, under `/api/admin/users`, by the rules `/admin/` keeps too ([apps/accounts/manage_views.py](../apps/accounts/manage_views.py)); any other caller gets a 403 `PERMISSION_DENIED`.
+
+| Method and path | Does |
+| --------------- | ---- |
+| `GET /api/admin/users` | every account by username, 50 a page (`?page=`), in DRF's page shape `{"count", "next", "previous", "results"}`; `?q=` keeps the usernames containing it in any case, `?active=true` or `false` the active or the deactivated accounts. A row is `{"id", "username", "is_active", "is_superuser", "last_login", "date_joined", "roles"}`, with `roles` as `me` names them |
+| `POST /api/admin/users/<id>/deactivate` | → 204: the account no longer signs in, and every session of it ends |
+| `POST /api/admin/users/<id>/activate` | → 204: the account signs in again, afresh; an active one is left as it is |
+| `POST /api/admin/users/<id>/sessions/end` | → 204: every session of the account ends, and it stays active |
+| `DELETE /api/admin/users/<id>` | → 204: deletes a deactivated account and its conversations |
+
+No change asks for the password again. A superuser does not take their own access away here, a 409 `SELF_NOT_ALLOWED`, and deletes their own account through `me/delete`; an active account is deactivated before it is deleted, a 409 `ACCOUNT_STILL_ACTIVE`, and an `<id>` naming no account is a 404 `NOT_FOUND` ([apps/accounts/services.py](../apps/accounts/services.py)). A deactivated account signing in gets the 400 `WRONG_CREDENTIALS` of a wrong password.
+
 ## Question-answering API
 
 `POST /api/ask` is the same chain as `rag.agent` over HTTP — route, retrieve, generate — and it answers with a **server-sent event stream**, not a JSON body: one answer takes tens of seconds, and streaming is how the reader sees the system working. It needs what the CLI needs (Ollama running, the Qdrant service up and indexed) plus the server, and an account for course material: an anonymous question is searched against the campus pages only (`scope=[]`, [data-model.md](data-model.md)), so one routed to the slides gets no citation and the refusal, and `route.target` in the `start` event says why.
