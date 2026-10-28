@@ -240,6 +240,20 @@ def pk(username: str) -> int:
             403,
             id="set-a-password",
         ),
+        # Django's own form for the caller's password, which nothing here
+        # throttles or logs: the SPA's is `POST /api/auth/password`.
+        pytest.param(
+            lambda admin: admin.post(
+                "/admin/password_change/",
+                {
+                    "old_password": PASSWORD,
+                    "new_password1": "lamp-orbit-quietly-87",
+                    "new_password2": "lamp-orbit-quietly-87",
+                },
+            ),
+            403,
+            id="change-your-own-password",
+        ),
     ],
 )
 def test_the_admin_refuses_what_the_account_rules_forbid(
