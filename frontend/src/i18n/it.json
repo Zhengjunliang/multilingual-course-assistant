@@ -8,7 +8,7 @@
     "registerTitle": "Crea un account",
     "username": "Nome utente",
     "password": "Password",
-    "passwordHint": "Almeno 8 caratteri.",
+    "passwordHint": "Almeno 15 caratteri. Qualche parola di fila si ricorda facilmente.",
     "showPassword": "Mostra la password",
     "capsLock": "Bloc Maiusc attivo",
     "logIn": "Accedi",
