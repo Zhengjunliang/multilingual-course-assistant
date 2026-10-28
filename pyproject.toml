@@ -153,6 +153,9 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 "tests/**" = ["S101", "S105", "S603", "TID251"]
 # The one module that turns those exceptions into codes.
 "config/errors.py" = ["TID251"]
+# The admin answers with its own pages, never under `/api/`: a model admin
+# refuses with Django's `PermissionDenied`, as Django's own do.
+"apps/*/admin.py" = ["TID251"]
 # The check chain exists to run subprocesses, from a fixed table in its own source.
 "scripts/**" = ["S603"]
 # Written by makemigrations, not by hand. E501: the long lines are Django's own
