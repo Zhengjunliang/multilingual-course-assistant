@@ -186,6 +186,15 @@ REST_FRAMEWORK = {
 # rates only stop one caller from being the entire queue.
 
 
+# Question answering
+
+# The callable that builds the engine's index, encoders and reranker
+# (apps/qa/engine.py), named by dotted path as EMAIL_BACKEND names Django's
+# mail backend. The browser journeys point it at stubs (tests/journeys/), so
+# the code they run has no test branch in it.
+QA_RETRIEVAL = "apps.qa.engine.build_retrieval"
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
