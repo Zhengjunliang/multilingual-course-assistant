@@ -480,12 +480,17 @@ describe("the row under the answer", () => {
       [...list.querySelectorAll("a")].map((row) => row.getAttribute("href")),
     );
     const text = panel?.textContent ?? "";
+    const cited = panel?.querySelector("ol li")?.textContent ?? "";
     unmount();
 
     const at = (page: number) => `/api/sources/${"ab".repeat(32)}#page=${page}`;
     expect(lists).toEqual([[at(3)], [at(4), at(5)]]);
     expect(text).toContain("Altre consultate"); // spellchecker:disable-line
     expect(text).not.toContain("non citata");
+    // A slide's row names its page, its file and the edition it was read from.
+    expect(cited).toContain("Slide p. 3");
+    expect(cited).toContain("deck.pdf");
+    expect(cited).toContain("test · 2025-2026");
   });
 
   it.each<[string, Partial<Turn>]>([

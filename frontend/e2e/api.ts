@@ -21,7 +21,6 @@ import type {
   StudyPlanCourse,
   Syllabus,
 } from "@/api/catalog";
-import type { AskBody } from "@/api/client";
 import type { AnswerEvent } from "@/api/contract";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
 import {
@@ -49,8 +48,6 @@ function frames(events: AnswerEvent[]): string {
 export class Api {
   /** `METHOD /path` of every request no fixture answered. */
   readonly unanswered: string[] = [];
-  /** The body of every question asked, in order. */
-  readonly asked: AskBody[] = [];
   private readonly handlers = new Map<string, Handler>();
   private readonly servers: Server[] = [];
 
@@ -106,7 +103,7 @@ export class Api {
     }
   }
 
-  on(method: string, path: string, handler: Handler): void {
+  private on(method: string, path: string, handler: Handler): void {
     this.handlers.set(`${method} ${path}`, handler);
   }
 
@@ -152,18 +149,12 @@ export class Api {
 
   /** Every question gets this stream, whole. */
   answer(events: AnswerEvent[]): void {
-    this.on("POST", "/api/ask", (request) => {
-      this.asked.push(request.postDataJSON() as AskBody);
-      return { sse: events };
-    });
+    this.on("POST", "/api/ask", () => ({ sse: events }));
   }
 
   /** Every question gets these events, and then the stream stays open. */
   holdAnswer(events: AnswerEvent[]): void {
-    this.on("POST", "/api/ask", (request) => {
-      this.asked.push(request.postDataJSON() as AskBody);
-      return { open: events };
-    });
+    this.on("POST", "/api/ask", () => ({ open: events }));
   }
 }
 
