@@ -47,7 +47,7 @@ function scopeName(grant: InvitationGrant): string {
 export default function InvitePage() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
-  const { account, logOut, forget, recheck } = useSession();
+  const { account, logOut, recheck } = useSession();
   const link = useLink(lookUpInvitation);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -79,7 +79,9 @@ export default function InvitePage() {
           link.died();
           return;
         }
-        if (isSessionLost(error)) forget();
+        // The account the page showed is not signed in: ended, or another
+        // signed in from elsewhere, which the session read again tells apart.
+        if (isSessionLost(error)) void recheck();
         setFailure(describeError(error, { shownFields: FIELDS }));
       },
     );
