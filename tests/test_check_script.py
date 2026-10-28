@@ -57,13 +57,20 @@ CHAIN = re.compile(r"scripts[/.]check\b")
 
 
 def _block(lines: list[str], header: str, indent: int) -> list[str] | None:
-    """The lines under `header`, up to the next key at the same indentation."""
-    if header not in lines:
-        return None
-    start = lines.index(header) + 1
-    sibling = re.compile(" " * indent + r"[^\s#]")
-    end = next((i for i in range(start, len(lines)) if sibling.match(lines[i])), len(lines))
-    return lines[start:end]
+    """The lines under `header`, up to the next key at the same indentation.
+
+    The header line may end in a comment. One that carries its value inline
+    (`env: {KEY: value}`) has no lines under it to read, and is an error rather
+    than an empty block."""
+    for start, line in enumerate(lines, 1):
+        if not line.startswith(header):
+            continue
+        if line[len(header) :].split("#", 1)[0].strip():
+            raise ValueError(f"cannot read {line!r} as a block of lines")
+        sibling = re.compile(" " * indent + r"[^\s#]")
+        end = next((i for i in range(start, len(lines)) if sibling.match(lines[i])), len(lines))
+        return lines[start:end]
+    return None
 
 
 def _jobs(lines: list[str]) -> dict[str, list[str]]:
@@ -453,6 +460,20 @@ def test_a_comment_naming_the_chain_is_not_a_call() -> None:
             "the workflow sets DJANGO_DEBUG",
             id="the-mode-in-the-workflow",
         ),
+        pytest.param(
+            _workflow(IN_ORDER, job_env=('DJANGO_DEBUG: "false"',)).replace(
+                "    env:\n", "    env:  # the mode\n"
+            ),
+            "the static job sets DJANGO_DEBUG",
+            id="the-mode-under-a-commented-job-env",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER, workflow_env=('DJANGO_DEBUG: "false"',)).replace(
+                "env:\n", "env:  # credentials\n", 1
+            ),
+            "the workflow sets DJANGO_DEBUG",
+            id="the-mode-under-a-commented-workflow-env",
+        ),
     ],
 )
 def test_the_drift_guard_names_each_way_of_drifting(workflow: str, reason: str) -> None:
@@ -470,9 +491,28 @@ def test_a_workflow_without_a_chain_job_is_an_error_not_a_pass(job: str) -> None
         drift(workflow)
 
 
-def test_a_job_level_line_the_guard_cannot_read_is_an_error_not_a_pass() -> None:
+@pytest.mark.parametrize(
+    "workflow",
+    [
+        pytest.param(
+            _workflow(IN_ORDER) + "  - run: uv run python scripts/check.py tests\n",
+            id="a-step-at-job-level",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER, job_extra='    env: {PYTEST_ADDOPTS: "-k smoke"}\n'),
+            id="a-job-env-on-one-line",
+        ),
+        pytest.param(
+            _workflow(IN_ORDER).replace(
+                "env:\n  DJANGO_SECRET_KEY: k\n", 'env: {DJANGO_SECRET_KEY: k, DJANGO_DEBUG: "1"}\n'
+            ),
+            id="the-workflow-env-on-one-line",
+        ),
+    ],
+)
+def test_a_line_the_guard_cannot_read_is_an_error_not_a_pass(workflow: str) -> None:
     with pytest.raises(ValueError, match="cannot read"):
-        drift(_workflow(IN_ORDER) + "  - run: uv run python scripts/check.py tests\n")
+        drift(workflow)
 
 
 def test_ci_runs_exactly_the_chain() -> None:
