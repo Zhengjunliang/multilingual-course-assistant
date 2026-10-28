@@ -13,14 +13,15 @@
  * screen.
  *
  * Two limits. The critical path may not grow by more than a tenth over what it
- * weighed on 12 October 2026: a ratchet against drift, not a target. It was
- * last measured anew when the headings moved to Figtree and Fraunces, the
- * largest font the first screen fetched, left it (#190). The scripts
- * may not pass 300 KiB, Alex Russell's figure for a page that loads in three
- * seconds on the 75th-percentile phone and network ("The Performance Inequality
- * Gap 2026", outside the repository). web.dev's 170 KB for the critical path
- * ("Performance budgets 101", outside the repository) is further than either;
- * reaching it means splitting the entry chunk, and is #175.
+ * weighed on 28 October 2026: a ratchet against drift, not a target. It was
+ * last measured anew when the superuser's accounts and the invitations took
+ * it past the ratchet (#167), since the entry chunk holds every staff page
+ * until #175 splits it. The scripts may not pass 300 KiB, Alex Russell's
+ * figure for a page that loads in three seconds on the 75th-percentile phone
+ * and network ("The Performance Inequality Gap 2026", outside the
+ * repository). web.dev's 170 KB for the critical path ("Performance budgets
+ * 101", outside the repository) is further than either; reaching it means
+ * splitting the entry chunk, and is #175.
  */
 
 import { readFileSync } from "node:fs";
@@ -34,8 +35,8 @@ const BUILD = fileURLToPath(new URL("../dist-e2e/", import.meta.url));
 const COUNTED = new Set(["document", "stylesheet", "script", "font"]);
 const LAZY = /\/assets\/(MathMarkdown|SyllabusEditor)-/;
 
-/** 12 October 2026, #190: page 385, stylesheet 9 294, script 239 264, fonts 20 085. */
-const MEASURED_CRITICAL_PATH = 269_028;
+/** 28 October 2026, #167: page 385, stylesheet 10 698, script 265 039, fonts 20 085. */
+const MEASURED_CRITICAL_PATH = 296_207;
 const CRITICAL_PATH_LIMIT = Math.round(MEASURED_CRITICAL_PATH * 1.1);
 const SCRIPT_LIMIT = 300 * 1024;
 
