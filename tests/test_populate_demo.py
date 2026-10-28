@@ -405,6 +405,10 @@ def _with(**changes: Any) -> dict[str, Any]:
     return {**DEMO, **changes}
 
 
+# Shorter than the rules take.
+TOO_SHORT = "too-short"
+
+
 @pytest.mark.parametrize(
     ("demo", "taken", "refusal"),
     [
@@ -473,6 +477,12 @@ def _with(**changes: Any) -> dict[str, Any]:
         pytest.param(
             DEMO, None, "DEMO_PASSWORD is refused for demo-", id="a-demo-password-the-rules-refuse"
         ),
+        pytest.param(
+            DEMO,
+            "with that password, before the rules",
+            "DEMO_PASSWORD is refused for demo-admin:",
+            id="a-demo-password-stored-before-the-rules",
+        ),
     ],
 )
 def test_a_refused_run_changes_nothing(
@@ -489,6 +499,9 @@ def test_a_refused_run_changes_nothing(
     # it writes the catalogue.
     if taken == "before the run":
         User.objects.create_user(username="demo-admin", password=PASSWORD)
+    # A database a run filled when the rules took a shorter password.
+    if taken == "with that password, before the rules":
+        User.objects.create_user(username="demo-admin", password=TOO_SHORT)
     empty = snapshot()
     if taken == "during the run":
         catalogue = Command._catalogue
@@ -501,7 +514,7 @@ def test_a_refused_run_changes_nothing(
 
     # Too short, and refused only once the catalogue is written: the run
     # still leaves nothing behind.
-    password = "too-short" if refusal.startswith("DEMO_PASSWORD") else None
+    password = TOO_SHORT if refusal.startswith("DEMO_PASSWORD") else None
     with pytest.raises(CommandError, match=refusal):
         run(tmp_path, monkeypatch, password, demo, content)
 
