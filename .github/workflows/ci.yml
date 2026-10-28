@@ -95,9 +95,9 @@ jobs:
   # but no database, since none of these steps opens one.
   static:
     runs-on: ubuntu-latest
-    # About twice the old single job's run with a cold uv cache, 138 s, rounded
-    # up to minutes; it catches a hung run.
-    timeout-minutes: 5
+    # About twice its median over three runs of one commit, 90 s (run
+    # 40682814055), rounded up to minutes; it catches a hung run.
+    timeout-minutes: 3
     steps:
       # As in `hooks`, the token is not left in .git/config: nothing here needs it.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -142,9 +142,9 @@ jobs:
   # pytest, the last step of the chain, beside the rest of it.
   tests:
     runs-on: ubuntu-latest
-    # As `static`: about twice a cold-cache run, a guard against a hung job;
+    # As `static`: about twice its median, 107 s, a guard against a hung job;
     # the budget is the cap on the tests step, which network time does not touch.
-    timeout-minutes: 5
+    timeout-minutes: 4
     services:
       # Migrations and the model tests need a real PostgreSQL; the version
       # tracks docker-compose.yml so CI tests what the developer runs.
@@ -178,10 +178,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      # About twice its measured median of 54.5 s, rounded up to minutes: a suite
-      # that needs longer has grown a regression to look at, not to wait for.
+      # About twice its median of 82 s, rounded up to minutes: a suite that needs
+      # longer has grown a regression to look at, not to wait for. The three runs
+      # took 50 to 85 s, every test of the slowest about 1.7 times as long as in
+      # the fastest: the runner, not the suite.
       - name: Tests
-        timeout-minutes: 2
+        timeout-minutes: 3
         run: uv run python scripts/check.py tests
 
   # The browser floors of #134: the built interface in Chromium, every `/api`
@@ -241,8 +243,9 @@ jobs:
   # scripts/check.py, for the reason `browser` is not.
   journeys:
     runs-on: ubuntu-latest
-    # As `static`: about twice a cold-cache run, a guard against a hung job.
-    timeout-minutes: 5
+    # As `static`: about twice its median, 66 s (the journeys themselves 28 s),
+    # a guard against a hung job.
+    timeout-minutes: 3
     services:
       # As in `tests`. The journeys create a database of their own beside it,
       # `mca_journeys`, which this user may: the image makes it a superuser.
