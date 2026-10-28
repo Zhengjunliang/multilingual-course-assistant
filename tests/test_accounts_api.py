@@ -25,6 +25,7 @@ from apps.catalog.models import Course, CourseEdition, DegreeProgramme
 from apps.qa import engine as engine_module
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Role
+from config.request_id import RequestIdFilter
 from rag.chunk import normalize_locale
 
 if TYPE_CHECKING:
@@ -213,6 +214,85 @@ def test_logging_out_ends_the_session(student: User) -> None:
 
     assert client.post(LOGOUT_URL).status_code == 204
     assert client.get(ME_URL).json()["authenticated"] is False
+
+
+WRONG_PASSWORD = "not-the-password"
+CREDENTIALS = {"username": USERNAME, "password": PASSWORD}
+
+
+@pytest.mark.parametrize(
+    ("signed_in", "url", "body", "data_format", "lines"),
+    [
+        pytest.param(False, LOGIN_URL, CREDENTIALS, "json", [("login", USERNAME)], id="login"),
+        pytest.param(True, LOGOUT_URL, None, "json", [("logout", USERNAME)], id="logout"),
+        pytest.param(
+            False,
+            LOGIN_URL,
+            {"username": USERNAME, "password": WRONG_PASSWORD},
+            "json",
+            [("login_failed", USERNAME)],
+            id="wrong-password",
+        ),
+        pytest.param(
+            False,
+            REGISTER_URL,
+            {"username": "ada", "password": PASSWORD},
+            "json",
+            [("register", "ada"), ("login", "ada")],
+            id="register",
+        ),
+        # The admin's own form and views, which pass through no view of this app.
+        pytest.param(
+            False,
+            "/admin/login/",
+            CREDENTIALS,
+            "multipart",
+            [("login", USERNAME)],
+            id="admin-login",
+        ),
+        pytest.param(
+            False,
+            "/admin/login/",
+            {"username": USERNAME, "password": WRONG_PASSWORD},
+            "multipart",
+            [("login_failed", USERNAME)],
+            id="admin-wrong-password",
+        ),
+        pytest.param(
+            True, "/admin/logout/", None, "multipart", [("logout", USERNAME)], id="admin-logout"
+        ),
+    ],
+)
+def test_each_sign_in_and_out_leaves_one_line_naming_who_and_from_where(
+    caplog: pytest.LogCaptureFixture,
+    signed_in: bool,
+    url: str,
+    body: dict[str, str] | None,
+    data_format: str,
+    lines: list[tuple[str, str]],
+) -> None:
+    """#13: the line an incident is traced by, from whichever door was used.
+    A superuser, the one account the admin lets in (config/admin.py)."""
+    User.objects.create_superuser(username=USERNAME, password=PASSWORD)
+    client = logged_in() if signed_in else APIClient()
+    caplog.clear()
+    caplog.handler.addFilter(RequestIdFilter())
+
+    with caplog.at_level(logging.INFO, logger="apps.accounts.events"):
+        response = client.post(url, body, format=data_format)
+
+    records = [record for record in caplog.records if record.name == "apps.accounts.events"]
+    seen = [
+        (record.getMessage().split(" ", 1)[0], getattr(record, "request_id", None))
+        for record in records
+    ]
+    assert seen == [(event, response["X-Request-ID"]) for event, _ in lines]
+    for record, (_, username) in zip(records, lines, strict=True):
+        assert f"username={username!r}" in record.getMessage()
+        assert "ip='127.0.0.1'" in record.getMessage()
+    # The password, right or wrong, is in no line.
+    assert PASSWORD not in caplog.text
+    assert WRONG_PASSWORD not in caplog.text
 
 
 def test_a_student_can_change_the_interface_language(student: User) -> None:
