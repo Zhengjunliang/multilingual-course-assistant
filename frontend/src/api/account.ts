@@ -144,12 +144,16 @@ export interface NewAccount {
 }
 
 /**
- * Accepts as the account signed in, or, given `account`, as one made for it
- * and signed in. Either way the answer is `me`'s, naming the role.
+ * Accepts as the account named: the one signed in, by its `id`, or one made
+ * for it and signed in. A named account that is not the one signed in is a
+ * 401 `UNAUTHENTICATED`. Either way the answer is `me`'s, naming the role.
  */
-export function acceptInvitation(token: string, account?: NewAccount): Promise<Session> {
+export function acceptInvitation(
+  token: string,
+  as: { account: number } | NewAccount,
+): Promise<Session> {
   return request<Session>("/api/auth/invitation/accept", {
     method: "POST",
-    body: JSON.stringify({ token, ...account }),
+    body: JSON.stringify({ token, ...as }),
   });
 }

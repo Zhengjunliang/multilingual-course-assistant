@@ -167,6 +167,12 @@ class LinkSerializer(serializers.Serializer):
     token = serializers.CharField()
 
 
+class AcceptAsSerializer(LinkSerializer):
+    """An invitation's token, and the id of the account signed in that accepts it."""
+
+    account = serializers.IntegerField()
+
+
 class PasswordResetSerializer(LinkSerializer):
     """A reset link's token, and the password it sets."""
 

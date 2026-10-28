@@ -70,7 +70,7 @@ export default function InvitePage() {
       async () => {
         await acceptInvitation(
           link.token,
-          who === null ? { username, password, locale } : undefined,
+          who === null ? { username, password, locale } : { account: who.id },
         );
         await recheck();
       },

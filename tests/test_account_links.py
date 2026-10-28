@@ -279,7 +279,8 @@ def an_invitations_life(root: User, ada: User) -> str:
     for password in ("too-short", NEW_PASSWORD):
         body = {"token": token, "username": "grace", "password": password}
         holder.post(ACCEPT_URL, body, content_type=JSON)
-    holder.post(ACCEPT_URL, {"token": token}, content_type=JSON)
+    grace = User.objects.get(username="grace")
+    holder.post(ACCEPT_URL, {"token": token, "account": grace.pk}, content_type=JSON)
     return token
 
 
@@ -545,7 +546,7 @@ def test_accepting_makes_an_account_staff_of_the_scope_and_signs_it_in(
     ],
 )
 def test_an_account_signed_in_accepts_as_itself(who: str, status: int, code: str | None) -> None:
-    """The token alone. The session that gains the role is given a new key,
+    """Named by its id. The session that gains the role is given a new key,
     and stays signed in."""
     w = world()
     token = to_teach(w)
@@ -553,7 +554,7 @@ def test_an_account_signed_in_accepts_as_itself(who: str, status: int, code: str
     client = as_user(user)
     key = client.cookies[settings.SESSION_COOKIE_NAME].value
 
-    response = client.post(ACCEPT_URL, {"token": token}, format="json")
+    response = client.post(ACCEPT_URL, {"token": token, "account": user.pk}, format="json")
 
     assert response.status_code == status
     rotated = client.cookies[settings.SESSION_COOKIE_NAME].value != key
@@ -567,16 +568,39 @@ def test_an_account_signed_in_accepts_as_itself(who: str, status: int, code: str
     assert not Invitation.objects.exists()
 
 
-def test_the_token_alone_with_no_session_is_refused_as_signed_out() -> None:
-    """A page that took itself for signed in, its session ended meanwhile: told
-    so, it offers to make an account instead, and the link stays."""
+@pytest.mark.parametrize(
+    "signed_in_as",
+    [
+        pytest.param(None, id="nobody"),
+        pytest.param("secretariat", id="another-account"),
+    ],
+)
+def test_an_account_named_but_not_signed_in_is_refused_as_signed_out(
+    signed_in_as: str | None,
+) -> None:
+    """A page that took itself for signed in as the student, its session ended
+    or another window having signed in as someone else meanwhile: told so, it
+    offers to make an account instead, nobody gains the role, the link stays."""
     w = world()
     token = to_teach(w)
+    client = as_user(None if signed_in_as is None else getattr(w, signed_in_as))
+    teachers = RoleAssignment.objects.filter(role="teacher", edition=w.ppm_old).count()
 
-    response = APIClient().post(ACCEPT_URL, {"token": token}, format="json")
+    response = client.post(ACCEPT_URL, {"token": token, "account": w.student.pk}, format="json")
 
     assert (response.status_code, refused(response)) == (401, ("UNAUTHENTICATED", {}))
+    assert RoleAssignment.objects.filter(role="teacher", edition=w.ppm_old).count() == teachers
     assert Invitation.objects.exists()
+
+
+@pytest.mark.parametrize("body", ["5", "null", "[{}]"])
+def test_a_body_that_is_not_an_object_is_refused_as_one(body: str) -> None:
+    w = world()
+    to_teach(w)
+
+    response = Client().post(ACCEPT_URL, body, content_type=JSON)
+
+    assert (response.status_code, refused(response)[0]) == (400, "INVALID_ARGUMENT")
 
 
 def test_an_account_named_while_signed_in_is_made_and_signed_in_as_registering_does() -> None:

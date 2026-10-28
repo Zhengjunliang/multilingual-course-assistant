@@ -23,6 +23,7 @@ from rest_framework.views import APIView
 from apps.accounts.links import reset_link_owner, reset_password
 from apps.accounts.permissions import AllowAnyWithCsrf
 from apps.accounts.serializers import (
+    AcceptAsSerializer,
     InvitedAccountSerializer,
     LinkSerializer,
     PasswordResetSerializer,
@@ -84,17 +85,19 @@ class InvitationLookupView(_LinkView):
 class InvitationAcceptView(_LinkView):
     """`POST`: accepts an invitation, as the account signed in (200) or as one it makes (201).
 
-    The body says which, not the session, which may have changed since the
-    page last read it. The token alone accepts as the account signed in, and
-    with none is refused as signed out. A body naming an account makes it as
-    registering does, whoever is signed in, its fields checked before the
-    invitation is looked at, so a username taken or a password refused leaves
-    the link working; the account made is signed in, as registering signs one
-    in. Either way the answer is `me`'s, now naming the role.
+    The body names the account that accepts, not the session, which may have
+    changed since the page last read it. One signed in is named by its `id`,
+    and accepts if it is the one signed in: otherwise the account the page
+    took for signed in is not, a 401 as for a session that ended. Any other
+    body names an account to make as registering does, whoever is signed in,
+    its fields checked before the invitation is looked at, so a username taken
+    or a password refused leaves the link working; the account made is signed
+    in, as registering signs one in. Either way the answer is `me`'s, now
+    naming the role.
     """
 
     def post(self, request: Request) -> Response:
-        if set(request.data) - {"token"}:
+        if not (isinstance(request.data, dict) and "account" in request.data):
             serializer = InvitedAccountSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             made = serializer.validated_data["user"]
@@ -103,11 +106,13 @@ class InvitationAcceptView(_LinkView):
             # session of another account is signed over, as registering does.
             login(request, made, backend="django.contrib.auth.backends.ModelBackend")
             return Response(session_body(made), status=status.HTTP_201_CREATED)
-        # `isinstance` for the reason `SessionView.get` gives (apps/accounts/views.py).
-        if isinstance(request.user, AnonymousUser):
-            fail(ErrorCode.UNAUTHENTICATED)
-        link = LinkSerializer(data=request.data)
+        link = AcceptAsSerializer(data=request.data)
         link.is_valid(raise_exception=True)
+        # `isinstance` for the reason `SessionView.get` gives (apps/accounts/views.py).
+        if isinstance(request.user, AnonymousUser) or (
+            request.user.pk != link.validated_data["account"]
+        ):
+            fail(ErrorCode.UNAUTHENTICATED)
         user = cast("User", request.user)
         accept(link.validated_data["token"], user, request)
         # A new key for a session that now holds a role, as the OWASP
