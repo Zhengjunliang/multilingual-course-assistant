@@ -1,12 +1,14 @@
 /**
  * What the API answers in the browser tests, typed by the client's mirrors of
- * the server's shapes (`src/api/*.ts`), which `tests/test_qa_contract.py` and
- * `tests/test_catalog_contract.py` hold to the Python side: a field renamed on
+ * the server's shapes (`src/api/*.ts`), which `tests/test_qa_contract.py`,
+ * `tests/test_catalog_contract.py` and `tests/test_admin_contract.py` hold to
+ * the Python side: a field renamed on
  * the server breaks `tsc` here before it can make a test pass for nothing.
  * Which endpoint answers which of them is written in `e2e/api.ts`.
  */
 
 import type { Account, AccountSession, Session } from "@/api/account";
+import type { ManagedUser } from "@/api/admin";
 import type {
   Course,
   Edition,
@@ -45,6 +47,15 @@ export const STAFF: Account = {
   ],
 };
 
+/** The superuser, who also has the accounts' page. */
+export const ADMIN: Account = {
+  id: 3,
+  username: "demo-admin",
+  locale: "it",
+  is_superuser: true,
+  roles: [],
+};
+
 /** The student's devices: this one, and a phone. */
 export const SESSIONS: AccountSession[] = [
   {
@@ -65,6 +76,32 @@ export const SESSIONS: AccountSession[] = [
     authenticated_at: "2026-10-21T18:12:00Z",
     last_activity: "2026-10-26T21:04:00Z",
   },
+];
+
+// --- the accounts the superuser manages ---------------------------------------
+
+function managed(account: Account, changes: Partial<ManagedUser> = {}): ManagedUser {
+  return {
+    id: account.id,
+    username: account.username,
+    is_active: true,
+    is_superuser: account.is_superuser,
+    last_login: "2026-10-28T08:00:00Z",
+    date_joined: "2026-09-01T08:00:00Z",
+    roles: account.roles,
+    ...changes,
+  };
+}
+
+/** One of each: the reader, staff, a student, and a deactivated account that never signed in. */
+export const USERS: ManagedUser[] = [
+  managed(ADMIN),
+  managed(STAFF),
+  managed(STUDENT),
+  managed(
+    { id: 4, username: "demo-gone", locale: "it", is_superuser: false, roles: [] },
+    { is_active: false, last_login: null },
+  ),
 ];
 
 // --- links handed out ----------------------------------------------------------

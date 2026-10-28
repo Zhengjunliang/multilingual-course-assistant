@@ -38,8 +38,14 @@ export interface Loaded<T> {
   reload: () => Promise<boolean>;
 }
 
-/** `load`'s answer, read when the page opens and again on `reload()`; `load` must be stable. */
-export function useLoad<T>(load: () => Promise<T>): Loaded<T> {
+/**
+ * `load`'s answer, read when the page opens and again on `reload()`; `load`
+ * must be stable. `keep` is for a list whose `load` changes with its filter:
+ * the last answer stays shown until the new one arrives, rather than the
+ * list emptying at each letter of a search (outside the repository: TanStack
+ * Query, `placeholderData: keepPreviousData`).
+ */
+export function useLoad<T>(load: () => Promise<T>, { keep = false } = {}): Loaded<T> {
   const { forget } = useSession();
   const [state, setState] = useState<{ data: T | null; error: unknown }>({
     data: null,
@@ -69,14 +75,15 @@ export function useLoad<T>(load: () => Promise<T>): Loaded<T> {
   useEffect(() => {
     // Another object's page shows nothing of the last one while it is read:
     // the same page, reached again for another id through the history.
-    setState((shown) =>
-      shown.data === null && shown.error === null ? shown : { data: null, error: null },
-    );
+    if (!keep)
+      setState((shown) =>
+        shown.data === null && shown.error === null ? shown : { data: null, error: null },
+      );
     void read();
     return () => {
       latest.current += 1;
     };
-  }, [read]);
+  }, [read, keep]);
 
   return { ...state, reload: read };
 }

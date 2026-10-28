@@ -13,6 +13,7 @@ import type { AddressInfo } from "node:net";
 import { test as base, expect, type Page, type Request } from "@playwright/test";
 
 import type { Account, AccountSession, Session } from "@/api/account";
+import type { ListPage, ManagedUser } from "@/api/admin";
 import type {
   Course,
   Edition,
@@ -35,6 +36,7 @@ import {
   SESSIONS,
   STUDY_PLAN,
   SYLLABUS,
+  USERS,
   VISITOR,
 } from "./fixtures";
 
@@ -155,6 +157,16 @@ export class Api {
       this.json<Syllabus>(`/api/catalog/editions/${id}/syllabus`, SYLLABUS);
       this.json<ReadingItem[]>(`/api/catalog/editions/${id}/readings`, READINGS);
     }
+  }
+
+  /** The superuser's accounts, one page of them. */
+  users(): void {
+    this.json<ListPage<ManagedUser>>("/api/admin/users", {
+      count: USERS.length,
+      next: null,
+      previous: null,
+      results: USERS,
+    });
   }
 
   /** Every question gets this stream, whole. */
