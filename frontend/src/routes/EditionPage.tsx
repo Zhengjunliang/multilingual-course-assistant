@@ -7,15 +7,17 @@
  * found". Its head names the year, whether it is current and, where it was
  * entered, the day its teaching starts, which is what makes it current
  * (apps/catalog/editions.py). Who may assign a teacher here is the edition's
- * `permissions`: the button is in the page's head, and nobody else is offered
- * it. The syllabus and the books are read beside the edition, so their tabs
- * can count them, and written on their own (features/staff/content/), by
- * whoever holds `edition.edit_content`. The path it was reached through is `?programme=`,
+ * `permissions`: the button is in the page's head, beside the one that makes
+ * an invitation (features/staff/Invitations.tsx), and nobody else is offered
+ * either; the invitations not accepted yet are under the teachers. The
+ * syllabus and the books are read beside the edition, so their tabs can count
+ * them, and written on their own (features/staff/content/), by whoever holds
+ * `edition.edit_content`. The path it was reached through is `?programme=`,
  * or the teacher's own courses when no programme the reader may view lists
  * it (features/staff/crumbs.ts).
  */
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router-dom";
 
@@ -29,6 +31,7 @@ import { useSyllabus } from "@/features/staff/content/syllabus";
 import { useLoad } from "@/features/staff/context";
 import { contextProgramme, programmeLine } from "@/features/staff/crumbs";
 import { isNotFound } from "@/features/staff/errors";
+import { useInvitations } from "@/features/staff/Invitations";
 import { Code, PageHead } from "@/features/staff/page";
 import { StaffList, shownName } from "@/features/staff/people";
 import { periodName } from "@/features/staff/period";
@@ -50,8 +53,9 @@ export default function EditionPage() {
   const assigns = data?.permissions.includes("edition.assign_teacher") ?? false;
   const edits = data?.permissions.includes("edition.edit_content") ?? false;
   const object = data === null ? "" : `${data.course.name} · ${data.academic_year}`;
+  const scope = useMemo(() => ({ kind: "edition", id: Number(id) }) as const, [id]);
   const members = useMembers({
-    scope: { kind: "edition", id: Number(id) },
+    scope,
     people: data?.teachers ?? [],
     object,
     description: object,
@@ -68,6 +72,12 @@ export default function EditionPage() {
       />
     ),
     reload: edition.reload,
+  });
+  const invitations = useInvitations({
+    scope,
+    canInvite: assigns,
+    object,
+    reloadPage: edition.reload,
   });
   const through =
     data === null
@@ -113,7 +123,12 @@ export default function EditionPage() {
           </>
         }
         sub={programmeLine(course.entries, i18n.language)}
-        actions={members.assign}
+        actions={
+          <>
+            {members.assign}
+            {invitations.invite}
+          </>
+        }
       />
       <Tabs
         label={t("staff.edition.views")}
@@ -151,17 +166,21 @@ export default function EditionPage() {
             label: t("staff.edition.teachers"),
             count: data.teachers.length,
             content: (
-              <StaffList
-                people={data.teachers}
-                staffRole="teacher"
-                empty={t("staff.edition.empty")}
-                action={members.action}
-              />
+              <div className="flex flex-col gap-room">
+                <StaffList
+                  people={data.teachers}
+                  staffRole="teacher"
+                  empty={t("staff.edition.empty")}
+                  action={members.action}
+                />
+                {invitations.list}
+              </div>
             ),
           },
         ]}
       />
       {members.dialogs}
+      {invitations.dialogs}
     </>
   );
 }

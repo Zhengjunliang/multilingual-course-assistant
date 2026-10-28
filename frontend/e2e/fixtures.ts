@@ -12,6 +12,7 @@ import type { ManagedUser } from "@/api/admin";
 import type {
   Course,
   Edition,
+  Invitation,
   InvitationGrant,
   Programme,
   ReadingItem,
@@ -269,6 +270,36 @@ export const EDITION_READ: Edition = {
   teachers: [STAFF_MEMBER],
   permissions: ["edition.view", "edition.edit_content"],
 };
+
+/** The edition's invitations not accepted yet: one still good, one expired. */
+export const PENDING: Invitation[] = [
+  {
+    id: 21,
+    role: "teacher",
+    edition: {
+      id: EDITION.id,
+      course: { code: COURSE.code, name: COURSE.name, locale: COURSE.locale },
+      academic_year: EDITION.academic_year,
+    },
+    programme: null,
+    created_by: STAFF.username,
+    created_at: "2026-10-28T09:00:00Z",
+    expires_at: "2099-10-31T09:00:00Z",
+  },
+  {
+    id: 22,
+    role: "teacher",
+    edition: {
+      id: EDITION.id,
+      course: { code: COURSE.code, name: COURSE.name, locale: COURSE.locale },
+      academic_year: EDITION.academic_year,
+    },
+    programme: null,
+    created_by: STAFF.username,
+    created_at: "2026-10-20T09:00:00Z",
+    expires_at: "2026-10-23T09:00:00Z",
+  },
+];
 
 /** Two sections written, in Italian, one with a bold phrase and a list; the other five are empty. */
 export const SYLLABUS: Syllabus = {

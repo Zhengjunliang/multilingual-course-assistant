@@ -17,6 +17,7 @@ import type { ListPage, ManagedUser } from "@/api/admin";
 import type {
   Course,
   Edition,
+  Invitation,
   InvitationGrant,
   Programme,
   ReadingItem,
@@ -30,6 +31,7 @@ import {
   EDITION,
   EDITION_READ,
   INVITATION,
+  PENDING,
   PROGRAMME,
   READINGS,
   RESET_FOR,
@@ -153,14 +155,18 @@ export class Api {
     this.json<Edition[]>("/api/catalog/editions", [EDITION, EDITION_READ]);
     this.json<Edition>(`/api/catalog/editions/${EDITION.id}`, EDITION);
     this.json<Edition>(`/api/catalog/editions/${EDITION_READ.id}`, EDITION_READ);
+    // Who may grant a role there reads its invitations; EDITION_READ grants none.
+    this.json<Invitation[]>(`/api/catalog/programmes/${PROGRAMME.code}/invitations`, []);
+    this.json<Invitation[]>(`/api/catalog/editions/${EDITION.id}/invitations`, PENDING);
     for (const { id } of [EDITION, EDITION_READ]) {
       this.json<Syllabus>(`/api/catalog/editions/${id}/syllabus`, SYLLABUS);
       this.json<ReadingItem[]>(`/api/catalog/editions/${id}/readings`, READINGS);
     }
   }
 
-  /** The superuser's accounts, one page of them. */
+  /** The superuser's accounts, one page of them, and every scope's invitations. */
   users(): void {
+    this.json<Invitation[]>("/api/catalog/invitations", PENDING);
     this.json<ListPage<ManagedUser>>("/api/admin/users", {
       count: USERS.length,
       next: null,

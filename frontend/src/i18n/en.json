@@ -507,7 +507,8 @@
       "link": {
         "action": "Password link",
         "title": "Password link"
-      }
+      },
+      "views": "Views of the accounts"
     },
     "link": {
       "label": "Link",
@@ -515,6 +516,26 @@
       "copied": "Copied",
       "done": "Done",
       "once": "Works once, until {{date}}. It will not be shown again: copy it now and hand it over yourself."
+    },
+    "invitations": {
+      "title": "Pending invitations",
+      "teacher": "Invite teacher",
+      "secretariat": "Invite to secretariat",
+      "link": "Invitation link",
+      "for": "For",
+      "by": "Made by",
+      "expires": "Expires",
+      "expired": "Expired",
+      "none": "No invitation is pending.",
+      "gone": "The invitation was no longer there: it had been accepted or revoked elsewhere.",
+      "failed": "The invitation was not made",
+      "revoke": {
+        "action": "Revoke",
+        "label": "Revoke the invitation {{username}} made on {{date}}",
+        "title": "Revoke the invitation?",
+        "body": "The link <person>{{username}}</person> made on {{date}} stops working.",
+        "done": "Invitation revoked"
+      }
     },
     "retry": "Try again",
     "failure": {

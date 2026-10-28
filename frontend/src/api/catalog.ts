@@ -383,6 +383,42 @@ export function removeMember(scope: MemberScope, username: string): Promise<void
   });
 }
 
+/** Where an invitation is made, listed and revoked: under the scope whose role it grants. */
+function invitationsPath(scope: MemberScope): string {
+  return scope.kind === "edition"
+    ? `${CATALOG}/editions/${scope.id}/invitations`
+    : `${CATALOG}/programmes/${encodeURIComponent(scope.code)}/invitations`;
+}
+
+/** The scope an invitation grants its role on. */
+export function invitationScope(invitation: Invitation): MemberScope {
+  return invitation.edition !== null
+    ? { kind: "edition", id: invitation.edition.id }
+    : { kind: "programme", code: invitation.programme?.code ?? "" };
+}
+
+/** The scope's invitations not accepted yet, the expired too, oldest first. */
+export function listInvitations(scope: MemberScope): Promise<Invitation[]> {
+  return request<Invitation[]>(invitationsPath(scope));
+}
+
+/** Every scope's, for the superuser. */
+export function listAllInvitations(): Promise<Invitation[]> {
+  return request<Invitation[]>(`${CATALOG}/invitations`);
+}
+
+/** The server answers 201 with the invitation and the one time its token is shown. */
+export function createInvitation(scope: MemberScope): Promise<NewInvitation> {
+  return request<NewInvitation>(invitationsPath(scope), { method: "POST" });
+}
+
+/** The server answers 204, or 404 when it was accepted or revoked elsewhere first. */
+export function revokeInvitation(invitation: Invitation): Promise<void> {
+  return request<void>(`${invitationsPath(invitationScope(invitation))}/${invitation.id}`, {
+    method: "DELETE",
+  });
+}
+
 /** The edition's syllabus: its language and its sections, in the catalogue's order. */
 export function readSyllabus(edition: number): Promise<Syllabus> {
   return request<Syllabus>(`${CATALOG}/editions/${edition}/syllabus`);
