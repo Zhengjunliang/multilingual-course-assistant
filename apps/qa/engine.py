@@ -240,48 +240,86 @@ class Engine:
         yield EndEvent()
 
 
-def build_engine() -> Engine:
-    """Load this process's copy of the pipeline.
+@dataclass(frozen=True)
+class Retrieval:
+    """The half of an `Engine` that finds the sources: the index and the models
+    that read it.
+
+    Built by the callable `QA_RETRIEVAL` names (config/settings.py), as Django
+    builds its mail backend from `EMAIL_BACKEND`, so a process is pointed at
+    another index without a branch in this file: the browser journeys run on
+    stub encoders over an in-memory index (tests/journeys/retrieval.py). The
+    generation half has no such setting; those journeys run it unchanged,
+    against a fake model server.
+    """
+
+    client: QdrantClient
+    dense: DenseEncoder
+    sparse: SparseEncoder
+    reranker: Reranker | None
+
+
+def build_retrieval() -> Retrieval:
+    """The Qdrant service, the two encoders and the reranker.
 
     The Qdrant client connects on first use, so an unreachable server surfaces
     on the first question, as a 503 from `Engine.stream`, and a server that
     comes back needs no rebuild.
     """
-    from config.env import env
     from rag.index import build_sparse_encoder, cached_dense_encoder, open_client
-    from rag.llm import build_completer, build_streamer
     from rag.search import DEFAULT_RERANK_MODEL, build_reranker
 
-    client = None
+    # QDRANT_URL (config/env.py): the server every process shares. A URL the
+    # client cannot parse (a port past 65535) fails here, and `build_engine`
+    # converts it like any other build failure.
+    client = open_client()
     try:
-        # QDRANT_URL (config/env.py): the server every process shares. A URL
-        # the client cannot parse (a port past 65535) fails here, and is
-        # converted like any other build failure.
-        client = open_client()
-        # Greedy decoding stated rather than inherited, matching the CLIs: the
-        # same question must produce the same answer across two runs of a gate.
-        return Engine(
+        return Retrieval(
             client=client,
             dense=cached_dense_encoder(),
             sparse=build_sparse_encoder(),
             reranker=build_reranker(DEFAULT_RERANK_MODEL),
-            completer=build_completer(
-                env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0, seed=0
-            ),
-            streamer=build_streamer(
-                env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0
-            ),
         )
-    except Exception as exc:
+    except Exception:
         # A failed build is not cached, so the next request opens a client of
         # its own; closing this one — after a first-run download or an
         # out-of-memory card fails a model load — keeps its connections from
-        # piling up with every retry. Converting the failure is what makes it a
-        # 503 the caller can wait out rather than a 500; its traceback reaches
-        # the log as this error's cause.
-        if client is not None:
-            client.close()
+        # piling up with every retry.
+        client.close()
+        raise
+
+
+def build_engine() -> Engine:
+    """Load this process's copy of the pipeline: the two LLM clients, and the
+    retrieval `QA_RETRIEVAL` names."""
+    from django.conf import settings
+    from django.utils.module_loading import import_string
+
+    from config.env import env
+    from rag.llm import build_completer, build_streamer
+
+    try:
+        # Greedy decoding stated rather than inherited, matching the CLIs: the
+        # same question must produce the same answer across two runs of a gate.
+        completer = build_completer(
+            env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0, seed=0
+        )
+        streamer = build_streamer(env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0)
+        # Last, because it is the part holding connections: a retrieval built
+        # is never dropped by a failure after it.
+        retrieval: Retrieval = import_string(settings.QA_RETRIEVAL)()
+    except Exception as exc:
+        # Converting the failure is what makes it a 503 the caller can wait out
+        # rather than a 500; its traceback reaches the log as this error's cause.
         raise EngineUnavailableError("The question service could not start.") from exc
+    return Engine(
+        client=retrieval.client,
+        dense=retrieval.dense,
+        sparse=retrieval.sparse,
+        reranker=retrieval.reranker,
+        completer=completer,
+        streamer=streamer,
+    )
 
 
 @dataclass
