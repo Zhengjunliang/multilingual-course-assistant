@@ -93,8 +93,6 @@ function RichEditor({ markdown, onChange, labelledBy, lang }: EditorProps) {
     extensions: syllabusKit(),
     content: markdown,
     contentType: "markdown",
-    // The reader pressed «Modifica» to write here.
-    autofocus: "end",
     shouldRerenderOnTransaction: false,
     editorProps: {
       attributes: {
@@ -128,6 +126,16 @@ function RichEditor({ markdown, onChange, labelledBy, lang }: EditorProps) {
         boolean
       >,
   });
+
+  // The reader pressed «Modifica» to write here. Not Tiptap's `autofocus`: it
+  // focuses a timer and a frame after the editor is made, and on a busy
+  // machine both can come before React has put the text in the page, where a
+  // focus goes nowhere. An effect runs once EditorContent has put it there.
+  // An editor whose effects came that late has been destroyed and replaced by
+  // `useEditor`; the replacement runs the effect again.
+  useEffect(() => {
+    if (editor !== null && !editor.isDestroyed) editor.commands.focus("end");
+  }, [editor]);
 
   if (editor === null) return null;
 

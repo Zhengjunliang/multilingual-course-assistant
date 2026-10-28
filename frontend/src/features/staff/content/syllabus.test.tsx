@@ -6,6 +6,7 @@
  * asks first, and what a reader without `edition.edit_content` is offered.
  */
 
+import { Selection } from "@tiptap/pm/state";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -61,6 +62,40 @@ describe("a syllabus section", () => {
       status: "Sezione «Prerequisiti» salvata.",
       focused: "Modifica · Prerequisiti",
     });
+  });
+
+  it("takes the focus at the end of its text as its box opens, on a machine too busy to keep up", async () => {
+    // What a busy machine did in 3 of 200 runs of the browser floors' test
+    // of this box: Tiptap's start, a timer and an animation frame after the
+    // editor is made, came before React had put the box in the page, and its
+    // focus went nowhere. Here the timer and the frame run at once.
+    const later = window.setTimeout;
+    const timers = vi.spyOn(window, "setTimeout").mockImplementation(((
+      run: () => void,
+      delay?: number,
+    ) => {
+      if (delay) return later(run, delay);
+      run();
+      return 0;
+    }) as typeof window.setTimeout);
+    const frames = vi.spyOn(window, "requestAnimationFrame").mockImplementation((run) => {
+      run(performance.now());
+      return 0;
+    });
+    const { unmount } = open(true);
+    await settle();
+    await show("Prerequisiti");
+    await openEditor("Prerequisiti", "Modifica");
+    const editor = editorIn("Prerequisiti");
+    const seen = {
+      focused: document.activeElement === editor?.view.dom,
+      atEnd: editor?.state.selection.eq(Selection.atEnd(editor.state.doc)),
+    };
+    timers.mockRestore();
+    frames.mockRestore();
+    unmount();
+
+    expect(seen).toEqual({ focused: true, atEnd: true });
   });
 
   it("is cleared only once the reader confirms", async () => {
@@ -248,7 +283,9 @@ describe("a section not saved", () => {
   });
 
   it("is not said of a box cancelled before the editor's own start has run", async () => {
-    // A list last: Tiptap's start focuses the end, and a paragraph follows the list.
+    // A list last, which a focus at the end follows with a paragraph: a focus
+    // left to Tiptap's start, a task later, would change the text of a box
+    // already closed, and open it again.
     server.syllabus = {
       locale: "it",
       sections: [{ section: "prerequisiti", text: "Fisica I:\n\n- Analisi\n- Algebra" }],
