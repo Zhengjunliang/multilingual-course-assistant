@@ -186,26 +186,33 @@ def test_furniture_threshold_floors_at_five_pages() -> None:
     assert furniture_threshold(100) == 20
 
 
-def test_locale_heuristic_separates_the_corpus_languages() -> None:
-    italian = (
-        "Il sistema di gestione della base di dati non è una scelta che si fa "
-        "per caso: anche le query più semplici passano per il modello."
-    )
-    english = (
-        "The database management system is not a choice that you make at random: "
-        "even the simplest queries go through the model."
-    )
-    assert detect_locale(italian) == "it"
-    assert detect_locale(english) == "en"
-    assert detect_locale("") == "en"
-
-
-def test_locale_heuristic_detects_chinese_by_cjk_ratio() -> None:
-    """Stopword voting is structurally blind to Chinese (both counts stay zero,
-    the tie falls to en) — the CJK-ratio branch must catch it first, without
-    tripping on Latin text that merely mentions a CJK term."""
-    assert detect_locale("如何申请学分转换? 需要哪些文件?") == "zh"
-    assert detect_locale("What is the deadline for the 报名 form of this course?") == "en"
+@pytest.mark.parametrize(
+    ("text", "locale"),
+    [
+        pytest.param(
+            "Il sistema di gestione della base di dati non è una scelta che si fa "
+            "per caso: anche le query più semplici passano per il modello.",
+            "it",
+            id="italian",
+        ),
+        pytest.param(
+            "The database management system is not a choice that you make at random: "
+            "even the simplest queries go through the model.",
+            "en",
+            id="english",
+        ),
+        pytest.param("", "en", id="empty"),
+        # Stopword voting is structurally blind to Chinese (both counts stay
+        # zero, the tie falls to en): the CJK-ratio branch must catch it first,
+        # without tripping on Latin text that merely mentions a CJK term.
+        pytest.param("如何申请学分转换? 需要哪些文件?", "zh", id="chinese"),
+        pytest.param(
+            "What is the deadline for the 报名 form of this course?", "en", id="a-cjk-term-in-latin"
+        ),
+    ],
+)
+def test_the_locale_heuristic_tells_the_corpus_languages_apart(text: str, locale: str) -> None:
+    assert detect_locale(text) == locale
 
 
 def test_locale_arg_normalizes_bcp47_and_rejects_junk() -> None:

@@ -139,25 +139,28 @@ def test_one_text_under_two_addresses_is_one_hit_cited_at_a_page_that_holds_it(
     assert found[0] in (alias, page)
 
 
+@pytest.mark.parametrize(
+    ("text", "content_hash", "reranker"),
+    [
+        pytest.param(TASSE, "aa" * 32, None, id="the-same-bytes"),
+        pytest.param(
+            TASSE.replace("tramite il portale", "tramite il nuovo portale"),
+            "bb" * 32,
+            KeywordReranker(),
+            id="an-edited-version",
+        ),
+    ],
+)
 def test_a_crawl_point_and_a_live_point_of_one_page_are_one_hit_the_live_one(
-    web_index: QdrantClient,
+    web_index: QdrantClient, text: str, content_hash: str, reranker: KeywordReranker | None
 ) -> None:
     url = "https://www.unifi.it/it/studia-con-noi/tasse"
     crawl = web_chunk(0, TASSE, url, content_hash="aa" * 32)
-    live = web_chunk(1, TASSE, url, source="live", content_hash="aa" * 32, fetch_date="2026-10-01")
+    live = web_chunk(
+        1, text, url, source="live", content_hash=content_hash, fetch_date="2026-10-01"
+    )
 
-    assert retrieve(web_index, [crawl, live], None) == [live]
-
-
-def test_an_edited_live_version_of_a_page_collapses_into_its_crawl_version(
-    web_index: QdrantClient,
-) -> None:
-    url = "https://www.unifi.it/it/studia-con-noi/tasse"
-    crawl = web_chunk(0, TASSE, url, content_hash="aa" * 32)
-    edited = TASSE.replace("tramite il portale", "tramite il nuovo portale")
-    live = web_chunk(1, edited, url, source="live", content_hash="bb" * 32, fetch_date="2026-10-01")
-
-    assert retrieve(web_index, [crawl, live], KeywordReranker()) == [live]
+    assert retrieve(web_index, [crawl, live], reranker) == [live]
 
 
 def test_four_editions_of_one_passage_are_one_hit_the_newest_guide(

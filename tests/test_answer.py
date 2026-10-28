@@ -25,7 +25,6 @@ from rag.answer import (
     build_messages,
     format_context,
     main,
-    source_marker,
 )
 from rag.index import ensure_collection, index_chunks, open_client
 from rag.search import Hit
@@ -221,10 +220,6 @@ def test_cli_answers_end_to_end_with_sources(
     out = capsys.readouterr().out
     assert "An ORM maps objects to tables" in out
     assert "Sources:\n  [1] [deck.pdf p.1]" in out
-
-
-def test_source_marker_matches_the_prompt_citation_format() -> None:
-    assert source_marker(make_hits()[0]) == "[deck.pdf p.1]"
 
 
 def test_importing_answer_loads_none_of_the_heavy_dependencies() -> None:

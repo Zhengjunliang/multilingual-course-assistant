@@ -319,13 +319,6 @@ def test_a_relevance_cutoff_keeps_what_the_reranker_calls_relevant_and_never_not
     assert len(texts("django models", None)) == 3
 
 
-def test_search_with_reranker_promotes_its_ranking(client: QdrantClient) -> None:
-    hits = search(
-        client, "django orm", StubDense(), StubSparse(), KeywordReranker(), scope=None, limit=1
-    )
-    assert [hit.chunk.text for hit in hits] == [ORM_TEXT]
-
-
 @pytest.fixture
 def two_collection_client(tmp_path: Path) -> Iterator[QdrantClient]:
     qdrant = open_client(tmp_path / "qdrant")

@@ -63,22 +63,24 @@ def make_meta(**overrides: object) -> ParsedMeta:
     return ParsedMeta.model_validate(fields)
 
 
-def test_ligatures_fold_to_plain_letters() -> None:
-    """The corpus contains U+FB01 in `micc.uniﬁ.it`; a query for `unifi` must match."""
-    assert normalize_text("micc.uniﬁ.it") == "micc.unifi.it"
+PLAIN = "Digital images are sampled as a grid of pixels."
 
 
-def test_decomposed_accents_are_composed() -> None:
-    """PDF extraction can emit `e` + combining acute, which tokenises differently."""
-    decomposed = unicodedata.normalize("NFD", COMPOSED)
-    assert decomposed != COMPOSED, "fixture is not actually decomposed"
-    assert normalize_text(decomposed) == COMPOSED
-
-
-def test_already_normal_text_is_untouched() -> None:
-    assert normalize_text("Digital images are sampled as a grid of pixels.") == (
-        "Digital images are sampled as a grid of pixels."
-    )
+@pytest.mark.parametrize(
+    ("text", "normal"),
+    [
+        # The corpus contains U+FB01 in `micc.uniﬁ.it`; a query for `unifi` must match.
+        pytest.param("micc.uniﬁ.it", "micc.unifi.it", id="a-ligature"),
+        # PDF extraction can emit `e` + combining acute, which tokenises differently.
+        pytest.param(unicodedata.normalize("NFD", COMPOSED), COMPOSED, id="a-decomposed-accent"),
+        pytest.param(PLAIN, PLAIN, id="already-normal"),
+    ],
+)
+def test_text_is_normalised_before_it_is_indexed(text: str, normal: str) -> None:
+    # Only the plain row may start out normal: a fixture that is not really
+    # decomposed would pass without testing anything.
+    assert (text == normal) == (text is PLAIN)
+    assert normalize_text(text) == normal
 
 
 def test_variant_names_encode_the_enabled_enrichments() -> None:
