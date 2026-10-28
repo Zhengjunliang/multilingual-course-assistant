@@ -13,7 +13,7 @@ One behaviour is tested in one layer, the one whose seam it belongs to: a rule o
 | pytest, `tests/` | The server's rules: permissions, error codes, the scope invariants, the API contract and its TypeScript mirrors, the pipeline | How a page shows any of it | [tests/test_access_matrix.py](../tests/test_access_matrix.py): what each kind of caller gets from every API route |
 | vitest, `frontend/src/**/*.test.{ts,tsx}` | The interface's logic and state, tested at page level: what a page shows for each answer the API can give, and what it sends | The server's rules, which its fixtures assume; a component on its own, unless a page test cannot reach its logic | [ChatPage.routing.test.tsx](../frontend/src/routes/ChatPage.routing.test.tsx) |
 | Browser floors, [frontend/e2e/](../frontend/e2e/) | What only a real browser measures, on every screen: accessibility, reduced motion, type, the byte budget of the first screen; and the first question's travel to the foot of the page | The server, whose answers [frontend/e2e/api.ts](../frontend/e2e/api.ts) records | [frontend/e2e/a11y.spec.ts](../frontend/e2e/a11y.spec.ts) |
-| Journeys, [frontend/journeys/](../frontend/journeys/) | The flows whose two sides must agree, through the real Django and PostgreSQL: signing in and out, a role granted and then found, a question streamed, stored and reopened, a visitor's question | Interface states (refusals, languages, layout), which vitest and the floors hold; the model and retrieval, faked by [tests/journeys/](../tests/journeys/) | [frontend/journeys/ask.spec.ts](../frontend/journeys/ask.spec.ts) |
+| Journeys, [frontend/journeys/](../frontend/journeys/) | The flows whose two sides must agree, through the real Django and PostgreSQL: signing in and out, a role granted and then found, an account from its invitation to the superuser switching it off, a question streamed, stored and reopened, a visitor's question | Interface states (refusals, languages, layout), which vitest and the floors hold; the model and retrieval, faked by [tests/journeys/](../tests/journeys/) | [frontend/journeys/ask.spec.ts](../frontend/journeys/ask.spec.ts) |
 
 A component test that repeats what a page test of the same behaviour checks meets criterion (c) below.
 
@@ -77,7 +77,7 @@ Each of these is the only guard of what it protects. One that meets a criterion 
 | Every route says who may call it | `tests/test_route_permissions.py` |
 | What each kind of caller gets from every API route | `tests/access_matrix.txt`, checked by `tests/test_access_matrix.py` |
 | CI calls exactly the chain, and every guard rule fails on its bad examples | `tests/test_check_script.py`, `tests/test_guards.py` |
-| The interface and the server agree end to end: a session ended on the server, a granted role, a stream stored and reopened, a visitor's question | `frontend/journeys/` |
+| The interface and the server agree end to end: a session ended on the server, a granted role, an invitation accepted and the account's other device ended, a stream stored and reopened, a visitor's question | `frontend/journeys/` |
 
 One overlap is kept on purpose: `tests/test_smoke.py::test_django_system_checks_pass` runs the system checks that the chain's `deploy` step runs too, so that `uv run pytest`, the quick loop, catches a broken setting without the whole chain.
 
