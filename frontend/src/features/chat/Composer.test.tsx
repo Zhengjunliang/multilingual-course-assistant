@@ -7,7 +7,7 @@
  * The send button is never turned off (DESIGN.md, Do's and Don'ts): with
  * nothing to send it is outlined rather than filled, and a press says what is
  * missing. How far the box travels needs a layout, which a document has not
- * got; the browser test in `e2e/demo.spec.ts` reads that, and these read only
+ * got; the browser test in `e2e/motion.spec.ts` reads that, and these read only
  * whether it travels at all.
  */
 

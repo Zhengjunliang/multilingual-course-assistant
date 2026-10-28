@@ -53,13 +53,6 @@ const CAMPUS_ROUTE: RouteDecision = {
   reason: "La domanda riguarda l'ateneo.",
 };
 
-const SLIDES_ROUTE: RouteDecision = {
-  target: "slides",
-  query: "chiave primaria",
-  fresh: false,
-  reason: "La domanda riguarda il corso.",
-};
-
 const WEB_CITATION: Citation = {
   marker: "[Excerpt 1]",
   kind: "web",
@@ -76,26 +69,8 @@ const WEB_CITATION: Citation = {
   fetch_date: "2026-09-30",
 };
 
-export const SLIDES_CITATION: Citation = {
-  marker: "[Excerpt 1]",
-  kind: "slides",
-  text: "Una chiave primaria identifica ogni riga della tabella.",
-  heading_path: ["Chiavi"],
-  course: "B003",
-  academic_year: "2025-2026",
-  locale: "it",
-  score: 0.77,
-  source_file: "basi-di-dati-05.pdf",
-  source_sha256: "ab".repeat(32),
-  page: 12,
-  url: null,
-  fetch_date: null,
-};
-
 export const CAMPUS_QUESTION = "Come mi iscrivo a un esame?";
 const CAMPUS_ANSWER = "Ci si iscrive su Sol, entro cinque giorni dall'appello.";
-export const SLIDES_QUESTION = "Cos'è una chiave primaria?";
-const SLIDES_ANSWER = "È il campo che distingue una riga da ogni altra.";
 
 /** A whole answer: `start`, the text in two tokens, `end`. */
 function stream(
@@ -126,9 +101,6 @@ function stream(
 
 export const campusStream = (conversation: string | null) =>
   stream(CAMPUS_QUESTION, CAMPUS_ANSWER, CAMPUS_ROUTE, WEB_CITATION, conversation);
-
-export const slidesStream = (conversation: string | null) =>
-  stream(SLIDES_QUESTION, SLIDES_ANSWER, SLIDES_ROUTE, SLIDES_CITATION, conversation);
 
 /** The campus exchange, stored: what `/chat/<id>` reopens. */
 export const CONVERSATION: ConversationDetail = {
