@@ -26,6 +26,18 @@ if TYPE_CHECKING:
     from rest_framework.request import Request
 
 
+def password_field() -> serializers.CharField:
+    """A password, read exactly as typed.
+
+    A `CharField` trims its value by default, which would set and check a
+    password other than the one typed (ASVS 6.2.8, outside the repository);
+    Django's own forms turn the same off (`strip=False`).
+    """
+    return serializers.CharField(
+        write_only=True, trim_whitespace=False, style={"input_type": "password"}
+    )
+
+
 # `ModelSerializer[User]` rather than a bare `ModelSerializer` in both classes
 # below: the stubs declare the model as a type variable, so an unparameterised
 # subclass has a `Meta.model` the checker cannot reconcile with the base. DRF's
@@ -68,7 +80,7 @@ class RegisterSerializer(serializers.ModelSerializer[User]):
     hand-written serializer would let through to an IntegrityError and a 500.
     """
 
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    password = password_field()
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = User
@@ -107,7 +119,7 @@ class LoginSerializer(serializers.Serializer):
     """Credentials in, an authenticated user out."""
 
     username = serializers.CharField()
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    password = password_field()
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         request: Request | None = self.context.get("request")
@@ -128,8 +140,8 @@ class PasswordChangeSerializer(serializers.Serializer):
     rules on the new one answer nobody but the account's owner.
     """
 
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
-    new_password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    password = password_field()
+    new_password = password_field()
 
 
 class EndSessionsSerializer(serializers.Serializer):
@@ -139,7 +151,7 @@ class EndSessionsSerializer(serializers.Serializer):
     session of the account but the caller's.
     """
 
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    password = password_field()
     session = serializers.CharField()
 
 
