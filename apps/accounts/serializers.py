@@ -155,6 +155,12 @@ class EndSessionsSerializer(serializers.Serializer):
     session = serializers.CharField()
 
 
+class DeleteAccountSerializer(serializers.Serializer):
+    """The password, confirming who asks to delete the account."""
+
+    password = password_field()
+
+
 class AccountSessionSerializer(serializers.ModelSerializer[AccountSession]):
     """A row of the device list; `current` is the session the list was asked from."""
 

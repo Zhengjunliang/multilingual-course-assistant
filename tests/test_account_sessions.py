@@ -24,6 +24,7 @@ from rest_framework.test import APIClient
 from apps.accounts.models import AccountSession, User
 from apps.accounts.sessions import AUTH_AT, SEEN_AT, USER_AGENT_MAX_LENGTH, public_id
 from apps.catalog.models import Course, CourseEdition
+from apps.qa.models import Conversation
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Role
 
@@ -41,6 +42,7 @@ LOGIN_URL = "/api/auth/login"
 PASSWORD_URL = "/api/auth/password"
 SESSIONS_URL = "/api/auth/sessions"
 END_URL = "/api/auth/sessions/end"
+DELETE_URL = "/api/auth/me/delete"
 # Any route that needs a session, for what a signed-out caller gets: a 401.
 CONVERSATIONS_URL = "/api/conversations"
 USERS_URL = "/admin/accounts/user/"
@@ -111,6 +113,14 @@ def save_change_page(admin: Client, user: User, **flags: bool) -> HttpResponseBa
         **{flag: "on" for flag, on in (held | flags).items() if on},
     }
     return admin.post(f"{USERS_URL}{user.pk}/change/", data)
+
+
+def teach(user: User) -> User:
+    """Makes `user` staff: a teacher of an edition."""
+    course = Course.objects.create(code="B028451", name="Progettazione e Produzione Multimediale")
+    edition = CourseEdition.objects.create(course=course, academic_year="2025-2026")
+    RoleAssignment.objects.create(user=user, role=Role.TEACHER, edition=edition)
+    return user
 
 
 @pytest.mark.parametrize(
@@ -360,9 +370,7 @@ def test_a_role_granted_mid_session_holds_it_to_staffs_limits_from_the_next_requ
 ) -> None:
     client = signed_in(ada)
     age(client, seen=since_seen)
-    course = Course.objects.create(code="B028451", name="Progettazione e Produzione Multimediale")
-    edition = CourseEdition.objects.create(course=course, academic_year="2025-2026")
-    RoleAssignment.objects.create(user=ada, role=Role.TEACHER, edition=edition)
+    teach(ada)
 
     assert client.get(ME_URL).json()["authenticated"] is bool(limits)
     sessions = AccountSession.objects.filter(user=ada)
@@ -506,4 +514,62 @@ def test_an_account_ends_its_other_sessions_with_its_password(
 
     calls = [client.get(CONVERSATIONS_URL).status_code for client in (phone, laptop, other)]
     assert (response.status_code, calls) == (status, [200 if phone_in else 401, 200, 200])
+    assert [line.split(" ", 1)[0] for line in events(caplog)] == lines
+
+
+def another_superuser(root: User, ada: User) -> User:
+    User.objects.create_superuser(username="deputy", password=PASSWORD)
+    return root
+
+
+def the_last_superuser(root: User, ada: User) -> User:
+    # A superuser who is not active is not one who could manage the accounts.
+    User.objects.create_superuser(username="former", password=PASSWORD, is_active=False)
+    return root
+
+
+@pytest.mark.parametrize(
+    ("caller", "password", "code", "lines"),
+    [
+        pytest.param(lambda root, ada: ada, PASSWORD, None, ["delete", "logout"], id="a-student"),
+        pytest.param(
+            another_superuser, PASSWORD, None, ["delete", "logout"], id="a-superuser-with-another"
+        ),
+        pytest.param(
+            lambda root, ada: ada,
+            "not-the-password",
+            "WRONG_CREDENTIALS",
+            ["reauth_failed"],
+            id="a-wrong-password",
+        ),
+        pytest.param(lambda root, ada: teach(ada), PASSWORD, "ROLES_HELD", [], id="holding-a-role"),
+        pytest.param(the_last_superuser, PASSWORD, "LAST_SUPERUSER", [], id="the-last-superuser"),
+    ],
+)
+def test_an_account_deletes_itself_with_its_password_unless_a_rule_keeps_it(
+    caplog: pytest.LogCaptureFixture,
+    root: User,
+    ada: User,
+    caller: Callable[[User, User], User],
+    password: str,
+    code: str | None,
+    lines: list[str],
+) -> None:
+    """AC-M4. Deleted, the account takes its conversations and every session with it."""
+    user = caller(root, ada)
+    Conversation.objects.create(owner=user, locale="it")
+    phone, laptop = signed_in(user), signed_in(user)
+    caplog.clear()
+
+    with caplog.at_level(logging.INFO, logger="apps.accounts.events"):
+        response = laptop.post(DELETE_URL, {"password": password}, content_type="application/json")
+
+    kept = code is not None
+    if kept:
+        assert response.json()["error"]["code"] == code
+    else:
+        assert response.status_code == 204
+    assert signed_in_still(phone, laptop) == [kept, kept]
+    assert User.objects.filter(pk=user.pk).exists() is kept
+    assert Conversation.objects.filter(owner=user.pk).exists() is kept
     assert [line.split(" ", 1)[0] for line in events(caplog)] == lines

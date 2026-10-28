@@ -1,9 +1,11 @@
-"""What the signed-in caller does to their own account: change the password, see and end sessions.
+"""What the signed-in caller does to their own account: change the password, see and end
+sessions, delete it.
 
 Each change asks for the password first (apps/accounts/reauth.py), at the
 login's rate (`throttle_scope`). Ending sessions goes through `end_sessions`
-(apps/accounts/sessions.py), the one function that does, and each change
-leaves its line in the authentication log.
+(apps/accounts/sessions.py), the one function that does, deleting through
+the rules of apps/accounts/services.py, and each change leaves its line in
+the authentication log.
 
 A session is named by its `public_id`, never by its key, which is the cookie
 itself. The caller's own session is listed and marked, but not ended here:
@@ -29,9 +31,11 @@ from apps.accounts.passwords import set_password_checked
 from apps.accounts.reauth import require_password
 from apps.accounts.serializers import (
     AccountSessionSerializer,
+    DeleteAccountSerializer,
     EndSessionsSerializer,
     PasswordChangeSerializer,
 )
+from apps.accounts.services import AccountRuleError, delete_own_account, refuse
 from apps.accounts.sessions import end_sessions
 from config.errors import ErrorCode, django_field_error, fail
 
@@ -103,4 +107,27 @@ class EndSessionsView(APIView):
         elif not (ended := end_sessions(user, keep=current, only=session)):
             fail(ErrorCode.NOT_FOUND)
         auth_event(AuthEvent.SESSIONS_ENDED, request, user, session=session, ended=ended)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DeleteAccountView(APIView):
+    """`POST`: deletes the caller's account, its conversations with it, and signs it out.
+
+    A `POST` to its own path and not a `DELETE` of `me`: the password goes in
+    the body, and a `DELETE` with a body has no meaning a proxy has to keep
+    (RFC 9110, section 9.3.5, outside the repository).
+    """
+
+    permission_classes = (IsAuthenticated,)
+    throttle_scope = "auth"
+
+    def post(self, request: Request) -> Response:
+        serializer = DeleteAccountSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = cast("User", request.user)
+        require_password(request, user, serializer.validated_data["password"])
+        try:
+            delete_own_account(user, request)
+        except AccountRuleError as exc:
+            refuse(exc.rule)
         return Response(status=status.HTTP_204_NO_CONTENT)
