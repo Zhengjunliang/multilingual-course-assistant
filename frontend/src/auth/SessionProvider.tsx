@@ -94,10 +94,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         adopt(session.user);
       },
       logOut: async () => {
-        await logOut();
-        // The next reader of a shared screen does not find the question this
-        // one was typing (draft.ts).
-        clearDraft();
+        try {
+          await logOut();
+        } finally {
+          // The next reader of a shared screen does not find the question this
+          // one was typing (draft.ts), even when the session had ended before.
+          clearDraft();
+        }
         forget();
       },
       chooseLocale: async (locale) => {

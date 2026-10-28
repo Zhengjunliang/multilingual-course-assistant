@@ -49,6 +49,8 @@ interface ComposerProps {
    * is sent (draft.ts) and from which the field starts; `null` keeps nothing.
    */
   draftAt?: string | null;
+  /** The signed-in account the draft is kept for; `null`, a visitor, keeps nothing. */
+  draftBy?: number | null;
 }
 
 export function Composer({
@@ -60,9 +62,12 @@ export function Composer({
   travelFrom = null,
   rise = false,
   draftAt = null,
+  draftBy = null,
 }: ComposerProps) {
   const { t } = useTranslation();
-  const [question, setQuestion] = useState(() => (draftAt === null ? "" : readDraft(draftAt)));
+  const [question, setQuestion] = useState(() =>
+    draftAt === null || draftBy === null ? "" : readDraft(draftBy, draftAt),
+  );
   const [travelling, setTravelling] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -73,10 +78,11 @@ export function Composer({
 
   // Kept with every keystroke rather than when the field is left: a session
   // that ends takes the page away without the field ever being left. Sending
-  // empties the field, and the draft with it.
+  // empties the field, and the draft with it. An account forgotten under the
+  // page leaves the draft as it typed it, for when it signs in again.
   useEffect(() => {
-    if (draftAt !== null) writeDraft(draftAt, question);
-  }, [draftAt, question]);
+    if (draftAt !== null && draftBy !== null) writeDraft(draftBy, draftAt, question);
+  }, [draftAt, draftBy, question]);
 
   // Measured after the move and before it is painted: the distance from
   // where the field stands now to where it stood is where the box starts.
