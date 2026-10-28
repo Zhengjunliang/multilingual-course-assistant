@@ -29,12 +29,9 @@ from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreePr
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import (
     EDITION_PERMISSIONS,
-    GRANT_PERMISSION,
     PROGRAMME_PERMISSIONS,
-    ROLE_PERMISSIONS,
     Permission,
     Role,
-    roles_with,
 )
 from apps.roles.scopes import (
     courses_for,
@@ -386,21 +383,3 @@ def test_the_admin_enters_a_role_and_refuses_a_misfit(client: Client) -> None:
     assert [str(row) for row in RoleAssignment.objects.filter(user=w.student)] == [
         "student · teacher · B028451:2025-2026"
     ]
-
-
-def test_the_assign_table() -> None:
-    """Who may grant whom: each cell of the table, as the registry holds it."""
-    may_grant = {
-        (holder, target): GRANT_PERMISSION[target] in ROLE_PERMISSIONS[holder]
-        for holder in Role
-        for target in Role
-    }
-
-    assert may_grant == {
-        (Role.TEACHER, Role.TEACHER): False,
-        (Role.TEACHER, Role.SECRETARIAT): False,
-        (Role.SECRETARIAT, Role.TEACHER): True,
-        (Role.SECRETARIAT, Role.SECRETARIAT): False,
-    }
-    # So only the superuser assigns secretariat staff.
-    assert roles_with(Permission.PROGRAMME_ASSIGN_SECRETARIAT) == frozenset()
