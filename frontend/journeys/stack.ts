@@ -17,6 +17,7 @@ export const PASSWORD = "journeys-only-password";
 /** Where auth.setup.ts saves each demo account's session (gitignored). */
 export const STUDENT = fileURLToPath(new URL(".auth/student.json", import.meta.url));
 export const SECRETARIAT = fileURLToPath(new URL(".auth/secretariat.json", import.meta.url));
+export const ADMIN = fileURLToPath(new URL(".auth/admin.json", import.meta.url));
 
 /** What tests/journeys/fake_llm.py answers every question with, up to its citation. */
 const ANSWER = "Lo sportello della segreteria è aperto il martedì";
