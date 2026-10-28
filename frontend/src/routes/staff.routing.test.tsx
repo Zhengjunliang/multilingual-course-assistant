@@ -898,6 +898,8 @@ describe("a course, an edition, and a teacher's own courses", () => {
       path(),
       row?.querySelector("a")?.getAttribute("href"),
       document.activeElement === row?.querySelector("a"),
+      // Marked for the stylesheet only: a row of a plain table takes no selection state.
+      row?.hasAttribute("aria-selected"),
     ];
     unmount();
 
@@ -906,6 +908,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
       "/staff/courses/B028451?programme=B047",
       "/staff/editions/5?programme=B047",
       true,
+      false,
     ]);
   });
 
