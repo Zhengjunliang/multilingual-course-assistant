@@ -45,7 +45,7 @@ const WCAG_22_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
  * measured here instead (`floatingContrast`), and only a ratio under 4.5:1
  * is reported.
  *
- * A staff page's `main` scrolls by itself (routes/StaffLayout.tsx), so text
+ * A staff page's `main` scrolls by itself (routes/PageLayout.tsx), so text
  * across its lower edge is cut by it, and axe leaves that text unmeasured
  * too, as `elmPartiallyObscured`, whatever its colours. That text is
  * scrolled to the middle of the view and measured again (`measuredInView`);
@@ -279,7 +279,7 @@ test("every staff page and second tab fits 375 px without scrolling sideways, it
 }) => {
   // Shorter than an edition's page, so that its main scrolls: a document taller
   // than the window would then scroll beside it, two scrollbars, as it did while
-  // a screen-reader-only text was placed against the page (StaffLayout.tsx).
+  // a screen-reader-only text was placed against the page (PageLayout.tsx).
   await page.setViewportSize({ width: 375, height: 360 });
   const width = () => page.evaluate(() => document.documentElement.scrollWidth);
   const height = () => page.evaluate(() => document.scrollingElement?.scrollHeight ?? 0);

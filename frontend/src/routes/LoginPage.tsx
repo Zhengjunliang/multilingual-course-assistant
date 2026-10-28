@@ -106,6 +106,9 @@ export default function LoginPage() {
             {t(said.key, said.values)}
           </FieldError>
         )}
+        <Link to="/forgot" className="self-end text-caption text-muted underline">
+          {t("auth.forgot")}
+        </Link>
         <AuthButton phase={landing.phase}>{t("auth.logIn")}</AuthButton>
       </form>
     </AuthLayout>

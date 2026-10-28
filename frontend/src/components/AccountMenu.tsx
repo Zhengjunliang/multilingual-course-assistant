@@ -6,13 +6,15 @@
  * top of the main area holds nothing but where the reader is. The row shows
  * the avatar, the name and the account's widest role on a chip
  * (auth/staff.ts, `roleOf`), and the menu opens above it with the same three
- * at its head. Then the language, at the first level and showing the one in
+ * at its head. Then the account's own page (routes/AccountPage.tsx), its
+ * password, devices and deletion; the language, at the first level and showing the one in
  * use, since it is the setting a reader of three languages changes most, and
  * choosing one writes it to the account (`User.locale`) as well as the
  * interface; the settings, which hold the theme alone; the list of shortcuts;
  * the Django admin for the superuser, a plain page load since Django serves
- * it; and signing out. The staff pages are not here: they are the sidebar's
- * «Gestione» group.
+ * it; and signing out, which says so in a toast when the server could not
+ * be reached and the account is still signed in. The staff pages are not
+ * here: they are the sidebar's «Gestione» group.
  *
  * A dialog is opened from `onCloseAutoFocus` rather than from `onSelect`, and
  * that is not a flourish. Radix returns focus to the trigger as the menu
@@ -25,6 +27,7 @@
 
 import {
   ChevronsUpDown,
+  CircleUserRound,
   Globe,
   Keyboard,
   LogOut,
@@ -33,6 +36,8 @@ import {
 } from "lucide-react";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 import type { Account } from "@/api/account";
 import { roleOf } from "@/auth/staff";
@@ -42,6 +47,7 @@ import { Chip } from "@/components/ui/chip";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { shortcuts } from "@/features/chat/shortcuts";
 import { endonym, isUiLocale, languageCode, UI_LOCALES } from "@/i18n";
+import { describeError } from "@/lib/errorText";
 
 interface AccountMenuProps {
   /**
@@ -79,6 +85,7 @@ export function AccountMenu({
 }: AccountMenuProps) {
   const { t, i18n } = useTranslation();
   const { account, logOut, chooseLocale } = useSession();
+  const navigate = useNavigate();
   const after = useRef<(() => void) | null>(null);
 
   if (account === null) return null;
@@ -134,6 +141,12 @@ export function AccountMenu({
           key: "preferences",
           items: [
             {
+              key: "account",
+              icon: CircleUserRound,
+              label: t("account.page"),
+              onSelect: () => void navigate("/account"),
+            },
+            {
               key: "language",
               icon: Globe,
               label: t("account.language"),
@@ -181,7 +194,11 @@ export function AccountMenu({
               key: "logout",
               icon: LogOut,
               label: t("account.logOut"),
-              onSelect: () => void logOut(),
+              onSelect: () =>
+                void logOut().catch((error: unknown) => {
+                  const said = describeError(error).sentence;
+                  toast.error(t("account.logOutFailed"), { description: t(said.key, said.values) });
+                }),
             },
           ],
         },

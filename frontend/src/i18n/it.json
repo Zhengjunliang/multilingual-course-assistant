@@ -14,7 +14,20 @@
     "logIn": "Accedi",
     "register": "Registrati",
     "noAccount": "Non hai un account?",
-    "haveAccount": "Hai già un account?"
+    "haveAccount": "Hai già un account?",
+    "forgot": "Password dimenticata?",
+    "forgotTitle": "Password dimenticata",
+    "forgotBody": "Chiedi all'amministratore un link per sceglierne una nuova: vale una volta sola, per 24 ore.",
+    "backToLogIn": "Torna all'accesso",
+    "resetTitle": "Scegli una nuova password",
+    "currentPassword": "Password attuale",
+    "newPassword": "Nuova password",
+    "resetSubmit": "Imposta la password",
+    "inviteTitle": "Un invito nello staff",
+    "acceptAs": "Accetti con l'account {{username}}.",
+    "notYou": "Non sei {{username}}?",
+    "accept": "Accetta l'invito",
+    "acceptAndRegister": "Crea l'account e accetta"
   },
   "sidebar": {
     "title": "Menu",
@@ -67,6 +80,34 @@
       "secretariat": "Segreteria",
       "teacher": "Docente",
       "student": "Studente"
+    },
+    "page": "Il mio account",
+    "logOutFailed": "Uscita non riuscita",
+    "roles": "Ruoli",
+    "wrongPassword": "La password non è giusta.",
+    "password": {
+      "title": "Password",
+      "submit": "Cambia password",
+      "done": "Password cambiata",
+      "ended": "Gli altri dispositivi sono stati disconnessi."
+    },
+    "sessions": {
+      "title": "Dispositivi",
+      "device": "Dispositivo",
+      "address": "Indirizzo",
+      "lastActivity": "Ultima attività",
+      "current": "Questo dispositivo",
+      "unknown": "Browser sconosciuto",
+      "end": "Disconnetti",
+      "endOne": "Disconnetti il dispositivo",
+      "endOthers": "Disconnetti gli altri",
+      "ended": "Dispositivo disconnesso",
+      "endedOthers": "Altri dispositivi disconnessi"
+    },
+    "delete": {
+      "title": "Elimina account",
+      "consequence": "Le tue conversazioni vengono eliminate con l'account, e non si possono recuperare.",
+      "confirm": "Elimina"
     }
   },
   "theme": {

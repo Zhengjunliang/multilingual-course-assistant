@@ -38,6 +38,11 @@ interface DialogProps {
   description?: string;
   /** The action's icon, in the tinted disc at the head. */
   icon?: LucideIcon;
+  /**
+   * The warning's tint on the disc, for a form that destroys something, as
+   * `AlertDialog`'s `destructive`; its submit button, in the footer, takes `warn`.
+   */
+  warn?: boolean;
   /** Labels the close button for a reader who cannot see the cross. */
   closeLabel: string;
   /** The buttons, in the tinted foot. */
@@ -84,6 +89,7 @@ export function Dialog({
   heading,
   description,
   icon,
+  warn = false,
   closeLabel,
   footer,
   onSubmit,
@@ -110,7 +116,7 @@ export function Dialog({
           className="-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-floating flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-110 flex-col overflow-hidden rounded-card border border-line bg-surface shadow-overlay"
         >
           <div className="flex items-start gap-snug px-room pt-room pb-gutter">
-            {icon !== undefined && <DialogDisc icon={icon} />}
+            {icon !== undefined && <DialogDisc icon={icon} warn={warn} />}
             <div className="flex min-w-0 flex-1 flex-col gap-hair">
               <RadixDialog.Title className="font-semibold text-ink text-title">
                 {heading}
