@@ -29,7 +29,7 @@ from apps.catalog.serializers import StaffMemberSerializer
 from apps.catalog.views import EditionView, ProgrammeView
 from apps.roles.api import ScopedObjectView
 from apps.roles.grants import AlreadyHeldError, grant, revoke
-from apps.roles.models import RoleAssignment
+from apps.roles.models import RoleAssignment, on_scope
 from apps.roles.registry import GRANT_PERMISSION, Role
 from config.errors import ErrorCode, fail
 
@@ -47,12 +47,9 @@ class _Staff[M: (CourseEdition, DegreeProgramme)](ScopedObjectView[M]):
     serializer_class = StaffMemberSerializer
 
     def rows(self) -> QuerySet[RoleAssignment]:
-        on = (
-            {"edition": self.scope}
-            if isinstance(self.scope, CourseEdition)
-            else {"programme": self.scope}
+        return RoleAssignment.objects.filter(role=self.role, **on_scope(self.scope)).select_related(
+            "user"
         )
-        return RoleAssignment.objects.filter(role=self.role, **on).select_related("user")
 
 
 class _StaffList[M: (CourseEdition, DegreeProgramme)](_Staff[M]):

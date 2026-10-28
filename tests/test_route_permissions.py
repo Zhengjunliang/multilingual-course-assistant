@@ -63,6 +63,13 @@ OPEN: dict[str, str] = {
         "and apps/accounts/links.py answers any other with LINK_EXPIRED"
     ),
     "accounts:reset": "the same holder, setting the password the token opens",
+    "accounts:invitation-lookup": (
+        "an invitation's holder may have no account yet; the token in the body is the "
+        "credential, and apps/roles/invitations.py answers any other with LINK_EXPIRED"
+    ),
+    "accounts:invitation-accept": (
+        "the same holder, accepting as the account signed in or as one the body makes"
+    ),
     "qa:ask": (
         "an anonymous student may ask campus questions; AskView stores nothing for them "
         "and answers them from no course material"

@@ -173,6 +173,19 @@ class PasswordResetSerializer(LinkSerializer):
     new_password = password_field()
 
 
+class InvitedAccountSerializer(RegisterSerializer):
+    """An invitation's token, and the account accepting it makes, checked as registering does."""
+
+    token = serializers.CharField(write_only=True)
+
+    class Meta(RegisterSerializer.Meta):  # pyright: ignore[reportIncompatibleVariableOverride]
+        fields = ("token", *RegisterSerializer.Meta.fields)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        token = attrs.pop("token")
+        return {**super().validate(attrs), "token": token}
+
+
 class AccountSessionSerializer(serializers.ModelSerializer[AccountSession]):
     """A row of the device list; `current` is the session the list was asked from."""
 

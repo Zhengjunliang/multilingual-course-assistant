@@ -19,12 +19,11 @@ from typing import TYPE_CHECKING
 import psycopg
 from django.db import IntegrityError, transaction
 
-from apps.catalog.models import CourseEdition
-from apps.roles.models import RoleAssignment
+from apps.roles.models import RoleAssignment, on_scope
 
 if TYPE_CHECKING:
     from apps.accounts.models import User
-    from apps.catalog.models import DegreeProgramme
+    from apps.catalog.models import CourseEdition, DegreeProgramme
     from apps.roles.registry import Role
 
 logger = logging.getLogger(__name__)
@@ -38,12 +37,11 @@ def grant(
     actor: User, user: User, role: Role, scope: CourseEdition | DegreeProgramme
 ) -> RoleAssignment:
     """Give `user` the role on `scope`; raises `AlreadyHeldError` when they have it."""
-    on = {"edition": scope} if isinstance(scope, CourseEdition) else {"programme": scope}
     try:
         # Its own savepoint, so a refused insert leaves the caller's
         # transaction usable.
         with transaction.atomic():
-            assignment = RoleAssignment.objects.create(user=user, role=role, **on)
+            assignment = RoleAssignment.objects.create(user=user, role=role, **on_scope(scope))
     except IntegrityError as exc:
         # Only the unique constraint means "already held"; the check
         # constraint failing would be a caller pairing a role with the wrong

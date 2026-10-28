@@ -27,6 +27,7 @@ from apps.accounts.links import make_reset_link
 from apps.accounts.models import User
 from apps.catalog.models import Course, CourseEdition, DegreeProgramme
 from apps.qa import engine as engine_module
+from apps.roles.invitations import invite
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Role
 from config.request_id import RequestIdFilter
@@ -49,6 +50,8 @@ SESSIONS_END_URL = "/api/auth/sessions/end"
 DELETE_URL = "/api/auth/me/delete"
 RESET_LOOKUP_URL = "/api/auth/reset/lookup"
 RESET_URL = "/api/auth/reset"
+INVITATION_URL = "/api/auth/invitation/lookup"
+ACCEPT_URL = "/api/auth/invitation/accept"
 ASK_URL = "/api/ask"
 
 USERNAME = "student"
@@ -240,12 +243,20 @@ def reset_to(password: str) -> Response:
     return APIClient().post(RESET_URL, {"token": token, "new_password": password}, format="json")
 
 
+def accept_with(password: str) -> Response:
+    b047 = DegreeProgramme.objects.create(code="B047", name="Ingegneria Informatica")
+    _, token = invite(User.objects.create_superuser(username="root"), Role.SECRETARIAT, b047, None)
+    body = {"token": token, "username": RULES_USERNAME, "password": password}
+    return APIClient().post(ACCEPT_URL, body, format="json")
+
+
 @pytest.mark.parametrize(
     ("set_password", "field"),
     [
         pytest.param(register_with, "password", id="register"),
         pytest.param(change_to, "new_password", id="change"),
         pytest.param(reset_to, "new_password", id="reset"),
+        pytest.param(accept_with, "password", id="invitation"),
     ],
 )
 @pytest.mark.parametrize(
@@ -606,6 +617,13 @@ def test_signing_in_with_the_csrf_token_from_the_cookie_works(
             RESET_URL,
             {"token": "guess", "new_password": "lamp-orbit-quietly-87"},
             id="reset",
+        ),
+        pytest.param(False, INVITATION_URL, {"token": "guess"}, id="invitation-lookup"),
+        pytest.param(
+            False,
+            ACCEPT_URL,
+            {"token": "guess", "username": "grace", "password": "lamp-orbit-quietly-87"},
+            id="invitation-accept",
         ),
     ],
 )
