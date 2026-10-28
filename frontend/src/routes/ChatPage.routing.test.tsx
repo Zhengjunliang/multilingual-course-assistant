@@ -85,6 +85,8 @@ let rechecked = 0;
  * sign-out as unauthenticated.
  */
 let signedIn = true;
+/** Whose that session is: the reader's, unless a test signs another account in. */
+let sessionOf: Account | null = null;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -112,7 +114,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   const method = init.method ?? "GET";
   requested.push(`${method} ${path}`);
   if (path === "/api/auth/me") {
-    return json({ authenticated: signedIn, user: signedIn ? STUDENT : null });
+    return json({ authenticated: signedIn, user: signedIn ? (sessionOf ?? STUDENT) : null });
   }
   if (method === "POST" && path === "/api/auth/logout") {
     signedIn = false;
@@ -940,24 +942,29 @@ describe("a session that ends under the page", () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     signedIn = true;
+    sessionOf = null;
     localStorage.clear();
   });
 
   const field = (container: HTMLElement) =>
     container.querySelector<HTMLTextAreaElement>("#question");
 
+  const typed = () => backToThisTab();
+  const sent = async (container: HTMLElement) => {
+    act(() => container.querySelector<HTMLButtonElement>("button[type='submit']")?.click());
+    await settle();
+  };
+  const other: Account = { ...STUDENT, id: 2, username: "other" };
+
+  // A screen can be shared: what one account typed is not shown to the next.
   it.each([
-    ["typed, when another tab signs out", () => backToThisTab()],
-    [
-      "sent, when the server refuses it",
-      async (container: HTMLElement) => {
-        act(() => container.querySelector<HTMLButtonElement>("button[type='submit']")?.click());
-        await settle();
-      },
-    ],
+    ["typed, when another tab signs out", "the account that typed it", typed, STUDENT, DRAFT],
+    ["sent, when the server refuses it", "the account that typed it", sent, STUDENT, DRAFT],
+    ["typed, when another tab signs out", "no other account", typed, other, ""],
+    ["sent, when the server refuses it", "no other account", sent, other, ""],
   ])(
-    "keeps a question %s, through the login page, at the address it was typed at",
-    async (_, end) => {
+    "keeps a question %s, through the login page, at the address it was typed at, for %s",
+    async (_, _who, end, account, kept) => {
       const { container, unmount, path } = app(`/chat/${ID_7}`);
       await settle();
       typeInto(container, DRAFT);
@@ -965,13 +972,14 @@ describe("a session that ends under the page", () => {
       await end(container);
       const lost = path();
       signedIn = true;
+      sessionOf = account;
       await backToThisTab();
       const back = { path: path(), typed: field(container)?.value };
       unmount();
 
       expect({ lost, back }).toEqual({
         lost: "/login",
-        back: { path: `/chat/${ID_7}`, typed: DRAFT },
+        back: { path: `/chat/${ID_7}`, typed: kept },
       });
     },
   );

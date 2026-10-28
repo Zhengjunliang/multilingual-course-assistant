@@ -168,7 +168,7 @@ export default function ChatPage() {
     }
     void submit(question).then((refusal) => {
       if (isSessionLost(refusal)) {
-        writeDraft(pathname, question);
+        if (account !== null) writeDraft(account.id, pathname, question);
         forget();
       } else {
         void (visitor ? recheck() : refreshConversations());
@@ -218,6 +218,7 @@ export default function ChatPage() {
       travelFrom={travelFrom}
       rise={landed}
       draftAt={pathname}
+      draftBy={account?.id ?? null}
     />
   );
 
