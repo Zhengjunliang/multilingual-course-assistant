@@ -209,6 +209,7 @@ omit = [
 [tool.coverage.report]
 show_missing = true
 # Measured 75% after the M2 test additions (the gap is parse.py's converter loop,
-# which needs docling models), set ~5 points under. Ratchet up as coverage grows;
-# never lower it.
+# which needs docling models), set ~5 points under. A floor that catches a large
+# untested addition, not a target: it is not raised for its own sake, and no test
+# is written to move it (docs/testing.md, section "Coverage").
 fail_under = 70

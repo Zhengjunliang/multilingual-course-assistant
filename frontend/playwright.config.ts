@@ -24,10 +24,11 @@ export default defineConfig({
   testMatch: /\.spec\.ts$/,
   fullyParallel: true,
   forbidOnly: CI,
-  // One more try in CI, where a shared runner can stall a frame: red twice
-  // fails the job, green the second time is reported as flaky. None locally,
-  // so whoever runs it sees the red at once.
-  retries: CI ? 1 : 0,
+  // None anywhere: a retry reports a race as a pass, and a flaky test is fixed
+  // or deleted (docs/testing.md, section "Flaky tests"). The one CI retry this
+  // replaced went unused: no `browser` job from 2026-10-05 to 2026-10-28, 49
+  // runs, reported a flaky test.
+  retries: 0,
   reporter: CI ? [["github"], ["list"]] : "list",
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
