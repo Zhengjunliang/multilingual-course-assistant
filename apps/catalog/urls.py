@@ -10,6 +10,13 @@ from apps.catalog.content_views import (
     EditionSyllabusSectionView,
     EditionSyllabusView,
 )
+from apps.catalog.invitation_views import (
+    EditionInvitationsView,
+    EditionInvitationView,
+    InvitationListView,
+    ProgrammeInvitationsView,
+    ProgrammeInvitationView,
+)
 from apps.catalog.models import SyllabusSection
 from apps.catalog.staff_views import (
     EditionTeachersView,
@@ -79,14 +86,36 @@ urlpatterns = [
         ProgrammeSecretariatMemberView.as_view(),
         name="programme-secretariat-member",
     ),
+    path(
+        "programmes/<key:code>/invitations",
+        ProgrammeInvitationsView.as_view(),
+        name="programme-invitations",
+    ),
+    path(
+        "programmes/<key:code>/invitations/<int:invitation>",
+        ProgrammeInvitationView.as_view(),
+        name="programme-invitation",
+    ),
     path("courses/<key:code>", CourseDetailView.as_view(), name="course"),
     path("editions", EditionListView.as_view(), name="editions"),
+    # Every scope's, for the superuser; each one's are under its scope.
+    path("invitations", InvitationListView.as_view(), name="invitations"),
     path("editions/<int:pk>", EditionDetailView.as_view(), name="edition"),
     path("editions/<int:pk>/teachers", EditionTeachersView.as_view(), name="edition-teachers"),
     path(
         "editions/<int:pk>/teachers/<key:username>",
         EditionTeacherView.as_view(),
         name="edition-teacher",
+    ),
+    path(
+        "editions/<int:pk>/invitations",
+        EditionInvitationsView.as_view(),
+        name="edition-invitations",
+    ),
+    path(
+        "editions/<int:pk>/invitations/<int:invitation>",
+        EditionInvitationView.as_view(),
+        name="edition-invitation",
     ),
     path("editions/<int:pk>/syllabus", EditionSyllabusView.as_view(), name="edition-syllabus"),
     path(

@@ -2,20 +2,19 @@
 
 from django.urls import path
 
+from apps.accounts.link_views import (
+    InvitationAcceptView,
+    InvitationLookupView,
+    ResetLookupView,
+    ResetView,
+)
 from apps.accounts.self_views import (
     DeleteAccountView,
     EndSessionsView,
     PasswordView,
     SessionsView,
 )
-from apps.accounts.views import (
-    LoginView,
-    LogoutView,
-    RegisterView,
-    ResetLookupView,
-    ResetView,
-    SessionView,
-)
+from apps.accounts.views import LoginView, LogoutView, RegisterView, SessionView
 
 app_name = "accounts"
 
@@ -33,4 +32,6 @@ urlpatterns = [
     path("sessions/end", EndSessionsView.as_view(), name="sessions-end"),
     path("reset/lookup", ResetLookupView.as_view(), name="reset-lookup"),
     path("reset", ResetView.as_view(), name="reset"),
+    path("invitation/lookup", InvitationLookupView.as_view(), name="invitation-lookup"),
+    path("invitation/accept", InvitationAcceptView.as_view(), name="invitation-accept"),
 ]

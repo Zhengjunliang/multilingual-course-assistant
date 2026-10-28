@@ -1,11 +1,13 @@
-"""Links one person hands another, each good for one use: a password reset.
+"""Links one person hands another, each good for one use: a password reset, and an invitation.
 
 A superuser makes a reset link for an account whose owner lost the password,
-and hands it over in person; the site sends no mail. The token is the only
-credential the holder has, so it travels in a request's body and never in a
-URL a log would keep. It is 256 random bits, stored as its SHA-256 alone, so
-a copy of the table resets no account; a fast digest is enough for a secret
-nobody chose, which no guessing reaches. Not Django's
+and hands it over in person; the site sends no mail. An invitation
+(apps/roles/invitations.py) is handed over the same way, and its token made
+and opened by the same two functions below, `new_token` and `live`. The
+token is the only credential the holder has, so it travels in a request's
+body and never in a URL a log would keep. It is 256 random bits, stored as
+its SHA-256 alone, so a copy of the table opens no link; a fast digest is
+enough for a secret nobody chose, which no guessing reaches. Not Django's
 `PasswordResetTokenGenerator`, which stores nothing: its links stay valid
 until the password changes, so a newer link could not void the one before.
 
@@ -40,6 +42,7 @@ if TYPE_CHECKING:
 
     from apps.accounts.models import User
     from apps.accounts.services import Caller
+    from apps.roles.models import Invitation
 
 # The longest NIST SP 800-63B-4 lets a recovery code sent by email live
 # (section 4.2.1.2, outside the repository): a link handed over in person
@@ -77,7 +80,7 @@ def make_reset_link(actor: User, user: User, request: Caller) -> tuple[str, date
     return token, expires_at
 
 
-def live(links: QuerySet[ResetLink], token: str) -> ResetLink:
+def live[L: (ResetLink, Invitation)](links: QuerySet[L], token: str) -> L:
     """The link of `links` that `token` opens; fails with `LINK_EXPIRED` when none does."""
     link = links.filter(token_hash=digest(token), expires_at__gt=timezone.now()).first()
     if link is None:

@@ -8,11 +8,12 @@ session that ran out. Registering has no signal, so `RegisterView` calls
 `auth_event` itself, as apps/accounts/services.py does for an account it
 deactivates, reactivates or deletes, apps/accounts/self_views.py for a
 password changed or a session ended, apps/accounts/links.py for a reset link
-made and used, apps/accounts/reauth.py for a password mistyped to confirm
-one, and apps/accounts/middleware.py for why it ends a session, before the
-logout it signals. A session past the deadline Django
-keeps for it is never loaded again, so it signs nobody out and leaves no
-line. Nothing else writes to this logger.
+made and used, apps/roles/invitations.py for an invitation made, revoked or
+accepted and for the account accepting one makes, apps/accounts/reauth.py
+for a password mistyped to confirm one, and apps/accounts/middleware.py for
+why it ends a session, before the logout it signals. A session past the
+deadline Django keeps for it is never loaded again, so it signs nobody out
+and leaves no line. Nothing else writes to this logger.
 
 A line is the event's name and `key=value` pairs, at INFO, or at WARNING for
 a failure, where a search for attacks starts. Each value is in its `repr`: a
@@ -53,6 +54,9 @@ class AuthEvent(StrEnum):
     SESSIONS_ENDED = "sessions_ended"
     RESET_LINK_CREATED = "reset_link_created"
     PASSWORD_RESET = "password_reset"
+    INVITATION_CREATED = "invitation_created"
+    INVITATION_REVOKED = "invitation_revoked"
+    INVITATION_ACCEPTED = "invitation_accepted"
 
 
 FAILURES = frozenset({AuthEvent.LOGIN_FAILED, AuthEvent.REAUTH_FAILED})

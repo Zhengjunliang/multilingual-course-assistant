@@ -43,6 +43,8 @@ from test_sources_api import PDF, SHA, write_sidecar
 from apps.catalog.models import Importance, ReadingItem
 from apps.qa import sources
 from apps.qa.models import Conversation, Message
+from apps.roles.invitations import invite
+from apps.roles.registry import Role
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -63,22 +65,31 @@ def targets(
     """The object each route with parameters is asked about.
 
     PPM's current edition, which its teachers and B047's secretariat may act
-    on, with one section of its syllabus and a book of its reading list; B047;
-    the student's account, and a conversation of theirs; the deck of the
-    `deck` fixture.
+    on, with one section of its syllabus, a book of its reading list and an
+    invitation to teach it; B047, with an invitation to its secretariat; the
+    student's account, and a conversation of theirs; the deck of the `deck`
+    fixture.
     """
     edition = {"pk": w.ppm_old.pk}
     programme = {"code": w.b047.code}
     account = {"pk": w.student.pk}
+    teach, run = (
+        invite(w.root, role, scope, None)[0]
+        for role, scope in ((Role.TEACHER, w.ppm_old), (Role.SECRETARIAT, w.b047))
+    )
     return {
         "catalog:programme": programme,
         "catalog:programme-courses": programme,
         "catalog:programme-secretariat": programme,
         "catalog:programme-secretariat-member": {**programme, "username": w.secretariat.username},
+        "catalog:programme-invitations": programme,
+        "catalog:programme-invitation": {**programme, "invitation": run.pk},
         "catalog:course": {"code": w.ppm_old.course.code},
         "catalog:edition": edition,
         "catalog:edition-teachers": edition,
         "catalog:edition-teacher": {**edition, "username": w.continuing.username},
+        "catalog:edition-invitations": edition,
+        "catalog:edition-invitation": {**edition, "invitation": teach.pk},
         "catalog:edition-syllabus": edition,
         "catalog:edition-syllabus-section": {**edition, "section": "prerequisiti"},
         "catalog:edition-readings": edition,

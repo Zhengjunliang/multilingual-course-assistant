@@ -1,4 +1,6 @@
 route                                       continuing newcomer secretariat other_secretariat dual  student root  inactive anonymous
+POST accounts:invitation-accept             allow      allow    allow       allow             allow allow   allow allow    allow
+POST accounts:invitation-lookup             allow      allow    allow       allow             allow allow   allow allow    allow
 POST accounts:login                         allow      allow    allow       allow             allow allow   allow allow    allow
 POST accounts:logout                        allow      allow    allow       allow             allow allow   allow deny     deny
 GET accounts:me                             allow      allow    allow       allow             allow allow   allow allow    allow
@@ -12,6 +14,9 @@ GET accounts:sessions                       allow      allow    allow       allo
 POST accounts:sessions-end                  allow      allow    allow       allow             allow allow   allow deny     deny
 GET catalog:course                          hide       hide     allow       hide              allow hide    allow deny     deny
 GET catalog:edition                         allow      allow    allow       hide              allow hide    allow deny     deny
+DELETE catalog:edition-invitation           deny       deny     allow       hide              allow hide    allow deny     deny
+GET catalog:edition-invitations             deny       deny     allow       hide              allow hide    allow deny     deny
+POST catalog:edition-invitations            deny       deny     allow       hide              allow hide    allow deny     deny
 DELETE catalog:edition-reading              allow      allow    allow       hide              allow hide    allow deny     deny
 PATCH catalog:edition-reading               allow      allow    allow       hide              allow hide    allow deny     deny
 GET catalog:edition-readings                allow      allow    allow       hide              allow hide    allow deny     deny
@@ -22,8 +27,12 @@ PUT catalog:edition-syllabus-section        allow      allow    allow       hide
 DELETE catalog:edition-teacher              deny       deny     allow       hide              allow hide    allow deny     deny
 POST catalog:edition-teachers               deny       deny     allow       hide              allow hide    allow deny     deny
 GET catalog:editions                        allow      allow    allow       allow             allow allow   allow deny     deny
+GET catalog:invitations                     deny       deny     deny        deny              deny  deny    allow deny     deny
 GET catalog:programme                       hide       hide     allow       hide              allow hide    allow deny     deny
 GET catalog:programme-courses               hide       hide     allow       hide              allow hide    allow deny     deny
+DELETE catalog:programme-invitation         hide       hide     deny        hide              deny  hide    allow deny     deny
+GET catalog:programme-invitations           hide       hide     deny        hide              deny  hide    allow deny     deny
+POST catalog:programme-invitations          hide       hide     deny        hide              deny  hide    allow deny     deny
 POST catalog:programme-secretariat          hide       hide     deny        hide              deny  hide    allow deny     deny
 DELETE catalog:programme-secretariat-member hide       hide     deny        hide              deny  hide    allow deny     deny
 GET catalog:programmes                      allow      allow    allow       allow             allow allow   allow deny     deny
