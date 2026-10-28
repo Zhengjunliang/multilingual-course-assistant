@@ -156,6 +156,9 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 # The admin answers with its own pages, never under `/api/`: a model admin
 # refuses with Django's `PermissionDenied`, as Django's own do.
 "apps/*/admin.py" = ["TID251"]
+# S105 reads the event names (`PASSWORD_CHANGED`) as passwords; no password
+# reaches the authentication log by design (its docstring).
+"apps/accounts/events.py" = ["S105"]
 # The check chain exists to run subprocesses, from a fixed table in its own source.
 "scripts/**" = ["S603"]
 # Written by makemigrations, not by hand. E501: the long lines are Django's own
