@@ -51,6 +51,7 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -217,17 +218,21 @@ class Command(BaseCommand):
         username = account["username"]
         user = User.objects.filter(username=username).first() or User(username=username)
         if password is not None:
-            # A new hash would end the account's sessions (Django ties each
-            # session to it), so a run with the same password leaves it alone.
             # Checked by the rules a registration meets, with this account: a
-            # demo account open to others is the last one to get a weak one.
-            if not user.check_password(password):
-                try:
+            # demo account open to others is the last one to get a weak one. A
+            # new hash would end the account's sessions (Django ties each
+            # session to it), so a run with the same password leaves the hash
+            # alone, and still checks it: one stored before the rules is no
+            # less weak.
+            try:
+                if user.check_password(password):
+                    validate_password(password, user=user)
+                else:
                     set_password_checked(user, password)
-                except ValidationError as exc:
-                    raise CommandError(
-                        f"DEMO_PASSWORD is refused for {username}: {' '.join(exc.messages)}"
-                    ) from exc
+            except ValidationError as exc:
+                raise CommandError(
+                    f"DEMO_PASSWORD is refused for {username}: {' '.join(exc.messages)}"
+                ) from exc
         elif user.pk is None:
             user.set_unusable_password()
         elif user.has_usable_password():
