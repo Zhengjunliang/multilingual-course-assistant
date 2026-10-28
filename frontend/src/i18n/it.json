@@ -176,7 +176,7 @@
       "ALREADY_EXISTS": "Esiste già.",
       "NO_SUCH_USER": "Nessun utente con questo nome.",
       "TOO_COMMON": "Questa password è troppo comune.",
-      "ENTIRELY_NUMERIC": "La password non può essere fatta solo di numeri.",
+      "BREACHED": "Questa password è comparsa in una violazione di dati: scegline un'altra.",
       "TOO_SIMILAR": "La password è troppo simile al nome utente.",
       "username": {
         "INVALID": "Usa solo lettere, numeri e i segni @ . + - _",

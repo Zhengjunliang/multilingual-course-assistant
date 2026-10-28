@@ -13,11 +13,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django.contrib.auth import authenticate
-from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from apps.accounts.models import User
+from apps.accounts.passwords import set_password_checked
 from apps.roles.scopes import role_scopes
 from config.errors import ErrorCode, django_field_error, fail
 
@@ -73,25 +73,33 @@ class RegisterSerializer(serializers.ModelSerializer[User]):
         model = User
         fields = ("username", "password", "locale")
 
-    def validate_password(self, value: str) -> str:
-        """Django's own validators — the four `AUTH_PASSWORD_VALIDATORS` lists.
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """The account, unsaved, with its password checked and hashed onto it.
 
-        Bridged by hand because the two frameworks raise different exceptions
-        with the same name: Django's would escape as a 500, and only DRF's
-        becomes the 400 that tells the caller which rule they broke, each by
-        its code (config/errors.py).
+        In `validate()` and not `validate_password`, because one of
+        `AUTH_PASSWORD_VALIDATORS` judges the password against the account (a
+        password close to the username is refused), and only here are both
+        known. Bridged by hand because the two frameworks raise different
+        exceptions with the same name: Django's would escape as a 500, and only
+        DRF's becomes the 400 that tells the caller which rule they broke, each
+        by its code (config/errors.py).
         """
+        password = attrs.pop("password")
+        user = User(**attrs)
+        # What `create_user` would do to the name, which this path replaces.
+        user.username = User.normalize_username(user.username)
         try:
-            validate_password(value)
+            set_password_checked(user, password)
         except DjangoValidationError as exc:
-            raise django_field_error(exc) from exc
-        return value
+            raise django_field_error(exc, field="password") from exc
+        return {"user": user}
 
     def create(self, validated_data: dict[str, Any]) -> User:
-        # `create_user`, never `create`: it is what hashes the password. `create`
-        # would store it as typed and every later login would fail — the quiet
-        # half of that mistake being that the plaintext is now in the database.
-        return User.objects.create_user(**validated_data)
+        # Hashed already, by `set_password_checked`: `save` stores the hash,
+        # never the password as typed.
+        user: User = validated_data["user"]
+        user.save()
+        return user
 
 
 class LoginSerializer(serializers.Serializer):

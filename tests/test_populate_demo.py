@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 
 pytestmark = pytest.mark.django_db
 
-PASSWORD = "demo-password"
+PASSWORD = "correct-horse-battery"
 
 # PPM in both of B047's curricula, a course B047 shares with B046, and an integrated
 # course of B046's own, whose code no single Moodle course holds.
@@ -470,6 +470,9 @@ def _with(**changes: Any) -> dict[str, Any]:
             id="an-edition-with-no-year",
         ),
         pytest.param(DEMO, None, "no edition B028451:2026-2027", id="content-of-no-edition"),
+        pytest.param(
+            DEMO, None, "DEMO_PASSWORD is refused for demo-", id="a-demo-password-the-rules-refuse"
+        ),
     ],
 )
 def test_a_refused_run_changes_nothing(
@@ -496,8 +499,11 @@ def test_a_refused_run_changes_nothing(
 
         monkeypatch.setattr(Command, "_catalogue", racing)
 
+    # Too short, and refused only once the catalogue is written: the run
+    # still leaves nothing behind.
+    password = "too-short" if refusal.startswith("DEMO_PASSWORD") else None
     with pytest.raises(CommandError, match=refusal):
-        run(tmp_path, monkeypatch, None, demo, content)
+        run(tmp_path, monkeypatch, password, demo, content)
 
     assert snapshot() == empty
 

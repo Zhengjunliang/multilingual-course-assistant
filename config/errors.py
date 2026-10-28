@@ -99,7 +99,7 @@ class FieldReason(StrEnum):
     ALREADY_EXISTS = "ALREADY_EXISTS"
     NO_SUCH_USER = "NO_SUCH_USER"
     TOO_COMMON = "TOO_COMMON"
-    ENTIRELY_NUMERIC = "ENTIRELY_NUMERIC"
+    BREACHED = "BREACHED"
     TOO_SIMILAR = "TOO_SIMILAR"
 
 
@@ -192,7 +192,7 @@ FIELD_SPEC: dict[FieldReason, frozenset[str]] = {
     FieldReason.ALREADY_EXISTS: frozenset(),
     FieldReason.NO_SUCH_USER: frozenset(),
     FieldReason.TOO_COMMON: frozenset(),
-    FieldReason.ENTIRELY_NUMERIC: frozenset(),
+    FieldReason.BREACHED: frozenset(),
     FieldReason.TOO_SIMILAR: frozenset(),
 }
 
@@ -220,8 +220,9 @@ FIELD_MAP: dict[str, FieldReason] = {
     "max_value": FieldReason.TOO_LARGE,
     "unique": FieldReason.ALREADY_EXISTS,
     "password_too_short": FieldReason.TOO_SHORT,
+    "password_too_long": FieldReason.TOO_LONG,
     "password_too_common": FieldReason.TOO_COMMON,
-    "password_entirely_numeric": FieldReason.ENTIRELY_NUMERIC,
+    "password_compromised": FieldReason.BREACHED,
     "password_too_similar": FieldReason.TOO_SIMILAR,
 }
 
@@ -332,12 +333,14 @@ def field_error(
     return ValidationError(detail if field is None else {field: detail})
 
 
-def django_field_error(exc: DjangoValidationError) -> ValidationError:
-    """Django's rejections of one value, for `validate_<field>`: each by its code and parameters.
+def django_field_error(exc: DjangoValidationError, *, field: str | None = None) -> ValidationError:
+    """Django's rejections of one value: each by its code and parameters.
 
     Django's validators say why by `code` and the values their message names by
     `params` (`password_too_short` with `min_length`), which is what a reason
     and its data are; a code no row names reads as `INVALID` in the handler.
+    `field` as in `field_error`: left out in `validate_<field>`, named in
+    `validate()`.
     """
     details = []
     for error in exc.error_list:
@@ -348,7 +351,7 @@ def django_field_error(exc: DjangoValidationError) -> ValidationError:
             continue
         data = {key: params[key] for key in FIELD_SPEC[reason] if key in params}
         details.append(ErrorDetail(str(reason), code=encode_field_code(reason, data)))
-    return ValidationError(details)
+    return ValidationError(details if field is None else {field: details})
 
 
 # What every `/api/` error is read as, by its class; the first row that

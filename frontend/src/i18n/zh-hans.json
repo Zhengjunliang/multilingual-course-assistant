@@ -176,7 +176,7 @@
       "ALREADY_EXISTS": "已经存在。",
       "NO_SUCH_USER": "没有这个名字的用户。",
       "TOO_COMMON": "这个密码太常见了。",
-      "ENTIRELY_NUMERIC": "密码不能全是数字。",
+      "BREACHED": "这个密码在数据泄露中出现过，请换一个。",
       "TOO_SIMILAR": "密码和用户名太相似了。",
       "username": {
         "INVALID": "只能使用字母、数字和 @ . + - _",

@@ -54,7 +54,7 @@ export const FIELD_REASONS = {
   ALREADY_EXISTS: { dataKeys: [] },
   NO_SUCH_USER: { dataKeys: [] },
   TOO_COMMON: { dataKeys: [] },
-  ENTIRELY_NUMERIC: { dataKeys: [] },
+  BREACHED: { dataKeys: [] },
   TOO_SIMILAR: { dataKeys: [] },
 } as const satisfies Record<string, { dataKeys: readonly string[] }>;
 

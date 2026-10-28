@@ -156,18 +156,43 @@ def test_registering_keeps_the_chosen_locale(chosen: dict[str, str], kept: str) 
     assert User.objects.get(username="ada").locale == kept
 
 
-def test_a_password_django_rejects_is_refused(student: User) -> None:
+# Long enough for every rule but the one a row breaks, and close to no username.
+LEAKED = "a-made-up-password-only-the-fake-range-holds"
+RULES_USERNAME = "analytical-engine"
+
+
+@pytest.mark.parametrize(
+    ("password", "refusals"),
+    [
+        # No rule on what a password is made of (config/settings.py).
+        pytest.param("804917365208431", [], id="fifteen-digits"),
+        pytest.param("k" * 64, [], id="sixty-four-characters"),
+        pytest.param("k7#q2-mVz9Lp4w!", [], id="fifteen-characters"),
+        pytest.param(
+            "k7#q2-mVz9Lp4w", [("TOO_SHORT", {"min_length": 15})], id="fourteen-characters"
+        ),
+        pytest.param("k" * 129, [("TOO_LONG", {"max_length": 128})], id="129-characters"),
+        pytest.param("1234567890qwertyuiop", [("TOO_COMMON", {})], id="common"),
+        pytest.param(LEAKED, [("BREACHED", {})], id="breached"),
+        pytest.param("analytical-engine-1843", [("TOO_SIMILAR", {})], id="like-the-username"),
+    ],
+)
+def test_a_new_password_is_held_to_the_rules(
+    leaked_passwords: set[str], password: str, refusals: list[tuple[str, dict[str, int]]]
+) -> None:
     """`AUTH_PASSWORD_VALIDATORS` is configured but reaches nothing on its own —
     something has to call it, and the two frameworks' `ValidationError` classes
-    are different, so the call is a bridge that can be dropped."""
+    are different, so the call is a bridge that can be dropped. Each rule broken
+    is a reason of its own, with the bound it names, which the page words."""
+    leaked_passwords.add(LEAKED)
     response = APIClient().post(
-        REGISTER_URL, {"username": "ada", "password": "password"}, format="json"
+        REGISTER_URL, {"username": RULES_USERNAME, "password": password}, format="json"
     )
 
-    assert response.status_code == 400
-    # Each rule broken is a reason of its own, which the page words.
-    assert refused(response) == ("INVALID_ARGUMENT", {"password": ["TOO_COMMON"]})
-    assert not User.objects.filter(username="ada").exists()
+    fields = response.json()["error"]["fields"] if response.status_code == 400 else []
+    seen = [(field["field"], field["reason"], field.get("data", {})) for field in fields]
+    assert seen == [("password", reason, data) for reason, data in refusals]
+    assert User.objects.filter(username=RULES_USERNAME).exists() == (not refusals)
 
 
 def test_a_username_already_taken_is_refused(student: User) -> None:
