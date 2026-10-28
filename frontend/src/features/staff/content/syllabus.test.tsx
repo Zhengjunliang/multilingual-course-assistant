@@ -69,6 +69,13 @@ describe("a syllabus section", () => {
     // of this box: Tiptap's start, a timer and an animation frame after the
     // editor is made, came before React had put the box in the page, and its
     // focus went nowhere. Here the timer and the frame run at once.
+    const { unmount } = open(true);
+    await settle();
+    await show("Prerequisiti");
+    // The editor's chunk loaded first, so the box below makes its editor
+    // while React renders, with the timer and the frame already at once.
+    await openEditor("Prerequisiti", "Modifica");
+    await press("Annulla");
     const later = window.setTimeout;
     const timers = vi.spyOn(window, "setTimeout").mockImplementation(((
       run: () => void,
@@ -82,18 +89,20 @@ describe("a syllabus section", () => {
       run(performance.now());
       return 0;
     });
-    const { unmount } = open(true);
-    await settle();
-    await show("Prerequisiti");
-    await openEditor("Prerequisiti", "Modifica");
-    const editor = editorIn("Prerequisiti");
-    const seen = {
-      focused: document.activeElement === editor?.view.dom,
-      atEnd: editor?.state.selection.eq(Selection.atEnd(editor.state.doc)),
-    };
-    timers.mockRestore();
-    frames.mockRestore();
-    unmount();
+    let seen: { focused: boolean; atEnd?: boolean };
+    try {
+      await openEditor("Prerequisiti", "Modifica");
+      const editor = editorIn("Prerequisiti");
+      seen = {
+        focused: document.activeElement === editor?.view.dom,
+        atEnd: editor?.state.selection.eq(Selection.atEnd(editor.state.doc)),
+      };
+    } finally {
+      // Left in place, they would run every later test's timers at once.
+      timers.mockRestore();
+      frames.mockRestore();
+      unmount();
+    }
 
     expect(seen).toEqual({ focused: true, atEnd: true });
   });
