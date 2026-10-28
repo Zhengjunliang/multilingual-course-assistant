@@ -27,5 +27,12 @@
     // relative to this file, which is what the alias in vite.config.ts does too.
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts"]
+  "include": [
+    "src",
+    "e2e",
+    "journeys",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "playwright.journeys.config.ts"
+  ]
 }
