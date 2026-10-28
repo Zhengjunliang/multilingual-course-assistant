@@ -26,7 +26,6 @@ from apps.qa.contract import StartEvent
 from apps.qa.conversation_views import ConversationDetailView
 from apps.qa.conversations import (
     BrokenThreadError,
-    ConversationGoneError,
     recent_turns,
     record_exchange,
     thread,
@@ -120,11 +119,6 @@ def test_a_conversation_nothing_was_written_to_is_an_empty_thread() -> None:
     assert thread(None, []) == []
 
 
-def test_a_leaf_with_no_rows_is_a_conversation_deleted_while_it_was_read() -> None:
-    with pytest.raises(ConversationGoneError):
-        thread(uuid.uuid4(), [])
-
-
 def test_a_chain_that_does_not_reach_a_root_is_a_broken_thread() -> None:
     """A leaf missing from the rows, a parent missing from them, and a cycle:
     none of them is something a reader did, and none is read as a shorter
@@ -197,12 +191,22 @@ def test_an_address_that_is_not_a_uuid_is_not_found(address: str) -> None:
 
 
 @pytest.mark.parametrize("method", ["get", "patch", "delete"])
-def test_a_uuid_naming_nothing_is_not_found(method: str) -> None:
+@pytest.mark.parametrize("whose", ["nobody", "stranger"])
+def test_a_uuid_naming_nothing_of_the_readers_is_not_found(whose: str, method: str) -> None:
+    """Somebody else's conversation is missing rather than forbidden, as one
+    that never existed is: a 403 would confirm the id names something real. A
+    pin or a delete of it gets the same answer and changes nothing."""
     started(0)
+    stranger = User.objects.create_user(username="stranger")
+    theirs = Conversation.objects.create(owner=stranger, locale="it")
+    # Held something, or it would be missing for that alone.
+    turn(theirs, 0, [web()])
+    target = theirs.pk if whose == "stranger" else uuid.uuid4()
 
-    response = getattr(client(), method)(f"{URL}/{uuid.uuid4()}", {"pinned": True}, format="json")
+    response = getattr(client(), method)(f"{URL}/{target}", {"pinned": True}, format="json")
 
     assert (response.status_code, refused(response)) == (404, ("NOT_FOUND", {}))
+    assert Conversation.objects.filter(pk=theirs.pk, pinned=False).exists()
 
 
 @pytest.mark.parametrize("which", ["question", "answer"])

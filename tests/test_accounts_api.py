@@ -138,22 +138,21 @@ def test_a_registered_password_is_stored_hashed() -> None:
     assert ada.check_password(PASSWORD)
 
 
-def test_a_new_account_defaults_to_the_project_locale() -> None:
-    APIClient().post(REGISTER_URL, {"username": "ada", "password": PASSWORD}, format="json")
-
-    assert User.objects.get(username="ada").locale == "it"
-
-
-def test_registering_with_a_chosen_locale_keeps_it() -> None:
+@pytest.mark.parametrize(
+    ("chosen", "kept"),
+    [
+        pytest.param({}, "it", id="none-the-projects"),
+        pytest.param({"locale": "zh-hans"}, "zh-hans"),
+    ],
+)
+def test_registering_keeps_the_chosen_locale(chosen: dict[str, str], kept: str) -> None:
     """The domain is multilingual from the first request a person makes, not
     from the moment they find a settings page."""
     APIClient().post(
-        REGISTER_URL,
-        {"username": "ada", "password": PASSWORD, "locale": "zh-hans"},
-        format="json",
+        REGISTER_URL, {"username": "ada", "password": PASSWORD, **chosen}, format="json"
     )
 
-    assert User.objects.get(username="ada").locale == "zh-hans"
+    assert User.objects.get(username="ada").locale == kept
 
 
 def test_a_password_django_rejects_is_refused(student: User) -> None:

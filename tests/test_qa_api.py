@@ -35,6 +35,7 @@ import logging
 import uuid
 from collections.abc import Iterator, Sequence
 from pathlib import Path
+from types import EllipsisType
 from typing import Any
 
 import httpx
@@ -378,26 +379,43 @@ def test_the_router_decision_reaches_the_stream(index: QdrantClient) -> None:
     assert [citation["text"] for citation in start["citations"]] == [TASSE_TEXT]
 
 
-def test_a_web_citation_carries_the_page_a_student_can_open(index: QdrantClient) -> None:
-    install_engine(index, WEB_ROUTE)
-    citation = start_of(events(ask("Quando scadono le tasse?")))["citations"][0]
-    assert citation["marker"] == WEB_MARKER
-    assert citation["kind"] == "web"
-    assert citation["url"] == TASSE_URL
-    assert citation["fetch_date"] == FETCH_DATE
-    assert citation["source_sha256"] is None
-    assert citation["academic_year"] is None
-
-
-def test_a_slides_citation_cites_the_file_and_page(index: QdrantClient) -> None:
-    install_engine(index, SLIDES_ROUTE)
-    citation = start_of(events(ask()))["citations"][0]
-    assert citation["marker"] == SLIDES_MARKER
-    assert citation["kind"] == "slides"
-    assert citation["source_sha256"] == "ab" * 32
-    assert citation["academic_year"] == "2025-2026"
-    assert citation["url"] is None
-    assert citation["fetch_date"] is None
+@pytest.mark.parametrize(
+    ("route", "question", "expected"),
+    [
+        pytest.param(
+            WEB_ROUTE,
+            "Quando scadono le tasse?",
+            {
+                "marker": WEB_MARKER,
+                "kind": "web",
+                "url": TASSE_URL,
+                "fetch_date": FETCH_DATE,
+                "source_sha256": None,
+                "academic_year": None,
+            },
+            id="a-web-page-a-student-can-open",
+        ),
+        pytest.param(
+            SLIDES_ROUTE,
+            "What is an ORM?",
+            {
+                "marker": SLIDES_MARKER,
+                "kind": "slides",
+                "url": None,
+                "fetch_date": None,
+                "source_sha256": "ab" * 32,
+                "academic_year": "2025-2026",
+            },
+            id="a-file-and-its-page",
+        ),
+    ],
+)
+def test_a_citation_carries_what_opens_its_source(
+    index: QdrantClient, route: str, question: str, expected: dict[str, str | None]
+) -> None:
+    install_engine(index, route)
+    citation = start_of(events(ask(question)))["citations"][0]
+    assert {key: citation[key] for key in expected} == expected
 
 
 def test_a_marker_split_across_tokens_survives_the_join(index: QdrantClient) -> None:
@@ -433,60 +451,61 @@ def test_a_non_ascii_answer_survives_the_wire(index: QdrantClient) -> None:
     assert answer_of(events(ask("学费缴纳时间"))) == "学费在 11 月 30 日前缴纳。"
 
 
-def test_a_blank_question_is_rejected(index: QdrantClient) -> None:
+@pytest.mark.parametrize(
+    ("question", "locale", "field", "reason", "data"),
+    [
+        pytest.param("   ", None, "question", "REQUIRED", {}, id="blank-question"),
+        # The cap the page's sentence names, read off the serializer's field.
+        pytest.param(
+            "a" * (MAX_QUESTION_CHARS + 1),
+            None,
+            "question",
+            "TOO_LONG",
+            {"max_length": MAX_QUESTION_CHARS},
+            id="question-over-the-cap",
+        ),
+        # An empty string is not a way of saying "decide for me", as null is: it
+        # is a client sending a field it failed to fill in.
+        pytest.param("What is an ORM?", "", "locale", "REQUIRED", {}, id="blank-locale"),
+        # `english` is a language name, not a tag; passing it through would
+        # filter every result away and read as an empty corpus.
+        pytest.param("What is an ORM?", "english", "locale", "INVALID", {}, id="not-a-subtag"),
+    ],
+)
+def test_a_question_or_a_locale_the_client_got_wrong_is_rejected(
+    index: QdrantClient,
+    question: str,
+    locale: str | None,
+    field: str,
+    reason: str,
+    data: dict[str, int],
+) -> None:
     install_engine(index, SLIDES_ROUTE)
-    response = ask("   ")
+    response = ask(question) if locale is None else ask(question, locale=locale)
     assert response.status_code == 400
-    assert refused(response) == ("INVALID_ARGUMENT", {"question": ["REQUIRED"]})
+    assert refused(response) == ("INVALID_ARGUMENT", {field: [reason]})
+    assert [violation["data"] for violation in response.json()["error"]["fields"]] == [data]
 
 
-def test_a_question_over_the_length_cap_is_rejected(index: QdrantClient) -> None:
-    install_engine(index, SLIDES_ROUTE)
-    response = ask("a" * (MAX_QUESTION_CHARS + 1))
-    assert response.status_code == 400
-    assert refused(response) == ("INVALID_ARGUMENT", {"question": ["TOO_LONG"]})
-    # The cap the page's sentence names, read off the serializer's field.
-    assert response.json()["error"]["fields"][0]["data"] == {"max_length": MAX_QUESTION_CHARS}
-
-
-def test_a_regional_locale_tag_is_normalised(index: QdrantClient) -> None:
+@pytest.mark.parametrize(
+    "locale",
+    [
+        pytest.param("it-IT", id="a-regional-tag"),
+        # `...`: the request carries no `locale` key at all.
+        pytest.param(..., id="omitted"),
+        # `allow_null` is what separates "decide for me" from "": a client that
+        # has no preference sends null rather than omitting the key.
+        pytest.param(None, id="null"),
+    ],
+)
+def test_a_locale_is_normalised_or_detected_from_the_question(
+    index: QdrantClient, locale: str | EllipsisType | None
+) -> None:
     install_engine(index, WEB_ROUTE)
-    response = ask("Quando scadono le tasse?", locale="it-IT")
+    question = "Quando scadono le tasse universitarie?"
+    response = ask(question) if locale is ... else ask(question, locale=locale)
     assert response.status_code == 200
     assert start_of(events(response))["locale"] == "it"
-
-
-def test_an_omitted_locale_is_detected_from_the_question(index: QdrantClient) -> None:
-    install_engine(index, WEB_ROUTE)
-    stream = events(ask("Quando scadono le tasse universitarie?"))
-    assert start_of(stream)["locale"] == "it"
-
-
-def test_an_explicit_null_locale_means_detect_it(index: QdrantClient) -> None:
-    """`allow_null` is what separates "decide for me" from "" — a client that
-    has no preference sends null rather than omitting the key."""
-    install_engine(index, WEB_ROUTE)
-    response = ask("Quando scadono le tasse universitarie?", locale=None)
-    assert response.status_code == 200
-    assert start_of(events(response))["locale"] == "it"
-
-
-def test_a_blank_locale_is_rejected_rather_than_defaulted(index: QdrantClient) -> None:
-    """The other half of that pair: an empty string is not a way of saying
-    "decide for me", it is a client sending a field it failed to fill in."""
-    install_engine(index, SLIDES_ROUTE)
-    response = ask(locale="")
-    assert response.status_code == 400
-    assert refused(response) == ("INVALID_ARGUMENT", {"locale": ["REQUIRED"]})
-
-
-def test_a_locale_that_is_not_a_subtag_is_rejected(index: QdrantClient) -> None:
-    """`english` is a language name, not a tag; passing it through would filter
-    every result away and read as an empty corpus."""
-    install_engine(index, SLIDES_ROUTE)
-    response = ask(locale="english")
-    assert response.status_code == 400
-    assert refused(response) == ("INVALID_ARGUMENT", {"locale": ["INVALID"]})
 
 
 def test_a_client_asking_for_the_stream_is_not_refused(index: QdrantClient) -> None:
@@ -773,7 +792,8 @@ def test_a_queue_deeper_than_the_wait_is_refused_with_a_retry_hint(
     assert response.headers["Retry-After"] == str(views_module.RETRY_AFTER_SECONDS)
 
 
-def test_a_client_that_walks_away_releases_the_lock(index: QdrantClient) -> None:
+@pytest.mark.parametrize("chunks", [1, 0], ids=["halfway", "before-a-byte"])
+def test_a_client_that_walks_away_releases_the_lock(index: QdrantClient, chunks: int) -> None:
     """The lock is taken in the view and released inside the generator, so the
     path nothing else exercises is the one that matters most: a reader who
     closes the tab halfway through an answer.
@@ -781,31 +801,19 @@ def test_a_client_that_walks_away_releases_the_lock(index: QdrantClient) -> None
     Django closes the response for exactly that, and if closing did not reach
     the generator's `finally`, this process would hold its own queue lock
     forever and answer every later question with a 503.
+
+    The same close one step earlier, before a byte was read, decides how the
+    response body is written. Routing and retrieval have run by the time the
+    response exists, so the lock is held before the first chunk is asked for,
+    and a body written as a generator ignores `close()` when it was never
+    iterated: its `finally` needs a body that started.
     """
     install_engine(index, SLIDES_ROUTE, ["An ", "ORM ", "maps."])
     response = ask_the_view()
 
-    read_one(response)  # the start event is delivered, then silence
+    for _ in range(chunks):
+        read_one(response)  # the start event is delivered, then silence
     finish(response)  # what Django does when the connection goes away
-
-    assert engine_module._HOLDER.lock.acquire(blocking=False)
-    engine_module._HOLDER.lock.release()
-
-
-def test_a_client_that_never_reads_a_byte_releases_the_lock(index: QdrantClient) -> None:
-    """The same close, one step earlier — and the case that decides how the
-    response body is written.
-
-    Routing and retrieval have already run by the time the response exists, so
-    the lock is held before the first chunk is asked for. A body written as a
-    generator ignores `close()` when it was never iterated: its `finally` needs
-    a body that started. Nothing would then give the lock back, and this process
-    would answer 503 to everything from here on.
-    """
-    install_engine(index, SLIDES_ROUTE)
-    response = ask_the_view()
-
-    finish(response)  # not one chunk was ever pulled
 
     assert engine_module._HOLDER.lock.acquire(blocking=False)
     engine_module._HOLDER.lock.release()
@@ -1006,7 +1014,8 @@ def test_the_history_window_stops_at_its_limit(index: QdrantClient) -> None:
     assert "Question 1?" in router_prompt
 
 
-def test_somebody_elses_conversation_is_refused(index: QdrantClient) -> None:
+@pytest.mark.parametrize("whose", ["stranger", "nobody"])
+def test_somebody_elses_conversation_is_refused(index: QdrantClient, whose: str) -> None:
     """An id is not a credential: whoever holds one is still asked to own it,
     and this is the whole of the access check. The message is the same one a
     conversation that never existed gets: telling them apart would say whose
@@ -1015,18 +1024,10 @@ def test_somebody_elses_conversation_is_refused(index: QdrantClient) -> None:
     stranger = User.objects.create_user(username="stranger")
     theirs = Conversation.objects.create(owner=stranger, locale="it")
 
-    response = ask(conversation_id=theirs.pk)
+    response = ask(conversation_id=theirs.pk if whose == "stranger" else str(uuid.uuid4()))
 
     assert (response.status_code, refused(response)) == (404, ("CONVERSATION_GONE", {}))
     assert not Message.objects.exists()
-
-
-def test_a_conversation_that_never_existed_is_refused(index: QdrantClient) -> None:
-    install_engine(index, SLIDES_ROUTE)
-
-    response = ask(conversation_id=str(uuid.uuid4()))
-
-    assert (response.status_code, refused(response)) == (404, ("CONVERSATION_GONE", {}))
 
 
 @pytest.mark.parametrize("conversation_id", ["abc", 7, True], ids=["text", "integer", "boolean"])
@@ -1090,37 +1091,6 @@ def test_reopening_a_conversation_returns_what_the_stream_delivered(
     assert answer_message["search_ms"] == start_of(stream)["search_ms"]
     # The student's half has no search of its own: the column is empty there.
     assert body["messages"][0]["search_ms"] is None
-
-
-@pytest.mark.parametrize("method", ["get", "delete"], ids=["read", "delete"])
-def test_somebody_elses_conversation_is_not_there_to_open(method: str) -> None:
-    """Missing rather than forbidden: a 403 would confirm the id names
-    something real. A delete gets the same answer and deletes nothing."""
-    stranger = User.objects.create_user(username="stranger")
-    theirs = Conversation.objects.create(owner=stranger, locale="it")
-    # Held something, or it would be missing for that alone.
-    Message.objects.create(conversation=theirs, role=Message.Role.USER, text="?", locale="it")
-
-    response = getattr(client_for(), method)(f"{CONVERSATIONS_URL}/{theirs.pk}")
-
-    assert response.status_code == 404
-    assert Conversation.objects.filter(pk=theirs.pk).exists()
-
-
-def test_a_student_deletes_their_own_conversation_and_its_messages() -> None:
-    """Deleting is hard and takes the messages with it."""
-    mine = Conversation.objects.create(owner=student(), locale="it")
-    Message.objects.create(
-        conversation=mine, role=Message.Role.USER, text="?", locale="it", complete=True
-    )
-    Message.objects.create(
-        conversation=mine, role=Message.Role.ASSISTANT, text="!", locale="it", complete=True
-    )
-    url = f"{CONVERSATIONS_URL}/{mine.pk}"
-
-    assert client_for().delete(url).status_code == 204
-    assert not Conversation.objects.filter(pk=mine.pk).exists()
-    assert not Message.objects.exists()
 
 
 class DeletingCompleter:

@@ -158,6 +158,8 @@ DB = ("B003376", "BASI DI DATI")
             },
             id="several-courses-in-citation-order-each-once",
         ),
+        # Refused for lack of excerpts: the answer before it, which cited the web.
+        pytest.param([], {"courses": [], "web": True}, id="a-refusal-keeps-the-answer-before"),
     ],
 )
 def test_a_row_names_what_its_last_answer_drew_on(
@@ -169,13 +171,6 @@ def test_a_row_names_what_its_last_answer_drew_on(
     turn(conversation, 5, citations)
 
     assert only_row()["last_source"] == source
-
-
-def test_an_answer_refused_for_lack_of_excerpts_leaves_the_source_of_the_one_before() -> None:
-    conversation = started(0, [slides("PPM")])
-    turn(conversation, 5, [])
-
-    assert only_row()["last_source"] == {"courses": [{"name": "PPM", "locale": None}], "web": False}
 
 
 def test_a_conversation_whose_every_answer_was_refused_has_no_source() -> None:
@@ -234,15 +229,6 @@ def test_pinning_puts_a_conversation_first_and_unpinning_returns_it_to_its_place
 
     assert [row["id"] for row in rows()] == [str(second.pk), str(third.pk), str(first.pk)]
     assert Conversation.objects.get(pk=second.pk).pinned
-
-
-def test_somebody_elses_conversation_cannot_be_pinned() -> None:
-    stranger = User.objects.create_user(username="stranger")
-    theirs = Conversation.objects.create(owner=stranger, locale="it")
-    turn(theirs, 0, [web()])
-
-    assert pin(theirs, True).status_code == 404
-    assert not Conversation.objects.get(pk=theirs.pk).pinned
 
 
 def test_pinned_is_the_only_field_a_conversation_takes() -> None:
