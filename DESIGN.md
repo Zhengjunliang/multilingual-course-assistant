@@ -454,5 +454,6 @@ A screen with nothing of its own to show is one centred panel on `surface`, `com
 - Do show the ground with `bg-ground`; don't paint `bg-canvas`, which leaves a flat patch in the grain.
 - Do let a table stack on a phone; don't let a page scroll sideways.
 - Do let a control act and say what will follow, as deleting the conversation being answered says that its answer stops; don't disable a control to say why it cannot act, and where it truly cannot, say why beside it. A control is disabled only while its own request is on its way, so that it is not sent twice.
+- Do let the layout do the explaining: a section's heading, a column's head and a control's place say what is under them; don't add a secondary label or a description that says it again. A second line (rule 1) carries data, such as a code or a username, and a caption says only what no layout can, such as the rules a new password is held to.
 - Don't use the university's mark, its lettering or its page furniture (a blue band, uppercase navigation, square frames): only its blue.
 - Don't move anything a reader with reduced motion would see move.
