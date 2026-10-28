@@ -31,6 +31,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.events import AuthEvent, auth_event
@@ -55,6 +56,19 @@ def session_body(user: AbstractBaseUser) -> dict[str, object]:
     by tests/test_accounts.py.
     """
     return {"authenticated": True, "user": UserSerializer(cast("User", user)).data}
+
+
+class AddressRateThrottle(ScopedRateThrottle):
+    """The view's scope, counted by the caller's address whoever is signed in.
+
+    `ScopedRateThrottle` counts a signed-in caller by account, and signing in
+    and registering are open to one: registering signs the new account in, so
+    an account a minute would buy a fresh bucket a minute, with as many
+    guesses in each.
+    """
+
+    def get_cache_key(self, request: Request, view: APIView) -> str:
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -94,6 +108,7 @@ class LoginView(APIView):
     # With the token checked, so another site cannot log a visitor's browser
     # into an account of its own and read what they ask next.
     permission_classes = (AllowAnyWithCsrf,)
+    throttle_classes = (AddressRateThrottle,)
     throttle_scope = "auth"
 
     def post(self, request: Request) -> Response:
@@ -117,6 +132,7 @@ class LogoutView(APIView):
 class RegisterView(APIView):
     # Checked for the reason LoginView is: registering signs the caller in.
     permission_classes = (AllowAnyWithCsrf,)
+    throttle_classes = (AddressRateThrottle,)
     throttle_scope = "auth"
 
     def post(self, request: Request) -> Response:

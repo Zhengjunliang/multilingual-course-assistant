@@ -600,26 +600,39 @@ def test_registering_and_logging_in_share_one_bucket() -> None:
     assert not User.objects.filter(username="ada").exists()
 
 
-def test_a_forwarded_header_cannot_buy_a_fresh_auth_bucket() -> None:
-    """DRF's default is to take the throttle identity from a client-supplied
-    X-Forwarded-For, which would make the limit above a suggestion: one header
-    per request and every request is a new client. Nothing proxies this service,
-    so the identity has to stay REMOTE_ADDR.
+GUESS = {"username": "nobody", "password": "guess"}
 
-    This is where that setting finally carries weight. `ScopedRateThrottle`
-    bills an authenticated caller by primary key, so only the endpoints reachable
-    without an account — these — are billed by address at all.
-    """
-    codes = [
+
+def guesses_under_forwarded_headers() -> list[int]:
+    return [
         APIClient()
-        .post(
-            LOGIN_URL,
-            {"username": "nobody", "password": "guess"},
-            format="json",
-            HTTP_X_FORWARDED_FOR=f"10.0.0.{attempt}",
-        )
+        .post(LOGIN_URL, GUESS, format="json", HTTP_X_FORWARDED_FOR=f"10.0.0.{attempt}")
         .status_code
         for attempt in range(6)
     ]
 
-    assert codes[5] == 429
+
+def guesses_after_signing_up() -> list[int]:
+    client = APIClient()
+    signed_up = client.post(REGISTER_URL, {"username": "ada", "password": PASSWORD}, format="json")
+    return [signed_up.status_code] + [
+        client.post(LOGIN_URL, GUESS, format="json").status_code for _ in range(5)
+    ]
+
+
+@pytest.mark.parametrize(
+    "attempts",
+    [
+        # DRF's default takes the identity from a client-supplied
+        # X-Forwarded-For; nothing proxies this service, so it stays REMOTE_ADDR.
+        pytest.param(guesses_under_forwarded_headers, id="forwarded-header"),
+        # `ScopedRateThrottle` bills a signed-in caller by account, and signing
+        # up signs in: an account a minute would be a fresh bucket a minute.
+        pytest.param(guesses_after_signing_up, id="new-account"),
+    ],
+)
+def test_a_fresh_auth_bucket_cannot_be_bought(attempts: Callable[[], list[int]]) -> None:
+    """The limit above holds only while the caller cannot change who the
+    throttle thinks they are; signing in and registering are counted by
+    address whoever asks."""
+    assert attempts()[5] == 429
