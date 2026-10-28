@@ -19,7 +19,7 @@ export const STUDENT = fileURLToPath(new URL(".auth/student.json", import.meta.u
 export const SECRETARIAT = fileURLToPath(new URL(".auth/secretariat.json", import.meta.url));
 
 /** What tests/journeys/fake_llm.py answers every question with, up to its citation. */
-const ANSWER ="Lo sportello della segreteria è aperto il martedì";
+const ANSWER = "Lo sportello della segreteria è aperto il martedì";
 
 /** The page that answer cites, which tests/journeys/retrieval.py indexes. */
 export const PAGE = "https://ingegneria.unifi.it/vp-185.html";

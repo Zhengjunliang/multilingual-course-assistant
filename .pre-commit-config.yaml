@@ -137,7 +137,7 @@ repos:
         name: the frontend passes Biome
         language: system
         entry: node frontend/scripts/biome-staged.mjs
-        files: ^frontend/((src|e2e|scripts)/.*\.(ts|tsx|js|mjs|json|css)|(vite\.config\.ts|playwright\.config\.ts|biome\.json|package\.json|tsconfig\.json))$
+        files: ^frontend/((src|e2e|journeys|scripts)/.*\.(ts|tsx|js|mjs|json|css)|(vite\.config\.ts|playwright(\.journeys)?\.config\.ts|biome\.json|package\.json|tsconfig\.json))$
       # Agent rule 6 of CLAUDE.md: one correct implementation, with the old
       # versions in git history rather than beside the file. A `v2` or later
       # counts, since it implies a `v1` beside it; a lone `v1` may be an API's.
