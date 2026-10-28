@@ -14,7 +14,20 @@
     "logIn": "Sign in",
     "register": "Register",
     "noAccount": "No account yet?",
-    "haveAccount": "Already have an account?"
+    "haveAccount": "Already have an account?",
+    "forgot": "Forgot your password?",
+    "forgotTitle": "Forgotten password",
+    "forgotBody": "Ask the administrator for a link to choose a new one: it works once, for 24 hours.",
+    "backToLogIn": "Back to sign in",
+    "resetTitle": "Choose a new password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "resetSubmit": "Set password",
+    "inviteTitle": "An invitation to the staff",
+    "acceptAs": "You accept with the account {{username}}.",
+    "notYou": "Not {{username}}?",
+    "accept": "Accept the invitation",
+    "acceptAndRegister": "Create the account and accept"
   },
   "sidebar": {
     "title": "Menu",
@@ -67,6 +80,34 @@
       "secretariat": "Secretariat",
       "teacher": "Teacher",
       "student": "Student"
+    },
+    "page": "My account",
+    "logOutFailed": "Could not sign out",
+    "roles": "Roles",
+    "wrongPassword": "That password is wrong.",
+    "password": {
+      "title": "Password",
+      "submit": "Change password",
+      "done": "Password changed",
+      "ended": "Your other devices were signed out."
+    },
+    "sessions": {
+      "title": "Devices",
+      "device": "Device",
+      "address": "Address",
+      "lastActivity": "Last active",
+      "current": "This device",
+      "unknown": "Unknown browser",
+      "end": "Sign out",
+      "endOne": "Sign out the device",
+      "endOthers": "Sign out the others",
+      "ended": "Device signed out",
+      "endedOthers": "Other devices signed out"
+    },
+    "delete": {
+      "title": "Delete account",
+      "consequence": "Your conversations are deleted with the account, and cannot be recovered.",
+      "confirm": "Delete"
     }
   },
   "theme": {

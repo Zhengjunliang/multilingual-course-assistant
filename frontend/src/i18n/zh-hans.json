@@ -14,7 +14,20 @@
     "logIn": "登录",
     "register": "注册",
     "noAccount": "还没有账号？",
-    "haveAccount": "已经有账号了？"
+    "haveAccount": "已经有账号了？",
+    "forgot": "忘记密码？",
+    "forgotTitle": "忘记密码",
+    "forgotBody": "请向管理员索取设置新密码的链接：只能用一次，24 小时内有效。",
+    "backToLogIn": "返回登录",
+    "resetTitle": "设置新密码",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "resetSubmit": "设置密码",
+    "inviteTitle": "加入教职人员的邀请",
+    "acceptAs": "将以账号 {{username}} 接受。",
+    "notYou": "不是 {{username}}？",
+    "accept": "接受邀请",
+    "acceptAndRegister": "创建账号并接受"
   },
   "sidebar": {
     "title": "菜单",
@@ -67,6 +80,34 @@
       "secretariat": "教学秘书",
       "teacher": "教师",
       "student": "学生"
+    },
+    "page": "我的账号",
+    "logOutFailed": "退出登录失败",
+    "roles": "角色",
+    "wrongPassword": "密码不正确。",
+    "password": {
+      "title": "密码",
+      "submit": "修改密码",
+      "done": "密码已修改",
+      "ended": "其他设备已退出登录。"
+    },
+    "sessions": {
+      "title": "设备",
+      "device": "设备",
+      "address": "地址",
+      "lastActivity": "最近活动",
+      "current": "本设备",
+      "unknown": "未知浏览器",
+      "end": "退出登录",
+      "endOne": "让这台设备退出登录",
+      "endOthers": "退出其他设备",
+      "ended": "设备已退出登录",
+      "endedOthers": "其他设备已退出登录"
+    },
+    "delete": {
+      "title": "删除账号",
+      "consequence": "你的对话会随账号一起删除，无法恢复。",
+      "confirm": "删除"
     }
   },
   "theme": {

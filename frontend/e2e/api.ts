@@ -12,10 +12,11 @@ import type { AddressInfo } from "node:net";
 
 import { test as base, expect, type Page, type Request } from "@playwright/test";
 
-import type { Account, Session } from "@/api/account";
+import type { Account, AccountSession, Session } from "@/api/account";
 import type {
   Course,
   Edition,
+  InvitationGrant,
   Programme,
   ReadingItem,
   StudyPlanCourse,
@@ -27,8 +28,11 @@ import {
   COURSE,
   EDITION,
   EDITION_READ,
+  INVITATION,
   PROGRAMME,
   READINGS,
+  RESET_FOR,
+  SESSIONS,
   STUDY_PLAN,
   SYLLABUS,
   VISITOR,
@@ -53,6 +57,11 @@ export class Api {
 
   constructor(private readonly page: Page) {
     this.json<Session>("/api/auth/me", VISITOR);
+    // A link's lookup is a `POST`: its token goes in a body (src/api/account.ts).
+    this.on("POST", "/api/auth/reset/lookup", () => ({ json: RESET_FOR }));
+    this.on("POST", "/api/auth/invitation/lookup", () => ({
+      json: INVITATION satisfies InvitationGrant,
+    }));
   }
 
   async install(): Promise<void> {
@@ -118,11 +127,12 @@ export class Api {
     this.on("GET", path, () => ({ json: body }));
   }
 
-  /** Signed in as `account`, with no stored conversations. */
+  /** Signed in as `account`, with no stored conversations, on two devices. */
   signIn(account: Account): void {
     const session: Session = { authenticated: true, user: account };
     this.json<Session>("/api/auth/me", session);
     this.json<ConversationSummary[]>("/api/conversations", []);
+    this.json<AccountSession[]>("/api/auth/sessions", SESSIONS);
   }
 
   /** One stored conversation, listed in the sidebar and readable at `/chat/<id>`. */

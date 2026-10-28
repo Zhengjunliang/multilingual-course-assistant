@@ -55,6 +55,8 @@ interface PasswordFieldProps {
   invalid?: boolean;
   /** The ids of what tells the reader about this password: a hint, a refusal. */
   describedBy?: string;
+  /** In a dialog that asks for the password, where the reader types the moment it opens. */
+  autoFocus?: boolean;
 }
 
 export function PasswordField({
@@ -65,6 +67,7 @@ export function PasswordField({
   onChange,
   invalid = false,
   describedBy,
+  autoFocus,
 }: PasswordFieldProps) {
   const { t } = useTranslation();
   const [shown, setShown] = useState(false);
@@ -101,6 +104,7 @@ export function PasswordField({
         autoCapitalize="none"
         spellCheck={false}
         required
+        autoFocus={autoFocus}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={readCapsLock}

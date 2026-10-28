@@ -96,22 +96,36 @@ describe("asking the server again", () => {
     vi.restoreAllMocks();
   });
 
-  it("takes a session another tab opened, which this tab cannot see on its own", async () => {
+  it.each([
+    {
+      takes: "a session another tab opened, which this tab cannot see on its own",
+      before: null,
+      after: ACCOUNT,
+    },
+    {
+      takes: "a role the account signed in was given, by an invitation it accepted",
+      before: ACCOUNT,
+      after: { ...ACCOUNT, roles: [{ role: "teacher", edition: 5 }] } satisfies Account,
+    },
+  ])("takes $takes", async ({ before, after }) => {
+    signedInElsewhere = before !== null;
+    account = before ?? ACCOUNT;
     const page = mount(
       <SessionProvider>
         <Probe />
       </SessionProvider>,
     );
     await settle();
-    const before = session.account;
+    const first = session.account;
     signedInElsewhere = true;
+    account = after;
 
     await act(() => session.recheck());
-    const after = session.account;
+    const later = session.account;
     page.unmount();
+    account = ACCOUNT;
 
-    expect(before).toBeNull();
-    expect(after?.username).toBe("ada");
+    expect({ first, later }).toEqual({ first: before, later: after });
   });
 
   it("asks when the tab comes back into view, before the next question is typed", async () => {

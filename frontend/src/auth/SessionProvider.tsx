@@ -32,13 +32,16 @@ interface SessionValue {
   /** Called when a request comes back refused, to drop a session that ended elsewhere. */
   forget: () => void;
   /**
-   * Asks the server again who is signed in, and follows it if that changed.
+   * Asks the server again who is signed in, and follows it if that changed,
+   * the account's roles and language included.
    * Signing in or out in another tab shares the cookie and not this tab's
    * state; a visitor's next question would then be refused as a signed-in
    * client's (apps/qa/serializers.py). So the tab asks whenever it comes back
    * into view, as NextAuth's `refetchOnWindowFocus` does (outside the
    * repository), and a visitor's tab after each question too, for the window
-   * that stayed in view while the other one signed in.
+   * that stayed in view while the other one signed in. An accepted
+   * invitation asks too (routes/InvitePage.tsx): it may have signed an
+   * account in, or given the one signed in a role.
    */
   recheck: () => Promise<void>;
 }
@@ -119,7 +122,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       recheck: async () => {
         try {
           const { user } = await readSession();
-          if ((user?.id ?? null) === (account?.id ?? null)) return;
+          if (JSON.stringify(user) === JSON.stringify(account)) return;
           adopt(user);
         } catch {
           // A server that cannot say who is signed in has nothing to follow;

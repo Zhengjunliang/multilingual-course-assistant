@@ -2,7 +2,10 @@ import { ArrowRight } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { APP_NAME } from "@/brand/fumetto";
+import type { FormRefusal } from "@/components/FormRefusal";
+import { LineField } from "@/components/LineField";
 import { LivingMascot } from "@/components/LivingMascot";
+import { PasswordField } from "@/components/PasswordField";
 import { Button } from "@/components/ui/button";
 import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { Spinner } from "@/components/ui/spinner";
@@ -159,5 +162,65 @@ export function AuthButton({ phase, children }: { phase: Phase; children: string
         </svg>
       )}
     </Button>
+  );
+}
+
+const HINT = "password-hint";
+
+interface NewAccountFieldsProps {
+  username: string;
+  password: string;
+  onUsername: (value: string) => void;
+  onPassword: (value: string) => void;
+  /** Built on the fields `username` and `password`, which are also the inputs' ids. */
+  refusal: FormRefusal;
+}
+
+/**
+ * The two fields an account is made with, by registering or by accepting an
+ * invitation: the username, and the password with the hint of its rules,
+ * each with the refusals the server said of it.
+ */
+export function NewAccountFields({
+  username,
+  password,
+  onUsername,
+  onPassword,
+  refusal,
+}: NewAccountFieldsProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="flex flex-col gap-tight">
+        <LineField
+          id="username"
+          label={t("auth.username")}
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          required
+          value={username}
+          onChange={(event) => onUsername(event.target.value)}
+          aria-invalid={refusal.refused("username") || undefined}
+          aria-describedby={refusal.describedBy("username")}
+        />
+        {refusal.lines("username")}
+      </div>
+      <div className="flex flex-col gap-tight">
+        <PasswordField
+          id="password"
+          label={t("auth.password")}
+          autoComplete="new-password"
+          value={password}
+          onChange={onPassword}
+          invalid={refusal.refused("password")}
+          describedBy={refusal.describedBy("password", HINT)}
+        />
+        <p id={HINT} className="text-caption text-muted">
+          {t("auth.passwordHint")}
+        </p>
+        {refusal.lines("password")}
+      </div>
+    </>
   );
 }

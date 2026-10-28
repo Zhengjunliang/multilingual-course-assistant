@@ -6,10 +6,11 @@
  * Which endpoint answers which of them is written in `e2e/api.ts`.
  */
 
-import type { Account, Session } from "@/api/account";
+import type { Account, AccountSession, Session } from "@/api/account";
 import type {
   Course,
   Edition,
+  InvitationGrant,
   Programme,
   ReadingItem,
   StaffMember,
@@ -42,6 +43,47 @@ export const STAFF: Account = {
     { role: "secretariat", programme: "B060" },
     { role: "teacher", edition: 11 },
   ],
+};
+
+/** The student's devices: this one, and a phone. */
+export const SESSIONS: AccountSession[] = [
+  {
+    id: "3b5d5c3712955042212316173ccd37be",
+    current: true,
+    user_agent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    ip: "203.0.113.5",
+    authenticated_at: "2026-10-27T08:00:00Z",
+    last_activity: "2026-10-28T09:30:00Z",
+  },
+  {
+    id: "e3b0c44298fc1c149afbf4c8996fb924",
+    current: false,
+    user_agent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1",
+    ip: "198.51.100.7",
+    authenticated_at: "2026-10-21T18:12:00Z",
+    last_activity: "2026-10-26T21:04:00Z",
+  },
+];
+
+// --- links handed out ----------------------------------------------------------
+
+/** The fragment of a reset link's or an invitation's address. */
+export const LINK_TOKEN = "QmFzZTY0LXVybCB0b2tlbg";
+
+/** Who a reset link resets. */
+export const RESET_FOR = { username: "demo-forgetful" };
+
+/** What an invitation makes its holder: a teacher of the edition the staff pages show. */
+export const INVITATION: InvitationGrant = {
+  role: "teacher",
+  edition: {
+    id: 11,
+    course: { code: "B028451", name: "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE", locale: "it" },
+    academic_year: "2025-2026",
+  },
+  programme: null,
 };
 
 // --- answers ---------------------------------------------------------------------

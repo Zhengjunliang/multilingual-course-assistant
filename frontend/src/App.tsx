@@ -2,19 +2,23 @@ import type { RouteObject } from "react-router-dom";
 
 import { RequireSession } from "@/auth/RequireSession";
 import { RequireStaff } from "@/auth/RequireStaff";
+import AccountPage from "@/routes/AccountPage";
 import ChatPage from "@/routes/ChatPage";
 import CoursePage from "@/routes/CoursePage";
 import EditionPage from "@/routes/EditionPage";
+import ForgotPage from "@/routes/ForgotPage";
+import InvitePage from "@/routes/InvitePage";
 import LoginPage from "@/routes/LoginPage";
 import MinePage from "@/routes/MinePage";
 import NotFoundPage from "@/routes/NotFoundPage";
+import PageLayout from "@/routes/PageLayout";
 import ProgrammePage from "@/routes/ProgrammePage";
 import ProgrammesPage from "@/routes/ProgrammesPage";
 import RegisterPage from "@/routes/RegisterPage";
+import ResetPage from "@/routes/ResetPage";
 import RouteError from "@/routes/RouteError";
 import ShellLayout from "@/routes/ShellLayout";
 import StaffLanding, { StaffNotFound } from "@/routes/StaffLanding";
-import StaffLayout from "@/routes/StaffLayout";
 import StyleguidePage from "@/routes/StyleguidePage";
 import VisitorLayout from "@/routes/VisitorLayout";
 
@@ -29,8 +33,10 @@ import VisitorLayout from "@/routes/VisitorLayout";
  * around the whole tree catches the rest, the frame itself included, over the
  * whole window. Moving to another address clears either.
  *
- * Five routes, the staff pages, and a page for every other address; two of the
- * five are the same page.
+ * Before a session, the two forms and the three pages of what to do about a
+ * forgotten password, a reset link and an invitation; then the chat, at two
+ * addresses that are the same page, the account's page, the staff pages,
+ * and a page for every other address.
  *
  * `/` and `/chat/:conversationId` both render the chat because a new conversation
  * and a stored one differ only in whether the thread starts empty — the page
@@ -42,13 +48,14 @@ import VisitorLayout from "@/routes/VisitorLayout";
  * `errorElement` the other lacks (ChatPage.routing.test.tsx fails if the page
  * is rebuilt).
  *
- * `/styleguide` sits outside `RequireSession` with the two public routes: it
+ * `/styleguide` sits outside `RequireSession` with the public routes: it
  * renders the component layer against no data at all, so a session would gate
- * nothing and its test would have to forge one.
+ * nothing and its test would have to forge one. `/invite` is public too, and
+ * answers a signed-in reader as well as one without an account.
  *
- * Every signed-in page sits in one layout route, `ShellLayout`: the chat and
- * the staff pages share its sidebar, whose "Gestione" group opens the staff
- * pages. A reader without an account gets `/` alone, in `VisitorLayout`, and
+ * Every signed-in page sits in one layout route, `ShellLayout`: the chat, the
+ * account's page and the staff pages share its sidebar, whose "Gestione" group
+ * opens the staff pages; every one but the chat in `PageLayout`'s column. A reader without an account gets `/` alone, in `VisitorLayout`, and
  * the login page for every other address; one guard decides both, so `/` and
  * `/chat/:conversationId` stay one route tree. `/staff/*` is open to an account
  * holding a role or the superuser (`RequireStaff`); `/staff` lands on the
@@ -61,6 +68,9 @@ export const routes: RouteObject[] = [
     children: [
       { path: "/login", element: <LoginPage /> },
       { path: "/register", element: <RegisterPage /> },
+      { path: "/forgot", element: <ForgotPage /> },
+      { path: "/reset", element: <ResetPage /> },
+      { path: "/invite", element: <InvitePage /> },
       { path: "/styleguide", element: <StyleguidePage /> },
       {
         element: (
@@ -75,10 +85,15 @@ export const routes: RouteObject[] = [
               { path: "/", element: <ChatPage /> },
               { path: "/chat/:conversationId", element: <ChatPage /> },
               {
+                path: "/account",
+                element: <PageLayout />,
+                children: [{ index: true, element: <AccountPage /> }],
+              },
+              {
                 path: "/staff",
                 element: (
                   <RequireStaff>
-                    <StaffLayout />
+                    <PageLayout />
                   </RequireStaff>
                 ),
                 children: [

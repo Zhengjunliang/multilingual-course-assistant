@@ -275,6 +275,58 @@ export interface ReadingDraft {
   importance: Importance;
 }
 
+/** A course as an invitation names it (apps/catalog/invitation_serializers.py): no entries. */
+export interface CourseName {
+  code: string;
+  name: string;
+  locale: string;
+}
+
+/** An edition as an invitation names it: its course and its year. */
+export interface EditionName {
+  id: number;
+  course: CourseName;
+  academic_year: string;
+}
+
+/** The role an invitation grants: on an edition for a teacher, on a programme for the secretariat. */
+export type InvitedRole = "teacher" | "secretariat";
+
+/**
+ * A row of a scope's invitations, or of every scope's. `edition` is null on a
+ * secretariat invitation and `programme` on a teacher's; past `expires_at` it
+ * no longer works, and stays listed until revoked.
+ */
+export interface Invitation {
+  id: number;
+  role: InvitedRole;
+  edition: EditionName | null;
+  programme: ProgrammeName | null;
+  /** By username. */
+  created_by: string;
+  created_at: string;
+  expires_at: string;
+}
+
+/** An invitation just made: its row, and the one time its token is shown. */
+export interface NewInvitation {
+  id: number;
+  role: InvitedRole;
+  edition: EditionName | null;
+  programme: ProgrammeName | null;
+  created_by: string;
+  created_at: string;
+  expires_at: string;
+  token: string;
+}
+
+/** What an invitation makes its holder, for the page it is opened on. */
+export interface InvitationGrant {
+  role: InvitedRole;
+  edition: EditionName | null;
+  programme: ProgrammeName | null;
+}
+
 /** Where staff members belong: an edition's teachers, or a programme's secretariat. */
 export type MemberScope = { kind: "edition"; id: number } | { kind: "programme"; code: string };
 

@@ -10,13 +10,15 @@ import type { Page } from "@playwright/test";
 
 import it from "../src/i18n/it.json" with { type: "json" };
 import { type Api, expect } from "./api";
-import { CONVERSATION, COURSE, PROGRAMME, STAFF, STUDENT } from "./fixtures";
+import { CONVERSATION, COURSE, LINK_TOKEN, PROGRAMME, STAFF, STUDENT } from "./fixtures";
 
 export interface Screen {
   path: string;
+  /** The address's fragment, `#` and all: the token of a link a page opens. */
+  hash?: string;
   as: "visitor" | "student" | "staff";
   /** An element only this screen, fully drawn, shows, by its role and its exact name. */
-  mark: { role: "heading" | "button"; name: string };
+  mark: { role: "heading" | "button" | "link"; name: string };
 }
 
 const heading = (name: string) => ({ role: "heading", name }) as const;
@@ -25,6 +27,20 @@ export const SCREENS: Screen[] = [
   // The two forms share their page heading; their buttons tell them apart.
   { path: "/login", as: "visitor", mark: { role: "button", name: it.auth.logIn } },
   { path: "/register", as: "visitor", mark: { role: "button", name: it.auth.register } },
+  // The pages of a forgotten password and of a link: the last two once it is looked up.
+  { path: "/forgot", as: "visitor", mark: { role: "link", name: it.auth.backToLogIn } },
+  {
+    path: "/reset",
+    hash: `#${LINK_TOKEN}`,
+    as: "visitor",
+    mark: { role: "button", name: it.auth.resetSubmit },
+  },
+  {
+    path: "/invite",
+    hash: `#${LINK_TOKEN}`,
+    as: "visitor",
+    mark: { role: "button", name: it.auth.acceptAndRegister },
+  },
   { path: "/styleguide", as: "visitor", mark: heading("Component catalogue") },
   { path: "/", as: "visitor", mark: heading(it.entry.caption) },
   { path: "/", as: "student", mark: heading(it.entry.caption) },
@@ -33,6 +49,8 @@ export const SCREENS: Screen[] = [
     as: "student",
     mark: { role: "button", name: it.answer.copy },
   },
+  // Its devices are the last section to arrive.
+  { path: "/account", as: "student", mark: heading(it.account.sessions.title) },
   { path: "/staff/programmes", as: "staff", mark: heading(it.staff.programmes.title) },
   { path: `/staff/programmes/${PROGRAMME.code}`, as: "staff", mark: heading(PROGRAMME.name) },
   // A course and its editions share the course's name as their title; an
@@ -77,7 +95,7 @@ export async function visit(page: Page, api: Api, screen: Screen): Promise<void>
     api.signIn(STAFF);
     api.catalog();
   }
-  await page.goto(screen.path);
+  await page.goto(screen.path + (screen.hash ?? ""));
   const { role, name } = screen.mark;
   await expect(page.getByRole(role, { name, exact: true }).first()).toBeVisible();
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
