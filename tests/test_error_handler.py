@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 
 import pytest
 from django.conf import settings
+from django.contrib.sessions.exceptions import SessionInterrupted
 from django.core.exceptions import (
     BadRequest,
     SuspiciousOperation,
@@ -42,7 +43,7 @@ from config.errors import (
     django_field_error,
     field_error,
 )
-from config.views import server_error
+from config.views import bad_request, server_error
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -302,13 +303,25 @@ def test_a_500_no_view_answered_is_the_coded_body_under_api_only(rf: RequestFact
 def test_a_request_django_refuses_before_any_view_is_the_coded_body_under_api_only(
     client: Client,
 ) -> None:
-    """A `Host` the site does not serve is refused by Django's middleware, as a
-    session another request ended is, before any view runs (`handler400`)."""
+    """A `Host` the site does not serve is refused by Django's middleware
+    before any view runs (`handler400`)."""
     api = client.get("/api/conversations", HTTP_HOST="elsewhere.example")
     page = client.get("/login", HTTP_HOST="elsewhere.example")
 
     assert (api.status_code, refused(api)) == (400, ("MALFORMED_REQUEST", {}))
     assert (page.status_code, page["Content-Type"].split(";")[0]) == (400, "text/html")
+
+
+def test_a_session_another_request_ended_meanwhile_is_a_401_with_its_challenge(
+    rf: RequestFactory,
+) -> None:
+    """Django finds it only as the response saves the session, and hands
+    `handler400` its `SessionInterrupted`: the caller is signed in no more."""
+    response = bad_request(rf.get("/api/conversations"), SessionInterrupted())
+
+    body = json.loads(response.content)["error"]
+    assert (response.status_code, body["code"]) == (401, "UNAUTHENTICATED")
+    assert response["WWW-Authenticate"] == CHALLENGE
 
 
 def serializer_codes() -> dict[str, set[str]]:

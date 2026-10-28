@@ -250,7 +250,8 @@ def test_the_admin_deletes_a_conversation_and_an_account_with_their_messages(
     """A conversation that goes takes its leaf with it, so its messages are no
     longer held back: the refusal above is for a message alone."""
     conversation = started(0)
-    stranger = User.objects.create_user(username="stranger")
+    # Deactivated, as an account is before it is deleted (apps/accounts/services.py).
+    stranger = User.objects.create_user(username="stranger", is_active=False)
     theirs = Conversation.objects.create(owner=stranger, locale="it")
     turn(theirs, 0, [web()])
 

@@ -17,10 +17,10 @@ And frontend/index.html contains no Django template syntax at all. Handing it
 to the template engine adds a way for it to fail — the day some Vite plugin
 inlines a script holding `{{` — in exchange for nothing.
 
-An `/api/` path no view has, a request Django refuses before any view runs,
-and a 500 no API view answered itself, are answered in the API's coded error
-body (config/errors.py) rather than with a page of HTML, which a caller would
-meet as a JSON parse error.
+An `/api/` path no view has, a request Django's middleware refuses, and a 500
+no API view answered itself, are answered in the API's coded error body
+(config/errors.py) rather than with a page of HTML, which a caller would meet
+as a JSON parse error.
 """
 
 from __future__ import annotations
@@ -28,13 +28,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
+from django.contrib.sessions.exceptions import SessionInterrupted
 from django.http import HttpResponse, JsonResponse
 from django.utils.translation import gettext_lazy as _
 from django.views import defaults
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
-from config.errors import SPEC, ErrorCode, error_body, fail
+from config.errors import CHALLENGE, SPEC, ErrorCode, error_body, fail
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -83,10 +84,22 @@ class ApiNotFound(APIView):
 
 
 def bad_request(request: HttpRequest, exception: Exception) -> HttpResponse:
-    """A request Django's middleware refused before any view ran (`handler400`):
-    a `Host` the site does not serve, or a session another request ended. The
-    coded body under `/api/`."""
+    """A request Django's middleware refused (`handler400`): the coded body under `/api/`.
+
+    A `Host` the site does not serve is refused before any view runs. A
+    session another request ended while this one ran (a device signed out
+    from elsewhere, an account deactivated) is found only as the response
+    saves it: that caller is signed in no more, a 401 with its challenge as
+    DRF's would be (config/errors.py), not a malformed request.
+    """
     if request.path.startswith("/api/"):
+        if isinstance(exception, SessionInterrupted):
+            response = JsonResponse(
+                error_body(ErrorCode.UNAUTHENTICATED),
+                status=SPEC[ErrorCode.UNAUTHENTICATED].status,
+            )
+            response["WWW-Authenticate"] = CHALLENGE
+            return response
         status = SPEC[ErrorCode.MALFORMED_REQUEST].status
         return JsonResponse(error_body(ErrorCode.MALFORMED_REQUEST), status=status)
     return defaults.bad_request(request, exception)

@@ -8,7 +8,7 @@ second place to keep in sync.
 from django.apps import AppConfig
 from django.contrib.auth.signals import user_logged_in, user_logged_out, user_login_failed
 
-from apps.accounts import events
+from apps.accounts import events, sessions
 
 
 class AccountsConfig(AppConfig):
@@ -21,3 +21,4 @@ class AccountsConfig(AppConfig):
         user_logged_in.connect(events.logged_in, dispatch_uid="accounts.events.login")
         user_logged_out.connect(events.logged_out, dispatch_uid="accounts.events.logout")
         user_login_failed.connect(events.login_failed, dispatch_uid="accounts.events.failed")
+        user_logged_in.connect(sessions.stamp, dispatch_uid="accounts.sessions.stamp")

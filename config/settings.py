@@ -114,6 +114,11 @@ DATABASES = {
 # Swapped from the first migration: see apps/accounts/models.py.
 AUTH_USER_MODEL = "accounts.User"
 
+# Django's database store, saving into a table that names each session's
+# account: see apps/accounts/sessions.py. `django.contrib.sessions` stays
+# installed for `clearsessions`, which purges through this setting.
+SESSION_ENGINE = "apps.accounts.sessions"
+
 # ModelBackend first. A login records the backend that authenticated the user,
 # but the test client's force_login() takes the first backend that has a
 # get_user(), and RoleBackend's loads nobody: it authenticates no one and
