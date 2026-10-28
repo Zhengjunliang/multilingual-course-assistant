@@ -306,8 +306,12 @@ def test_a_session_ends_at_its_tiers_limits(
     since_seen: timedelta,
     reason: str | None,
 ) -> None:
-    """AC-F4. Read off the session's own data: an expiry Django has not reached
-    yet does not keep alive a session past its limits."""
+    """AC-F4, as the middleware reads it: off the session's own data, so an
+    expiry Django has not reached does not keep alive a session past its
+    limits. The rows move that data and not the expiry, the state of a session
+    whose limits shrank under it since its last refresh (a role granted, two
+    tests below); one that simply runs out is past the expiry the next test
+    sets, and Django never loads it again, so it leaves no line."""
     user: User = request.getfixturevalue(who)
     client = signed_in(user)
     age(client, signed_in=since_sign_in, seen=since_seen)

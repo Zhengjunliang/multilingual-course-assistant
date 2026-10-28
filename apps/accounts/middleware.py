@@ -4,7 +4,9 @@
 the reasons for them. Most of the work is Django's: each refresh moves the
 session's expiry (`extend`, apps/accounts/sessions.py), and Django loads no
 session past it, so the device list, `clearsessions` and this middleware read
-one deadline. This adds what Django cannot do:
+one deadline. A session past it is never seen here: its caller is a stranger,
+no line is logged, and `clearsessions` deletes its row. This adds what Django
+cannot do, and logs each session it ends:
 
 - the absolute limit, counted from the sign-in however busy the session is;
 - the tier, read afresh on every request: a role granted mid-session holds
