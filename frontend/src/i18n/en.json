@@ -151,6 +151,7 @@
     "CSRF_FAILED": "This page has expired: reload it and try again.",
     "NOT_FOUND": "This is no longer there.",
     "CONVERSATION_GONE": "This conversation no longer exists: start a new one.",
+    "LINK_EXPIRED": "This link no longer works: ask whoever gave it to you for a new one.",
     "METHOD_NOT_ALLOWED": "$t(errors.INTERNAL)",
     "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",

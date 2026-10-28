@@ -58,6 +58,11 @@ OPEN: dict[str, str] = {
     ),
     "accounts:login": "logging in is what a caller without a session does",
     "accounts:register": "anyone may open an account",
+    "accounts:reset-lookup": (
+        "a reset link's holder is signed out; the token in the body is the credential, "
+        "and apps/accounts/links.py answers any other with LINK_EXPIRED"
+    ),
+    "accounts:reset": "the same holder, setting the password the token opens",
     "qa:ask": (
         "an anonymous student may ask campus questions; AskView stores nothing for them "
         "and answers them from no course material"

@@ -4,7 +4,7 @@ This file owns the HTTP API the site serves: accounts, question answering, conve
 
 ## Accounts
 
-Every endpoint needs a session except `GET /api/auth/me`, `login`, `register` and `POST /api/ask`: a stored conversation belongs to someone, and an anonymous student asks campus questions only, with nothing stored and the history sent back by the client (section *Multi-turn conversations*; [docs/decisions.md](decisions.md), 2026-09-25, *The data model is decided on paper*, point 3). An anonymous `POST` carries the CSRF token, as a logged-in one does ([apps/accounts/permissions.py](../apps/accounts/permissions.py)).
+Every endpoint needs a session except `GET /api/auth/me`, `login`, `register`, `reset/lookup`, `reset` and `POST /api/ask`: a stored conversation belongs to someone, and an anonymous student asks campus questions only, with nothing stored and the history sent back by the client (section *Multi-turn conversations*; [docs/decisions.md](decisions.md), 2026-09-25, *The data model is decided on paper*, point 3). An anonymous `POST` carries the CSRF token, as a logged-in one does ([apps/accounts/permissions.py](../apps/accounts/permissions.py)).
 
 | Method and path | Does |
 | --------------- | ---- |
@@ -17,10 +17,14 @@ Every endpoint needs a session except `GET /api/auth/me`, `login`, `register` an
 | `GET /api/auth/sessions` | the account's live sessions, the last used first: a bare array of `{"id", "current", "user_agent", "ip", "authenticated_at", "last_activity"}`, where `current` marks the one asking |
 | `POST /api/auth/sessions/end` | `{"password", "session"}` → 204: ends the session whose `id` is `session`, or with `"others"` every one but the caller's |
 | `POST /api/auth/me/delete` | `{"password"}` → 204: deletes the account and its conversations, and signs out every session of it |
+| `POST /api/auth/reset/lookup` | `{"token"}` → `{"username"}`: the account a reset link resets, for the page to name; the link stays as it is |
+| `POST /api/auth/reset` | `{"token", "new_password"}` → 204: sets the account's password, ends every session of it and voids the link; nobody is signed in by it |
 
-`me` answers 200 when nobody is logged in: "who am I" has an answer for a stranger too, and the page asks it before anything else. Elsewhere a request that needs a session and has none is a 401 `UNAUTHENTICATED`, and a failed CSRF check a 403 `CSRF_FAILED` (section *Errors*). Throttling is per endpoint (`ask` 4/min per account or, anonymous, per address; `auth` 5/min, per address on `login` and `register` and per account on `password`, `sessions/end` and `me/delete`) with no global cap; the reasons are next to the rates in [config/settings.py](../config/settings.py).
+`me` answers 200 when nobody is logged in: "who am I" has an answer for a stranger too, and the page asks it before anything else. Elsewhere a request that needs a session and has none is a 401 `UNAUTHENTICATED`, and a failed CSRF check a 403 `CSRF_FAILED` (section *Errors*). Throttling is per endpoint (`ask` 4/min per account or, anonymous, per address; `auth` 5/min, per address on `login`, `register`, `reset/lookup` and `reset` and per account on `password`, `sessions/end` and `me/delete`) with no global cap; the reasons are next to the rates in [config/settings.py](../config/settings.py).
 
 A session lives by its account's tier, a staff one (a superuser or the holder of a role) 1 hour idle and 24 hours in all, a student's 7 days idle and 14 in all, and the first request past either limit finds its caller signed out, answered as a stranger is ([apps/accounts/middleware.py](../apps/accounts/middleware.py); [decisions.md](decisions.md), 2026-10-27, *Signing in stays a server-side session, which lives by its account's tier*). A session's `id` is a digest of its key, so the key, which is the cookie, never leaves the server; the caller's own session is listed but not ended here, and an `id` naming it is the 404 `NOT_FOUND` of an `id` naming no session of the account, since signing out is how it ends. The three changes ask for the current password, and a wrong one is a 400 `WRONG_CREDENTIALS`, as at login ([apps/accounts/self_views.py](../apps/accounts/self_views.py)). An account that holds a staff role is not deleted, a 409 `ROLES_HELD`, until its roles are revoked, and neither is the last active superuser, a 409 `LAST_SUPERUSER` ([apps/accounts/services.py](../apps/accounts/services.py)).
+
+A reset link is made by a superuser and handed over in person; the site sends no mail. Its token is the holder's only credential, so it travels in a body, never in a URL a log keeps, and the server stores its digest alone. A link works once within 24 hours, and a newer link of the account voids it; a token that opens no link, unknown, used, replaced or expired, is the one 404 `LINK_EXPIRED` whichever, and a new password the rules refuse is the 400 `INVALID_ARGUMENT` of registering, which leaves the link working ([apps/accounts/links.py](../apps/accounts/links.py)).
 
 A superuser manages every account from the site, under `/api/admin/users`, by the rules `/admin/` keeps too ([apps/accounts/manage_views.py](../apps/accounts/manage_views.py)); any other caller gets a 403 `PERMISSION_DENIED`.
 
@@ -31,8 +35,9 @@ A superuser manages every account from the site, under `/api/admin/users`, by th
 | `POST /api/admin/users/<id>/activate` | → 204: the account signs in again, afresh; an active one is left as it is |
 | `POST /api/admin/users/<id>/sessions/end` | → 204: every session of the account ends, and it stays active |
 | `DELETE /api/admin/users/<id>` | → 204: deletes a deactivated account and its conversations |
+| `POST /api/admin/users/<id>/reset-link` | → 201 `{"token", "expires_at"}`: a reset link for the account, deactivated or not, its token in this answer only; any earlier link of the account stops working |
 
-No change asks for the password again. A superuser does not take their own access away here, a 409 `SELF_NOT_ALLOWED`, and deletes their own account through `me/delete`; an active account is deactivated before it is deleted, a 409 `ACCOUNT_STILL_ACTIVE`, and an `<id>` naming no account is a 404 `NOT_FOUND` ([apps/accounts/services.py](../apps/accounts/services.py)). A deactivated account signing in gets the 400 `WRONG_CREDENTIALS` of a wrong password.
+No change asks for the password again. A superuser does not take their own access away here, nor makes a reset link for their own account, a 409 `SELF_NOT_ALLOWED`, and deletes their own account through `me/delete`; an active account is deactivated before it is deleted, a 409 `ACCOUNT_STILL_ACTIVE`, and an `<id>` naming no account is a 404 `NOT_FOUND` ([apps/accounts/services.py](../apps/accounts/services.py)). A deactivated account signing in gets the 400 `WRONG_CREDENTIALS` of a wrong password.
 
 ## Question-answering API
 
@@ -147,6 +152,7 @@ Every error of an `/api/` path answers one body, built by `api_exception_handler
 | `CSRF_FAILED` | 403 | failure | the CSRF token is missing or does not match; reloading the page fixes it | |
 | `NOT_FOUND` | 404 | fixable | no such object within the caller's scope, or no route for the path | |
 | `CONVERSATION_GONE` | 404 | fixable | the conversation a question names does not exist, or was deleted while the question waited | |
+| `LINK_EXPIRED` | 404 | fixable | a link's token is unknown, used, replaced by a newer link or past its time | |
 | `METHOD_NOT_ALLOWED` | 405 | failure | the route does not serve the method | |
 | `NOT_ACCEPTABLE` | 406 | failure | no response matches `Accept` | |
 | `ROLE_ALREADY_HELD` | 409 | fixable | the user holds the role being granted, on that scope | |

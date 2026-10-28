@@ -11,6 +11,7 @@ from apps.accounts.manage_views import (
     ActivateView,
     DeactivateView,
     EndSessionsView,
+    ResetLinkView,
     UserListView,
     UserView,
 )
@@ -24,4 +25,5 @@ urlpatterns = [
     path("users/<int:pk>/deactivate", DeactivateView.as_view(), name="user-deactivate"),
     path("users/<int:pk>/activate", ActivateView.as_view(), name="user-activate"),
     path("users/<int:pk>/sessions/end", EndSessionsView.as_view(), name="user-sessions-end"),
+    path("users/<int:pk>/reset-link", ResetLinkView.as_view(), name="user-reset-link"),
 ]

@@ -1,4 +1,4 @@
-"""Account endpoints: who am I, log in, log out, register.
+"""Account endpoints: who am I, log in, log out, register, reset a password with a link.
 
 Sessions rather than tokens. The SPA is served from this same origin — by Vite's
 proxy in development (frontend/vite.config.ts), by Django itself once there is a
@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, cast
 
 from django.contrib.auth import login, logout
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
@@ -35,8 +36,16 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.events import AuthEvent, auth_event
+from apps.accounts.links import reset_link_owner, reset_password
 from apps.accounts.permissions import AllowAnyWithCsrf
-from apps.accounts.serializers import LoginSerializer, RegisterSerializer, UserSerializer
+from apps.accounts.serializers import (
+    LinkSerializer,
+    LoginSerializer,
+    PasswordResetSerializer,
+    RegisterSerializer,
+    UserSerializer,
+)
+from config.errors import django_field_error
 
 if TYPE_CHECKING:
     from django.contrib.auth.base_user import AbstractBaseUser
@@ -148,3 +157,45 @@ class RegisterView(APIView):
         # that checks passwords.
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         return Response(session_body(user), status=status.HTTP_201_CREATED)
+
+
+class ResetLookupView(APIView):
+    """`POST`: the username a reset link's token resets, for the page to name; the link stays.
+
+    A `POST` for a read, as `ResetView` is: the token is a credential, and
+    goes in a body, where no log reads it (apps/accounts/links.py).
+    """
+
+    # Checked for the reason LoginView is, and counted with it: NIST throttles
+    # a recovery code as it does a password (SP 800-63B-4, section 4.2.1.2,
+    # outside the repository).
+    permission_classes = (AllowAnyWithCsrf,)
+    throttle_classes = (AddressRateThrottle,)
+    throttle_scope = "auth"
+
+    def post(self, request: Request) -> Response:
+        serializer = LinkSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = reset_link_owner(serializer.validated_data["token"])
+        return Response({"username": user.get_username()})
+
+
+class ResetView(APIView):
+    """`POST`: sets the password a reset link resets, and signs the account out everywhere (204)."""
+
+    permission_classes = (AllowAnyWithCsrf,)
+    throttle_classes = (AddressRateThrottle,)
+    throttle_scope = "auth"
+
+    def post(self, request: Request) -> Response:
+        serializer = PasswordResetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            reset_password(
+                serializer.validated_data["token"],
+                serializer.validated_data["new_password"],
+                request,
+            )
+        except DjangoValidationError as exc:
+            raise django_field_error(exc, field="new_password") from exc
+        return Response(status=status.HTTP_204_NO_CONTENT)

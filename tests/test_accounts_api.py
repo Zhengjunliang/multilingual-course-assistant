@@ -23,6 +23,7 @@ from test_error_contract import refused
 
 import config.env
 import config.settings
+from apps.accounts.links import make_reset_link
 from apps.accounts.models import User
 from apps.catalog.models import Course, CourseEdition, DegreeProgramme
 from apps.qa import engine as engine_module
@@ -46,6 +47,8 @@ REGISTER_URL = "/api/auth/register"
 PASSWORD_URL = "/api/auth/password"
 SESSIONS_END_URL = "/api/auth/sessions/end"
 DELETE_URL = "/api/auth/me/delete"
+RESET_LOOKUP_URL = "/api/auth/reset/lookup"
+RESET_URL = "/api/auth/reset"
 ASK_URL = "/api/ask"
 
 USERNAME = "student"
@@ -231,11 +234,18 @@ def change_to(password: str) -> Response:
     )
 
 
+def reset_to(password: str) -> Response:
+    user = User.objects.create_user(username=RULES_USERNAME, password=PASSWORD)
+    token, _ = make_reset_link(User.objects.create_superuser(username="root"), user, None)
+    return APIClient().post(RESET_URL, {"token": token, "new_password": password}, format="json")
+
+
 @pytest.mark.parametrize(
     ("set_password", "field"),
     [
         pytest.param(register_with, "password", id="register"),
         pytest.param(change_to, "new_password", id="change"),
+        pytest.param(reset_to, "new_password", id="reset"),
     ],
 )
 @pytest.mark.parametrize(
@@ -588,6 +598,15 @@ def test_signing_in_with_the_csrf_token_from_the_cookie_works(
             True, SESSIONS_END_URL, {"password": "guess", "session": "others"}, id="end-sessions"
         ),
         pytest.param(True, DELETE_URL, {"password": "guess"}, id="delete-account"),
+        # A recovery code is throttled as a password is (NIST SP 800-63B-4,
+        # section 4.2.1.2, outside the repository), and a 404 here.
+        pytest.param(False, RESET_LOOKUP_URL, {"token": "guess"}, id="reset-lookup"),
+        pytest.param(
+            False,
+            RESET_URL,
+            {"token": "guess", "new_password": "lamp-orbit-quietly-87"},
+            id="reset",
+        ),
     ],
 )
 def test_the_auth_bucket_refuses_a_sixth_attempt_in_a_minute(
@@ -598,8 +617,7 @@ def test_the_auth_bucket_refuses_a_sixth_attempt_in_a_minute(
     client = logged_in() if signed_in else APIClient()
     codes = [client.post(url, body, format="json").status_code for _ in range(6)]
 
-    assert codes[:5] == [400] * 5
-    assert codes[5] == 429
+    assert [code == 429 for code in codes] == [False] * 5 + [True]
 
 
 def test_registering_and_logging_in_share_one_bucket() -> None:

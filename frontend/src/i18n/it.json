@@ -151,6 +151,7 @@
     "CSRF_FAILED": "La pagina è scaduta: ricaricala e riprova.",
     "NOT_FOUND": "Non esiste più.",
     "CONVERSATION_GONE": "Questa conversazione non esiste più: iniziane una nuova.",
+    "LINK_EXPIRED": "Questo link non funziona più: chiedine uno nuovo a chi te l'ha dato.",
     "METHOD_NOT_ALLOWED": "$t(errors.INTERNAL)",
     "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",

@@ -28,6 +28,7 @@ export const ERROR_CODES = {
   CSRF_FAILED: { status: 403, kind: "failure", dataKeys: [] },
   NOT_FOUND: { status: 404, kind: "fixable", dataKeys: [] },
   CONVERSATION_GONE: { status: 404, kind: "fixable", dataKeys: [] },
+  LINK_EXPIRED: { status: 404, kind: "fixable", dataKeys: [] },
   METHOD_NOT_ALLOWED: { status: 405, kind: "failure", dataKeys: [] },
   NOT_ACCEPTABLE: { status: 406, kind: "failure", dataKeys: [] },
   UNSUPPORTED_MEDIA_TYPE: { status: 415, kind: "failure", dataKeys: [] },
