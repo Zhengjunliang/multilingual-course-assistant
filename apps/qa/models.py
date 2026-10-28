@@ -134,9 +134,9 @@ class Message(models.Model):
     first question has none. The chain is the only source of a thread's order —
     the id is random and two rows of one exchange can share a timestamp — and a
     parent always belongs to the same conversation, which `record_exchange`
-    guarantees by being the only writer (docs/decisions.md, 2026-10-27, *A
-    conversation and its messages are named by random UUIDs, and a thread is a
-    chain of parents*).
+    guarantees by being the only writer
+    (docs/decisions.md, 2026-10-27, *A conversation and its messages are named
+    by random UUIDs, and a thread is a chain of parents*).
     """
 
     class Role(models.TextChoices):
