@@ -209,8 +209,7 @@ omit = [
 
 [tool.coverage.report]
 show_missing = true
-# Measured 75% after the M2 test additions (the gap is parse.py's converter loop,
-# which needs docling models), set ~5 points under. A floor that catches a large
-# untested addition, not a target: it is not raised for its own sake, and no test
+# A floor that catches a large untested addition, not a target: set ~5 points
+# under the 75% measured after M2, it is not raised for its own sake, and no test
 # is written to move it (docs/testing.md, section "Coverage").
 fail_under = 70

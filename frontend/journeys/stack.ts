@@ -1,6 +1,6 @@
 /**
- * What the journeys share: the one password, the answer the fake model gives,
- * and the two ways a test gets an account. The demo's are seeded by
+ * What the journeys share: the one password, the fake model's answer `ask`
+ * waits for, and the two ways a test gets an account. The demo's are seeded by
  * tests/journeys/serve.py and signed in once (auth.setup.ts); a test that
  * logs out registers one of its own instead, because logging out ends the
  * session the saved sign-in hands every other test.
@@ -19,7 +19,7 @@ export const STUDENT = fileURLToPath(new URL(".auth/student.json", import.meta.u
 export const SECRETARIAT = fileURLToPath(new URL(".auth/secretariat.json", import.meta.url));
 
 /** What tests/journeys/fake_llm.py answers every question with, up to its citation. */
-export const ANSWER = "Lo sportello della segreteria è aperto il martedì";
+const ANSWER ="Lo sportello della segreteria è aperto il martedì";
 
 /** The page that answer cites, which tests/journeys/retrieval.py indexes. */
 export const PAGE = "https://ingegneria.unifi.it/vp-185.html";

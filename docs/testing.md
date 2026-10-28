@@ -21,7 +21,7 @@ A component test that repeats what a page test of the same behaviour checks meet
 
 - **Only logic gets a test**: state, data, permissions, validation, API contracts. A change to style, copy or layout gets none and is looked at instead. The browser floors are no exception to this: they check invariants of every screen rather than one change's look, and a new screen joins them as a row of [frontend/e2e/screens.ts](../frontend/e2e/screens.ts), not as a new test.
 - **Extend before adding.** Search first, by the unit's name, the text on screen or the error code, and extend the test that covers the behaviour, as a new row of its table where it has one. Every new test function costs every later run its time (Open WebUI's regression contract, outside the repository).
-- **The deletion criteria hold for a new test**: one that would meet any of (a)–(d) below is not written.
+- **The deletion criteria hold for a new or changed test**: one that would meet any of (a)–(d) below is not written.
 - **The requirement wins.** A test that contradicts the issue or the spec it implements is reported, never changed to agree with the code.
 - **A new browser test passes five runs in a row**, `npx playwright test <file> --repeat-each=5` from `frontend/` (with `--config playwright.journeys.config.ts` for a journey), before it is committed; one failure in five is a failing test (Open WebUI's contract). Those five runs happen once, when the test is accepted, and never in the chain.
 
@@ -59,7 +59,7 @@ A test earns its place by what breaks when it is gone. It may be deleted when on
 
 The book is read online (outside the repository: abseil.io/resources/swe-book, chapters 12 and 13). The four criteria are those of issue `#89`.
 
-The commit that deletes a test names the criterion on a line of its own for every test it deletes, such as `- delete tests/test_x.py::test_y — (c) repeats tests/test_x.py::test_z`. The criteria hold for a new or changed test too: a test that would meet one of them is not written.
+The commit that deletes a test names the criterion on a line of its own for every test it deletes, such as `- delete tests/test_x.py::test_y — (c) repeats tests/test_x.py::test_z`.
 
 ## Kept whatever the criteria say
 
