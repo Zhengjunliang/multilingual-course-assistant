@@ -122,7 +122,13 @@ STEPS: tuple[Step, ...] = (
             "generate one with the command at the top of .env.example."
         ),
     ),
-    Step("tests", ((PYTHON, "-m", "pytest", "--cov"),)),
+    # Four workers (pytest-xdist), each on a test database of its own
+    # (test_mca_gw0…): CI's runner has four cores, and on the dev machine four
+    # beat both its fourteen cores and eight, since every worker first creates
+    # and migrates its database (63 s against 79 s and 68 s, 90 s serial). A
+    # fixed number keeps the two runs alike. The ten slowest tests are printed,
+    # so a slow one is seen in the run that brings it (docs/testing.md).
+    Step("tests", ((PYTHON, "-m", "pytest", "--cov", "-n", "4", "--durations=10"),)),
 )
 
 
