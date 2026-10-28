@@ -87,7 +87,8 @@ function Session(props: {
   account: Account | null;
   onForget: () => void;
   logOut: () => Promise<void>;
-  recheck: () => Promise<void>;
+  /** The account the server reads, or `undefined` for the one the page holds. */
+  recheck: () => Promise<Account | null | undefined>;
   children: ReactNode;
 }) {
   const [account, setAccount] = useState(props.account);
@@ -103,7 +104,10 @@ function Session(props: {
           props.onForget();
           setAccount(null);
         },
-        recheck: props.recheck,
+        recheck: async () => {
+          const read = await props.recheck();
+          if (read !== undefined) setAccount(read);
+        },
       }}
     >
       {props.children}
@@ -111,8 +115,11 @@ function Session(props: {
   );
 }
 
-function open(path: string, session: { account?: Account | null; recheck?: () => Promise<void> }) {
-  const recheck = vi.fn(session.recheck ?? (async () => {}));
+function open(
+  path: string,
+  session: { account?: Account | null; recheck?: () => Promise<Account | null | undefined> },
+) {
+  const recheck = vi.fn(session.recheck ?? (async () => undefined));
   const logOut = vi.fn(async () => {});
   const forget = vi.fn();
   const marker = (id: string): ReactNode => <p id={id} />;
@@ -414,23 +421,29 @@ describe("an invitation", () => {
     });
   });
 
-  it("signed in, the session ended meanwhile: said, and an account to make is offered", async () => {
+  it.each([
+    { meanwhile: "the session ended", read: null, offered: { as: undefined, username: true } },
+    {
+      meanwhile: "another account signed in",
+      read: { ...READER, id: 4, username: "demo-other" },
+      offered: { as: i18n.t("auth.acceptAs", { username: "demo-other" }), username: false },
+    },
+  ])("signed in, $meanwhile: said, and the session read again", async ({ read, offered }) => {
     answers["/api/auth/invitation/accept"] = refusal("UNAUTHENTICATED");
-    const opened = open(`/invite#${TOKEN}`, { account: READER });
+    const opened = open(`/invite#${TOKEN}`, { account: READER, recheck: async () => read });
     await settle();
     await send(opened.container);
     const after = {
       said: opened.container.querySelector('[role="alert"]')?.textContent,
-      username: opened.container.querySelector("#username") !== null,
+      offered: {
+        as: opened.container.querySelector("form p.text-center")?.textContent,
+        username: opened.container.querySelector("#username") !== null,
+      },
       path: opened.path(),
     };
     opened.unmount();
 
-    expect(after).toEqual({
-      said: i18n.t("errors.UNAUTHENTICATED"),
-      username: true,
-      path: "/invite",
-    });
+    expect(after).toEqual({ said: i18n.t("errors.UNAUTHENTICATED"), offered, path: "/invite" });
   });
 
   it("signed in as someone else: signing out is offered", async () => {
