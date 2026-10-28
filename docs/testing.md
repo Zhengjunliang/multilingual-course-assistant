@@ -13,6 +13,7 @@ One behaviour is tested in one layer, the one whose seam it belongs to: a rule o
 | pytest, `tests/` | The server's rules: permissions, error codes, the scope invariants, the API contract and its TypeScript mirrors, the pipeline | How a page shows any of it | [tests/test_access_matrix.py](../tests/test_access_matrix.py): what each kind of caller gets from every API route |
 | vitest, `frontend/src/**/*.test.{ts,tsx}` | The interface's logic and state, tested at page level: what a page shows for each answer the API can give, and what it sends | The server's rules, which its fixtures assume; a component on its own, unless a page test cannot reach its logic | [ChatPage.routing.test.tsx](../frontend/src/routes/ChatPage.routing.test.tsx) |
 | Browser floors, [frontend/e2e/](../frontend/e2e/) | What only a real browser measures, on every screen: accessibility, reduced motion, type, the byte budget of the first screen; and the demo path on recorded answers | The server, whose answers [frontend/e2e/api.ts](../frontend/e2e/api.ts) records | [frontend/e2e/a11y.spec.ts](../frontend/e2e/a11y.spec.ts) |
+| Journeys, [frontend/journeys/](../frontend/journeys/) | The flows whose two sides must agree, through the real Django and PostgreSQL: signing in and out, a role granted and then found, a question streamed, stored and reopened, a visitor's question | Interface states (refusals, languages, layout), which vitest and the floors hold; the model and retrieval, faked by [tests/journeys/](../tests/journeys/) | [frontend/journeys/ask.spec.ts](../frontend/journeys/ask.spec.ts) |
 
 A component test that repeats what a page test of the same behaviour checks meets criterion (c) below.
 
@@ -22,7 +23,7 @@ A component test that repeats what a page test of the same behaviour checks meet
 - **Extend before adding.** Search first, by the unit's name, the text on screen or the error code, and extend the test that covers the behaviour, as a new row of its table where it has one. Every new test function costs every later run its time (Open WebUI's regression contract, outside the repository).
 - **The deletion criteria hold for a new test**: one that would meet any of (a)–(d) below is not written.
 - **The requirement wins.** A test that contradicts the issue or the spec it implements is reported, never changed to agree with the code.
-- **A new browser test passes five runs in a row**, `npx playwright test <file> --repeat-each=5` from `frontend/`, before it is committed; one failure in five is a failing test (Open WebUI's contract). Those five runs happen once, when the test is accepted, and never in the chain.
+- **A new browser test passes five runs in a row**, `npx playwright test <file> --repeat-each=5` from `frontend/` (with `--config playwright.journeys.config.ts` for a journey), before it is committed; one failure in five is a failing test (Open WebUI's contract). Those five runs happen once, when the test is accepted, and never in the chain.
 
 ## Time caps
 
@@ -40,12 +41,12 @@ By hand, once at the end of each milestone, never in the chain:
 
 1. **pytest, per test.** `uv run pytest --cov --cov-context=test`, then `uv run coverage json --show-contexts -o htmlcov/contexts.json`. A test whose covered lines are all covered by another test is a candidate.
 2. **vitest, per file**, since vitest records no coverage per test. Run each test file alone, `npx vitest run <file> --coverage --coverage.reportsDirectory=coverage/<name>` from `frontend/`; a file whose covered lines another file covers is a candidate, and the tests inside one file are read for repeats.
-3. **The browser floors**: a test whose behaviour a lower layer can see is a candidate.
+3. **The browser floors and the journeys**: a test whose behaviour a lower layer can see is a candidate.
 4. **Triage.** Each candidate gets a verdict, delete, merge or keep, and the criterion of the next section or the layer rule above that decides it. Line coverage does not drop, or each line lost is explained, such as a line only a test asserting on its own mock ever ran.
 
 ## Flaky tests
 
-A test that fails with no change to the code is a wrong test: it is fixed or deleted when it is seen, never retried, skipped or set aside in a quarantine. The browser suite runs with `retries: 0` ([frontend/playwright.config.ts](../frontend/playwright.config.ts)), since a retry reports a race as a pass; Open WebUI and Dify run their browser suites the same way, and Zulip treats a nondeterministic failure as an urgent bug (outside the repository). A browser test waits for what the page or the server states, through an assertion that retries by itself such as `toBeVisible`, never for a fixed time. Guard: `retries: 0`.
+A test that fails with no change to the code is a wrong test: it is fixed or deleted when it is seen, never retried, skipped or set aside in a quarantine. Both browser suites run with `retries: 0` ([frontend/playwright.config.ts](../frontend/playwright.config.ts), [frontend/playwright.journeys.config.ts](../frontend/playwright.journeys.config.ts)), since a retry reports a race as a pass; Open WebUI and Dify run their browser suites the same way, and Zulip treats a nondeterministic failure as an urgent bug (outside the repository). A browser test waits for what the page or the server states, through an assertion that retries by itself such as `toBeVisible`, never for a fixed time. Guard: `retries: 0`.
 
 ## When a test may be deleted
 
@@ -75,6 +76,7 @@ Each of these is the only guard of what it protects. One that meets a criterion 
 | Every route says who may call it | `tests/test_route_permissions.py` |
 | What each kind of caller gets from every API route | `tests/access_matrix.txt`, checked by `tests/test_access_matrix.py` |
 | CI calls exactly the chain, and every guard rule fails on its bad examples | `tests/test_check_script.py`, `tests/test_guards.py` |
+| The interface and the server agree end to end: a session ended on the server, a granted role, a stream stored and reopened, a visitor's question | `frontend/journeys/` |
 
 One overlap is kept on purpose: `tests/test_smoke.py::test_django_system_checks_pass` runs the system checks that the chain's `deploy` step runs too, so that `uv run pytest`, the quick loop, catches a broken setting without the whole chain.
 
@@ -86,11 +88,11 @@ The fix of a logic defect brings the test that was red before it, and the commit
 
 A test runs the project's own code and fakes only what is outside it or cannot be had on demand:
 
-- **Out of process**: the LLM endpoint (`rag.llm.build_completer`, `rag.llm.build_streamer`, `openai.OpenAI`), HTTP fetches (`rag.crawl.HttpxFetcher`), git and other binaries (`subprocess.run`).
+- **Out of process**: the LLM endpoint (`rag.llm.build_completer`, `rag.llm.build_streamer`, `openai.OpenAI`; for the journeys, an OpenAI-compatible server of their own, `tests/journeys/fake_llm.py`), HTTP fetches (`rag.crawl.HttpxFetcher`), git and other binaries (`subprocess.run`).
 - **Time**: the clock (`time.monotonic`) and the wait between fetches (`rag.live.shared_throttle`, replaced by a `Throttle` with no interval).
 - **Too heavy for the unit loop**: the embedding encoders and the reranker (`StubDense` and `StubSparse` in `tests/test_index.py`), the document converters and the chunker (`rag.live.build_converter`, `rag.live.chunk_document`).
 - **A failure no input produces**: an encoder that cannot load, a Qdrant that refuses, a build slow enough for two requests to meet (`tests/test_qa_api.py`, `tests/test_qa_engine.py`).
 
-Two things are never faked. The database is the PostgreSQL test database Django creates, the engine production runs. Qdrant is a real embedded index under `tmp_path` (`rag.index.open_client` with a directory). Pointing a setting or a directory at the test's own, such as `PARSED_DIR` at `tmp_path` or a shorter queue timeout, is not a fake.
+Two things are never faked. The database is the PostgreSQL test database Django creates, the engine production runs. Qdrant is a real embedded index, under `tmp_path` (`rag.index.open_client` with a directory), or in memory for the journeys (`tests/journeys/retrieval.py`, which `QA_RETRIEVAL` names). Pointing a setting or a directory at the test's own, such as `PARSED_DIR` at `tmp_path` or a shorter queue timeout, is not a fake.
 
 A fake of the project's own code outside these cases checks how the code is called, not what it does (*Software Engineering at Google*, chapter 12, *Test State, Not Interactions*). It is written only where no outcome can show the behaviour, and its docstring says why, as `tests/test_qa_api.py` does for the wrapper that keeps the engine's generator alive.

@@ -6,15 +6,16 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "biome check src e2e scripts vite.config.ts playwright.config.ts biome.json package.json tsconfig.json",
-    "format": "biome format --write src e2e scripts vite.config.ts playwright.config.ts biome.json package.json tsconfig.json",
+    "lint": "biome check src e2e journeys scripts vite.config.ts playwright.config.ts playwright.journeys.config.ts biome.json package.json tsconfig.json",
+    "format": "biome format --write src e2e journeys scripts vite.config.ts playwright.config.ts playwright.journeys.config.ts biome.json package.json tsconfig.json",
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
     "check:design": "node scripts/design-md.mjs --check",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:journeys": "playwright test --config playwright.journeys.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.24",

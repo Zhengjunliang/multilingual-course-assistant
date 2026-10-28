@@ -21,6 +21,8 @@ node_modules/
 dist/
 dist-e2e/
 test-results/
+# The sessions frontend/journeys/auth.setup.ts saves
+frontend/journeys/.auth/
 coverage/
 build/
 .vite/
