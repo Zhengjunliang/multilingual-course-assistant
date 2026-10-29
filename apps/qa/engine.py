@@ -217,7 +217,9 @@ class Engine:
             locale=answer_locale,
             route=decision,
             citations=[Citation.of(hit) for hit in hits],
-            search_ms=round((time.time() - started) * 1000),
+            # Never below zero: `asked_at` is the web host's clock, and a
+            # worker's may be behind it.
+            search_ms=max(0, round((time.time() - started) * 1000)),
         )
 
         try:

@@ -88,6 +88,9 @@ def test_the_engine_answers_without_touching_the_database(tmp_path: Path) -> Non
         # The task passes the admission's reading: the wait for a worker, and
         # the first build of the models, are in what the reader waited.
         pytest.param(10.0, [40.0], 30_000, id="from-the-admission"),
+        # A worker whose clock is behind the web host's must not make it
+        # negative, which the row's column refuses.
+        pytest.param(50.0, [40.0], 0, id="a-worker-clock-behind"),
     ],
 )
 def test_the_search_time_counts_from_when_the_question_was_asked(
