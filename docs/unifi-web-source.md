@@ -39,13 +39,13 @@ data/webcorpus/
 
 A registry row (`RegistryEntry` in `rag/crawl.py`): `url · content_hash · fetch_date · ingest_run_id · ingest_source ("crawl" | "live") · trigger · referrer_url · section · outlinks[]` (anchor text and URL). The last row for a URL wins. The ledger has three duties: the **outlink graph** (candidates for growth), the **incremental check** (a page is parsed and indexed again only when its `content_hash` changes) and **rollback grouping** (a run is rolled back by deleting the points of its `ingest_run_id` from Qdrant by payload filter, `delete_by_run()` in `rag/index.py`; the registry names the runs).
 
-- Concurrency: one process writes; readers skip a corrupt row with a warning. Concurrent writers come with questions answered on the Celery worker, several at once, 🔜 M5 `#230`.
+- Concurrency: one process writes; readers skip a corrupt row with a warning. Concurrent writers come with the deepening loop run from the site, on the worker that answers several questions at once, 🔜 M7, no issue.
 - Rolling back a live write keeps the earlier crawl version of the same URL: the index returns to the snapshot.
 - Storage: `data/` (gitignored), with the corpus's risk posture.
 
 ## The deepening loop
 
-✅ `deepen()` in `rag/agent.py` is the state machine below, and `narrow_candidates()` builds the shortlist; the command is `uv run python -m rag.agent "<question>" [--no-deepen]`. The web API routes and retrieves without the loop (`apps/qa/engine.py`): its fetches write into the shared index and take tens of seconds each, so running it from the site is an asynchronous task, 🔜 M5 `#34`. 🔶 A page the gate passes is stored at once (`rag/live.py`); the decided human confirmation step is `#48`, which has no milestone. The diagram is `deepen()` as the code runs it; every exit ends in generation over the hits gathered, which refuses only when nothing grounds an answer. When a step stored a page and then went over the step clock, and no later step retrieved again, one more retrieval runs before generation, so the answer cites what was stored.
+✅ `deepen()` in `rag/agent.py` is the state machine below, and `narrow_candidates()` builds the shortlist; the command is `uv run python -m rag.agent "<question>" [--no-deepen]`. The web API routes and retrieves without the loop (`apps/qa/engine.py`): its fetches write into the shared index and take tens of seconds each, so running it from the site is a task on the worker that answers the questions, 🔜 M7, no issue. 🔶 A page the gate passes is stored at once (`rag/live.py`); the decided human confirmation step is `#48`, which has no milestone. The diagram is `deepen()` as the code runs it; every exit ends in generation over the hits gathered, which refuses only when nothing grounds an answer. When a step stored a page and then went over the step clock, and no later step retrieved again, one more retrieval runs before generation, so the answer cites what was stored.
 
 ```mermaid
 stateDiagram-v2

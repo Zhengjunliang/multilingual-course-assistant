@@ -9,7 +9,7 @@ How the ingest and query pipelines work: what each step does, why it is needed a
 Three principles:
 
 - **Ingest errors become permanent.** A parse that reads two columns as one or garbles `perché` cannot be rescued by any LLM later — the index itself is wrong. Parsing quality is checked first; the order cannot be reversed.
-- **The query side is small, explicit control flow**: a router, retrieval and generation; for the campus source the command-line agent adds a deepening loop of at most three fetches (`route()` and `deepen()` in `rag/agent.py`; the state machine is [unifi-web-source.md](unifi-web-source.md)). The web API does not run the loop (`apps/qa/engine.py`); its web path is 🔜 M5 `#34`. Why no framework: [rag-analysis.md](rag-analysis.md).
+- **The query side is small, explicit control flow**: a router, retrieval and generation; for the campus source the command-line agent adds a deepening loop of at most three fetches (`route()` and `deepen()` in `rag/agent.py`; the state machine is [unifi-web-source.md](unifi-web-source.md)). The web API does not run the loop (`apps/qa/engine.py`); its web path is 🔜 M7, no issue. Why no framework: [rag-analysis.md](rag-analysis.md).
 - **The LLM is the last and least important step.** If retrieval misses the right excerpt, generation can only invent. RAGAS measures *context precision/recall* (retrieval) and *faithfulness* (generation) separately so that the blame lands in the right place (🔜 M3 `#20`).
 
 ## 2. Steps 0–1 · probe and parse
@@ -74,7 +74,7 @@ Each lesson's numbers are in [experiment-log.md](experiment-log.md), entries of 
 - **Formula placeholders underestimate the loss**: with enrichment off, some formulas leave no placeholder at all, so the loss can only be judged by running the enrichment once and comparing. VLM-generated LaTeX has trustworthy values but hallucinated symbols.
 - **Dead chunks**: sections whose only content under the heading is `<!-- image -->` — and they are the course's core, such as `Django's ORM`, `CRUD examples`, `Components of a Database`. A student asking how Django's ORM works finds an empty chunk in the index. They are the denominator of the picture-description ablation (`#28`).
 - **Batch vision and generation work belongs on the server**: the VLM and picture description generate autoregressively, a local GPU fed one page at a time is latency-bound, and the one lever that works is batching — vLLM's continuous batching on MICC. Locally only single-document comparisons run.
-- **One switch, two defaults, on purpose**: formula enrichment is off by default in the `rag/parse.py` command line (each run would pay the model download and load again), and on in the resident Celery worker (loaded once, then gating itself per item at almost no cost; 🔜 M5 `#34`).
+- **One switch, two defaults, on purpose**: formula enrichment is off by default in the `rag/parse.py` command line (each run would pay the model download and load again), and on in the resident Celery worker (loaded once, then gating itself per item at almost no cost; 🔜 M5 `#35`).
 
 ## 3. Step 2 · chunking
 
