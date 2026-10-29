@@ -458,8 +458,6 @@
     },
     "users": {
       "title": "Account",
-      "count_one": "{{count}} account",
-      "count_other": "{{count}} account",
       "state": "Stato",
       "all": "Tutti",
       "active": "Attivi",

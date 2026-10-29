@@ -458,8 +458,6 @@
     },
     "users": {
       "title": "Accounts",
-      "count_one": "{{count}} account",
-      "count_other": "{{count}} accounts",
       "state": "State",
       "all": "All",
       "active": "Active",
