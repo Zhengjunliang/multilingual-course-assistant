@@ -8,6 +8,8 @@ headers at the bottom are therefore conditional rather than a separate file.
 
 from pathlib import Path
 
+from celery.schedules import crontab
+
 # Secrets and per-environment values come from .env — see .env.example.
 from config.env import env
 
@@ -277,6 +279,55 @@ TIME_ZONE = "Europe/Rome"
 USE_I18N = True
 
 USE_TZ = True
+
+
+# Background tasks
+# https://docs.celeryq.dev/en/stable/userguide/configuration.html
+
+# Celery reads every setting below that starts with CELERY_ (config/celery.py).
+# Not restated: JSON as the only serialisation, Celery's default since 4.0.
+# Pickle would let whoever can write to the broker run code in the worker.
+CELERY_BROKER_URL = env.celery_broker_url
+
+# Queues are named by the work they hold: a worker starts with `-Q default`,
+# and a long kind of work gets a queue and a worker of its own, so it never
+# waits behind another. Celery's default name, `celery`, names no work.
+CELERY_TASK_DEFAULT_QUEUE = "default"
+
+# Celery's own advice for long tasks (the Optimizing guide): acknowledged
+# once done, so a worker that dies mid-task leaves it to be delivered again,
+# and fetched one at a time, so a worker never holds a second task while a
+# free one waits. Each task must therefore survive running twice.
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+
+# The soft limit raises inside the task, which can still clean up; the hard
+# one kills it. The longest task here takes seconds, and one that needs more
+# says so in its decorator. Both stay far under the broker's visibility
+# timeout, an hour on Redis: an unacknowledged task past it goes to a second
+# worker while the first still runs it. Only the prefork pool enforces them
+# (Celery's Workers guide); the solo pool of a Windows worker and the threads
+# pool ignore them.
+CELERY_TASK_SOFT_TIME_LIMIT = 5 * 60
+CELERY_TASK_TIME_LIMIT = 6 * 60
+
+# A schedule's hours are Rome's, not UTC, Celery's default.
+CELERY_TIMEZONE = TIME_ZONE
+
+# Beat's schedule, in code rather than a database (no django-celery-beat):
+# what runs and when changes with a commit, never from the admin. One beat
+# runs at a time; two would send every task twice.
+CELERY_BEAT_SCHEDULE = {
+    # Django keeps expired sessions until something deletes them.
+    "clear-expired-sessions": {
+        "task": "apps.accounts.tasks.clear_expired_sessions",
+        "schedule": crontab(hour=4, minute=0),
+    },
+}
+# No result backend is configured, so a task's return value is never stored.
+# Left at its one-day default, this would make beat add Celery's own nightly
+# `celery.backend_cleanup` to the schedule above, a task with nothing to clean.
+CELERY_RESULT_EXPIRES = None
 
 
 # Static files (CSS, JavaScript, Images)
