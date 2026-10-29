@@ -1,8 +1,9 @@
 /**
  * `/account`: what belongs to the signed-in account rather than to a
- * conversation or a scope (#167), reached from the account menu: the
- * interface's language, the roles it holds, its password, the devices
- * signed in to it, and deleting it. One page of sections, the way GitHub's
+ * conversation or a scope (#167), reached from the account menu: the roles
+ * it holds, its password, the devices signed in to it, and deleting it. The
+ * language is not repeated here: the account menu that leads here sets it,
+ * one level up. One page of sections, the way GitHub's
  * and Google's account pages stack theirs, deleting last in the warning's
  * tint (outside the repository).
  *
@@ -33,7 +34,6 @@ import { useSession } from "@/auth/useSession";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { LocaleSwitch } from "@/components/ui/locale-switch";
 import { PasswordChange } from "@/features/account/PasswordChange";
 import { PasswordDialog } from "@/features/account/PasswordDialog";
 import { Sessions } from "@/features/account/Sessions";
@@ -41,13 +41,12 @@ import { clearDraft } from "@/features/chat/draft";
 import { useLoad } from "@/features/staff/context";
 import { Section } from "@/features/staff/page";
 import { LoadFailure } from "@/features/staff/Refusal";
-import { UI_LOCALES } from "@/i18n";
 import { useShell } from "./shell";
 
 export default function AccountPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const { account, chooseLocale, forget } = useSession();
+  const { account, forget } = useSession();
   const { back } = useShell();
   const sessions = useLoad(listSessions);
   const [deleting, setDeleting] = useState(false);
@@ -73,17 +72,6 @@ export default function AccountPage() {
           <Chip tone={role === "student" ? "neutral" : "accent"}>{t(`account.role.${role}`)}</Chip>
         </div>
       </header>
-
-      <Section heading={t("account.language")}>
-        <LocaleSwitch
-          className="self-start"
-          locales={UI_LOCALES}
-          value={i18n.language}
-          label={t("account.language")}
-          hint={t("account.languageHint")}
-          onChange={(locale) => void chooseLocale(locale)}
-        />
-      </Section>
 
       {account.roles.length > 0 && (
         <Section heading={t("account.roles")}>

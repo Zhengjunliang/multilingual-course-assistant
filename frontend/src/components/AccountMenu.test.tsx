@@ -80,14 +80,7 @@ describe("the account row and its menu", () => {
       "the superuser",
       account(true, []),
       "Amministratore",
-      [
-        "Il mio account",
-        "Lingua",
-        "Impostazioni…",
-        "Aiuto e scorciatoie",
-        "Amministrazione",
-        "Esci",
-      ],
+      ["Il mio account", "Lingua", "Impostazioni…", "Aiuto e scorciatoie", "Esci"],
     ],
   ])("name %s, its role, and offer its items", (_, reader, role, labels) => {
     const { row, unmount } = menu(reader);

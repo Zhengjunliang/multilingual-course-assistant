@@ -66,16 +66,13 @@
   "account": {
     "menu": "打开账号菜单",
     "theme": "主题",
-    "themeCaption": "只对这台设备生效，不跟随账号。",
     "language": "语言",
     "languageHint": "回答跟随提问所用的语言，而不是界面的语言。",
     "logOut": "退出登录",
     "close": "关闭",
-    "admin": "管理后台",
     "settings": "设置",
     "settingsItem": "设置…",
     "help": "帮助与快捷键",
-    "languageInMenu": "语言在账号菜单里切换。",
     "role": {
       "admin": "管理员",
       "secretariat": "教学秘书",

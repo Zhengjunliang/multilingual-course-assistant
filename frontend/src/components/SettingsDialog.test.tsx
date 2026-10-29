@@ -31,19 +31,14 @@ function buttonLabelled(text: string) {
 }
 
 describe("the settings dialog", () => {
-  it("offers all three themes, says the choice is per device, and holds nothing else", () => {
+  it("offers all three themes and holds nothing else", () => {
     const { unmount } = dialog();
     const offered = ["Di sistema", "Chiaro", "Scuro"].map((label) => buttonLabelled(label));
-    const text = document.body.textContent;
     const menus = document.body.querySelectorAll('[aria-haspopup="menu"]').length;
     unmount();
 
     for (const button of offered) expect(button).toBeDefined();
-    // The distinction ThemeProvider argues for, in front of the reader rather
-    // than only in a source comment.
-    expect(text).toContain("questo dispositivo");
-    // The language is the account menu's now, and the dialog says so.
-    expect(text).toContain("menu dell'account");
+    // The language is the account menu's.
     expect(menus).toBe(0);
     expect(buttonLabelled("Esci")).toBeUndefined();
   });

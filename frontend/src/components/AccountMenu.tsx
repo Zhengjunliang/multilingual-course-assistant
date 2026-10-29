@@ -11,10 +11,12 @@
  * use, since it is the setting a reader of three languages changes most, and
  * choosing one writes it to the account (`User.locale`) as well as the
  * interface; the settings, which hold the theme alone; the list of shortcuts;
- * the Django admin for the superuser, a plain page load since Django serves
- * it; and signing out, which says so in a toast when the server could not
- * be reached and the account is still signed in. The staff pages are not
- * here: they are the sidebar's «Gestione» group.
+ * and signing out, which says so in a toast when the server could not be
+ * reached and the account is still signed in. The staff pages are not here:
+ * they are the sidebar's «Gestione» group. Nor is the Django admin, where a
+ * technician repairs rows the site does not reach: a product's menu does not
+ * open its raw data tool, so the superuser's work stays in the site's own
+ * pages and the admin is reached by its address.
  *
  * A dialog is opened from `onCloseAutoFocus` rather than from `onSelect`, and
  * that is not a flourish. Radix returns focus to the trigger as the menu
@@ -31,7 +33,6 @@ import {
   Globe,
   Keyboard,
   LogOut,
-  ShieldCheck,
   SlidersHorizontal,
 } from "lucide-react";
 import { useRef } from "react";
@@ -91,16 +92,6 @@ export function AccountMenu({
   if (account === null) return null;
 
   const keys = shortcuts();
-  const admin = account.is_superuser
-    ? [
-        {
-          key: "admin",
-          icon: ShieldCheck,
-          label: t("account.admin"),
-          onSelect: () => window.location.assign("/admin/"),
-        },
-      ]
-    : [];
 
   const row = variant === "row";
   return (
@@ -184,7 +175,6 @@ export function AccountMenu({
                 after.current = onOpenHelp;
               },
             },
-            ...admin,
           ],
         },
         {

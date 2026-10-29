@@ -66,16 +66,13 @@
   "account": {
     "menu": "Apri il menu dell'account",
     "theme": "Tema",
-    "themeCaption": "Vale su questo dispositivo, non sull'account.",
     "language": "Lingua",
     "languageHint": "Le risposte seguono la lingua della domanda, non quella dell'interfaccia.",
     "logOut": "Esci",
     "close": "Chiudi",
-    "admin": "Amministrazione",
     "settings": "Impostazioni",
     "settingsItem": "Impostazioni…",
     "help": "Aiuto e scorciatoie",
-    "languageInMenu": "La lingua si cambia dal menu dell'account.",
     "role": {
       "admin": "Amministratore",
       "secretariat": "Segreteria",

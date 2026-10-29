@@ -3,10 +3,10 @@
  *
  * The theme alone because it is the one setting that belongs to the screen
  * rather than to the person: it lives in `localStorage`, and `ThemeProvider`
- * argues that at length; the caption under it tells the reader. The language
- * is the person's (`User.locale`) and sits one level up, in the account menu,
- * where ChatGPT and Claude put it too; a line here says so, for a reader who
- * came looking for it, and says what it does not change.
+ * argues that at length. The language is the person's (`User.locale`) and
+ * sits one level up, in the account menu, where ChatGPT and Claude put it
+ * too. No caption explains either: the control is the whole section
+ * (DESIGN.md, Do's and Don'ts).
  *
  * Opened from the account menu's «Impostazioni…» and from Ctrl , anywhere
  * (features/chat/shortcuts.ts).
@@ -47,7 +47,6 @@ export function SettingsDialog({ open, onOpenChange, onCloseAutoFocus }: Setting
     >
       <section className="flex flex-col gap-tight">
         <h3 className="font-semibold text-caption text-muted uppercase">{t("account.theme")}</h3>
-        <p className="text-caption text-muted">{t("account.themeCaption")}</p>
         <ToggleGroup
           className="self-start"
           label={t("account.theme")}
@@ -60,9 +59,6 @@ export function SettingsDialog({ open, onOpenChange, onCloseAutoFocus }: Setting
           }))}
         />
       </section>
-      <p className="text-caption text-muted">
-        {t("account.languageInMenu")} {t("account.languageHint")}
-      </p>
     </Dialog>
   );
 }
