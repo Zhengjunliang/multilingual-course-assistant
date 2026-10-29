@@ -31,7 +31,8 @@ from urllib.parse import urlsplit
 import httpx
 import pytest
 from django.conf import settings
-from django.core.cache import cache
+from django.core.cache import cache, caches
+from django.core.signals import request_started
 from django.test import override_settings
 from pwned_passwords_django import api
 
@@ -50,10 +51,21 @@ def _redis_database_of_its_own(worker_id: str) -> Iterator[None]:
 @pytest.fixture(autouse=True)
 def _fresh_process_state() -> Iterator[None]:
     engine_module._HOLDER.engine = None
-    cache.clear()
+    served: list[object] = []
+
+    def note(sender: object, **kwargs: object) -> None:
+        served.append(sender)
+
+    request_started.connect(note)
     yield
+    request_started.disconnect(note)
     engine_module._HOLDER.engine = None
-    cache.clear()
+    # Cleared only where a test reached the cache, through a request or
+    # directly, so a test of rag/ never connects to Redis and runs without
+    # Docker. The signal, because a request served on a thread of the test's
+    # own holds a connection of that thread, which this one cannot see.
+    if served or caches.all(initialized_only=True):
+        cache.clear()
 
 
 @pytest.fixture(autouse=True)
