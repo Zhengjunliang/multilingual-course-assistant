@@ -195,6 +195,7 @@
     "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
     "ROLE_ALREADY_HELD": "Questo utente ha già questo ruolo qui.",
+    "LAST_TEACHER": "È l'ultimo docente di questa edizione: prima assegnane un altro, o chiedi alla segreteria didattica.",
     "SELF_NOT_ALLOWED": "Non sul tuo account: può farlo un altro amministratore.",
     "ACCOUNT_STILL_ACTIVE": "Disattiva l'account prima di eliminarlo.",
     "ROLES_HELD": "Hai un ruolo nello staff: chiedi che ti venga revocato prima di eliminare l'account.",

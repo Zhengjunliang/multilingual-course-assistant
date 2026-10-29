@@ -2,7 +2,8 @@
 
 Who may invite to a role is who may grant it (`GRANT_PERMISSION`,
 apps/roles/registry.py): secretariat staff invite teachers to their
-programme's editions, and the superuser invites to any role on any scope,
+programme's editions, a course's teachers their colleagues to its current and
+later editions, and the superuser invites to any role on any scope,
 the way Dify lets a workspace's admins invite members (outside the
 repository). The holder accepts with the account they are signed in to, or
 with one they make on the spot, choosing its username and password: nobody
@@ -12,7 +13,8 @@ invitation lives 72 hours, Dify's `INVITE_EXPIRY_HOURS`.
 
 The grant is the maker's, so accepting asks again whether the maker may still
 make it: an invitation whose maker was deactivated, or lost the role that let
-them grant it, is as dead as an expired one, and one whose scope or maker was
+them grant it, or a teacher's to an edition since become past, is as dead as an
+expired one, and one whose scope or maker was
 deleted went with it. Each dead link is the one 404 `LINK_EXPIRED`, as a
 reset link's is. A used or revoked invitation is deleted; an expired one
 stays on its scope's list until whoever may grant the role there revokes it,

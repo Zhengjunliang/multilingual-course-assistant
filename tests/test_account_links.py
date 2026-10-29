@@ -312,8 +312,9 @@ def invitations_of(scope: CourseEdition | DegreeProgramme) -> str:
     [
         pytest.param("secretariat", "ppm_old", 201, id="secretariat-to-teach-in-their-programme"),
         pytest.param("root", "b047", 201, id="the-superuser-to-a-secretariat"),
-        # Teaching an edition is not granting it.
-        pytest.param("continuing", "ppm_old", 403, id="a-teacher-to-teach-their-course"),
+        pytest.param("continuing", "ppm_old", 201, id="a-teacher-to-teach-their-course"),
+        # A past year's teachers are not its course's teachers to change.
+        pytest.param("continuing", "ppm_past", 403, id="a-teacher-to-teach-a-past-year"),
         pytest.param("secretariat", "b047", 403, id="secretariat-to-their-own-role"),
         pytest.param("other_secretariat", "ppm_old", 404, id="secretariat-outside-their-programme"),
     ],
@@ -457,6 +458,14 @@ def maker_no_longer_granting(w: World) -> str:
     return token
 
 
+def made_for_a_year_since_past(w: World) -> str:
+    """A teacher's invitation to the current year, which the next one's start makes past."""
+    token = invite(w.continuing, Role.TEACHER, w.ppm_old, None)[1]
+    w.ppm_new.teaching_starts = timezone.localdate()
+    w.ppm_new.save()
+    return token
+
+
 def invitation_unknown(w: World) -> str:
     to_teach(w)
     return "a-token-no-invitation-was-made-with"
@@ -470,6 +479,7 @@ def invitation_unknown(w: World) -> str:
         pytest.param(invitation_revoked, id="revoked"),
         pytest.param(maker_deactivated, id="its-maker-deactivated"),
         pytest.param(maker_no_longer_granting, id="its-maker-no-longer-granting-the-role"),
+        pytest.param(made_for_a_year_since_past, id="a-teacher-s-for-a-year-since-past"),
         pytest.param(invitation_unknown, id="unknown"),
     ],
 )

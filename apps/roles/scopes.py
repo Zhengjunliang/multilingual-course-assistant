@@ -10,6 +10,13 @@ maps and the `Exists` subqueries below, and nothing else restates it: the
 backend behind `user.has_perm` (apps/roles/backends.py), the catalogue lists
 and each item's `permissions` all read it, so the three cannot disagree.
 
+Covering an edition is not holding everything on it: on a past edition, one
+older than its course's current one (apps/catalog/editions.py), a role holds
+what `NOT_ON_PAST_EDITIONS` (apps/roles/registry.py) leaves it, so a course's
+teachers read and edit a past year but no longer change who taught it.
+`_held_by` alone applies that, for the lists' filter and for one row's
+permissions alike.
+
 Each role is a boolean annotation on the scope rows. `Exists` rather than a
 join through the role rows: a user covering an edition twice — its teacher and
 its programme's secretariat — still yields one row, with no `distinct()`, and
@@ -29,16 +36,18 @@ from typing import TYPE_CHECKING, cast
 
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import Exists, OuterRef, Q, QuerySet
+from django.utils import timezone
 
+from apps.catalog.editions import IS_PAST, with_past
 from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import (
     EDITION_PERMISSIONS,
+    NOT_ON_PAST_EDITIONS,
     PROGRAMME_PERMISSIONS,
     ROLE_PERMISSIONS,
     Permission,
     Role,
-    roles_with,
 )
 
 if TYPE_CHECKING:
@@ -69,9 +78,13 @@ def _active(user: Caller) -> User | None:
 
 
 def with_edition_roles(editions: QuerySet[CourseEdition], user: User) -> QuerySet[CourseEdition]:
-    """`editions`, each marked with the roles in which `user` covers it."""
+    """`editions`, each marked with the roles in which `user` covers it, and whether it is past.
+
+    Past on the day of the request, the day the catalogue views mark the
+    current edition on (apps/catalog/views.py).
+    """
     rows = RoleAssignment.objects.filter(user=user)
-    return editions.annotate(
+    return with_past(editions, timezone.localdate()).annotate(
         **{
             _EDITION_FLAGS[Role.TEACHER]: Exists(
                 rows.filter(role=Role.TEACHER, edition__course=OuterRef("course"))
@@ -100,13 +113,26 @@ def with_programme_roles(
     )
 
 
+def _held_by(role: Role, *, past: bool) -> frozenset[Permission]:
+    """What `role` holds on a scope it covers, a past edition or any other."""
+    held = ROLE_PERMISSIONS[role]
+    return held - NOT_ON_PAST_EDITIONS.get(role, frozenset()) if past else held
+
+
 def _covering(flags: Mapping[Role, str], permission: Permission) -> Q | None:
     """The filter keeping the rows on which some role holding `permission` covers them.
 
-    None when no role that marks this kind of scope holds it: an OR over no
-    terms would be the empty `Q()`, which keeps every row.
+    A role holding it on a past edition too keeps every row it covers; one
+    holding it elsewhere only keeps the rows not past. None when no role that
+    marks this kind of scope holds it: an OR over no terms would be the empty
+    `Q()`, which keeps every row.
     """
-    terms = [Q(**{flag: True}) for role, flag in flags.items() if role in roles_with(permission)]
+    terms: list[Q] = []
+    for role, flag in flags.items():
+        if permission in _held_by(role, past=True):
+            terms.append(Q(**{flag: True}))
+        elif permission in _held_by(role, past=False):
+            terms.append(Q(**{flag: True, IS_PAST: False}))
     return reduce(or_, terms) if terms else None
 
 
@@ -158,22 +184,38 @@ def courses_for(user: Caller, permission: Permission) -> QuerySet[Course]:
 def permissions_on(user: Caller, scope: CourseEdition | DegreeProgramme) -> frozenset[Permission]:
     """What `user` holds on `scope`, a row read through `with_*_roles` for this same user.
 
-    The flags are read before anything else, so a row that was not marked
+    The marks are read before anything else, so a row that was not marked
     raises `AttributeError` instead of passing for a scope the user holds
-    nothing on.
+    nothing on. Each covering role adds what it holds there on its own, so
+    what one role does not hold on a past edition takes nothing from another.
     """
     if isinstance(scope, CourseEdition):
-        flags, scoped = _EDITION_FLAGS, EDITION_PERMISSIONS
+        flags, scoped, past = _EDITION_FLAGS, EDITION_PERMISSIONS, getattr(scope, IS_PAST)
     else:
-        flags, scoped = _PROGRAMME_FLAGS, PROGRAMME_PERMISSIONS
+        flags, scoped, past = _PROGRAMME_FLAGS, PROGRAMME_PERMISSIONS, False
     covering = [role for role, flag in flags.items() if getattr(scope, flag)]
     caller = _active(user)
     if caller is None:
         return frozenset()
     if caller.is_superuser:
         return scoped
-    held: frozenset[Permission] = frozenset().union(*(ROLE_PERMISSIONS[r] for r in covering))
+    held: frozenset[Permission] = frozenset().union(*(_held_by(r, past=past) for r in covering))
     return held & scoped
+
+
+def must_leave_a_teacher(user: Caller, edition: CourseEdition) -> bool:
+    """Whether `user`, removing a teacher row of `edition`, must leave it another.
+
+    A teacher must; secretariat staff, who assign the teachers of their
+    programme's editions, and the superuser need not
+    (docs/decisions.md, 2026-10-27, *A course's teachers staff its current and
+    later editions, and leave each of them a teacher*, point 2). Read from the
+    marks `with_edition_roles` put on `edition` for this same user, as
+    `permissions_on` reads them.
+    """
+    as_secretariat = getattr(edition, _EDITION_FLAGS[Role.SECRETARIAT])
+    caller = _active(user)
+    return caller is None or not (caller.is_superuser or as_secretariat)
 
 
 def held_on(user: Caller, scope: CourseEdition | DegreeProgramme) -> frozenset[Permission]:

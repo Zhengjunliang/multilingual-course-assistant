@@ -14,6 +14,12 @@ the one query each already runs. It compares an edition with every edition of
 its course, not only those the caller may see, so the answer is the same
 whoever asks. `today` is the caller's to give: the catalogue views pass
 `timezone.localdate()`, and a test the day it needs.
+
+An edition older than the current one is past: a later year of its course has
+started. `with_past()` marks it from the same comparison, so the current
+edition and those not started yet are never past, and a course with no current
+edition has no past one either. Its teacher rows record who taught that year,
+and its course's teachers no longer change them (apps/roles/scopes.py).
 """
 
 from __future__ import annotations
@@ -31,8 +37,9 @@ if TYPE_CHECKING:
 
     from django.db.models import QuerySet
 
-# The mark `with_current()` puts on an edition row.
+# The marks `with_current()` and `with_past()` put on an edition row.
 IS_CURRENT = "is_current"
+IS_PAST = "is_past"
 
 
 def _started(today: date) -> LessThanOrEqual:
@@ -46,6 +53,14 @@ def _started(today: date) -> LessThanOrEqual:
     return LessThanOrEqual(Coalesce("teaching_starts", fallback), Value(today))
 
 
+def _later_started(today: date) -> Exists:
+    """True for an edition of whose course a later academic year has started by `today`."""
+    later = CourseEdition.objects.filter(
+        _started(today), course=OuterRef("course"), academic_year__gt=OuterRef("academic_year")
+    )
+    return Exists(later)
+
+
 def with_current[E: CourseEdition](editions: QuerySet[E], today: date) -> QuerySet[E]:
     """`editions`, each marked with whether it is its course's current edition on `today`.
 
@@ -53,13 +68,18 @@ def with_current[E: CourseEdition](editions: QuerySet[E], today: date) -> QueryS
     year has started. The years of a course are unique, so two editions are
     never current together.
     """
-    later = CourseEdition.objects.filter(
-        _started(today), course=OuterRef("course"), academic_year__gt=OuterRef("academic_year")
-    )
     return editions.annotate(
         **{
             IS_CURRENT: ExpressionWrapper(
-                _started(today) & ~Exists(later), output_field=BooleanField()
+                _started(today) & ~_later_started(today), output_field=BooleanField()
             )
         }
     )
+
+
+def with_past[E: CourseEdition](editions: QuerySet[E], today: date) -> QuerySet[E]:
+    """`editions`, each marked with whether it is past on `today`.
+
+    Past: older than its course's current edition, since a later year has started.
+    """
+    return editions.annotate(**{IS_PAST: _later_started(today)})

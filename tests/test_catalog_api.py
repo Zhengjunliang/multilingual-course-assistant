@@ -12,6 +12,8 @@ refused.
 
 from __future__ import annotations
 
+import contextlib
+import threading
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -21,6 +23,7 @@ from rest_framework.test import APIClient
 from test_error_contract import refused
 from test_roles import everyone, label, world
 
+from apps.catalog import staff_views
 from apps.catalog.models import Course, CourseEdition, CurriculumEntry, DegreeProgramme
 from apps.roles.grants import revoke
 from apps.roles.models import RoleAssignment
@@ -38,9 +41,12 @@ pytestmark = pytest.mark.django_db
 EDITIONS_URL = "/api/catalog/editions"
 PROGRAMMES_URL = "/api/catalog/programmes"
 COURSES_URL = "/api/catalog/courses"
-OLD, NEW = "B028451:2024-2025", "B028451:2025-2026"  # PPM's editions; the old one is current
+# PPM's editions: the past one, the current one, and the next.
+PAST, OLD, NEW = "B028451:2023-2024", "B028451:2024-2025", "B028451:2025-2026"
 
-TEACHES = ["edition.edit_content", "edition.view"]
+TEACHES = ["edition.assign_teacher", "edition.edit_content", "edition.view"]
+# A past year: its teacher rows are not its course's teachers to change.
+TAUGHT = ["edition.edit_content", "edition.view"]
 RUNS_EDITION = ["edition.assign_teacher", "edition.edit_content", "edition.view"]
 
 
@@ -75,7 +81,8 @@ def test_each_caller_lists_their_own_scope() -> None:
         year_of_study=3,
         ad_code="B003712",
     )
-    reads = {label(e): f"{EDITIONS_URL}/{e.pk}" for e in (w.ppm_old, w.ppm_new, w.ia, w.shared)}
+    editions = (w.ppm_past, w.ppm_old, w.ppm_new, w.ia, w.shared)
+    reads = {label(e): f"{EDITIONS_URL}/{e.pk}" for e in editions}
     reads |= {p.code: f"{PROGRAMMES_URL}/{p.code}" for p in (w.b047, w.l031)}
 
     seen: dict[str, object] = {}
@@ -117,9 +124,11 @@ def test_each_caller_lists_their_own_scope() -> None:
             },
         )
 
-    ppm_old, ppm_new, ia, shared = OLD, NEW, "B003725:2025-2026", "B000001:2025-2026"
-    # PPM's new edition has not started yet; every other course has one edition, started.
-    current = {ppm_old: True, ppm_new: False, ia: True, shared: True}
+    ppm_past, ppm_old, ppm_new = PAST, OLD, NEW
+    ia, shared = "B003725:2025-2026", "B000001:2025-2026"
+    # PPM's new edition has not started yet, and its past one is older than the current;
+    # every other course has one edition, started.
+    current = {ppm_past: False, ppm_old: True, ppm_new: False, ia: True, shared: True}
 
     def marked(permissions: list[str], *editions: str) -> dict[str, tuple[list[str], bool]]:
         return {edition: (permissions, current[edition]) for edition in editions}
@@ -130,11 +139,11 @@ def test_each_caller_lists_their_own_scope() -> None:
     l031 = ([], 2, ["other_secretariat"])
     views, assigns = ["programme.view"], ["programme.assign_secretariat", "programme.view"]
     assert seen == {
-        "continuing": (marked(TEACHES, ppm_old, ppm_new), {}),
+        "continuing": (marked(TAUGHT, ppm_past) | marked(TEACHES, ppm_old, ppm_new), {}),
         # Assigned to the new year, a teacher holds the same on the old one.
-        "newcomer": (marked(TEACHES, ppm_old, ppm_new), {}),
+        "newcomer": (marked(TAUGHT, ppm_past) | marked(TEACHES, ppm_old, ppm_new), {}),
         "secretariat": (
-            marked(RUNS_EDITION, ppm_old, ppm_new, shared),
+            marked(RUNS_EDITION, ppm_past, ppm_old, ppm_new, shared),
             {"B047": (views, *b047)},
         ),
         "other_secretariat": (
@@ -142,12 +151,12 @@ def test_each_caller_lists_their_own_scope() -> None:
             {"L031": (views, *l031)},
         ),
         "dual": (
-            marked(TEACHES, ia) | marked(RUNS_EDITION, ppm_old, ppm_new, shared),
+            marked(TEACHES, ia) | marked(RUNS_EDITION, ppm_past, ppm_old, ppm_new, shared),
             {"B047": (views, *b047)},
         ),
         "student": ({}, {}),
         "root": (
-            marked(RUNS_EDITION, ppm_old, ppm_new, ia, shared),
+            marked(RUNS_EDITION, ppm_past, ppm_old, ppm_new, ia, shared),
             {"B047": (assigns, *b047), "L031": (assigns, *l031)},
         ),
         # A disabled account has no session, whatever it held.
@@ -157,6 +166,7 @@ def test_each_caller_lists_their_own_scope() -> None:
     assert unlike_the_list == {}
     # Whoever lists an edition sees the same teachers on it.
     assert teachers == {
+        ppm_past: {()},
         ppm_old: {("continuing",)},
         ppm_new: {("continuing", "newcomer")},
         ia: {("dual",)},
@@ -277,11 +287,11 @@ def test_the_edition_list_narrows_to_a_course() -> None:
     }
 
     assert seen == {
-        "secretariat, a course of their programme": [NEW, OLD],
+        "secretariat, a course of their programme": [NEW, OLD, PAST],
         "secretariat, a course of another programme": [],
         "superuser, an unknown code": [],
         "superuser, a NUL byte": [],
-        "teacher of the new year": [NEW, OLD],
+        "teacher of the new year": [NEW, OLD, PAST],
     }
 
 
@@ -308,9 +318,9 @@ def test_a_write_without_the_csrf_token_is_refused() -> None:
 @pytest.mark.parametrize(
     ("url", "caller", "rows"),
     [
-        pytest.param(EDITIONS_URL, "secretariat", (3, 6), id="editions"),
+        pytest.param(EDITIONS_URL, "secretariat", (4, 7), id="editions"),
         # A teacher's editions are found through the course, not through their rows alone.
-        pytest.param(EDITIONS_URL, "newcomer", (2, 4), id="editions-teacher"),
+        pytest.param(EDITIONS_URL, "newcomer", (3, 5), id="editions-teacher"),
         pytest.param(PROGRAMMES_URL, "secretariat", (1, 2), id="programmes"),
         pytest.param(f"{PROGRAMMES_URL}/B047/courses", "secretariat", (2, 3), id="study-plan"),
         # A course's rows are its entries.
@@ -334,7 +344,7 @@ def test_each_read_costs_the_same_for_more_rows(
     # More editions, and teachers on editions that had none; a second programme
     # this caller runs, with its staff and an entry for the shared course; and
     # a new course in two of B047's curricula, current and taught.
-    for year in ("2022-2023", "2023-2024"):
+    for year in ("2021-2022", "2022-2023"):
         edition = CourseEdition.objects.create(course=w.ppm_old.course, academic_year=year)
         RoleAssignment.objects.create(user=w.newcomer, role=Role.TEACHER, edition=edition)
     RoleAssignment.objects.create(user=w.student, role=Role.TEACHER, edition=w.shared)
@@ -410,6 +420,7 @@ def test_granting_and_revoking_staff(
         )
 
     new, b047, student = teachers(w.ppm_new), secretariat("B047"), {"username": "student"}
+    old, past = teachers(w.ppm_old), teachers(w.ppm_past)
     cases = {
         "secretariat grants a teacher": (w.secretariat, "post", new, student),
         "superuser grants a teacher": (w.root, "post", new, student),
@@ -417,12 +428,27 @@ def test_granting_and_revoking_staff(
         "secretariat revokes a teacher": (w.secretariat, "delete", f"{new}/newcomer", None),
         "superuser revokes a teacher": (w.root, "delete", f"{new}/newcomer", None),
         "superuser revokes secretariat staff": (w.root, "delete", f"{b047}/secretariat", None),
+        # A course's teachers staff its current year and the next, the one who
+        # added them and themselves included, as long as a teacher row is left.
+        "teacher grants a colleague": (w.continuing, "post", new, student),
+        "teacher revokes a colleague": (w.continuing, "delete", f"{new}/newcomer", None),
+        "teacher revokes themselves": (w.newcomer, "delete", f"{new}/newcomer", None),
+        # Secretariat staff keep a past year, and may leave an edition no teacher.
+        "secretariat grants on a past year": (w.secretariat, "post", past, student),
+        "secretariat revokes the last teacher": (
+            w.secretariat,
+            "delete",
+            f"{old}/continuing",
+            None,
+        ),
+        "superuser revokes the last teacher": (w.root, "delete", f"{old}/continuing", None),
     }
     with caplog.at_level("INFO", logger="apps.roles.grants"):
         seen = {case: rolled_back(lambda args=args: attempt(*args)) for case, args in cases.items()}
 
     teacher_row = "student · teacher · B028451:2025-2026"
     newcomer_row = "newcomer · teacher · B028451:2025-2026"
+    last_row = "continuing · teacher · B028451:2024-2025"
     assert seen == {
         "secretariat grants a teacher": (
             201,
@@ -460,6 +486,42 @@ def test_granting_and_revoking_staff(
             ["secretariat · secretariat · B047"],
             ["revoked secretariat on B047 from secretariat by root"],
         ),
+        "teacher grants a colleague": (
+            201,
+            [teacher_row],
+            [],
+            ["granted teacher on B028451:2025-2026 to student by continuing"],
+        ),
+        "teacher revokes a colleague": (
+            204,
+            [],
+            [newcomer_row],
+            ["revoked teacher on B028451:2025-2026 from newcomer by continuing"],
+        ),
+        "teacher revokes themselves": (
+            204,
+            [],
+            [newcomer_row],
+            ["revoked teacher on B028451:2025-2026 from newcomer by newcomer"],
+        ),
+        "secretariat grants on a past year": (
+            201,
+            ["student · teacher · B028451:2023-2024"],
+            [],
+            ["granted teacher on B028451:2023-2024 to student by secretariat"],
+        ),
+        "secretariat revokes the last teacher": (
+            204,
+            [],
+            [last_row],
+            ["revoked teacher on B028451:2024-2025 from continuing by secretariat"],
+        ),
+        "superuser revokes the last teacher": (
+            204,
+            [],
+            [last_row],
+            ["revoked teacher on B028451:2024-2025 from continuing by root"],
+        ),
     }
 
 
@@ -469,19 +531,20 @@ def test_staff_requests_that_change_nothing(
     w = world()
     rows = RoleAssignment.objects.count()
     new, ia, b047 = teachers(w.ppm_new), teachers(w.ia), secretariat("B047")
+    old, past = teachers(w.ppm_old), teachers(w.ppm_past)
     student, nobody = {"username": "student"}, {"username": "nobody"}
     requests = {
         # Assigning outside one's scope is a 404, inside it without the
-        # assign permission a 403; teachers assign nobody.
+        # assign permission a 403; a course's teachers assign nobody on a past year.
         "other programme's secretariat assigns in PPM": (w.other_secretariat, "post", new, student),
-        "teacher assigns a teacher": (w.continuing, "post", new, student),
+        "teacher assigns on a past year": (w.continuing, "post", past, student),
         "teacher assigns on another course": (w.newcomer, "post", ia, student),
         "student assigns": (w.student, "post", new, student),
         "anonymous assigns": (None, "post", new, student),
         # The scope first, then the permission, then the body: an unknown
         # username is told apart only to a caller who may assign here.
         "student names nobody": (w.student, "post", new, nobody),
-        "teacher names nobody": (w.continuing, "post", new, nobody),
+        "teacher names nobody on a past year": (w.continuing, "post", past, nobody),
         "secretariat names nobody": (w.secretariat, "post", new, nobody),
         "secretariat grants what is held": (w.secretariat, "post", new, {"username": "newcomer"}),
         # Only the superuser assigns secretariat staff.
@@ -499,7 +562,10 @@ def test_staff_requests_that_change_nothing(
             f"{new}/newcomer",
             None,
         ),
-        "teacher revokes": (w.continuing, "delete", f"{new}/newcomer", None),
+        "teacher revokes on a past year": (w.continuing, "delete", f"{past}/newcomer", None),
+        # An edition's last teacher row stays, whoever of its teachers it is.
+        "teacher revokes themselves, the last": (w.continuing, "delete", f"{old}/continuing", None),
+        "teacher revokes the last colleague": (w.newcomer, "delete", f"{old}/continuing", None),
         "secretariat revokes a non-member": (w.secretariat, "delete", f"{new}/student", None),
         "secretariat revokes their own row": (w.secretariat, "delete", f"{b047}/secretariat", None),
         "other programme's secretariat revokes secretariat": (
@@ -537,12 +603,12 @@ def test_staff_requests_that_change_nothing(
 
     assert seen == {
         "other programme's secretariat assigns in PPM": (404, "NOT_FOUND"),
-        "teacher assigns a teacher": (403, "PERMISSION_DENIED"),
+        "teacher assigns on a past year": (403, "PERMISSION_DENIED"),
         "teacher assigns on another course": (404, "NOT_FOUND"),
         "student assigns": (404, "NOT_FOUND"),
         "anonymous assigns": (401, "UNAUTHENTICATED"),
         "student names nobody": (404, "NOT_FOUND"),
-        "teacher names nobody": (403, "PERMISSION_DENIED"),
+        "teacher names nobody on a past year": (403, "PERMISSION_DENIED"),
         # A name no account has is the field's; a role held already is no field's.
         "secretariat names nobody": (400, ("INVALID_ARGUMENT", {"username": ["NO_SUCH_USER"]})),
         "secretariat grants what is held": (409, "ROLE_ALREADY_HELD"),
@@ -550,7 +616,9 @@ def test_staff_requests_that_change_nothing(
         "teacher assigns secretariat": (404, "NOT_FOUND"),
         "other programme's secretariat assigns secretariat": (404, "NOT_FOUND"),
         "other programme's secretariat revokes": (404, "NOT_FOUND"),
-        "teacher revokes": (403, "PERMISSION_DENIED"),
+        "teacher revokes on a past year": (403, "PERMISSION_DENIED"),
+        "teacher revokes themselves, the last": (409, "LAST_TEACHER"),
+        "teacher revokes the last colleague": (409, "LAST_TEACHER"),
         "secretariat revokes a non-member": (404, "NOT_FOUND"),
         "secretariat revokes their own row": (403, "PERMISSION_DENIED"),
         "other programme's secretariat revokes secretariat": (404, "NOT_FOUND"),
@@ -628,3 +696,41 @@ def test_a_revocation_is_logged_once(
     assert grant_lines(caplog) == [
         "revoked teacher on B028451:2025-2026 from newcomer by secretariat"
     ]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_teachers_removing_each_other_at_once_leave_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each in a thread, on a connection, of its own. Past the count each waits
+    half a second for the other, which only the edition's lock keeps from
+    getting there: without it, both would count two and remove both rows."""
+    w = world()
+    meet = threading.Barrier(2, timeout=0.5)
+
+    def revoke_once_both_arrive(*args: object) -> bool:
+        with contextlib.suppress(threading.BrokenBarrierError):
+            meet.wait()
+        return revoke(*args)  # pyright: ignore[reportArgumentType]
+
+    monkeypatch.setattr(staff_views, "revoke", revoke_once_both_arrive)
+    statuses: list[int] = []
+
+    def remove(user: User, colleague: str) -> None:
+        try:
+            response = as_user(user).delete(f"{teachers(w.ppm_new)}/{colleague}")
+            statuses.append(response.status_code)
+        finally:
+            connection.close()
+
+    threads = [
+        threading.Thread(target=remove, args=(w.continuing, "newcomer")),
+        threading.Thread(target=remove, args=(w.newcomer, "continuing")),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(statuses) == [204, 409]
+    assert RoleAssignment.objects.filter(edition=w.ppm_new).count() == 1

@@ -195,6 +195,7 @@
     "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
     "ROLE_ALREADY_HELD": "This user already holds this role here.",
+    "LAST_TEACHER": "This is the edition's last teacher: assign another first, or ask the teaching secretariat.",
     "SELF_NOT_ALLOWED": "Not on your own account: another administrator can do it.",
     "ACCOUNT_STILL_ACTIVE": "Deactivate the account before deleting it.",
     "ROLES_HELD": "You hold a staff role: ask for it to be revoked before deleting your account.",
