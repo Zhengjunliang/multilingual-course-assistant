@@ -26,6 +26,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.catalog.models import Course
+from apps.qa import inflight
 from apps.qa.conversations import ConversationGoneError
 from apps.qa.models import Conversation, Message
 from apps.qa.serializers import (
@@ -202,3 +203,9 @@ class ConversationDetailView(RetrieveDestroyAPIView):
             locked = Conversation.objects.select_for_update().filter(pk=instance.pk).first()
             if locked is not None:
                 locked.delete()
+        # An answer still being written into it stops with it, as the sidebar's
+        # confirmation says: a worker writing on would hold a place under the
+        # cap for rows that are gone (apps/qa/inflight.py).
+        answering = inflight.answering(instance.pk)
+        if answering is not None:
+            inflight.stop(answering)
