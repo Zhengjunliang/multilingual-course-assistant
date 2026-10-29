@@ -73,6 +73,7 @@ export default function EditionPage() {
       />
     ),
     reload: edition.reload,
+    gone: isNotFound(edition.error),
   });
   const invitations = useInvitations({
     scope,

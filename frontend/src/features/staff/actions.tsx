@@ -9,9 +9,10 @@
  * course's teachers, unless the edition is past (apps/roles/scopes.py).
  *
  * A reader may revoke their own role. That changes the account, so the session
- * is read again, and when the page is no longer theirs to read they go to
- * `/staff`, which lands them where their roles now start, as GitLab sends a
- * member who leaves a project back to their projects.
+ * is read again, and when the page is no longer theirs to read, a 404, they go
+ * to `/staff`, which lands them where their roles now start, as GitLab sends a
+ * member who leaves a project back to their projects. A read that fails
+ * otherwise leaves them on the page, which says why and offers to read again.
  *
  * Focus goes back to the button that opened the dialog. Radix returns it only
  * to its own `Trigger`, which a dialog opened from state does not have, so
@@ -22,7 +23,7 @@
  */
 
 import { UserPlus } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -65,6 +66,8 @@ interface MembersOptions {
   /** The revoke question's body for `person`, its objects as chips. */
   sentence: (person: StaffMember) => ReactNode;
   reload: () => Promise<boolean>;
+  /** Whether the page's last read was a 404: its object is outside the reader's scope. */
+  gone: boolean;
 }
 
 interface Members {
@@ -83,6 +86,7 @@ export function useMembers({
   canManage,
   sentence,
   reload,
+  gone,
 }: MembersOptions): Members {
   const { t } = useTranslation();
   const { account, recheck } = useSession();
@@ -92,6 +96,13 @@ export function useMembers({
   // Read when the dialog has closed and its state is gone.
   const last = useRef<{ trigger?: HTMLElement; index: number }>({ index: 0 });
   const assignedFrom = useRef<HTMLElement>(undefined);
+  // The scope whose page the reader could not read after revoking their own
+  // role on it, so its 404, now or on a retry, sends them on.
+  const [left, setLeft] = useState<MemberScope | null>(null);
+
+  useEffect(() => {
+    if (gone && left === scope) navigate("/staff", { replace: true });
+  }, [gone, left, scope, navigate]);
 
   const assign = canManage ? (
     <Button
@@ -152,7 +163,7 @@ export function useMembers({
           if (revoking?.username !== account?.username) return reload();
           await recheck();
           const readable = await reload();
-          if (!readable) navigate("/staff", { replace: true });
+          if (!readable) setLeft(scope);
           return readable;
         }}
         onCloseAutoFocus={returnFocus(
