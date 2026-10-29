@@ -26,12 +26,21 @@ import { SCREENS, type Screen, visit } from "./screens";
 const WCAG_22_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 /**
- * What axe finds on the page as it stands, one line per rule: every violation,
- * and every contrast it could not measure. axe leaves a contrast unmeasured,
- * as `incomplete` rather than as a violation, wherever text sits over a
- * background image or a gradient (axe-core's `bgImage` and `bgGradient`), so a
- * check that read violations alone would pass a screen whose contrast it never
- * saw.
+ * What axe finds on the page once it has settled, one line per rule: every
+ * violation, and every contrast it could not measure.
+ *
+ * Settled, since axe blends a colour with what lies under a translucent
+ * ancestor. A conversation fades in (`arrive`, index.css) once its turns are
+ * read, and the fade outlasts every wait of `visit`: `toBeVisible` ignores
+ * opacity and `networkidle` ignores animations. Halfway through it the sources
+ * count measured 4.34:1, where it settles at 5.70:1 (#228). So every animation
+ * and transition with an end runs to it first; one that never ends, a
+ * spinner's, is measured as it stands.
+ *
+ * axe leaves a contrast unmeasured, as `incomplete` rather than as a
+ * violation, wherever text sits over a background image or a gradient
+ * (axe-core's `bgImage` and `bgGradient`), so a check that read violations
+ * alone would pass a screen whose contrast it never saw.
  *
  * The grain over the ground (index.css) is such an image, on every screen, so
  * it is taken away first and the contrast is measured on the bare ground;
@@ -52,6 +61,14 @@ const WCAG_22_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
  * text another element covers stays covered there, and is reported.
  */
 async function violations(page: Page): Promise<string[]> {
+  await page.evaluate(() =>
+    Promise.allSettled(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+        .map((animation) => animation.finished),
+    ),
+  );
   await page.addStyleTag({ content: ":root, [data-theme] { --grain: none !important; }" });
   const { violations, incomplete } = await new AxeBuilder({ page }).withTags(WCAG_22_AA).analyze();
   const found = violations.map(
