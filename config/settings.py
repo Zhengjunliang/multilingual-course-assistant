@@ -312,9 +312,13 @@ CELERY_BROKER_URL = env.celery_broker_url
 CELERY_TASK_DEFAULT_QUEUE = "default"
 
 # Celery's own advice for long tasks (the Optimizing guide): acknowledged
-# once done, so a worker that dies mid-task leaves it to be delivered again,
-# and fetched one at a time, so a worker never holds a second task while a
-# free one waits. Each task must therefore survive running twice.
+# once done, so a task whose worker goes down with it (the machine, or the
+# worker's main process) is delivered again once the visibility timeout below
+# passes, and fetched one at a time, so a worker never holds a second task
+# while a free one waits. Each task must therefore survive running twice. A
+# pool process killed under a task is acknowledged all the same: requeuing
+# it is task_reject_on_worker_lost, left off, since a task that kills its
+# process would then run again and again.
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
