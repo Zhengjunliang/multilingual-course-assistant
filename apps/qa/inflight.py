@@ -2,7 +2,7 @@
 
 A question is answered on a Celery worker (apps/qa/tasks.py) while the web
 process that took it relays the events to the browser (apps/qa/views.py).
-The two meet here, in six kinds of key under `QA_KEY_PREFIX`
+The two meet here, in seven kinds of key under `QA_KEY_PREFIX`
 (config/settings.py), each named by the answer's id:
 
 - `<prefix>:admitted`, a sorted set: one member per answer admitted and not
@@ -13,6 +13,7 @@ The two meet here, in six kinds of key under `QA_KEY_PREFIX`
   apps/qa/contract.py). The first entry also carries `owner`: the asking
   account's id, or empty for an anonymous question.
 - `<prefix>:stop:<id>`, present once someone asked the answer to stop.
+- `<prefix>:taken:<id>`, present once a worker took the question.
 - `<prefix>:conversation:<id>`, the answer a conversation is waiting for,
   so that a page reloaded mid-answer finds it.
 - `<prefix>:readers:<id>`, a list: the connections reading the answer,
@@ -112,9 +113,10 @@ return 1
 """
 )
 
-# KEYS: admitted, stop. ARGV: id, lease. `XX`, because a member the cap has
-# already reclaimed must stay out: added back, it would overfill the cap while
-# its reader has already been told the answer died.
+# KEYS: admitted, stop[, taken]. ARGV: id, lease[, ttl]. `XX`, because a
+# member the cap has already reclaimed must stay out: added back, it would
+# overfill the cap while its reader has already been told the answer died.
+# With `taken`, the worker's first renewal marks the question as taken.
 _RENEW = (
     _NOW
     + """
@@ -123,6 +125,9 @@ if not score or tonumber(score) <= now then
   return 'lost'
 end
 redis.call('ZADD', KEYS[1], 'XX', now + tonumber(ARGV[2]), ARGV[1])
+if KEYS[3] then
+  redis.call('SET', KEYS[3], 1, 'EX', ARGV[3])
+end
 if redis.call('EXISTS', KEYS[2]) == 1 then
   return 'stopped'
 end
@@ -148,10 +153,10 @@ end
 return 1
 """
 
-# KEYS: admitted, stream. ARGV: id, the last entry id read. New entries first,
-# so a writer that finished between the read and this probe is read, not
-# mourned. A lease gone from a stream that holds only `admit`'s first entry
-# is a question no worker began.
+# KEYS: admitted, stream, taken. ARGV: id, the last entry id read. New
+# entries first, so a writer that finished between the read and this probe is
+# read, not mourned. A lease gone from a question no worker took, whose stream
+# holds `admit`'s first entry alone, is a question that waited too long.
 _PROBE = (
     _NOW
     + """
@@ -163,7 +168,7 @@ if #redis.call('XRANGE', KEYS[2], '(' .. ARGV[2], '+', 'COUNT', 1) > 0 then
 end
 local score = redis.call('ZSCORE', KEYS[1], ARGV[1])
 if not score or tonumber(score) <= now then
-  if redis.call('XLEN', KEYS[2]) == 1 then
+  if redis.call('EXISTS', KEYS[3]) == 0 and redis.call('XLEN', KEYS[2]) == 1 then
     return 'untaken'
   end
   return 'dead'
@@ -268,6 +273,10 @@ def _waiting(conversation_id: UUID) -> str:
     return _key("conversation", conversation_id)
 
 
+def _taken(answer_id: UUID) -> str:
+    return _key("taken", answer_id)
+
+
 def _readers(answer_id: UUID) -> str:
     return _key("readers", answer_id)
 
@@ -315,6 +324,19 @@ def renew(answer_id: UUID) -> Renewal:
         "Renewal",
         connection().renew(
             keys=[_admitted(), _stop(answer_id)], args=[str(answer_id), RUNNING_LEASE_SECONDS]
+        ),
+    )
+
+
+def take(answer_id: UUID) -> Renewal:
+    """A worker's first renewal, which also marks the question as taken: from
+    then on a lease that runs out is a dead writer, not a question that waited
+    too long (`probe`). The mark lives as long as a stream no event follows."""
+    return cast(
+        "Renewal",
+        connection().renew(
+            keys=[_admitted(), _stop(answer_id), _taken(answer_id)],
+            args=[str(answer_id), RUNNING_LEASE_SECONDS, QUEUED_LEASE_SECONDS + KEPT_SECONDS],
         ),
     )
 
@@ -407,13 +429,16 @@ def read(
 
 def probe(answer_id: UUID, after: str) -> Probe:
     """After a read came back empty: `more` if events arrived since, `alive`
-    if the writer still holds its lease, `dead` if it lost it after it began,
-    `untaken` if before any worker wrote (a question that waited for one
-    longer than its lease, or whose worker died before its first event),
-    `gone` if the stream itself has expired."""
+    if the writer still holds its lease, `dead` if it lost it once a worker
+    took the question, `untaken` if before (a question that waited for a
+    worker longer than its lease, a busy site's or one where no worker
+    consumes `qa`), `gone` if the stream itself has expired."""
     return cast(
         "Probe",
-        connection().probe(keys=[_admitted(), _stream(answer_id)], args=[str(answer_id), after]),
+        connection().probe(
+            keys=[_admitted(), _stream(answer_id), _taken(answer_id)],
+            args=[str(answer_id), after],
+        ),
     )
 
 

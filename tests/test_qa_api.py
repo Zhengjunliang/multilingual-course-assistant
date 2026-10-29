@@ -70,7 +70,6 @@ from apps.accounts.models import User
 from apps.qa import engine as engine_module
 from apps.qa import inflight, tasks
 from apps.qa import views as views_module
-from apps.qa.contract import TokenEvent
 from apps.qa.conversations import thread
 from apps.qa.engine import LLM_DOWN, Engine, EngineUnavailableError
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
@@ -363,6 +362,13 @@ def ask_the_view(question: str = "What is an ORM?", *, anonymous: bool = False):
 def chunks(response: Any) -> Iterator[bytes]:
     """The body one chunk at a time, for a test that reads it in steps."""
     return iter(response.streaming_content)
+
+
+def read_the_view_again(answer_id: uuid.UUID):
+    """The events view's own response, as `ask_the_view` gives the ask view's."""
+    request = APIRequestFactory().get(f"/api/answers/{answer_id}/events")
+    force_authenticate(request, user=student())
+    return views_module.AnswerEventsView.as_view()(request, pk=answer_id)
 
 
 def read_one(response: Any) -> str:
@@ -1057,8 +1063,9 @@ def test_a_relay_whose_writer_is_gone_ends_in_an_outage(
     caplog: pytest.LogCaptureFixture,
     why: str,
 ) -> None:
-    """A worker that died after it began holds no lease, and one that holds it
-    past the longest an answer may take writes nothing worth waiting for:
+    """A worker that died after it took the question holds no lease, and one
+    that holds it past the longest an answer may take writes nothing worth
+    waiting for:
     either way the reader is told the service is down, instead of being held
     open with keepalives for ever. The waits are shortened, not waited out."""
     monkeypatch.setattr(inflight, "read", functools.partial(inflight.read, block=0.05))
@@ -1066,15 +1073,15 @@ def test_a_relay_whose_writer_is_gone_ends_in_an_outage(
         monkeypatch.setattr(views_module, "RELAY_LIMIT_SECONDS", 0)
     response = ask()
     [job] = held
-    # The worker began; a question no worker began is the next test's.
-    inflight.emit(job.answer_id, TokenEvent(text="An "))
+    # A worker took it; a question no worker took is the next test's.
+    inflight.take(job.answer_id)
     if why == "dead":
         expire(job.answer_id)
 
     with caplog.at_level(logging.ERROR, logger="apps.qa.views"):
         stream = frames(response)
 
-    assert [name for _, name, _ in stream] == ["queued", "token", "error"]
+    assert [name for _, name, _ in stream] == ["queued", "error"]
     assert stream[-1][0] is None
     assert stream[-1][2]["error"]["code"] == "ENGINE_DOWN"
     assert caplog.messages == [
@@ -1084,11 +1091,12 @@ def test_a_relay_whose_writer_is_gone_ends_in_an_outage(
     ]
 
 
-def test_a_question_no_worker_began_in_time_is_told_the_site_is_busy(
+def test_a_question_no_worker_took_in_time_is_told_the_site_is_busy(
     held: list[AnswerJob], monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """A lease that ran out before any worker wrote is, most often, a queue
-    longer than the lease: a site busy with other answers, not a broken one.
+    """A lease that ran out before any worker took the question is, most often,
+    a queue longer than the lease: a site busy with other answers, not a broken
+    one.
     The reader is told to retry, as a full cap tells them, and nothing is
     logged as an error."""
     monkeypatch.setattr(inflight, "read", functools.partial(inflight.read, block=0.05))
@@ -1208,6 +1216,26 @@ def test_a_third_reader_of_an_answer_ends_the_first(
     assert b"event: end" in b"".join(reload)
 
 
+def test_reloads_that_came_and_went_leave_the_asking_page_reading(
+    index: QdrantClient, held: list[AnswerJob], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A connection that closes gives its place among the readers back, so the
+    page that asked reads on past any number of reloads that came and went."""
+    monkeypatch.setattr(inflight, "read", functools.partial(inflight.read, block=0.05))
+    install_engine(index, SLIDES_ROUTE, ["An ORM ", "maps objects."])
+    asking = chunks(ask())
+    next(asking)
+    [job] = held
+    for _ in range(2):
+        reload = read_the_view_again(job.answer_id)
+        read_one(reload)
+        finish(reload)
+
+    answer(job)
+
+    assert b"event: end" in b"".join(asking)
+
+
 def test_a_last_event_id_that_names_no_event_is_malformed(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
     answer_id = queued_of(events(ask()))["answer_id"]
@@ -1287,6 +1315,35 @@ def test_a_stop_outlasts_a_router_slower_than_the_lease(
     assert names(events(response)) == ["queued", "stopped"]
     assert not Message.objects.exists()
     assert admitted() == set()
+
+
+def test_an_answer_stuck_before_it_began_gives_its_place_back_after_its_time_limit(
+    index: QdrantClient, held: list[AnswerJob], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The task checks its own time limit between two events, which an answer
+    stuck before its first one never reaches: a retrieval that hangs, or a
+    build. The heartbeat stops renewing at the limit, so the lease runs out and
+    the place comes back, stopped or not, and the answer ends as an outage if
+    it ever comes unstuck. The limit, the lease and the heartbeat are
+    shortened, and the router outlasts them."""
+    monkeypatch.setattr(tasks, "TIME_LIMIT_SECONDS", 0.1)
+    monkeypatch.setattr(inflight, "RUNNING_LEASE_SECONDS", 0.2)
+    monkeypatch.setattr(tasks, "HEARTBEAT_SECONDS", 0.01)
+
+    class StuckRouter:
+        def complete(self, messages: Sequence[ChatMessage]) -> str:
+            time.sleep(0.6)
+            return SLIDES_ROUTE
+
+    engine = install_engine(index, SLIDES_ROUTE)
+    engine_module._HOLDER.engine = dataclasses.replace(engine, completer=StuckRouter())
+    response = ask()
+    answer(held[0])
+
+    stream = events(response)
+    assert names(stream) == ["queued", "error"]
+    assert error_of(stream)["code"] == "ENGINE_DOWN"
+    assert not Message.objects.exists()
 
 
 def test_a_visitor_stops_their_own_answer_by_its_id(

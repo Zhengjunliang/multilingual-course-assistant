@@ -98,8 +98,9 @@ export type StoppedEvent = Record<string, never>;
 
 /**
  * The answer failed after the response had already started: `ENGINE_DOWN` for
- * a service that is down, `CONVERSATION_GONE` for a conversation deleted while
- * its question waited, `INTERNAL` for a defect.
+ * a service that is down, `UNAVAILABLE` for a question no worker took before
+ * its lease ran out, `CONVERSATION_GONE` for a conversation deleted while its
+ * question waited, `INTERNAL` for a defect.
  */
 export interface ErrorEvent {
   error: ErrorBody;

@@ -198,7 +198,7 @@ SPEC: dict[ErrorCode, Spec] = {
         "Too many requests; retry in {retry_after_seconds} seconds.",
     ),
     # As many questions are in flight as the site takes (QA_MAX_IN_FLIGHT): the
-    # page retries by itself. Inside a stream, a question no worker began before
+    # page retries by itself. Inside a stream, a question no worker took before
     # its lease ran out (apps/qa/views.py), which the page does not retry.
     ErrorCode.UNAVAILABLE: Spec(
         HTTPStatus.SERVICE_UNAVAILABLE,

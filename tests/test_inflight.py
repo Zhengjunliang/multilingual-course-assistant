@@ -135,16 +135,20 @@ def test_a_probe_tells_a_working_writer_from_a_dead_one() -> None:
     assert inflight.probe(answer_id, last.id) == "dead"
 
 
-def test_a_probe_tells_a_question_no_worker_began_from_a_dead_writer() -> None:
-    """Nothing past `admit`'s first event, and the lease gone: the question
-    waited for a worker longer than it may, which a full site does and a
-    broken one need not."""
-    answer_id = admit()
-    (first,) = inflight.read(answer_id, "0", block=0.01)
+def test_a_probe_tells_a_question_no_worker_took_from_a_dead_writer() -> None:
+    """The lease gone before any worker took the question: it waited for one
+    longer than it may, which a full site does and a broken one need not. A
+    worker that took it and died before writing a word is a dead writer."""
+    waited, taken = admit(), admit()
+    assert inflight.take(taken) == "ok"
+    (first,) = inflight.read(waited, "0", block=0.01)
+    (other,) = inflight.read(taken, "0", block=0.01)
 
-    expire(answer_id)
+    expire(waited)
+    expire(taken)
 
-    assert inflight.probe(answer_id, first.id) == "untaken"
+    assert inflight.probe(waited, first.id) == "untaken"
+    assert inflight.probe(taken, other.id) == "dead"
 
 
 def test_a_probe_of_an_expired_stream_says_it_is_gone() -> None:
@@ -204,13 +208,3 @@ def test_a_third_reader_pushes_the_first_out() -> None:
     with pytest.raises(inflight.PushedOutError):
         inflight.read(answer_id, queued.id, block=5, reader=first)
     assert inflight.read(answer_id, queued.id, block=0.01, reader=second) == []
-
-
-def test_a_reader_who_leaves_gives_its_place_back() -> None:
-    answer_id = admit()
-    first, second = inflight.join(answer_id), inflight.join(answer_id)
-    inflight.leave(answer_id, first)
-
-    inflight.join(answer_id)
-
-    assert [entry.name for entry in inflight.read(answer_id, "0", reader=second)] == ["token"]

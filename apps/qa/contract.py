@@ -239,7 +239,7 @@ class ErrorEvent(Event):
     By then there is no status code left to send, so this stands in for the one
     the same failure would have produced before the stream opened, and carries
     the body it would have: `ENGINE_DOWN` for a service that is down,
-    `UNAVAILABLE` for a question no worker began before its lease ran out,
+    `UNAVAILABLE` for a question no worker took before its lease ran out,
     `CONVERSATION_GONE` for a conversation deleted while its question waited,
     `INTERNAL` for a defect, under the id of the request that asked
     (config/errors.py).

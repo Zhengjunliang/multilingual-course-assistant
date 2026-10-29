@@ -101,7 +101,7 @@ def answer_question(payload: dict[str, object]) -> None:
     """Answer one question: the engine's events into the answer's stream."""
     job = AnswerJob.model_validate(payload)
     with serving(job.request_id):
-        verdict = inflight.renew(job.answer_id)
+        verdict = inflight.take(job.answer_id)
         if verdict == "lost":
             # Its reader has been told it died (apps/qa/views.py).
             logger.warning("answer %s was taken after its lease ran out", job.answer_id)
@@ -128,10 +128,15 @@ class _Heartbeat:
     may be one of those stretches away, and its lease has to last until then:
     a lease run out meanwhile would hand its place to another question while
     this one still runs, and end it as an outage rather than as stopped.
+
+    The answer's time limit does. The task checks it between two events,
+    which an answer stuck before its first one never reaches: past it the
+    renewals end, and the lease with them half a minute later, stopped or not.
     """
 
     def __init__(self, answer_id: UUID) -> None:
         self._answer_id = answer_id
+        self.deadline = time.monotonic() + TIME_LIMIT_SECONDS
         self._done = threading.Event()
         self.verdict: inflight.Renewal = "ok"
         # In a copy of the task's context, so its log lines carry the request's id.
@@ -153,6 +158,8 @@ class _Heartbeat:
 
     def _run(self) -> None:
         while not self._done.wait(HEARTBEAT_SECONDS):
+            if time.monotonic() > self.deadline:
+                return
             try:
                 verdict = inflight.renew(self._answer_id)
             except RedisError:
@@ -180,7 +187,6 @@ def _generate(job: AnswerJob, heartbeat: _Heartbeat) -> Event:
     Closing the engine's generator, on every way out, is what stops pulling
     tokens from a model nobody is listening to any more.
     """
-    deadline = time.monotonic() + TIME_LIMIT_SECONDS
     parts: list[str] = []
     stored = False
     complete = False
@@ -205,7 +211,7 @@ def _generate(job: AnswerJob, heartbeat: _Heartbeat) -> Event:
             for event in events:
                 if heartbeat.verdict != "ok":
                     return _halted(job, heartbeat.verdict)
-                if time.monotonic() > deadline:
+                if time.monotonic() > heartbeat.deadline:
                     logger.error("answer %s passed its time limit", job.answer_id)
                     return _failure(ErrorCode.ENGINE_DOWN)
                 if isinstance(event, EndEvent):
