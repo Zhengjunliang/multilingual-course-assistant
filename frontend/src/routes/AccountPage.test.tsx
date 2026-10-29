@@ -227,6 +227,7 @@ afterEach(() => {
 describe("the account's page shows", () => {
   it.each([
     {
+      who: "staff of two scopes",
       reader: account(false, [
         { role: "secretariat", programme: "B047" },
         { role: "teacher", edition: 5 },
@@ -236,20 +237,29 @@ describe("the account's page shows", () => {
         ["Docente PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026", "/staff/editions/5"],
       ],
     },
-    { reader: account(true, []), roles: [["Amministratore", null]] },
-    { reader: STUDENT, roles: [["Studente", null]] },
-  ])("each role by its scope's name: $roles.0.0", async ({ reader, roles }) => {
+    {
+      who: "a superuser who teaches",
+      reader: account(true, [{ role: "teacher", edition: 5 }]),
+      roles: [
+        ["Amministratore", null],
+        ["Docente PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026", "/staff/editions/5"],
+      ],
+    },
+    // The head's one word says it all, and no section repeats it.
+    { who: "a superuser alone", reader: account(true, []), roles: null },
+    { who: "a student", reader: STUDENT, roles: null },
+  ])("for $who, each role held on a scope by the scope's name", async ({ reader, roles }) => {
     const { container, unmount } = await page(reader);
     const section = [...container.querySelectorAll("section")].find(
       (candidate) => candidate.querySelector("h2")?.textContent === i18n.t("account.roles"),
     );
-    const listed = [...(section?.querySelectorAll("li") ?? [])];
-    // A role with no scope is the word alone, the section's last element.
-    const items = listed.length > 0 ? listed : [section?.lastElementChild];
-    const shown = items.map((item) => [
-      [...(item?.childNodes ?? [])].map((part) => part.textContent).join(" "),
-      item?.querySelector("a")?.getAttribute("href") ?? null,
-    ]);
+    const shown =
+      section === undefined
+        ? null
+        : [...section.querySelectorAll("li")].map((item) => [
+            [...item.childNodes].map((part) => part.textContent).join(" "),
+            item.querySelector("a")?.getAttribute("href") ?? null,
+          ]);
     unmount();
 
     expect(shown).toEqual(roles);

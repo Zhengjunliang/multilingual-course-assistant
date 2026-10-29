@@ -7,9 +7,11 @@
  * tint (outside the repository).
  *
  * The page's head is the account itself, its avatar, its name and its widest
- * role, as the menu's head shows it. A role names its scope by the scope's
- * own name, read from what the shell holds (the programmes) and from the
- * edition list (the editions), and leads to its page. Each section is its
+ * role, as the menu's head shows it. The roles section lists what the account
+ * holds on a scope, so a student's page and a superuser's that holds nothing
+ * else have none: the head's word says it all. A role names its scope by the
+ * scope's own name, read from what the shell holds (the programmes) and from
+ * the edition list (the editions), and leads to its page. Each section is its
  * heading and its controls (DESIGN.md, Do's and Don'ts); the only captions
  * are the password's rules and what deleting takes with it.
  *
@@ -83,9 +85,11 @@ export default function AccountPage() {
         />
       </Section>
 
-      <Section heading={t("account.roles")}>
-        <Roles account={account} />
-      </Section>
+      {account.roles.length > 0 && (
+        <Section heading={t("account.roles")}>
+          <Roles account={account} />
+        </Section>
+      )}
 
       <Section heading={t("account.password.title")}>
         <PasswordChange username={account.username} onChanged={() => void sessions.reload()} />
@@ -121,8 +125,8 @@ export default function AccountPage() {
 }
 
 /**
- * The roles the account holds, each naming its scope and leading to its
- * page; the superuser's and a student's are a word alone.
+ * The roles the account holds on a scope, each naming it and leading to its
+ * page, after the superuser's.
  */
 function Roles({ account }: { account: Account }) {
   const { t } = useTranslation();
@@ -150,12 +154,6 @@ function Roles({ account }: { account: Account }) {
     };
   });
 
-  if (rows.length === 0)
-    return (
-      <Chip className="self-start" tone={account.is_superuser ? "accent" : "neutral"}>
-        {t(account.is_superuser ? "account.role.admin" : "account.role.student")}
-      </Chip>
-    );
   return (
     <ul className="flex flex-col gap-tight">
       {account.is_superuser && (
