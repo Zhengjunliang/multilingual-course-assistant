@@ -67,7 +67,7 @@ uv sync
 npm ci --prefix frontend
 npm run build --prefix frontend
 cp .env.example .env               # set DJANGO_SECRET_KEY (the file has the command) and a DJANGO_DB_PASSWORD of your choice
-docker compose up -d --wait        # PostgreSQL and Qdrant, healthy
+docker compose up -d --wait        # PostgreSQL, Qdrant and Redis, healthy
 uv run python manage.py migrate
 uv run python manage.py createsuperuser
 uv run python manage.py runserver  # http://127.0.0.1:8000/
