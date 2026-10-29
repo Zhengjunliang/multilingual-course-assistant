@@ -18,7 +18,7 @@ Ask about a university course or about the campus in any language, and the answe
 
 **Students** sign in, or register, to ask about their courses as well; their conversations stay in the sidebar.
 
-**Staff** work from the *Management* group in the sidebar: a degree programme's teaching secretariat assigns teachers to course editions, and teachers and secretariat edit an edition's syllabus and reading list.
+**Staff** work from the *Management* group in the sidebar: a degree programme's teaching secretariat assigns teachers to course editions, a course's teachers add their colleagues to its current and later editions, and teachers and secretariat edit an edition's syllabus and reading list.
 
 **Reading an answer:**
 
