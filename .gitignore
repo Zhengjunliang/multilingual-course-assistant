@@ -15,6 +15,9 @@ env/
 .ruff_cache/
 .coverage
 htmlcov/
+# Celery beat's record of when each task last ran, written where beat starts;
+# on Windows the shelve is several files (.bak, .dat, .dir)
+celerybeat-schedule*
 
 # Node
 node_modules/
