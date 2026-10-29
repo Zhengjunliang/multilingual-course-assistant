@@ -39,7 +39,7 @@ data/webcorpus/
 
 A registry row (`RegistryEntry` in `rag/crawl.py`): `url · content_hash · fetch_date · ingest_run_id · ingest_source ("crawl" | "live") · trigger · referrer_url · section · outlinks[]` (anchor text and URL). The last row for a URL wins. The ledger has three duties: the **outlink graph** (candidates for growth), the **incremental check** (a page is parsed and indexed again only when its `content_hash` changes) and **rollback grouping** (a run is rolled back by deleting the points of its `ingest_run_id` from Qdrant by payload filter, `delete_by_run()` in `rag/index.py`; the registry names the runs).
 
-- Concurrency: one process writes; readers skip a corrupt row with a warning. Concurrent writers come with the Celery worker, 🔜 M5 `#34`.
+- Concurrency: one process writes; readers skip a corrupt row with a warning. Concurrent writers come with questions answered on the Celery worker, several at once, 🔜 M5 `#230`.
 - Rolling back a live write keeps the earlier crawl version of the same URL: the index returns to the snapshot.
 - Storage: `data/` (gitignored), with the corpus's risk posture.
 
