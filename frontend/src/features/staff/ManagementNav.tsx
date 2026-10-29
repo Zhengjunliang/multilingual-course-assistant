@@ -2,7 +2,8 @@
  * The chat sidebar's "Gestione" group: the staff pages an account may open,
  * between the search field and the conversations (ConversationSidebar).
  *
- * Its items are landing.ts's, each with the count of what its page lists.
+ * Its items are landing.ts's, each with the count of what its page lists, but
+ * the accounts, which only their own page counts.
  * Each link closes the narrow-screen drawer as a conversation link does,
  * through the same `onNavigate`, so both mounts of the sidebar behave alike.
  * The item the reader is inside — on its page or any page below it — is drawn

@@ -2,9 +2,9 @@
 
 /**
  * What the account row and its menu offer each kind of account. The staff
- * pages are not among its items: they are the sidebar's Gestione group. The
- * Django admin is, for the superuser alone; the language is at the first
- * level, showing the one in use, and choosing one goes to the account. A
+ * pages are not among its items: they are the sidebar's Gestione group; nor
+ * is the Django admin, for anyone. The language is at the first level,
+ * showing the one in use, and choosing one goes to the account. A
  * sign-out the server never answered says so, the account still signed in.
  */
 

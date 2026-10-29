@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * The settings: the theme alone, and a line saying where the language went.
+ * The settings: the theme alone.
  *
  * `ThemeProvider` is the real one rather than a fake context, because the
  * assertion worth making is that clicking "dark" *changes the theme* — which

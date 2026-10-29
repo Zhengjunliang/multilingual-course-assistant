@@ -13,7 +13,8 @@
  * A 404 is a member already gone — revoked from another tab, the outcome
  * asked for — or a scope the reader lost meanwhile; the page reads again to
  * tell them apart, and only the first gets the toast that says it was done
- * elsewhere, while the second closes on the page's "not found".
+ * elsewhere, while the second closes on the page's "not found", or, when the
+ * role was the reader's own, on `/staff` (actions.tsx).
  */
 
 import { UserMinus } from "lucide-react";

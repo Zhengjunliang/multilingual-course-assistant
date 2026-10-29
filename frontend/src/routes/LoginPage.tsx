@@ -21,7 +21,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [failure, setFailure] = useState<ErrorText | null>(null);
 
-  // Wherever `RequireSession` sent this reader from, or the front page.
+  // Wherever `RequireSession` or the invitation page sent this reader from, or
+  // the front page.
   const back = (location.state as { from?: string } | null)?.from ?? "/";
   const landing = useLanding(back);
 

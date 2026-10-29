@@ -170,15 +170,16 @@ let stoppedAtDelete: boolean | null = null;
 let deleteRefused = false;
 /** The next list of conversations, read as `body` and answered once `gate` opens. */
 let lateList: { body: ConversationSummary[]; gate: Promise<void> } | null = null;
-/** Secretariat staff revoked during a case, as the server would forget them. */
+/** Staff revoked during a case, secretariat or teachers, as the server would forget them. */
 const revoked = new Set<string>();
 /** Reads of the programme list that fail before one succeeds, as a server error would. */
 let failures = 0;
 /** Holds every read of one edition until it settles, as a slow server would. */
 let held: Promise<void> | null = null;
 /**
- * What every request about edition 5 is refused with since the page read it:
- * NOT_FOUND once it left the reader's scope, INTERNAL while the server fails.
+ * What every read of edition 5 is refused with since the page read it, its
+ * writes still answered: NOT_FOUND once it left the reader's scope, INTERNAL
+ * while the server fails.
  */
 let lost: "NOT_FOUND" | "INTERNAL" | null = null;
 /** PPM's editions older than EDITIONS, which a case adds to the list. */
@@ -1253,7 +1254,8 @@ describe("a write from a page", () => {
           .querySelector<HTMLButtonElement>('button[aria-label="Revoca demo-teacher"]')
           ?.click(),
       );
-      // The revocation goes through; a read of the edition after it is a 404 when it was the last row.
+      // The revocation goes through; the reads of the edition after it are
+      // refused with `refusal`, and a retry's with `retried`.
       lost = refusal;
       const confirm = [
         ...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),

@@ -6,8 +6,9 @@
  * source; tests/test_admin_contract.py fails when a field is added or renamed
  * on one side only, or when the page size differs from the server's. An
  * action is a `POST` to a path of its own under the account, and deleting is
- * the account's `DELETE`; each answers 204, or 404 for an account gone, or
- * 409 for a rule it breaks (apps/accounts/services.py).
+ * the account's `DELETE`; each answers 204, a reset link 201 with its token,
+ * or 404 for an account gone, or 409 for a rule it breaks
+ * (apps/accounts/services.py).
  */
 
 import type { RoleScope } from "./account";
