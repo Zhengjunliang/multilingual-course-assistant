@@ -1,0 +1,14 @@
+# gitleaks's own rules, and the test values that only look like secrets.
+[extend]
+useDefault = true
+
+# Allowed by value, never by path: a real secret pasted into the same test file
+# is still a finding. Not .gitleaksignore: its fingerprints name the commit, and
+# a rebase merge gives every commit a new hash, so the weekly scan of the whole
+# history would find the value again on main.
+[allowlist]
+description = "Test values shaped like secrets"
+regexes = [
+  # The link token of the e2e screens and of LinkPages.test.tsx: "Base64-url token" in base64url.
+  '''^QmFzZTY0LXVybCB0b2tlbg$''',
+]
