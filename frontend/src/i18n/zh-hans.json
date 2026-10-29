@@ -458,8 +458,6 @@
     },
     "users": {
       "title": "账号",
-      "count_one": "{{count}} 个账号",
-      "count_other": "{{count}} 个账号",
       "state": "状态",
       "all": "全部",
       "active": "已启用",

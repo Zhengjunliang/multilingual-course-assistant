@@ -391,7 +391,7 @@ function invitationsPath(scope: MemberScope): string {
 }
 
 /** The scope an invitation grants its role on. */
-export function invitationScope(invitation: Invitation): MemberScope {
+function invitationScope(invitation: Invitation): MemberScope {
   return invitation.edition !== null
     ? { kind: "edition", id: invitation.edition.id }
     : { kind: "programme", code: invitation.programme?.code ?? "" };

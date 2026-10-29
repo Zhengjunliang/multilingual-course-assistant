@@ -30,7 +30,7 @@ export interface Shown {
 }
 
 /** The address a link is handed over as. */
-export function linkAddress({ path, token }: Shown): string {
+function linkAddress({ path, token }: Shown): string {
   return `${window.location.origin}${path}#${token}`;
 }
 
