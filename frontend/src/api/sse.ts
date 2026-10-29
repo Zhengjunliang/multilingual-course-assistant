@@ -85,6 +85,9 @@ export async function* readFrames(body: ReadableStream<Uint8Array>): AsyncGenera
   }
 }
 
+/** An event of the answer's stream, with the id a resumed read starts after. */
+export type AnswerFrame = AnswerEvent & { id: string | null };
+
 /**
  * Frames, typed.
  *
@@ -94,7 +97,7 @@ export async function* readFrames(body: ReadableStream<Uint8Array>): AsyncGenera
  */
 export async function* readAnswerEvents(
   body: ReadableStream<Uint8Array>,
-): AsyncGenerator<AnswerEvent> {
+): AsyncGenerator<AnswerFrame> {
   for await (const frame of readFrames(body)) {
     const data: unknown = JSON.parse(frame.data);
     switch (frame.name) {
@@ -104,7 +107,7 @@ export async function* readAnswerEvents(
       case "end":
       case "stopped":
       case "error":
-        yield { name: frame.name, data } as AnswerEvent;
+        yield { name: frame.name, data, id: frame.id } as AnswerFrame;
         break;
       default:
         break;

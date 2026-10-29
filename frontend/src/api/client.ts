@@ -1,19 +1,23 @@
 /**
- * The one streaming call, and the failures it can come back with.
+ * The streaming calls, the failures they can come back with, and the stop.
  *
  * Everything up to the first event can still be a status code; after it, a
  * failure travels inside the stream as an `error` event. That split is the
- * server's (`apps/qa/views.py`), and it is why `ask` returns a body to read
- * rather than an answer.
+ * server's (`apps/qa/views.py`), and it is why `ask` and `resumeAnswer` return
+ * a body to read rather than an answer.
  *
- * It does not go through `request()` because nothing about it is JSON in the
+ * They do not go through `request()` because nothing about them is JSON in the
  * response direction — what comes back is a body to read frame by frame — but
- * it sends the same CSRF header, from the same helper.
+ * `ask` sends the same CSRF header, from the same helper.
  */
 
-import { ApiError, failureOf, writeHeaders } from "./http";
+import { ApiError, failureOf, request, writeHeaders } from "./http";
 
 const ASK_URL = "/api/ask";
+
+function answerPath(id: string): string {
+  return `/api/answers/${encodeURIComponent(id)}`;
+}
 
 /**
  * The server's caps on a request (apps/qa/serializers.py and the history window
@@ -51,7 +55,7 @@ export interface AskBody {
 }
 
 /** An answer on its way. */
-interface Answering {
+export interface Answering {
   /** The body to read events from. */
   body: ReadableStream<Uint8Array>;
   /**
@@ -61,11 +65,21 @@ interface Answering {
   requestId: string | null;
 }
 
+async function answering(response: Response): Promise<Answering> {
+  if (!response.ok) throw await failureOf(response);
+  const requestId = response.headers.get("X-Request-ID");
+  if (response.body === null) {
+    throw new ApiError({ status: response.status, code: "BAD_RESPONSE", requestId });
+  }
+  return { body: response.body, requestId };
+}
+
 /**
  * Ask, and hand back the body to read events from.
  *
- * `signal` is not optional by accident: abandoning a stream without aborting it
- * leaves the server generating for nobody and holding its one engine slot.
+ * `signal` is not optional by accident: a visitor's answer is stopped by the
+ * connection closing, so a stream abandoned without aborting it leaves a
+ * worker writing for nobody and holding a place under the server's cap.
  */
 export async function ask(body: AskBody, signal: AbortSignal): Promise<Answering> {
   const response = await fetch(ASK_URL, {
@@ -75,11 +89,32 @@ export async function ask(body: AskBody, signal: AbortSignal): Promise<Answering
     credentials: "same-origin",
     signal,
   });
+  return answering(response);
+}
 
-  if (!response.ok) throw await failureOf(response);
-  const requestId = response.headers.get("X-Request-ID");
-  if (response.body === null) {
-    throw new ApiError({ status: response.status, code: "BAD_RESPONSE", requestId });
-  }
-  return { body: response.body, requestId };
+/**
+ * A signed-in student's answer read again: from its start when `after` is
+ * `null`, which is what a reloaded page needs, or from the event after `after`,
+ * the id of the last one read, when the connection dropped. A GET, so nothing
+ * to protect from cross-site requests.
+ */
+export async function resumeAnswer(
+  id: string,
+  after: string | null,
+  signal: AbortSignal,
+): Promise<Answering> {
+  const response = await fetch(`${answerPath(id)}/events`, {
+    headers: { Accept: "text/event-stream", ...(after === null ? {} : { "Last-Event-ID": after }) },
+    credentials: "same-origin",
+    signal,
+  });
+  return answering(response);
+}
+
+/**
+ * Stop an answer being written. Safe to repeat: an answer that already ended
+ * is a 204 too. The id is the one the answer's `queued` event named.
+ */
+export function stopAnswer(id: string): Promise<void> {
+  return request<void>(`${answerPath(id)}/stop`, { method: "POST" });
 }

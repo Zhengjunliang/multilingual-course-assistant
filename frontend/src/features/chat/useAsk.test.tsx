@@ -2,7 +2,9 @@
 
 /**
  * A visitor's thread: what each question carries back, and how long the
- * thread lasts; and a question that does not get its whole answer.
+ * thread lasts; a question that does not get its whole answer; and an answer
+ * a worker writes, which waits in a queue, can be stopped, and is read back
+ * from its stream after a dropped connection or a reload.
  *
  * The server stores nothing for a visitor, so `historyOf` — the server's
  * `recent_turns` done on this side — is what makes a follow-up a follow-up,
@@ -17,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HISTORY_WINDOW_TURNS, MAX_HISTORY_ANSWER_CHARS } from "@/api/client";
 import type { RouteDecision } from "@/api/contract";
+import type { ConversationDetail, StoredMessage } from "@/api/conversations";
 import type { ErrorCode, ErrorData } from "@/api/errors";
 import { mount } from "@/test/mount";
 import { historyOf, type Turn, useAsk } from "./useAsk";
@@ -299,6 +302,284 @@ describe("a question that does not get its whole answer", () => {
     expect(waiting).toMatchObject({
       phase: "stopped",
       failure: { kind: "failed", error: { code: "STREAM_INTERRUPTED", requestId: ID } },
+    });
+  });
+});
+
+const ANSWER = "9b2e0c4d-6f1a-4e3b-8c5d-7a9e1f2b3c4d";
+const CONVERSATION = "00000000-0000-4000-8000-000000000009";
+const EVENTS_URL = `/api/answers/${ANSWER}/events`;
+const EVENTS = `GET ${EVENTS_URL}`;
+
+/** One frame as the server writes it, under its stream entry's id. */
+function frame(name: string, data: object, id: string): string {
+  return `id: ${id}\nevent: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+const QUEUED = frame(
+  "queued",
+  { answer_id: ANSWER, conversation_id: CONVERSATION, question: "Che cos'è un ORM?" },
+  "1-0",
+);
+const STARTED = frame(
+  "start",
+  {
+    question: "Che cos'è un ORM?",
+    conversation_id: CONVERSATION,
+    locale: "it",
+    route: ROUTE,
+    citations: [],
+    search_ms: 40,
+  },
+  "2-0",
+);
+const FIRST = frame("token", { text: "Un ORM " }, "3-0");
+const REST = frame("token", { text: "mappa le tabelle." }, "4-0");
+const ENDED = frame("end", {}, "5-0");
+
+/** A body that stays open for the test to write into, end, or break off. */
+function pipe() {
+  const encoder = new TextEncoder();
+  let writer: ReadableStreamDefaultController<Uint8Array> | null = null;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      writer = controller;
+    },
+  });
+  return {
+    body,
+    write: (frames: string) => writer?.enqueue(encoder.encode(frames)),
+    end: () => writer?.close(),
+    fail: (error: Error) => writer?.error(error),
+  };
+}
+
+type Pipe = ReturnType<typeof pipe>;
+
+/** The requests the page made, in order. */
+let calls: { method: string; url: string; lastEventId: string | null }[] = [];
+
+/**
+ * `fetch` answering each request with the next body queued for its method and
+ * path. A string is the whole stream; a pipe stays open, and breaks off when
+ * its request is aborted, as a real response's body does.
+ */
+function serve(routes: Record<string, (string | Pipe)[]>) {
+  calls = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const method = init.method ?? "GET";
+    const url = String(input);
+    calls.push({ method, url, lastEventId: new Headers(init.headers).get("Last-Event-ID") });
+    if (url.endsWith("/stop")) return new Response(null, { status: 204 });
+    const body = routes[`${method} ${url}`]?.shift();
+    if (body === undefined) throw new Error(`no body for ${method} ${url}`);
+    if (typeof body !== "string") {
+      init.signal?.addEventListener("abort", () =>
+        body.fail(new DOMException("The operation was aborted.", "AbortError")),
+      );
+    }
+    return new Response(typeof body === "string" ? body : body.body, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream", "X-Request-ID": ID },
+    });
+  });
+}
+
+function row(
+  id: string,
+  role: StoredMessage["role"],
+  text: string,
+  complete = true,
+): StoredMessage {
+  const answer = role === "assistant";
+  return {
+    id,
+    role,
+    text,
+    locale: "it",
+    complete,
+    citations: [],
+    route: answer ? ROUTE : null,
+    search_ms: answer ? 40 : null,
+    created_at: "2026-10-29T10:00:00Z",
+  };
+}
+
+function detail(messages: StoredMessage[], answering: string | null): ConversationDetail {
+  return {
+    id: CONVERSATION,
+    locale: "it",
+    created_at: "2026-10-29T10:00:00Z",
+    last_message_at: "2026-10-29T10:01:00Z",
+    title: "Quando scadono le tasse?",
+    title_locale: "it",
+    pinned: false,
+    last_source: null,
+    messages,
+    answering,
+  };
+}
+
+const EARLIER = [
+  row("q-1", "user", "Quando scadono le tasse?"),
+  row("a-1", "assistant", "Entro il 30 novembre."),
+];
+
+describe("a question answered on a worker", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Asks one question, its answer arriving on whatever `serve` was given. */
+  async function ask(visitor: boolean) {
+    const page = mount(<Probe visitor={visitor} />);
+    await act(async () => {
+      void hook.submit("Che cos'è un ORM?");
+    });
+    return page;
+  }
+
+  it("waits in the queue until `start`, and names its conversation only then", async () => {
+    const answer = pipe();
+    serve({ "POST /api/ask": [answer] });
+    const { unmount } = await ask(false);
+
+    answer.write(QUEUED);
+    await settle();
+    const queued = { waiting: hook.waiting, conversation: hook.conversationId };
+    answer.write(STARTED + FIRST);
+    await settle();
+    const started = { waiting: hook.waiting, conversation: hook.conversationId };
+    answer.write(ENDED);
+    answer.end();
+    await settle();
+    const ended = hook.waiting;
+    unmount();
+
+    expect({ queued, started, ended }).toEqual({
+      queued: { waiting: { phase: "queued" }, conversation: null },
+      started: { waiting: { phase: "streaming" }, conversation: CONVERSATION },
+      ended: { phase: "idle" },
+    });
+  });
+
+  it("shows an answer stopped elsewhere as interrupted, and keeps what was written", async () => {
+    serve({ "POST /api/ask": [QUEUED + STARTED + FIRST + frame("stopped", {}, "4-0")] });
+    const { unmount } = await ask(false);
+    await settle();
+    const { waiting, turns } = hook;
+    unmount();
+
+    expect(turns[0]).toMatchObject({ answer: "Un ORM ", failure: { kind: "interrupted" } });
+    expect(waiting).toEqual({ phase: "stopped", failure: { kind: "interrupted" } });
+  });
+
+  it.each([
+    ["a visitor's", true],
+    ["a student's", false],
+  ])("tells the server to stop %s answer, and stops reading it", async (_, visitor) => {
+    const answer = pipe();
+    serve({ "POST /api/ask": [answer] });
+    const { unmount } = await ask(visitor);
+    answer.write(QUEUED + STARTED + FIRST);
+    await settle();
+
+    act(() => hook.stop());
+    await settle();
+    const { waiting, turns } = hook;
+    unmount();
+
+    expect(calls.at(-1)).toEqual({
+      method: "POST",
+      url: `/api/answers/${ANSWER}/stop`,
+      lastEventId: null,
+    });
+    expect({ waiting, answer: turns[0]?.answer }).toEqual({
+      waiting: { phase: "idle" },
+      answer: "Un ORM ",
+    });
+  });
+
+  it("opens a student's dropped stream again, after the last event read", async () => {
+    const answer = pipe();
+    serve({ "POST /api/ask": [answer], [EVENTS]: [REST + ENDED] });
+    const { unmount } = await ask(false);
+    answer.write(QUEUED + STARTED + FIRST);
+    await settle();
+
+    answer.fail(new TypeError("network error"));
+    await settle();
+    const { waiting, turns } = hook;
+    unmount();
+
+    expect(calls.at(-1)).toEqual({ method: "GET", url: EVENTS_URL, lastEventId: "3-0" });
+    expect(turns[0]).toMatchObject({
+      answer: "Un ORM mappa le tabelle.",
+      complete: true,
+      failure: null,
+    });
+    expect(waiting).toEqual({ phase: "idle" });
+  });
+
+  it.each([
+    ["a visitor's, which is not opened again", true, 1, "Un ORM "],
+    ["a student's, dropped a second time", false, 2, "Un ORM mappa le tabelle."],
+  ])("reads a stream that breaks off as interrupted: %s", async (_, visitor, requests, text) => {
+    serve({ "POST /api/ask": [QUEUED + STARTED + FIRST], [EVENTS]: [REST] });
+    const { unmount } = await ask(visitor);
+    await settle();
+    const { waiting, turns } = hook;
+    unmount();
+
+    expect(calls).toHaveLength(requests);
+    expect(turns[0]?.answer).toBe(text);
+    expect(waiting).toMatchObject({
+      phase: "stopped",
+      failure: {
+        kind: "failed",
+        error: { status: 200, code: "STREAM_INTERRUPTED", requestId: ID },
+      },
+    });
+  });
+
+  it.each([
+    [
+      "once its rows are written",
+      [row("q-2", "user", "Che cos'è un ORM?"), row(ANSWER, "assistant", "Un ORM ", false)],
+    ],
+    ["while it waits for a worker", []],
+  ])("reads an answer being written back from its stream, %s", async (_, writing) => {
+    serve({ [EVENTS]: [QUEUED + STARTED + FIRST + REST + ENDED] });
+    const { unmount } = mount(<Probe visitor={false} />);
+
+    act(() => hook.adopt(detail([...EARLIER, ...writing], ANSWER)));
+    await settle();
+    const { waiting, turns } = hook;
+    unmount();
+
+    expect(calls).toEqual([{ method: "GET", url: EVENTS_URL, lastEventId: null }]);
+    expect(turns.map(({ question, answer, complete }) => ({ question, answer, complete }))).toEqual(
+      [
+        { question: "Quando scadono le tasse?", answer: "Entro il 30 novembre.", complete: true },
+        { question: "Che cos'è un ORM?", answer: "Un ORM mappa le tabelle.", complete: true },
+      ],
+    );
+    expect(waiting).toEqual({ phase: "idle" });
+  });
+
+  it("reads a conversation nobody is answering from its rows alone", async () => {
+    serve({});
+    const { unmount } = mount(<Probe visitor={false} />);
+
+    act(() => hook.adopt(detail(EARLIER, null)));
+    await settle();
+    const { waiting, turns } = hook;
+    unmount();
+
+    expect({ requests: calls.length, turns: turns.length, waiting }).toEqual({
+      requests: 0,
+      turns: 1,
+      waiting: { phase: "idle" },
     });
   });
 });

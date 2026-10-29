@@ -98,7 +98,7 @@ describe("readFrames", () => {
 });
 
 describe("readAnswerEvents", () => {
-  it("routes the six names of the contract and carries their payloads through", async () => {
+  it("routes the six names of the contract and carries their payloads and ids through", async () => {
     const events = await collect(
       readAnswerEvents(
         streamOf([
@@ -122,6 +122,7 @@ describe("readAnswerEvents", () => {
     expect(events[0]).toEqual({
       name: "queued",
       data: { answer_id: "9b2e", conversation_id: null, question: "q" },
+      id: null,
     });
     // Every field of START_FRAME is asserted here, and that is the point of
     // spelling the fixture out: without this the payload could be `{}` and the
@@ -135,10 +136,11 @@ describe("readAnswerEvents", () => {
         route: { target: "slides", query: "ORM", fresh: false, reason: "course material" },
         citations: [],
       },
+      id: "1730200004211-0",
     });
-    expect(events[2]).toEqual({ name: "token", data: { text: "An ORM " } });
-    expect(events[3]).toEqual({ name: "error", data: { detail: "gone" } });
-    expect(events[5]).toEqual({ name: "end", data: {} });
+    expect(events[2]).toEqual({ name: "token", data: { text: "An ORM " }, id: "1730200004390-0" });
+    expect(events[3]).toEqual({ name: "error", data: { detail: "gone" }, id: null });
+    expect(events[5]).toEqual({ name: "end", data: {}, id: "1730200009120-0" });
   });
 
   it("drops an unknown event and delivers the ones around it", async () => {
