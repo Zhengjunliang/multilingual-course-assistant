@@ -1223,16 +1223,28 @@ describe("a write from a page", () => {
   });
 
   it.each([
-    ["stays on a page still theirs, as a teacher of another year", null, "/staff/editions/5"],
-    ["goes where their roles now start, the page no longer theirs", "NOT_FOUND", "/staff/mine"],
+    ["stays on a page still theirs, as a teacher of another year", null, null, "/staff/editions/5"],
+    [
+      "goes where their roles now start, the page no longer theirs",
+      "NOT_FOUND",
+      null,
+      "/staff/mine",
+    ],
     [
       "stays on the page, which says why, when it could not be read",
       "INTERNAL",
+      null,
       "/staff/editions/5",
+    ],
+    [
+      "goes where their roles now start once a retry finds the page no longer theirs",
+      "INTERNAL",
+      "NOT_FOUND",
+      "/staff/mine",
     ],
   ] as const)(
     "reads the account again after revoking the reader's own role, and %s",
-    async (_, refusal, end) => {
+    async (_, refusal, retried, end) => {
       reader = TEACHER;
       const { container, unmount, path } = page("/staff/editions/5");
       await settle();
@@ -1248,10 +1260,19 @@ describe("a write from a page", () => {
       ].find((candidate) => candidate.textContent === "Revoca");
       act(() => confirm?.click());
       await settle();
+      if (retried !== null) {
+        lost = retried;
+        const retry = [...container.querySelectorAll<HTMLButtonElement>("main button")].find(
+          (button) => button.textContent === "Riprova",
+        );
+        act(() => retry?.click());
+        await settle();
+      }
       const seen = {
         sent: asked.filter((each) => each.startsWith("DELETE")),
         rechecks,
         path: path(),
+        failure: text(container.querySelector('main [role="alert"]')),
         toast: (document.body.textContent ?? "").includes("Ruolo revocato"),
       };
       unmount();
@@ -1260,6 +1281,10 @@ describe("a write from a page", () => {
         sent: ["DELETE /api/catalog/editions/5/teachers/demo-teacher"],
         rechecks: 1,
         path: end,
+        failure:
+          refusal === "INTERNAL" && retried === null
+            ? `${i18n.t("staff.failure.title")}${i18n.t("errors.INTERNAL")}`
+            : null,
         toast: true,
       });
     },
