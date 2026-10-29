@@ -139,8 +139,8 @@ class _Relay:
     (`inflight.probe`): a writer whose lease ran out, or a stream gone, ends
     the response with `ENGINE_DOWN`, as does an answer past the longest one
     may take, so that no response is held open for nothing. A lease that ran
-    out before any worker began is, most often, a queue longer than the
-    lease, and ends it with the `UNAVAILABLE` a full cap answers.
+    out before any worker took the question is, most often, a queue longer
+    than the lease, and ends it with the `UNAVAILABLE` a full cap answers.
 
     It counts as one of the answer's readers (`inflight.MAX_READERS`) from
     its first event to its last. Pushed out by a newer one, it ends without a
@@ -188,7 +188,9 @@ class _Relay:
                     continue
                 if state == "untaken":
                     logger.warning(
-                        "answer %s waited out its lease before a worker began it", self._answer_id
+                        "answer %s waited out its lease before a worker took it: the site is"
+                        " busy, or no worker consumes qa",
+                        self._answer_id,
                     )
                     yield self._failed(
                         ErrorCode.UNAVAILABLE, retry_after_seconds=RETRY_AFTER_SECONDS
