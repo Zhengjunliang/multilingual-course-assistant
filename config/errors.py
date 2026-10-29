@@ -82,6 +82,7 @@ class ErrorCode(StrEnum):
     NOT_ACCEPTABLE = "NOT_ACCEPTABLE"
     UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
     ROLE_ALREADY_HELD = "ROLE_ALREADY_HELD"
+    LAST_TEACHER = "LAST_TEACHER"
     SELF_NOT_ALLOWED = "SELF_NOT_ALLOWED"
     ACCOUNT_STILL_ACTIVE = "ACCOUNT_STILL_ACTIVE"
     ROLES_HELD = "ROLES_HELD"
@@ -170,6 +171,10 @@ SPEC: dict[ErrorCode, Spec] = {
     # A conflict with no field to correct; a taken username is a field's (ALREADY_EXISTS).
     ErrorCode.ROLE_ALREADY_HELD: Spec(
         HTTPStatus.CONFLICT, "fixable", "The user holds this role on this scope already."
+    ),
+    # A teacher leaves an edition at least one teacher row (apps/catalog/staff_views.py).
+    ErrorCode.LAST_TEACHER: Spec(
+        HTTPStatus.CONFLICT, "fixable", "The row is the edition's last teacher row."
     ),
     # The rules of apps/accounts/services.py, one code each: what the reader
     # does first differs, from asking for their roles to be revoked to naming

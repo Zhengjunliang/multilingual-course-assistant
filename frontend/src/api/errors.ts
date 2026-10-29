@@ -33,6 +33,7 @@ export const ERROR_CODES = {
   NOT_ACCEPTABLE: { status: 406, kind: "failure", dataKeys: [] },
   UNSUPPORTED_MEDIA_TYPE: { status: 415, kind: "failure", dataKeys: [] },
   ROLE_ALREADY_HELD: { status: 409, kind: "fixable", dataKeys: [] },
+  LAST_TEACHER: { status: 409, kind: "fixable", dataKeys: [] },
   SELF_NOT_ALLOWED: { status: 409, kind: "fixable", dataKeys: [] },
   ACCOUNT_STILL_ACTIVE: { status: 409, kind: "fixable", dataKeys: [] },
   ROLES_HELD: { status: 409, kind: "fixable", dataKeys: [] },

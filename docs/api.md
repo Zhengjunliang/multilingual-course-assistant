@@ -99,7 +99,7 @@ The deepening loop is not in this endpoint: it fetches pages and writes to the s
 
 ## Catalogue API
 
-What staff see and change, each within the scopes their roles cover ([apps/roles/scopes.py](../apps/roles/scopes.py)): a teacher every edition of a course they are assigned to an edition of, past and later years included, secretariat staff their programme and every edition of every course it offers, the superuser everything; what each role may do there is [apps/roles/registry.py](../apps/roles/registry.py). Every programme and edition carries `permissions`, what the caller holds on it, which is what a page reads to decide what to offer; an edition also carries `is_current`, worked out on the day of the request from the editions' teaching starts ([data-model.md](data-model.md), invariant 2), which nothing in the API changes.
+What staff see and change, each within the scopes their roles cover ([apps/roles/scopes.py](../apps/roles/scopes.py)): a teacher every edition of a course they are assigned to an edition of, past and later years included, secretariat staff their programme and every edition of every course it offers, the superuser everything; what each role may do there is [apps/roles/registry.py](../apps/roles/registry.py), a teacher assigning teachers on the current edition and the later ones only, never on a past one ([data-model.md](data-model.md), invariant 2). Every programme and edition carries `permissions`, what the caller holds on it, which is what a page reads to decide what to offer; an edition also carries `is_current`, worked out on the day of the request from the editions' teaching starts ([data-model.md](data-model.md), invariant 2), which nothing in the API changes.
 
 | Method and path | Does |
 | --------------- | ---- |
@@ -110,7 +110,7 @@ What staff see and change, each within the scopes their roles cover ([apps/roles
 | `GET /api/catalog/editions` | the editions the caller may view: `id`, `course` (as `courses/<code>` reads it), `academic_year`, `teaching_starts` (`YYYY-MM-DD` or `null`), `period` (`first_semester`, `second_semester`, or `""` when not entered), `is_current`, `teachers` (members shaped as a programme's `secretariat`), `permissions`; `?course=<code>` keeps one course's, and gives `[]` for a code the caller may not view |
 | `GET /api/catalog/editions/<id>` | one edition, as the list shows it |
 | `POST /api/catalog/editions/<id>/teachers` | `{"username": "..."}` makes that user a teacher of the edition (201, answering with the member as the lists show it); needs `edition.assign_teacher` |
-| `DELETE /api/catalog/editions/<id>/teachers/<username>` | revokes it (204) |
+| `DELETE /api/catalog/editions/<id>/teachers/<username>` | revokes it (204); a teacher removing the edition's last teacher row is a 409 `LAST_TEACHER`, which secretariat staff and the superuser are not |
 | `GET /api/catalog/editions/<id>/invitations` | the invitations to teach the edition not accepted yet, oldest first, the expired ones included, which stay until revoked: `[{"id", "role", "edition", "programme", "created_by", "created_at", "expires_at"}]`, `edition` as `{"id", "course": {"code", "name", "locale"}, "academic_year"}`, `programme` `null`, `created_by` a username, and never a token. `POST` with `{}` makes one (201, the row with its `token`, in this answer only); both need `edition.assign_teacher` |
 | `DELETE /api/catalog/editions/<id>/invitations/<invitation id>` | revokes it (204); an invitation of another scope is a 404 |
 | `GET /api/catalog/editions/<id>/syllabus` | the edition's syllabus, `{"locale", "sections": [{"section", "text"}]}`: the one language every section is written in, one of `settings.LANGUAGES`, and the sections in the course catalogue's order, each text in Markdown (CommonMark with GitHub's extensions); a section with no text is not listed |
@@ -166,6 +166,7 @@ Every error of an `/api/` path answers one body, built by `api_exception_handler
 | `METHOD_NOT_ALLOWED` | 405 | failure | the route does not serve the method | |
 | `NOT_ACCEPTABLE` | 406 | failure | no response matches `Accept` | |
 | `ROLE_ALREADY_HELD` | 409 | fixable | the user holds the role being granted, on that scope | |
+| `LAST_TEACHER` | 409 | fixable | a teacher removes an edition's last teacher row | |
 | `SELF_NOT_ALLOWED` | 409 | fixable | a superuser's change to an account is asked of the caller's own | |
 | `ACCOUNT_STILL_ACTIVE` | 409 | fixable | an account is deleted only once deactivated | |
 | `ROLES_HELD` | 409 | fixable | an account holding a staff role deletes itself only once its roles are revoked | |

@@ -7,7 +7,10 @@ scope they belong to, as GitLab nests `/projects/:id/members` and Canvas
 resolved, and checked, before anything else (apps/roles/api.py).
 
 Who may grant a role is the assign table, `GRANT_PERMISSION` in
-apps/roles/registry.py: holding its permission on the role's scope. A collection
+apps/roles/registry.py: holding its permission on the role's scope. A teacher
+who holds it, on their course's current and later editions, does not remove an
+edition's last teacher row; secretariat staff and the superuser may
+(`must_leave_a_teacher`, apps/roles/scopes.py). A collection
 view serves `POST` alone and a member view `DELETE` alone, so each view's
 methods are exactly the keys of its `scope_map`, and any other method,
 `OPTIONS` and `GET` included, is a 405. Members are read on the scope's own
@@ -21,6 +24,7 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
+from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -31,6 +35,7 @@ from apps.roles.api import ScopedObjectView
 from apps.roles.grants import AlreadyHeldError, grant, revoke
 from apps.roles.models import RoleAssignment, on_scope
 from apps.roles.registry import GRANT_PERMISSION, Role
+from apps.roles.scopes import must_leave_a_teacher
 from config.errors import ErrorCode, fail
 
 if TYPE_CHECKING:
@@ -80,6 +85,27 @@ class EditionTeachersView(_StaffList[CourseEdition], EditionView):
 class EditionTeacherView(_StaffMember[CourseEdition], EditionView):
     role = Role.TEACHER
     scope_map = MappingProxyType({"DELETE": GRANT_PERMISSION[Role.TEACHER]})
+
+    def delete(self, request: Request, username: str, **kwargs: object) -> Response:
+        """Revokes the row, unless a teacher would leave the edition without one.
+
+        The edition's row is locked before its teacher rows are counted: two
+        teachers removing each other at once would otherwise each count two
+        and remove both. The second waits for the first to commit, and its
+        count, a statement of its own under PostgreSQL's READ COMMITTED, sees
+        the row the first removed gone.
+        """
+        with transaction.atomic():
+            if CourseEdition.objects.select_for_update().filter(pk=self.scope.pk).first() is None:
+                fail(ErrorCode.NOT_FOUND)
+            rows = self.rows()
+            if (
+                must_leave_a_teacher(request.user, self.scope)
+                and rows.filter(user__username=username).exists()
+                and rows.count() == 1
+            ):
+                fail(ErrorCode.LAST_TEACHER)
+            return super().delete(request, username, **kwargs)
 
 
 class ProgrammeSecretariatView(_StaffList[DegreeProgramme], ProgrammeView):

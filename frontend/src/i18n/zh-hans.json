@@ -195,6 +195,7 @@
     "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
     "ROLE_ALREADY_HELD": "该用户在这里已有此角色。",
+    "LAST_TEACHER": "这是这个版本的最后一位教师：请先指派另一位，或请教学秘书处处理。",
     "SELF_NOT_ALLOWED": "不能对自己的账号这样做，请另一位管理员来做。",
     "ACCOUNT_STILL_ACTIVE": "请先停用这个账号，再删除它。",
     "ROLES_HELD": "你还持有教职角色，请先请人撤销，再删除账号。",

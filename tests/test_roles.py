@@ -51,6 +51,7 @@ pytestmark = pytest.mark.django_db
 class World(NamedTuple):
     b047: DegreeProgramme
     l031: DegreeProgramme
+    ppm_past: CourseEdition
     ppm_old: CourseEdition
     ppm_new: CourseEdition
     ia: CourseEdition
@@ -66,10 +67,11 @@ class World(NamedTuple):
 
 
 def world() -> World:
-    """Two programmes, three courses, four editions, and one user per way of holding a role.
+    """Two programmes, three courses, five editions, and one user per way of holding a role.
 
-    PPM is offered by B047 alone and runs in two years, the older one current,
-    since the newer one's teaching starts in a month; IA is offered by L031
+    PPM is offered by B047 alone and runs in three years: the oldest past, the
+    middle one current, since the newest one's teaching starts in a month, and
+    nobody assigned to the past one; IA is offered by L031
     alone; the shared course is offered by both. Start days count from today,
     so the world is the same whatever day the tests run. The
     users: a teacher of both PPM years, a teacher assigned to the new year only, the
@@ -92,6 +94,9 @@ def world() -> World:
     )
     today = timezone.localdate()
     started, starting = today - timedelta(days=365), today + timedelta(days=30)
+    ppm_past = CourseEdition.objects.create(
+        course=ppm, academic_year="2023-2024", teaching_starts=started - timedelta(days=365)
+    )
     ppm_old = CourseEdition.objects.create(
         course=ppm, academic_year="2024-2025", teaching_starts=started
     )
@@ -136,6 +141,7 @@ def world() -> World:
     return World(
         b047=b047,
         l031=l031,
+        ppm_past=ppm_past,
         ppm_old=ppm_old,
         ppm_new=ppm_new,
         ia=ia_edition,
@@ -222,14 +228,17 @@ def test_deleting_a_scope_or_a_user_deletes_its_role_rows() -> None:
     ]
 
 
-TEACHES = {"edition.view", "edition.edit_content"}
+TEACHES = {"edition.view", "edition.assign_teacher", "edition.edit_content"}
+# A past year: its teacher rows are not its course's teachers to change.
+TAUGHT = {"edition.view", "edition.edit_content"}
 RUNS_EDITION = {"edition.view", "edition.assign_teacher", "edition.edit_content"}
 RUNS_PROGRAMME = {"programme.view"}
 
 
 def test_who_holds_what_where() -> None:
     w = world()
-    cells = [(edition, EDITION_PERMISSIONS) for edition in (w.ppm_old, w.ppm_new, w.ia, w.shared)]
+    editions = (w.ppm_past, w.ppm_old, w.ppm_new, w.ia, w.shared)
+    cells = [(edition, EDITION_PERMISSIONS) for edition in editions]
     cells += [(programme, PROGRAMME_PERMISSIONS) for programme in (w.b047, w.l031)]
 
     held = {
@@ -238,17 +247,22 @@ def test_who_holds_what_where() -> None:
         for scope, permissions in cells
     }
 
-    ppm_old, ppm_new = "B028451:2024-2025", "B028451:2025-2026"
+    ppm_past, ppm_old, ppm_new = "B028451:2023-2024", "B028451:2024-2025", "B028451:2025-2026"
     ia, shared, b047, l031 = "B003725:2025-2026", "B000001:2025-2026", "B047", "L031"
     expected = {(user.username, label(scope)): set() for user in everyone(w) for scope, _ in cells}
     expected |= {
+        # The current year and the next: a course's teachers assign their colleagues there.
+        ("continuing", ppm_past): TAUGHT,
         ("continuing", ppm_old): TEACHES,
         ("continuing", ppm_new): TEACHES,
-        # A teacher covers every edition of their course, the year before their own included.
+        # A teacher covers every edition of their course, the years before their own included.
+        ("newcomer", ppm_past): TAUGHT,
         ("newcomer", ppm_old): TEACHES,
         ("newcomer", ppm_new): TEACHES,
         # A programme's secretariat covers every edition of every course it
-        # offers, the shared course included, and nothing of another programme.
+        # offers, a past one and the shared course included, and nothing of
+        # another programme.
+        ("secretariat", ppm_past): RUNS_EDITION,
         ("secretariat", ppm_old): RUNS_EDITION,
         ("secretariat", ppm_new): RUNS_EDITION,
         ("secretariat", shared): RUNS_EDITION,
@@ -258,10 +272,12 @@ def test_who_holds_what_where() -> None:
         ("other_secretariat", l031): RUNS_PROGRAMME,
         # Two roles add up, each on its own scope.
         ("dual", ia): TEACHES,
+        ("dual", ppm_past): RUNS_EDITION,
         ("dual", ppm_old): RUNS_EDITION,
         ("dual", ppm_new): RUNS_EDITION,
         ("dual", shared): RUNS_EDITION,
         ("dual", b047): RUNS_PROGRAMME,
+        ("root", ppm_past): RUNS_EDITION,
         ("root", ppm_old): RUNS_EDITION,
         ("root", ppm_new): RUNS_EDITION,
         ("root", ia): RUNS_EDITION,
@@ -271,10 +287,16 @@ def test_who_holds_what_where() -> None:
     }
     assert held == expected
 
-    # Past the table: a permission asked of the wrong kind of scope, of no
-    # scope, or by a name the registry does not have. The superuser's yes is
-    # Django's: `User.has_perm` answers an active superuser before any backend.
+    # Past the table: what a teacher does not hold on a past year takes
+    # nothing from the secretariat role of the same person; a permission
+    # asked of the wrong kind of scope, of no scope, or by a name the registry
+    # does not have. The superuser's yes is Django's: `User.has_perm` answers
+    # an active superuser before any backend.
+    RoleAssignment.objects.create(user=w.secretariat, role=Role.TEACHER, edition=w.ppm_old)
     edge = {
+        "secretariat who also teaches, on a past year": w.secretariat.has_perm(
+            "edition.assign_teacher", w.ppm_past
+        ),
         "programme permission on an edition": w.secretariat.has_perm("programme.view", w.ppm_new),
         "edition permission on a programme": w.secretariat.has_perm("edition.view", w.b047),
         "no scope": w.secretariat.has_perm("edition.view"),
@@ -283,6 +305,7 @@ def test_who_holds_what_where() -> None:
         "superuser, unknown permission": w.root.has_perm("edition.delete", w.ppm_new),
     }
     assert edge == {
+        "secretariat who also teaches, on a past year": True,
         "programme permission on an edition": False,
         "edition permission on a programme": False,
         "no scope": False,
