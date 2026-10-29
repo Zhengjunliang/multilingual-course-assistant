@@ -155,14 +155,17 @@ AUTHENTICATION_BACKENDS = [
 # Cache
 # https://docs.djangoproject.com/en/5.2/topics/cache/#redis
 
+# The site's own data in Redis: the cache below, and the answers in flight
+# (apps/qa/inflight.py). Database 1, never the broker's 0: config/env.py says why.
+REDIS_URL = env.redis_url
+
 # What lives here is the throttle counters below, and they must be shared: in
 # each process's own memory, Django's default, every process of a deployed site
-# would grant its own four questions a minute. Redis database 1, never the
-# broker's 0: config/env.py says why.
+# would grant its own four questions a minute.
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": env.redis_url,
+        "LOCATION": REDIS_URL,
         # As the database's connect_timeout: without them every throttled
         # request hangs on a stopped Docker engine instead of failing.
         "OPTIONS": {"socket_connect_timeout": 5, "socket_timeout": 5},
@@ -240,6 +243,15 @@ REST_FRAMEWORK = {
 # mail backend. The browser journeys point it at stubs (tests/journeys/), so
 # the code they run has no test branch in it.
 QA_RETRIEVAL = "apps.qa.engine.build_retrieval"
+
+# Every key of an answer in flight starts with this (apps/qa/inflight.py). The
+# browser journeys count under a prefix of their own, as their cache does.
+QA_KEY_PREFIX = "qa"
+
+# The questions waiting or being answered at once, every process of the site
+# together (apps/qa/inflight.py); past it a question is refused at once.
+# config/env.py says why the default is 4.
+QA_MAX_IN_FLIGHT = env.qa_max_in_flight
 
 
 # Password validation

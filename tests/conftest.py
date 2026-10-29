@@ -1,18 +1,23 @@
 """Process-wide state that must not travel between tests, and the one request no test may send.
 
-Two things in this project outlive a single request on purpose: the engine slot
-(apps/qa/engine.py, one set of models per process) and the throttle counters
-(the Redis cache of config/settings.py, which every process of the site
-shares). Both are correct in production and both are contamination in a test
-suite.
+Three things in this project outlive a single request on purpose: the engine
+slot (apps/qa/engine.py, one set of models per process), the throttle counters
+(the Redis cache of config/settings.py) and the answers in flight with their
+global cap (apps/qa/inflight.py), the last two shared by every process of the site.
+All three are correct in production and contamination in a test suite.
 
-The counters stay in Redis here too, the backend production runs, but each
-pytest-xdist worker gets a Redis database of its own, as it gets a PostgreSQL
-one: clearing the cache empties the whole database (FLUSHDB), and every worker
-numbers its users from 1, so two workers on one database would wipe and fill
-each other's buckets. Database 2 without xdist and 3 + N for worker gwN, clear of
-the 0 and 1 of the developer's own site; Redis's sixteen are enough for the
-four workers of scripts/check.py and for up to thirteen.
+The counters and the answers stay in Redis here too, the backend production
+runs, but each pytest-xdist worker gets a Redis database of its own, as it gets
+a PostgreSQL one: clearing the cache empties the whole database (FLUSHDB), and
+every worker numbers its users from 1, so two workers on one database would
+wipe and fill each other's buckets. Database 2 without xdist and 3 + N for
+worker gwN, clear of the 0 and 1 of the developer's own site; Redis's sixteen
+are enough for the four workers of scripts/check.py and for up to thirteen.
+
+Celery's broker is the opposite: no test may reach the developer's, where
+their own worker would take a queued question and answer it with the real
+models. It is Kombu's in-memory transport instead, named in the environment
+because Celery reads `CELERY_BROKER_URL` from there before its settings.
 
 This lives in a conftest rather than in the file that first needed it because an
 autouse fixture only applies to the module that defines it. A second test file
@@ -37,14 +42,24 @@ from django.test import override_settings
 from pwned_passwords_django import api
 
 from apps.qa import engine as engine_module
+from apps.qa import inflight
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _redis_database_of_its_own(worker_id: str) -> Iterator[None]:
     number = 2 if worker_id == "master" else 3 + int(worker_id.removeprefix("gw"))
     default = settings.CACHES["default"]
-    location = urlsplit(default["LOCATION"])._replace(path=f"/{number}").geturl()
-    with override_settings(CACHES={"default": {**default, "LOCATION": location}}):
+    location = urlsplit(settings.REDIS_URL)._replace(path=f"/{number}").geturl()
+    with override_settings(
+        REDIS_URL=location, CACHES={"default": {**default, "LOCATION": location}}
+    ):
+        yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _broker_in_memory() -> Iterator[None]:
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("CELERY_BROKER_URL", "memory://")
         yield
 
 
@@ -60,12 +75,17 @@ def _fresh_process_state() -> Iterator[None]:
     yield
     request_started.disconnect(note)
     engine_module._HOLDER.engine = None
-    # Cleared only where a test reached the cache, through a request or
-    # directly, so a test of rag/ never connects to Redis and runs without
-    # Docker. The signal, because a request served on a thread of the test's
-    # own holds a connection of that thread, which this one cannot see.
-    if served or caches.all(initialized_only=True):
+    # Cleared only where a test reached Redis, through a request, the cache
+    # or the answers in flight, so a test of rag/ never connects to Redis and
+    # runs without Docker. The signal, because a request served on a thread of
+    # the test's own holds a connection of that thread, which this one cannot
+    # see. One FLUSHDB clears both: the cache and the answers share a database.
+    if served or caches.all(initialized_only=True) or inflight.connected():
         cache.clear()
+    # Closed after each test, so that `connected()` says whether this one used it.
+    if inflight.connected():
+        inflight.connection().client.close()
+        inflight._connect.cache_clear()
 
 
 @pytest.fixture(autouse=True)

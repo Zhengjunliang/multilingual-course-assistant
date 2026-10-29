@@ -4,7 +4,7 @@ Deliberately free of Django imports: `rag/` must stay runnable without Django,
 so both sides can read their configuration from this one source.
 """
 
-from pydantic import SecretStr, field_validator
+from pydantic import PositiveInt, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -61,6 +61,14 @@ class Settings(BaseSettings):
     # 127.0.0.1 for the reason QDRANT_URL gives.
     celery_broker_url: str = "redis://127.0.0.1:6379/0"
     redis_url: str = "redis://127.0.0.1:6379/1"
+
+    # The global cap: questions waiting for a worker or being answered, across
+    # every process of the site. 4 because the development worker answers one
+    # question at a time in about 30 seconds, so the fourth waits about 90: a
+    # longer wait is better refused with a retry hint than spent in silence. A
+    # deployment with more workers raises it; its value waits for the
+    # measurement on MICC (#41).
+    qa_max_in_flight: PositiveInt = 4
 
     # HTTPS redirect, HSTS and secure cookies are meaningless — or actively
     # break the site — when nothing terminates TLS, and a demo on the MICC
