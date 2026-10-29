@@ -4,7 +4,14 @@
  * Each hook holds its dialog's state and returns the buttons that open it and
  * the dialog itself, for the page to place where the prototype puts them;
  * after a write the page reads again, since every row's flags may change.
- * A button is offered only where the row's `permissions` hold its permission.
+ * A button is offered only where the row's `permissions` hold its permission:
+ * on an edition, to the superuser, to its programme's secretariat and to its
+ * course's teachers, unless the edition is past (apps/roles/scopes.py).
+ *
+ * A reader may revoke their own role. That changes the account, so the session
+ * is read again, and when the page is no longer theirs to read they go to
+ * `/staff`, which lands them where their roles now start, as GitLab sends a
+ * member who leaves a project back to their projects.
  *
  * Focus goes back to the button that opened the dialog. Radix returns it only
  * to its own `Trigger`, which a dialog opened from state does not have, so
@@ -17,8 +24,10 @@
 import { UserPlus } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 import type { MemberScope, StaffMember } from "@/api/catalog";
+import { useSession } from "@/auth/useSession";
 import { Button } from "@/components/ui/button";
 import { AssignDialog } from "./AssignDialog";
 import { shownName } from "./people";
@@ -76,6 +85,8 @@ export function useMembers({
   reload,
 }: MembersOptions): Members {
   const { t } = useTranslation();
+  const { account, recheck } = useSession();
+  const navigate = useNavigate();
   const [assigning, setAssigning] = useState(false);
   const [revoking, setRevoking] = useState<Revoking | null>(null);
   // Read when the dialog has closed and its state is gone.
@@ -137,7 +148,13 @@ export function useMembers({
       <RevokeDialog
         revoking={revoking}
         onClose={() => setRevoking(null)}
-        onChanged={reload}
+        onChanged={async () => {
+          if (revoking?.username !== account?.username) return reload();
+          await recheck();
+          const readable = await reload();
+          if (!readable) navigate("/staff", { replace: true });
+          return readable;
+        }}
         onCloseAutoFocus={returnFocus(
           () => last.current.trigger,
           () => {

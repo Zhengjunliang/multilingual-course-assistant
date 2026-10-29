@@ -7,7 +7,8 @@
  * found". Its head names the year, whether it is current and, where it was
  * entered, the day its teaching starts, which is what makes it current
  * (apps/catalog/editions.py). Who may assign a teacher here is the edition's
- * `permissions`: the button is in the page's head, beside the one that makes
+ * `permissions`, which a course's teachers hold on its current and later
+ * editions: the button is in the page's head, beside the one that makes
  * an invitation (features/staff/Invitations.tsx), and nobody else is offered
  * either; the invitations not accepted yet are under the teachers. The
  * syllabus and the books are read beside the edition, so their tabs can count
