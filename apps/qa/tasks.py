@@ -117,11 +117,17 @@ def answer_question(payload: dict[str, object]) -> None:
 
 class _Heartbeat:
     """Renews an answer's lease every second, on a thread of its own, and
-    keeps the reason it stopped: `stopped` or `lost`, `ok` while it goes on.
+    keeps the verdict: `ok` while the answer goes on, `stopped` once someone
+    asked it to stop, `lost` once its lease ran out, which ends the renewals.
 
     A thread rather than a renewal between two events, because there are
     long stretches with no event: the engine's first build, the router's
     reply, the wait for the GPU behind another answer's retrieval.
+
+    A stop does not end it. The answer stops only at its next event, which
+    may be one of those stretches away, and its lease has to last until then:
+    a lease run out meanwhile would hand its place to another question while
+    this one still runs, and end it as an outage rather than as stopped.
     """
 
     def __init__(self, answer_id: UUID) -> None:
@@ -155,6 +161,7 @@ class _Heartbeat:
                 continue
             if verdict != "ok":
                 self.verdict = verdict
+            if verdict == "lost":
                 return
 
 

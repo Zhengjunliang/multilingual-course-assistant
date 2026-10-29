@@ -13,6 +13,8 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, cast
 
+import pytest
+
 from apps.qa import inflight
 from apps.qa.contract import EndEvent, TokenEvent
 
@@ -124,12 +126,25 @@ def test_a_probe_reads_a_finish_that_raced_the_read_rather_than_mourning_it() ->
 
 def test_a_probe_tells_a_working_writer_from_a_dead_one() -> None:
     answer_id = admit()
-    (first,) = inflight.read(answer_id, "0", block=0.01)
-    assert inflight.probe(answer_id, first.id) == "alive"
+    inflight.emit(answer_id, TokenEvent(text="An "))
+    *_, last = inflight.read(answer_id, "0", block=0.01)
+    assert inflight.probe(answer_id, last.id) == "alive"
 
     expire(answer_id)
 
-    assert inflight.probe(answer_id, first.id) == "dead"
+    assert inflight.probe(answer_id, last.id) == "dead"
+
+
+def test_a_probe_tells_a_question_no_worker_began_from_a_dead_writer() -> None:
+    """Nothing past `admit`'s first event, and the lease gone: the question
+    waited for a worker longer than it may, which a full site does and a
+    broken one need not."""
+    answer_id = admit()
+    (first,) = inflight.read(answer_id, "0", block=0.01)
+
+    expire(answer_id)
+
+    assert inflight.probe(answer_id, first.id) == "untaken"
 
 
 def test_a_probe_of_an_expired_stream_says_it_is_gone() -> None:
@@ -173,3 +188,29 @@ def test_an_abandoned_question_leaves_nothing_behind() -> None:
     assert admitted() == set()
     assert inflight.owner(answer_id) is None
     assert inflight.answering(conversation) is None
+
+
+def test_a_third_reader_pushes_the_first_out() -> None:
+    """An answer has two readers at most: the page, and the connection a
+    reload leaves behind until the server notices it closed. The newest
+    reader's join wakes the oldest from its wait and ends it, so opening one
+    answer many times over holds two connections, not one each."""
+    answer_id = admit()
+    first, second = inflight.join(answer_id), inflight.join(answer_id)
+    (queued,) = inflight.read(answer_id, "0", block=0.01, reader=first)
+
+    inflight.join(answer_id)
+
+    with pytest.raises(inflight.PushedOutError):
+        inflight.read(answer_id, queued.id, block=5, reader=first)
+    assert inflight.read(answer_id, queued.id, block=0.01, reader=second) == []
+
+
+def test_a_reader_who_leaves_gives_its_place_back() -> None:
+    answer_id = admit()
+    first, second = inflight.join(answer_id), inflight.join(answer_id)
+    inflight.leave(answer_id, first)
+
+    inflight.join(answer_id)
+
+    assert [entry.name for entry in inflight.read(answer_id, "0", reader=second)] == ["token"]
