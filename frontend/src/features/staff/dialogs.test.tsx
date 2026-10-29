@@ -48,6 +48,7 @@ const REFUSED = {
       fields: [{ field: "username", reason: "NO_SUCH_USER", data: {} }],
     }),
   alreadyHeld: () => codedRefusal("ROLE_ALREADY_HELD"),
+  lastTeacher: () => codedRefusal("LAST_TEACHER"),
   forbidden: () => codedRefusal("PERMISSION_DENIED"),
   gone: () => codedRefusal("NOT_FOUND"),
   broken: () => codedRefusal("INTERNAL"),
@@ -268,12 +269,12 @@ describe("assigning a member", () => {
 });
 
 describe("revoking a role", () => {
-  async function revoke(refusal: (() => Response) | null) {
+  async function revoke(refusal: (() => Response) | null, scope: MemberScope = B047) {
     answer = refusal ?? (() => new Response(null, { status: 204 }));
     const { unmount } = open(
       <RevokeDialog
         revoking={{
-          scope: B047,
+          scope,
           username: "mrossi",
           shown: "Mario Rossi",
           object: "B047",
@@ -341,5 +342,14 @@ describe("revoking a role", () => {
 
     expect([seen.closed, seen.confirmOff, seen.focused]).toEqual([0, false, "Annulla"]);
     expect(seen.text).toContain("Permesso mancante: programme.assign_secretariat");
+  });
+
+  it("says why an edition's last teacher stays, leaving the button on and the page as it was", async () => {
+    const seen = await revoke(REFUSED.lastTeacher, EDITION);
+
+    expect([seen.closed, seen.changed, seen.confirmOff]).toEqual([0, 0, false]);
+    expect(seen.text).toContain(
+      "È l'ultimo docente di questa edizione: prima assegnane un altro, o chiedi alla segreteria didattica.",
+    );
   });
 });

@@ -121,6 +121,8 @@ const EDITIONS: Edition[] = [
   },
   edition(4, "2024-2025", true, ["demo-teacher"]),
 ];
+/** A year before the current one, which the edition list leaves out: past, so its teachers' own. */
+const PAST = edition(3, "2023-2024", false, ["demo-teacher"]);
 
 function account(username: string, superuser: boolean, roles: Account["roles"]): Account {
   return { id: 1, username, locale: "it", is_superuser: superuser, roles };
@@ -182,6 +184,8 @@ let earlier: Edition[] = [];
 let invitations: Invitation[] = [];
 /** Whether the next invitation revoked was accepted elsewhere first, and is gone. */
 let acceptedElsewhere = false;
+/** How many times the page asked the session to read the account again. */
+let rechecks = 0;
 
 /** An invitation to `scope` (`editions/5`, `programmes/B047`), made by `by`. */
 function invitation(id: number, scope: string, by: string): Invitation {
@@ -318,11 +322,13 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return json({ locale: "it", sections: [] });
   }
   if (/^\/api\/catalog\/editions\/\d+\/readings$/.test(path)) return json([]);
-  const one = EDITIONS.find((e) => path === `/api/catalog/editions/${e.id}`);
+  const one = [...EDITIONS, PAST].find((e) => path === `/api/catalog/editions/${e.id}`);
   if (one !== undefined) {
     await held;
-    // Secretariat staff may assign a teacher; the teacher may not.
-    const assigns = scope.length > 0 ? ["edition.assign_teacher"] : [];
+    // Secretariat staff may assign a teacher on every year, the course's teachers on
+    // every year but a past one (apps/roles/scopes.py).
+    const teaches = reader?.roles.some((role) => role.role === "teacher") ?? false;
+    const assigns = scope.length > 0 || (teaches && one !== PAST) ? ["edition.assign_teacher"] : [];
     return json({ ...served(one), permissions: [...assigns, ...one.permissions] });
   }
   if (programme !== undefined && path.endsWith("/courses")) return json(PLAN);
@@ -349,7 +355,9 @@ function Session({ children }: { children: ReactNode }) {
         logOut: async () => {},
         chooseLocale: async () => {},
         forget: () => {},
-        recheck: async () => {},
+        recheck: async () => {
+          rechecks += 1;
+        },
       }}
     >
       {children}
@@ -452,6 +460,7 @@ beforeEach(() => {
   lost = false;
   earlier = [];
   invitations = [];
+  rechecks = 0;
   acceptedElsewhere = false;
   // Each test is a tab of its own: no row noted by another (features/staff/openedRow.ts).
   sessionStorage.clear();
@@ -887,11 +896,11 @@ describe("a course, an edition, and a teacher's own courses", () => {
 
   it.each([
     [
-      "its teacher, who reads it under their own courses",
+      "its teacher, who assigns a colleague, under their own courses",
       TEACHER,
       "/staff/editions/5",
       ["I miei insegnamenti →", "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026 (current)"],
-      false,
+      true,
     ],
     [
       "secretariat staff, who may assign, through their programme",
@@ -930,7 +939,7 @@ describe("a course, an edition, and a teacher's own courses", () => {
       // The reader is marked as themselves; whoever may assign gets a "Revoca" per row.
       people:
         who === TEACHER
-          ? ["demo-colleagueDocente", "demo-teachertuDocente"]
+          ? ["demo-colleagueDocenteRevoca", "demo-teachertuDocenteRevoca"]
           : ["demo-colleagueDocenteRevoca", "demo-teacherDocenteRevoca"],
       crumbs: trail,
       // The button for whoever may assign, and nothing in its place for anyone else.
@@ -1155,6 +1164,7 @@ describe("a write from a page", () => {
   it.each([
     [
       "the next row's Revoca",
+      SECRETARIAT,
       "/staff/editions/5?programme=B047",
       "demo-colleague",
       "Revoca demo-teacher",
@@ -1162,13 +1172,22 @@ describe("a write from a page", () => {
     ],
     [
       "the assign button, with nobody left",
+      SECRETARIAT,
       "/staff/editions/4?programme=B047",
       "demo-teacher",
       "Assegna docente",
       true,
     ],
-  ])("revokes a teacher and hands focus to %s", async (_, path, revoking, focus, empty) => {
-    reader = SECRETARIAT;
+    [
+      "the next row's Revoca, a teacher revoking a colleague",
+      TEACHER,
+      "/staff/editions/5",
+      "demo-colleague",
+      "Revoca demo-teacher",
+      false,
+    ],
+  ])("revokes a teacher and hands focus to %s", async (_, who, path, revoking, focus, empty) => {
+    reader = who;
     const { container, unmount } = page(path);
     await settle();
     act(() =>
@@ -1185,11 +1204,58 @@ describe("a write from a page", () => {
     const seen = {
       focused: active?.getAttribute("aria-label") ?? active?.textContent?.trim(),
       empty: (container.textContent ?? "").includes("Nessun docente assegnato a questa edizione."),
+      sent: asked.filter((each) => each.startsWith("DELETE")),
+      // Another's role leaves the reader's account as it was.
+      rechecks,
     };
     unmount();
 
-    expect(seen).toEqual({ focused: focus, empty });
+    const edition = path.split("?")[0]?.replace("/staff/", "/api/catalog/");
+    expect(seen).toEqual({
+      focused: focus,
+      empty,
+      sent: [`DELETE ${edition}/teachers/${revoking}`],
+      rechecks: 0,
+    });
   });
+
+  it.each([
+    ["stays on a page still theirs, as a teacher of another year", false, "/staff/editions/5"],
+    ["goes where their roles now start, the page no longer theirs", true, "/staff/mine"],
+  ])(
+    "reads the account again after revoking the reader's own role, and %s",
+    async (_, gone, end) => {
+      reader = TEACHER;
+      const { container, unmount, path } = page("/staff/editions/5");
+      await settle();
+      act(() =>
+        container
+          .querySelector<HTMLButtonElement>('button[aria-label="Revoca demo-teacher"]')
+          ?.click(),
+      );
+      // The revocation goes through; a read of the edition after it is a 404 when it was the last row.
+      lost = gone;
+      const confirm = [
+        ...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+      ].find((candidate) => candidate.textContent === "Revoca");
+      act(() => confirm?.click());
+      await settle();
+      const seen = {
+        sent: asked.filter((each) => each.startsWith("DELETE")),
+        rechecks,
+        path: path(),
+        toast: (document.body.textContent ?? "").includes("Ruolo revocato"),
+      };
+      unmount();
+
+      expect(seen).toEqual({
+        sent: ["DELETE /api/catalog/editions/5/teachers/demo-teacher"],
+        rechecks: 1,
+        path: end,
+        toast: true,
+      });
+    },
+  );
 
   it("revokes the last secretariat member, says so, and hands focus to the assign button", async () => {
     reader = ADMIN;
@@ -1246,64 +1312,86 @@ describe("invitations on a scope's page", () => {
       scope: "programmes/B047",
       object: "INGEGNERIA INFORMATICA · B047",
     },
-  ])("$button makes a link shown once, then listed under the staff", async (row) => {
-    reader = row.who;
-    const { container, unmount } = page(row.at);
-    await settle();
-    showTab(container, row.tab);
-    const button = container.querySelector<HTMLButtonElement>("main [data-invite]");
-    act(() => {
-      button?.focus();
-      button?.click();
-    });
-    await settle();
-    const dialog = document.body.querySelector('[role="dialog"]');
-    const shown = {
-      label: text(button),
-      object: dialog?.querySelector("p")?.textContent,
-      link: dialog?.querySelector<HTMLInputElement>("input")?.value,
-    };
-    const done = [...(dialog?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find(
-      (candidate) => candidate.textContent === "Fatto",
-    );
-    act(() => done?.click());
-    await settle();
-    const section = [...container.querySelectorAll("main section")].find(
-      (candidate) => candidate.querySelector("h2")?.textContent === "Inviti in sospeso",
-    );
-    const seen = {
-      ...shown,
-      sent: asked.filter((each) => each.startsWith("POST /api/catalog")),
-      listed: text(section?.querySelector("h2")?.parentElement),
-      by: section?.querySelector("tbody td span")?.textContent,
-      focused: document.activeElement === button,
-    };
-    unmount();
+    {
+      at: "/staff/editions/5",
+      who: TEACHER,
+      tab: "Docenti",
+      button: "Invita docente",
+      scope: "editions/5",
+      object: "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE · 2025-2026",
+    },
+  ])(
+    "$button, pressed by $who.username, makes a link shown once, then listed under the staff",
+    async (row) => {
+      reader = row.who;
+      const { container, unmount } = page(row.at);
+      await settle();
+      showTab(container, row.tab);
+      const button = container.querySelector<HTMLButtonElement>("main [data-invite]");
+      act(() => {
+        button?.focus();
+        button?.click();
+      });
+      await settle();
+      const dialog = document.body.querySelector('[role="dialog"]');
+      const shown = {
+        label: text(button),
+        object: dialog?.querySelector("p")?.textContent,
+        link: dialog?.querySelector<HTMLInputElement>("input")?.value,
+      };
+      const done = [...(dialog?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find(
+        (candidate) => candidate.textContent === "Fatto",
+      );
+      act(() => done?.click());
+      await settle();
+      const section = [...container.querySelectorAll("main section")].find(
+        (candidate) => candidate.querySelector("h2")?.textContent === "Inviti in sospeso",
+      );
+      const seen = {
+        ...shown,
+        sent: asked.filter((each) => each.startsWith("POST /api/catalog")),
+        listed: text(section?.querySelector("h2")?.parentElement),
+        by: section?.querySelector("tbody td span")?.textContent,
+        focused: document.activeElement === button,
+      };
+      unmount();
 
-    expect(seen).toEqual({
-      label: row.button,
-      object: row.object,
-      link: `${window.location.origin}/invite#tok-en_9`,
-      sent: [`POST /api/catalog/${row.scope}/invitations`],
-      listed: "Inviti in sospeso1",
-      by: row.who.username,
-      focused: true,
-    });
-  });
+      expect(seen).toEqual({
+        label: row.button,
+        object: row.object,
+        link: `${window.location.origin}/invite#tok-en_9`,
+        sent: [`POST /api/catalog/${row.scope}/invitations`],
+        listed: "Inviti in sospeso1",
+        by: row.who.username,
+        focused: true,
+      });
+    },
+  );
 
-  it("is offered to no one who may not grant the role, who asks for no invitations", async () => {
+  it("is offered to no one who may not grant the role, as a teacher on a past year, who asks for no invitations", async () => {
     reader = TEACHER;
     invitations = [invitation(1, "editions/5", "demo-secretariat")];
-    const { container, unmount } = page("/staff/editions/5");
+    const { container, unmount } = page("/staff/editions/3");
     await settle();
+    showTab(container, "Docenti");
     const seen = {
+      heading: text(container.querySelector("main h1")),
       invite: container.querySelector("main [data-invite]"),
+      assign: container.querySelector("main [data-assign]"),
+      revoke: container.querySelectorAll("main [data-revoke]").length,
       asked: asked.filter((each) => each.includes("/invitations")),
       listed: (container.textContent ?? "").includes("Inviti in sospeso"),
     };
     unmount();
 
-    expect(seen).toEqual({ invite: null, asked: [], listed: false });
+    expect(seen).toEqual({
+      heading: "PROGETTAZIONE E PRODUZIONE MULTIMEDIALE",
+      invite: null,
+      assign: null,
+      revoke: 0,
+      asked: [],
+      listed: false,
+    });
   });
 
   it.each([
