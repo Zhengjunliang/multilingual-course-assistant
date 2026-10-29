@@ -19,7 +19,8 @@ worker that takes it late anyway finds its lease gone and drops it.
 
 **Its own time limit.** Celery enforces time limits only on the prefork
 pool, and this task runs on the threads pool, or on solo on a Windows
-worker, so it checks the time itself between two events.
+worker, so it checks the time itself between two events, and its heartbeat
+stops renewing the lease past it, for an answer stuck before any event.
 """
 
 from __future__ import annotations
@@ -159,6 +160,10 @@ class _Heartbeat:
     def _run(self) -> None:
         while not self._done.wait(HEARTBEAT_SECONDS):
             if time.monotonic() > self.deadline:
+                # The only line an answer stuck for good leaves.
+                logger.error(
+                    "answer %s runs past its time limit: its lease is let go", self._answer_id
+                )
                 return
             try:
                 verdict = inflight.renew(self._answer_id)
@@ -201,6 +206,11 @@ def _generate(job: AnswerJob, heartbeat: _Heartbeat) -> Event:
         )
         with closing(events):
             start = cast("StartEvent", next(events))
+            # Before the renewal, which would hold on to a lease the
+            # heartbeat let go, and before any row is written.
+            if time.monotonic() > heartbeat.deadline:
+                logger.error("answer %s passed its time limit", job.answer_id)
+                return _failure(ErrorCode.ENGINE_DOWN)
             verdict = inflight.renew(job.answer_id)
             if verdict != "ok":
                 return _halted(job, verdict)
