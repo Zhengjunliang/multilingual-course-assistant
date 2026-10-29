@@ -1054,6 +1054,8 @@ def test_a_question_taken_after_its_lease_ran_out_is_dropped(
 
     assert written(job.answer_id) == ["queued"]
     assert not Message.objects.exists()
+    # Not taken: its reader, if it comes back, is told it waited too long.
+    assert not inflight.connection().client.exists(inflight._taken(job.answer_id))
 
 
 @pytest.mark.parametrize("why", ["dead", "too-long"])
@@ -1120,15 +1122,23 @@ def test_an_answer_that_passes_its_time_limit_ends_in_an_outage(
     index: QdrantClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """No pool this task runs on enforces Celery's time limits, so the task
-    checks its own between two events, and keeps what it wrote."""
-    install_engine(index, SLIDES_ROUTE, ["An ", "ORM."])
-    monkeypatch.setattr(tasks, "TIME_LIMIT_SECONDS", -1)
+    checks its own between two events, and keeps what it wrote. The limit is
+    shortened, and the model outlasts it between its two tokens."""
+
+    class SlowSecondToken:
+        def stream(self, messages: Sequence[ChatMessage]) -> Iterator[str]:
+            yield "An "
+            time.sleep(0.4)
+            yield "ORM."
+
+    install_streamer(index, SlowSecondToken())
+    monkeypatch.setattr(tasks, "TIME_LIMIT_SECONDS", 0.3)
 
     stream = events(ask())
 
-    assert names(stream) == ["queued", "start", "error"]
+    assert names(stream) == ["queued", "start", "token", "error"]
     assert error_of(stream)["code"] == "ENGINE_DOWN"
-    assert turns_of(only_conversation())[1] == ("assistant", "", False)
+    assert turns_of(only_conversation())[1] == ("assistant", "An ", False)
 
 
 def test_two_chunks_of_one_page_stay_two_citations(tmp_path: Path) -> None:
@@ -1318,14 +1328,18 @@ def test_a_stop_outlasts_a_router_slower_than_the_lease(
 
 
 def test_an_answer_stuck_before_it_began_gives_its_place_back_after_its_time_limit(
-    index: QdrantClient, held: list[AnswerJob], monkeypatch: pytest.MonkeyPatch
+    index: QdrantClient,
+    held: list[AnswerJob],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """The task checks its own time limit between two events, which an answer
     stuck before its first one never reaches: a retrieval that hangs, or a
     build. The heartbeat stops renewing at the limit, so the lease runs out and
     the place comes back, stopped or not, and the answer ends as an outage if
-    it ever comes unstuck. The limit, the lease and the heartbeat are
-    shortened, and the router outlasts them."""
+    it ever comes unstuck, as one past its limit, before any row is written.
+    The log tells a stuck answer from a dead worker. The limit, the lease and
+    the heartbeat are shortened, and the router outlasts them."""
     monkeypatch.setattr(tasks, "TIME_LIMIT_SECONDS", 0.1)
     monkeypatch.setattr(inflight, "RUNNING_LEASE_SECONDS", 0.2)
     monkeypatch.setattr(tasks, "HEARTBEAT_SECONDS", 0.01)
@@ -1338,12 +1352,18 @@ def test_an_answer_stuck_before_it_began_gives_its_place_back_after_its_time_lim
     engine = install_engine(index, SLIDES_ROUTE)
     engine_module._HOLDER.engine = dataclasses.replace(engine, completer=StuckRouter())
     response = ask()
-    answer(held[0])
+    [job] = held
+    with caplog.at_level(logging.ERROR, logger="apps.qa.tasks"):
+        answer(job)
 
     stream = events(response)
     assert names(stream) == ["queued", "error"]
     assert error_of(stream)["code"] == "ENGINE_DOWN"
     assert not Message.objects.exists()
+    assert caplog.messages == [
+        f"answer {job.answer_id} runs past its time limit: its lease is let go",
+        f"answer {job.answer_id} passed its time limit",
+    ]
 
 
 def test_a_visitor_stops_their_own_answer_by_its_id(
