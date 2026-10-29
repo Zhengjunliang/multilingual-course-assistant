@@ -176,8 +176,11 @@ const revoked = new Set<string>();
 let failures = 0;
 /** Holds every read of one edition until it settles, as a slow server would. */
 let held: Promise<void> | null = null;
-/** Whether edition 5 has left the reader's scope since the page read it: every request about it is a 404. */
-let lost = false;
+/**
+ * What every request about edition 5 is refused with since the page read it:
+ * NOT_FOUND once it left the reader's scope, INTERNAL while the server fails.
+ */
+let lost: "NOT_FOUND" | "INTERNAL" | null = null;
 /** PPM's editions older than EDITIONS, which a case adds to the list. */
 let earlier: Edition[] = [];
 /** The invitations not accepted yet, of every scope. */
@@ -314,8 +317,8 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     revoked.add(path.slice(path.lastIndexOf("/") + 1));
     return new Response(null, { status: 204 });
   }
-  if (lost && path.startsWith("/api/catalog/editions/5")) {
-    return codedRefusal("NOT_FOUND");
+  if (lost !== null && path.startsWith("/api/catalog/editions/5")) {
+    return codedRefusal(lost);
   }
   // Every edition's syllabus and books are empty: the pages around them are what this file asks.
   if (/^\/api\/catalog\/editions\/\d+\/syllabus$/.test(path)) {
@@ -457,7 +460,7 @@ beforeEach(() => {
   revoked.clear();
   failures = 0;
   held = null;
-  lost = false;
+  lost = null;
   earlier = [];
   invitations = [];
   rechecks = 0;
@@ -1145,7 +1148,7 @@ describe("a write from a page", () => {
     reader = SECRETARIAT;
     const { container, unmount } = page("/staff/editions/5?programme=B047");
     await settle();
-    lost = true;
+    lost = "NOT_FOUND";
     act(() => container.querySelector<HTMLButtonElement>("main [data-assign]")?.click());
     const input = document.body.querySelector<HTMLInputElement>('[role="dialog"] input');
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -1220,11 +1223,16 @@ describe("a write from a page", () => {
   });
 
   it.each([
-    ["stays on a page still theirs, as a teacher of another year", false, "/staff/editions/5"],
-    ["goes where their roles now start, the page no longer theirs", true, "/staff/mine"],
-  ])(
+    ["stays on a page still theirs, as a teacher of another year", null, "/staff/editions/5"],
+    ["goes where their roles now start, the page no longer theirs", "NOT_FOUND", "/staff/mine"],
+    [
+      "stays on the page, which says why, when it could not be read",
+      "INTERNAL",
+      "/staff/editions/5",
+    ],
+  ] as const)(
     "reads the account again after revoking the reader's own role, and %s",
-    async (_, gone, end) => {
+    async (_, refusal, end) => {
       reader = TEACHER;
       const { container, unmount, path } = page("/staff/editions/5");
       await settle();
@@ -1234,7 +1242,7 @@ describe("a write from a page", () => {
           ?.click(),
       );
       // The revocation goes through; a read of the edition after it is a 404 when it was the last row.
-      lost = gone;
+      lost = refusal;
       const confirm = [
         ...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
       ].find((candidate) => candidate.textContent === "Revoca");

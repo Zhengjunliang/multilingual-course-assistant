@@ -57,6 +57,7 @@ export default function ProgrammePage() {
       />
     ),
     reload: page.reload,
+    gone: isNotFound(page.error),
   });
   const invitations = useInvitations({
     scope,
