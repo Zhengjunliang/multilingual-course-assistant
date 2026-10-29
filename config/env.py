@@ -51,6 +51,17 @@ class Settings(BaseSettings):
     # port. Unset or empty sends no key.
     qdrant_api_key: SecretStr | None = None
 
+    # Redis, served by docker-compose.yml: Celery's broker and the site's own
+    # data, in two databases of the one server. Two, because Django's
+    # `cache.clear()` empties the whole database it is pointed at (FLUSHDB),
+    # and in the broker's that would drop every queued task. The broker takes
+    # database 0, Celery's own default; Celery also reads CELERY_BROKER_URL
+    # from the environment by itself, so one name means one value. Plain
+    # strings: the compose server has no password and listens on loopback only.
+    # 127.0.0.1 for the reason QDRANT_URL gives.
+    celery_broker_url: str = "redis://127.0.0.1:6379/0"
+    redis_url: str = "redis://127.0.0.1:6379/1"
+
     # HTTPS redirect, HSTS and secure cookies are meaningless — or actively
     # break the site — when nothing terminates TLS, and a demo on the MICC
     # intranet or on the defence machine may well have nothing. One flag gates

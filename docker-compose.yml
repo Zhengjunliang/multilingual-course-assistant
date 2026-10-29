@@ -2,16 +2,13 @@
 #
 # No profile => always starts. `docker compose up -d` brings up the stateful
 # backing services and nothing else, which is what local development needs:
-# Django and the Celery worker run on the host under `uv run` so they can reach
-# the GPU that rag/ requires (rag/search.py picks cuda when it is there).
+# Django and the Celery worker and beat run on the host under `uv run` so they
+# can reach the GPU that rag/ requires (rag/search.py picks cuda when it is there).
 #
-# profiles: ["app"] => starts only when named, `docker compose --profile app up`.
-# That is the MICC / defence-demo path, where the whole stack is containerised
-# on a Linux host.
-#
-# redis (Celery broker) and the app profile itself join this file when the code
-# that uses them does. Values come from .env, the same file config/env.py reads,
-# so there is one place to change a credential.
+# The app profile, which would containerise the whole stack on a Linux host for
+# MICC and the defence demo, joins this file with that deployment (#41). Values
+# come from .env, the same file config/env.py reads, so there is one place to
+# change a credential.
 
 # Fixed, so the volume names below do not depend on the checkout's directory
 # name (the commands of docs/development.md name them).
@@ -84,6 +81,29 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  redis:
+    # Celery's broker and Django's cache, each in a database of its own
+    # (config/env.py says why). The major only, as postgres above.
+    image: redis:8
+    ports:
+      # Loopback only: the server has no password, and the image turns Redis's
+      # protected mode off, so a port published on every interface would be
+      # open to the whole network. A containerised app reaches it as redis:6379.
+      - "127.0.0.1:6379:6379"
+    volumes:
+      # A named volume for the same reason as postgres-data above. It holds
+      # the image's default snapshots, so a restart keeps the queued tasks.
+      - redis-data:/data
+    healthcheck:
+      # While it loads its snapshot Redis answers PING with an error rather
+      # than PONG, so the reply is read, not only the exit code.
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   qdrant-data:
+  redis-data:
