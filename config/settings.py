@@ -152,6 +152,24 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 
+# Cache
+# https://docs.djangoproject.com/en/5.2/topics/cache/#redis
+
+# What lives here is the throttle counters below, and they must be shared: in
+# each process's own memory, Django's default, every process of a deployed site
+# would grant its own four questions a minute. Redis database 1, never the
+# broker's 0: config/env.py says why.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env.redis_url,
+        # As the database's connect_timeout: without them every throttled
+        # request hangs on a stopped Docker engine instead of failing.
+        "OPTIONS": {"socket_connect_timeout": 5, "socket_timeout": 5},
+    }
+}
+
+
 # REST framework
 # https://www.django-rest-framework.org/api-guide/settings/
 
@@ -166,8 +184,7 @@ AUTHENTICATION_BACKENDS = [
 # Throttling is not deferrable either: one POST occupies the GPU for tens of
 # seconds and answers are served one at a time (apps/qa/engine.py), so without a
 # limit a burst becomes a queue that times out instead of an honest 429. The
-# counters live in Django's default local-memory cache, which is exactly right
-# for one process; Redis arrives with Celery.
+# counters live in the cache above.
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         # DRF's session authentication, with a failed CSRF check refused by its own code.

@@ -161,6 +161,17 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # The throttle tests count in the cache, Redis as in docker-compose.yml,
+      # reached at config/env.py's default address.
+      redis:
+        image: redis:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping | grep -q PONG"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       # As in `hooks`, the token is not left in .git/config: nothing here needs it.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -259,6 +270,16 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U mca -d mca"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      # As in `tests`: every request the site throttles counts in it.
+      redis:
+        image: redis:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping | grep -q PONG"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
