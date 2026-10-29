@@ -1291,23 +1291,30 @@ def test_a_generation_failure_keeps_the_fragment_and_marks_it_incomplete(
     assert (role, text, complete) == ("assistant", "", False)
 
 
-def test_a_conversation_deleted_mid_answer_leaves_nothing_behind(index: QdrantClient) -> None:
-    """The sidebar's delete of the conversation being answered: the rows go
-    with the conversation, the answer goes on to its end, and the settling
-    write finds nothing to write and raises nothing."""
+def test_a_conversation_deleted_mid_answer_stops_it_and_leaves_nothing_behind(
+    index: QdrantClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The sidebar's delete of the conversation being answered, as its
+    confirmation says: the rows go with the conversation, the answer stops at
+    the worker's next heartbeat and gives its place back, and the settling
+    write finds nothing to write and raises nothing. Shortened and timed as
+    the stop button's test is."""
+    monkeypatch.setattr(tasks, "HEARTBEAT_SECONDS", 0.01)
 
     class DeletedMidway:
         def stream(self, messages: Sequence[ChatMessage]) -> Iterator[str]:
             yield "An ORM "
             deleted = client_for().delete(f"{CONVERSATIONS_URL}/{only_conversation().pk}")
             assert deleted.status_code == 204
+            time.sleep(0.2)
             yield "maps objects."
 
     install_streamer(index, DeletedMidway())
 
     stream = events(ask())
 
-    assert names(stream)[-1] == "end"
+    assert names(stream)[-1] == "stopped"
+    assert admitted() == set()
     assert not Conversation.objects.exists()
     assert not Message.objects.exists()
 
