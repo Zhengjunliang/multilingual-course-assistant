@@ -1,8 +1,8 @@
 """What a link's holder calls: a reset link's, to set a password, and an invitation's, to accept it.
 
-The holder of a reset link is signed out, and an invitation's may have no
-account yet, so every endpoint here is open, the token in the body the only
-credential (apps/accounts/links.py). Each is checked for the CSRF token as
+The holder of a reset link need not be signed in, and an invitation's may
+have no account yet, so every endpoint here is open, the token in the body
+the only credential (apps/accounts/links.py). Each is checked for the CSRF token as
 logging in is, and counted with it: NIST throttles a recovery code as it does
 a password (SP 800-63B-4, section 4.2.1.2, outside the repository). Each
 looks the link up with a `POST`, though it reads: the token goes in a body,

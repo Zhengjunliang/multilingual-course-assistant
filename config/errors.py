@@ -16,7 +16,7 @@ The body `error_body` builds::
 
     {"error": {"code": "INVALID_ARGUMENT", "message": "...", "data": {},
                "fields": [{"field": "password", "reason": "TOO_SHORT",
-                           "data": {"min_length": 8}}],
+                           "data": {"min_length": 15}}],
                "request_id": "4bf92f3577b34da6a3ce929d0e0e4736"}}
 
 `request_id` is the request's own (config/request_id.py), so the id a page
@@ -137,7 +137,8 @@ SPEC: dict[ErrorCode, Spec] = {
     ErrorCode.MALFORMED_REQUEST: Spec(
         HTTPStatus.BAD_REQUEST, "failure", "The request could not be read."
     ),
-    # Not 401: the page signs the reader out on a 401, and this one is still signing in.
+    # Not 401: the page signs the reader out on a 401, and this one is still signing in,
+    # or confirms a change with the password of the account it is signed in to.
     ErrorCode.WRONG_CREDENTIALS: Spec(
         HTTPStatus.BAD_REQUEST, "fixable", "Wrong username or password."
     ),

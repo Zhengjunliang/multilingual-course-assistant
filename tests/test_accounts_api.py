@@ -75,12 +75,11 @@ def logged_in() -> APIClient:
 
 
 def test_me_answers_a_stranger_with_two_hundred() -> None:
-    """Not a 403, and that is the whole design of this endpoint.
+    """Not a 401, and that is the whole design of this endpoint.
 
-    With only `SessionAuthentication` configured DRF refuses an unauthenticated
-    request with 403 rather than 401 — and a rejected CSRF token is a 403 too.
-    Answering "nobody is logged in" as an ordinary result leaves the SPA one
-    meaning per code instead of two per one.
+    The SPA asks "who am I" before anything else, and reads a 401 as a session
+    that ended; a stranger has an answer too, a flag in the body
+    (apps/accounts/views.py).
     """
     response = APIClient().get(ME_URL)
 
@@ -191,9 +190,9 @@ def test_registering_creates_an_account_and_signs_it_in() -> None:
 
 
 def test_a_registered_password_is_stored_hashed() -> None:
-    """`create_user` rather than `create` is what does this, and the failure it
-    prevents is silent in both directions — plaintext in the database, and every
-    later login refused."""
+    """`set_password_checked` in the serializer's `validate` is what does this,
+    and the failure it prevents is silent in both directions — plaintext in the
+    database, and every later login refused."""
     APIClient().post(REGISTER_URL, {"username": "ada", "password": PASSWORD}, format="json")
     ada = User.objects.get(username="ada")
 
