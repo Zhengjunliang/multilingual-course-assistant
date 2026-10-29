@@ -152,8 +152,12 @@ const WEB_CITATION: Citation = {
 export const CAMPUS_QUESTION = "Come mi iscrivo a un esame?";
 const CAMPUS_ANSWER = "Ci si iscrive su Sol, entro cinque giorni dall'appello.";
 
-/** A whole answer: `start`, the text in two tokens, `end`. */
+/** The campus answer's id: its stream's, and its row's once stored (apps/qa/conversations.py). */
+const CAMPUS_ANSWER_ID = uuidOf(2);
+
+/** A whole answer: `queued`, `start`, the text in two tokens, `end`. */
 function stream(
+  id: string,
   question: string,
   answer: string,
   route: RouteDecision,
@@ -162,6 +166,7 @@ function stream(
 ): AnswerEvent[] {
   const half = Math.floor(answer.length / 2);
   return [
+    { name: "queued", data: { answer_id: id, conversation_id: conversation, question } },
     {
       name: "start",
       data: {
@@ -180,7 +185,14 @@ function stream(
 }
 
 export const campusStream = (conversation: string | null) =>
-  stream(CAMPUS_QUESTION, CAMPUS_ANSWER, CAMPUS_ROUTE, WEB_CITATION, conversation);
+  stream(
+    CAMPUS_ANSWER_ID,
+    CAMPUS_QUESTION,
+    CAMPUS_ANSWER,
+    CAMPUS_ROUTE,
+    WEB_CITATION,
+    conversation,
+  );
 
 /** The campus exchange, stored: what `/chat/<id>` reopens. */
 export const CONVERSATION: ConversationDetail = {
@@ -206,7 +218,7 @@ export const CONVERSATION: ConversationDetail = {
       created_at: "2026-10-08T10:00:00Z",
     },
     {
-      id: uuidOf(2),
+      id: CAMPUS_ANSWER_ID,
       role: "assistant",
       text: `${CAMPUS_ANSWER} ${WEB_CITATION.marker}`,
       locale: "it",

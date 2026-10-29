@@ -16,10 +16,11 @@
  * the reset lands.
  *
  * The page tells the frame two things: that the list of conversations
- * changed, and which conversation is being answered, whose delete the sidebar
- * warns will stop it. Unmounting clears the second, since leaving stops the
- * answer; deleting the conversation being answered stops it too, since the
- * frame then leaves it for `/` and the page resets.
+ * changed, and which conversation is being answered here, whose delete the
+ * sidebar warns will stop it, as the server does (apps/qa/conversation_views.py).
+ * Unmounting clears the second, since a page that is gone follows no answer:
+ * a visitor's stops with it, and a student's goes on, on the worker, into the
+ * conversation it was asked in (features/chat/useAsk.ts).
  *
  * A visitor, on `/` only (auth/RequireSession.tsx), gets the same page with no
  * stored conversation behind it: the thread lives in this page's memory, and a
@@ -108,9 +109,15 @@ export default function ChatPage() {
     }
     // A reply is used only while the URL still names it: a reader who moved on
     // before it arrived would otherwise be pulled back into the old thread.
+    // An answer still being written is read back from its stream, and the list
+    // read again once it settles, as after a question asked here: the list may
+    // have been read while the question waited for a worker, with nothing of
+    // it written yet.
     readConversation(wanted)
       .then((conversation) => {
-        if (loaded.current === wanted) adopt(conversation);
+        if (loaded.current !== wanted) return;
+        const settled = adopt(conversation);
+        if (conversation.answering !== null) void settled.then(refreshConversations);
       })
       .catch((error: unknown) => {
         if (loaded.current !== wanted) return;
@@ -121,7 +128,7 @@ export default function ChatPage() {
         reset();
         setUnreadable({ error });
       });
-  }, [conversationId, visit, adopt, reset, refused]);
+  }, [conversationId, visit, adopt, reset, refused, refreshConversations]);
 
   // A new conversation becomes a place as soon as it has an id. `replace` so
   // that the back button leaves the chat rather than stepping through one
