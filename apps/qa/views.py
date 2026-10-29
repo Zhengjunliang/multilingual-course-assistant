@@ -138,7 +138,14 @@ class _Relay:
     sends a keepalive and asks whether the writer is alive
     (`inflight.probe`): a writer whose lease ran out, or a stream gone, ends
     the response with `ENGINE_DOWN`, as does an answer past the longest one
-    may take, so that no response is held open for nothing.
+    may take, so that no response is held open for nothing. A lease that ran
+    out before any worker began is, most often, a queue longer than the
+    lease, and ends it with the `UNAVAILABLE` a full cap answers.
+
+    It counts as one of the answer's readers (`inflight.MAX_READERS`) from
+    its first event to its last. Pushed out by a newer one, it ends without a
+    last event: a page still open reads that as a dropped connection and
+    resumes (frontend/src/features/chat/follow.ts).
 
     Everything it runs, runs in a copy of the view's context. Under WSGI the
     body is read after the response has left the middleware, which has reset
@@ -163,9 +170,11 @@ class _Relay:
 
     def _framed(self) -> Generator[str, None, None]:
         deadline = time.monotonic() + RELAY_LIMIT_SECONDS
+        reader: inflight.Reader | None = None
         try:
+            reader = inflight.join(self._answer_id)
             while True:
-                entries = inflight.read(self._answer_id, self._after)
+                entries = inflight.read(self._answer_id, self._after, reader=reader)
                 for entry in entries:
                     self._after = entry.id
                     self._ended = entry.name in TERMINAL
@@ -177,6 +186,14 @@ class _Relay:
                 state = inflight.probe(self._answer_id, self._after)
                 if state == "more":
                     continue
+                if state == "untaken":
+                    logger.warning(
+                        "answer %s waited out its lease before a worker began it", self._answer_id
+                    )
+                    yield self._failed(
+                        ErrorCode.UNAVAILABLE, retry_after_seconds=RETRY_AFTER_SECONDS
+                    )
+                    return
                 if state != "alive":
                     logger.error("answer %s lost its writer (%s)", self._answer_id, state)
                 elif time.monotonic() > deadline:
@@ -184,15 +201,24 @@ class _Relay:
                 else:
                     yield KEEPALIVE
                     continue
-                yield self._outage()
+                yield self._failed(ErrorCode.ENGINE_DOWN)
                 return
+        except inflight.PushedOutError:
+            return
         except RedisError:
             logger.exception("the stream of answer %s could not be read", self._answer_id)
-            yield self._outage()
+            yield self._failed(ErrorCode.ENGINE_DOWN)
+        finally:
+            if reader is not None:
+                try:
+                    inflight.leave(self._answer_id, reader)
+                except RedisError:
+                    # Pushed out by the next reader's join all the same.
+                    logger.exception("could not leave answer %s", self._answer_id)
 
-    def _outage(self) -> str:
+    def _failed(self, code: ErrorCode, **data: int) -> str:
         self._ended = True
-        return sse_event(ErrorEvent.model_validate(error_body(ErrorCode.ENGINE_DOWN)))
+        return sse_event(ErrorEvent.model_validate(error_body(code, data)))
 
     def close(self) -> None:
         self._context.run(self._close)

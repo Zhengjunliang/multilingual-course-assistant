@@ -2,7 +2,7 @@
 
 A question is answered on a Celery worker (apps/qa/tasks.py) while the web
 process that took it relays the events to the browser (apps/qa/views.py).
-The two meet here, in four kinds of key under `QA_KEY_PREFIX`
+The two meet here, in six kinds of key under `QA_KEY_PREFIX`
 (config/settings.py), each named by the answer's id:
 
 - `<prefix>:admitted`, a sorted set: one member per answer admitted and not
@@ -15,6 +15,10 @@ The two meet here, in four kinds of key under `QA_KEY_PREFIX`
 - `<prefix>:stop:<id>`, present once someone asked the answer to stop.
 - `<prefix>:conversation:<id>`, the answer a conversation is waiting for,
   so that a page reloaded mid-answer finds it.
+- `<prefix>:readers:<id>`, a list: the connections reading the answer,
+  oldest first, `MAX_READERS` at most.
+- `<prefix>:joins:<id>`, a stream with one entry per reader that joined,
+  which wakes the readers already waiting so that the one pushed out ends.
 
 **One clock.** Every decision about a lease runs as a Lua script on Redis's
 own `TIME`, so the web host's clock and the worker's never have to agree on
@@ -34,6 +38,7 @@ API: the URL is the same `REDIS_URL`, read when first used.
 from __future__ import annotations
 
 import functools
+import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, cast
 from uuid import UUID
@@ -43,6 +48,7 @@ from redis import Redis
 
 if TYPE_CHECKING:
     from redis.commands.core import Script
+    from redis.typing import KeyT, StreamIdT
 
     from apps.qa.contract import Event
 
@@ -63,6 +69,12 @@ RUNNING_LEASE_SECONDS = 30
 # ten minutes (its Background mode guide, outside the repository).
 KEPT_SECONDS = 10 * 60
 
+# How many connections read one answer at once: the page, and the one a
+# reload leaves behind until the server notices it closed. A newer reader
+# pushes the oldest out, so that opening one answer many times over holds two
+# of the web process's threads rather than one each.
+MAX_READERS = 2
+
 # Dify's stop flag lives ten minutes too (`set_stop_flag`, outside the
 # repository), longer than any answer runs.
 STOP_SECONDS = 10 * 60
@@ -73,7 +85,7 @@ STOP_SECONDS = 10 * 60
 READ_BLOCK_SECONDS = 10.0
 
 Renewal = Literal["ok", "stopped", "lost"]
-Probe = Literal["more", "alive", "dead", "gone"]
+Probe = Literal["more", "alive", "dead", "untaken", "gone"]
 
 _NOW = """
 local t = redis.call('TIME')
@@ -138,7 +150,8 @@ return 1
 
 # KEYS: admitted, stream. ARGV: id, the last entry id read. New entries first,
 # so a writer that finished between the read and this probe is read, not
-# mourned.
+# mourned. A lease gone from a stream that holds only `admit`'s first entry
+# is a question no worker began.
 _PROBE = (
     _NOW
     + """
@@ -150,11 +163,26 @@ if #redis.call('XRANGE', KEYS[2], '(' .. ARGV[2], '+', 'COUNT', 1) > 0 then
 end
 local score = redis.call('ZSCORE', KEYS[1], ARGV[1])
 if not score or tonumber(score) <= now then
+  if redis.call('XLEN', KEYS[2]) == 1 then
+    return 'untaken'
+  end
   return 'dead'
 end
 return 'alive'
 """
 )
+
+# KEYS: readers, joins. ARGV: reader, most, ttl. Returns the join's entry id.
+_JOIN = """
+redis.call('RPUSH', KEYS[1], ARGV[1])
+while redis.call('LLEN', KEYS[1]) > tonumber(ARGV[2]) do
+  redis.call('LPOP', KEYS[1])
+end
+local id = redis.call('XADD', KEYS[2], 'MAXLEN', ARGV[2], '*', 'reader', ARGV[1])
+redis.call('EXPIRE', KEYS[1], ARGV[3])
+redis.call('EXPIRE', KEYS[2], ARGV[3])
+return id
+"""
 
 
 @dataclass(frozen=True)
@@ -166,6 +194,19 @@ class Entry:
     data: str
 
 
+@dataclass
+class Reader:
+    """One connection reading an answer: its id among the answer's readers,
+    and the last join it has seen, which `read` moves on."""
+
+    id: str
+    seen: str
+
+
+class PushedOutError(Exception):
+    """A newer reader of the same answer took this one's place."""
+
+
 @dataclass(frozen=True)
 class _Connection:
     client: Redis
@@ -173,6 +214,7 @@ class _Connection:
     renew: Script
     finish: Script
     probe: Script
+    join: Script
 
 
 @functools.lru_cache(maxsize=1)
@@ -192,6 +234,7 @@ def _connect(url: str) -> _Connection:
         renew=client.register_script(_RENEW),
         finish=client.register_script(_FINISH),
         probe=client.register_script(_PROBE),
+        join=client.register_script(_JOIN),
     )
 
 
@@ -223,6 +266,14 @@ def _stop(answer_id: UUID) -> str:
 
 def _waiting(conversation_id: UUID) -> str:
     return _key("conversation", conversation_id)
+
+
+def _readers(answer_id: UUID) -> str:
+    return _key("readers", answer_id)
+
+
+def _joins(answer_id: UUID) -> str:
+    return _key("joins", answer_id)
 
 
 def admit(
@@ -303,24 +354,63 @@ def stop(answer_id: UUID) -> None:
     connection().client.set(_stop(answer_id), 1, ex=STOP_SECONDS)
 
 
-def read(answer_id: UUID, after: str, *, block: float = READ_BLOCK_SECONDS) -> list[Entry]:
+def join(answer_id: UUID) -> Reader:
+    """Count one more reader of the answer, pushing the oldest out past
+    `MAX_READERS`. Both keys outlive any relay (apps/qa/views.py) by being
+    kept `KEPT_SECONDS` past the last join."""
+    reader_id = uuid.uuid4().hex
+    joined = connection().join(
+        keys=[_readers(answer_id), _joins(answer_id)],
+        args=[reader_id, MAX_READERS, KEPT_SECONDS],
+    )
+    return Reader(id=reader_id, seen=cast("str", joined))
+
+
+def leave(answer_id: UUID, reader: Reader) -> None:
+    """Give the reader's place back."""
+    connection().client.lrem(_readers(answer_id), 0, reader.id)
+
+
+def read(
+    answer_id: UUID,
+    after: str,
+    *,
+    block: float = READ_BLOCK_SECONDS,
+    reader: Reader | None = None,
+) -> list[Entry]:
     """The entries after `after` ("0" for all), waiting up to `block` seconds
-    for the first; empty when none arrived."""
+    for the first; empty when none arrived.
+
+    With `reader`, another reader's join wakes the wait too, and a join that
+    pushed `reader` out raises `PushedOutError` instead.
+    """
+    streams: dict[KeyT, StreamIdT] = {_stream(answer_id): after}
+    if reader is not None:
+        streams[_joins(answer_id)] = reader.seen
     replies = cast(
         "list[tuple[str, list[tuple[str, dict[str, str]]]]] | None",
-        connection().client.xread({_stream(answer_id): after}, block=round(block * 1000)),
+        connection().client.xread(streams, block=round(block * 1000)),
     )
-    return [
-        Entry(id=entry_id, name=fields["event"], data=fields["data"])
-        for _key_name, entries in replies or ()
-        for entry_id, fields in entries
-    ]
+    entries: list[Entry] = []
+    for key_name, items in replies or ():
+        if key_name == _stream(answer_id):
+            entries.extend(
+                Entry(id=entry_id, name=fields["event"], data=fields["data"])
+                for entry_id, fields in items
+            )
+        elif reader is not None:
+            reader.seen = items[-1][0]
+            if connection().client.lpos(_readers(answer_id), reader.id) is None:
+                raise PushedOutError
+    return entries
 
 
 def probe(answer_id: UUID, after: str) -> Probe:
     """After a read came back empty: `more` if events arrived since, `alive`
-    if the writer still holds its lease, `dead` if it does not, `gone` if the
-    stream itself has expired."""
+    if the writer still holds its lease, `dead` if it lost it after it began,
+    `untaken` if before any worker wrote (a question that waited for one
+    longer than its lease, or whose worker died before its first event),
+    `gone` if the stream itself has expired."""
     return cast(
         "Probe",
         connection().probe(keys=[_admitted(), _stream(answer_id)], args=[str(answer_id), after]),

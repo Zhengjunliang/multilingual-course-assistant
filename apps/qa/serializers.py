@@ -9,8 +9,10 @@ directions, so they stay here with the rest of the DRF layer.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, TypedDict
 
+from redis.exceptions import RedisError
 from rest_framework import serializers
 
 from apps.qa import inflight
@@ -25,6 +27,8 @@ if TYPE_CHECKING:
 
     from rest_framework.request import Request
     from rest_framework.utils.serializer_helpers import ReturnDict
+
+logger = logging.getLogger(__name__)
 
 # A 4B model's context is a shared, GPU-bound resource: every question is queued
 # onto the one card this project has, and the prompt built around it — system
@@ -317,5 +321,12 @@ class ConversationDetailSerializer(ConversationSerializer):
     def get_answering(self, conversation: Conversation) -> uuid.UUID | None:
         """The answer a worker is writing into this conversation, if any: the
         page reopens it from its stream rather than from the rows, which hold
-        nothing of it until it ends (apps/qa/views.py)."""
-        return inflight.answering(conversation.pk)
+        nothing of it until it ends (apps/qa/views.py).
+
+        None with Redis down too: the rows are the conversation, and a page
+        that cannot follow an answer in flight still shows them."""
+        try:
+            return inflight.answering(conversation.pk)
+        except RedisError:
+            logger.exception("could not read the answer in flight of %s", conversation.pk)
+            return None

@@ -59,6 +59,7 @@ from openai import APIConnectionError, NotFoundError
 from pydantic import ValidationError
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.exceptions import ResponseHandlingException
+from redis.exceptions import RedisError
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 from test_agent import ScriptedCompleter
 from test_error_contract import refused
@@ -69,6 +70,7 @@ from apps.accounts.models import User
 from apps.qa import engine as engine_module
 from apps.qa import inflight, tasks
 from apps.qa import views as views_module
+from apps.qa.contract import TokenEvent
 from apps.qa.conversations import thread
 from apps.qa.engine import LLM_DOWN, Engine, EngineUnavailableError
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
@@ -356,6 +358,11 @@ def ask_the_view(question: str = "What is an ORM?", *, anonymous: bool = False):
     if not anonymous:
         force_authenticate(request, user=student())
     return views_module.AskView.as_view()(request)
+
+
+def chunks(response: Any) -> Iterator[bytes]:
+    """The body one chunk at a time, for a test that reads it in steps."""
+    return iter(response.streaming_content)
 
 
 def read_one(response: Any) -> str:
@@ -1050,22 +1057,24 @@ def test_a_relay_whose_writer_is_gone_ends_in_an_outage(
     caplog: pytest.LogCaptureFixture,
     why: str,
 ) -> None:
-    """A worker that died holds no lease, and one that holds it past the
-    longest an answer may take writes nothing worth waiting for: either way
-    the reader is told the service is down, instead of being held open with
-    keepalives for ever. The waits are shortened, not waited out."""
+    """A worker that died after it began holds no lease, and one that holds it
+    past the longest an answer may take writes nothing worth waiting for:
+    either way the reader is told the service is down, instead of being held
+    open with keepalives for ever. The waits are shortened, not waited out."""
     monkeypatch.setattr(inflight, "read", functools.partial(inflight.read, block=0.05))
     if why == "too-long":
         monkeypatch.setattr(views_module, "RELAY_LIMIT_SECONDS", 0)
     response = ask()
     [job] = held
+    # The worker began; a question no worker began is the next test's.
+    inflight.emit(job.answer_id, TokenEvent(text="An "))
     if why == "dead":
         expire(job.answer_id)
 
     with caplog.at_level(logging.ERROR, logger="apps.qa.views"):
         stream = frames(response)
 
-    assert [name for _, name, _ in stream] == ["queued", "error"]
+    assert [name for _, name, _ in stream] == ["queued", "token", "error"]
     assert stream[-1][0] is None
     assert stream[-1][2]["error"]["code"] == "ENGINE_DOWN"
     assert caplog.messages == [
@@ -1073,6 +1082,30 @@ def test_a_relay_whose_writer_is_gone_ends_in_an_outage(
         if why == "dead"
         else f"answer {job.answer_id} passed the longest a relay waits"
     ]
+
+
+def test_a_question_no_worker_began_in_time_is_told_the_site_is_busy(
+    held: list[AnswerJob], monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A lease that ran out before any worker wrote is, most often, a queue
+    longer than the lease: a site busy with other answers, not a broken one.
+    The reader is told to retry, as a full cap tells them, and nothing is
+    logged as an error."""
+    monkeypatch.setattr(inflight, "read", functools.partial(inflight.read, block=0.05))
+    response = ask()
+    [job] = held
+    expire(job.answer_id)
+
+    with caplog.at_level(logging.WARNING, logger="apps.qa.views"):
+        stream = frames(response)
+
+    assert [name for _, name, _ in stream] == ["queued", "error"]
+    error = stream[-1][2]["error"]
+    assert (error["code"], error["data"]) == (
+        "UNAVAILABLE",
+        {"retry_after_seconds": views_module.RETRY_AFTER_SECONDS},
+    )
+    assert [record.levelname for record in caplog.records] == ["WARNING"]
 
 
 def test_an_answer_that_passes_its_time_limit_ends_in_an_outage(
@@ -1153,6 +1186,28 @@ def test_only_the_student_who_asked_reads_an_answer_again(index: QdrantClient, w
     assert (response.status_code, refused(response)) == (404, ("NOT_FOUND", {}))
 
 
+def test_a_third_reader_of_an_answer_ends_the_first(
+    index: QdrantClient, held: list[AnswerJob], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The asking page and a reload read on; a third connection to the same
+    answer ends the oldest, whose page, if it is still open, resumes as after
+    any drop (frontend/src/features/chat/follow.ts)."""
+    monkeypatch.setattr(inflight, "read", functools.partial(inflight.read, block=0.05))
+    install_engine(index, SLIDES_ROUTE, ["An ORM ", "maps objects."])
+    asking = chunks(ask())
+    next(asking)
+    [job] = held
+    reload = chunks(client_for().get(answer_url(job.answer_id, "events")))
+    next(reload)
+    third = chunks(client_for().get(answer_url(job.answer_id, "events")))
+    next(third)
+
+    answer(job)
+
+    assert list(asking) == []
+    assert b"event: end" in b"".join(reload)
+
+
 def test_a_last_event_id_that_names_no_event_is_malformed(index: QdrantClient) -> None:
     install_engine(index, SLIDES_ROUTE)
     answer_id = queued_of(events(ask()))["answer_id"]
@@ -1204,6 +1259,34 @@ def test_an_answer_stopped_before_it_began_leaves_nothing_behind(
     assert stops == [204, 204]
     assert names(events(response)) == ["queued", "stopped"]
     assert not Message.objects.exists()
+
+
+def test_a_stop_outlasts_a_router_slower_than_the_lease(
+    index: QdrantClient, held: list[AnswerJob], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Stopped while the router is still thinking, which a cold model server
+    stretches past half a minute: the answer stops only at its next event, so
+    the heartbeat goes on renewing the lease until then. It ends as `stopped`,
+    not as an outage, and its place is not handed out while it runs. The lease
+    and the heartbeat are shortened, and the router outlasts the lease."""
+    monkeypatch.setattr(inflight, "RUNNING_LEASE_SECONDS", 0.2)
+    monkeypatch.setattr(tasks, "HEARTBEAT_SECONDS", 0.01)
+
+    class SlowRouter:
+        def complete(self, messages: Sequence[ChatMessage]) -> str:
+            stop = client_for().post(answer_url(held[0].answer_id, "stop"))
+            assert stop.status_code == 204
+            time.sleep(0.5)
+            return SLIDES_ROUTE
+
+    engine = install_engine(index, SLIDES_ROUTE)
+    engine_module._HOLDER.engine = dataclasses.replace(engine, completer=SlowRouter())
+    response = ask()
+    answer(held[0])
+
+    assert names(events(response)) == ["queued", "stopped"]
+    assert not Message.objects.exists()
+    assert admitted() == set()
 
 
 def test_a_visitor_stops_their_own_answer_by_its_id(
@@ -1484,6 +1567,28 @@ def test_a_conversation_reopened_while_answered_names_the_answer(
     assert len(waiting["messages"]) == 2
     assert answered["answering"] is None
     assert len(answered["messages"]) == 4
+
+
+def test_a_conversation_is_read_and_deleted_with_redis_down(
+    index: QdrantClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only the answer in flight lives in Redis: a Redis that is down costs a
+    reopened conversation its `answering`, and a delete the stop of an answer
+    it may not have, never the conversation itself."""
+    install_engine(index, SLIDES_ROUTE)
+    detail = f"{CONVERSATIONS_URL}/{start_of(events(ask()))['conversation_id']}"
+
+    def down(conversation_id: uuid.UUID) -> uuid.UUID | None:
+        raise RedisError("Redis is down")
+
+    monkeypatch.setattr(inflight, "answering", down)
+
+    read = client_for().get(detail)
+    deleted = client_for().delete(detail)
+
+    assert (read.status_code, read.json()["answering"]) == (200, None)
+    assert deleted.status_code == 204
+    assert not Conversation.objects.exists()
 
 
 def test_a_conversation_deleted_while_its_question_waits_is_told_so(

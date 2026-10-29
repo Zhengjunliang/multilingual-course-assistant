@@ -15,11 +15,13 @@ time the file changes.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from django.db import transaction
 from django.db.models import JSONField, OuterRef, Subquery
 from django.db.models.functions import Left
+from redis.exceptions import RedisError
 from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveDestroyAPIView
 from rest_framework.parsers import JSONParser
 from rest_framework.permissions import IsAuthenticated
@@ -48,6 +50,8 @@ if TYPE_CHECKING:
     from django.contrib.auth.models import AnonymousUser
     from django.db.models import Model, QuerySet
     from rest_framework.request import Request
+
+logger = logging.getLogger(__name__)
 
 
 def summaries(owner: AbstractBaseUser | AnonymousUser) -> QuerySet[Conversation]:
@@ -205,7 +209,11 @@ class ConversationDetailView(RetrieveDestroyAPIView):
                 locked.delete()
         # An answer still being written into it stops with it, as the sidebar's
         # confirmation says: a worker writing on would hold a place under the
-        # cap for rows that are gone (apps/qa/inflight.py).
-        answering = inflight.answering(instance.pk)
-        if answering is not None:
-            inflight.stop(answering)
+        # cap for rows that are gone (apps/qa/inflight.py). With Redis down
+        # the conversation is deleted all the same, and the delete says so.
+        try:
+            answering = inflight.answering(instance.pk)
+            if answering is not None:
+                inflight.stop(answering)
+        except RedisError:
+            logger.exception("could not stop the answer in flight of %s", instance.pk)
