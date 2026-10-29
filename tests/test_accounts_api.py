@@ -26,7 +26,7 @@ import config.settings
 from apps.accounts.links import make_reset_link
 from apps.accounts.models import User
 from apps.catalog.models import Course, CourseEdition, DegreeProgramme
-from apps.qa import engine as engine_module
+from apps.qa import inflight
 from apps.roles.invitations import invite
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Role
@@ -526,7 +526,8 @@ def test_a_question_without_the_csrf_token_is_refused(
         response = client.post(ASK_URL, body, format="json")
 
     assert (response.status_code, refused(response)) == (403, ("CSRF_FAILED", {}))
-    assert engine_module._HOLDER.engine is None
+    # Refused before the question was admitted: nothing reached the answers in flight.
+    assert not inflight.connected()
     assert "CSRF check failed: CSRF cookie not set." in caplog.messages
 
 

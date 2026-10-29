@@ -152,7 +152,7 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 "django.core.exceptions.PermissionDenied".msg = "refuse with config.errors.fail()"
 
 [tool.ruff.lint.per-file-ignores]
-# assert is the tool in tests; the smoke tests exist to spawn subprocesses; and a
+# assert is the tool in tests; the CLI tests spawn the module they test; and a
 # test that logs in has to write the password down somewhere (S105) — reading it
 # from the environment would only mean a credential that CI has to be given.
 # TID251: a test raises DRF's and Django's exceptions to see how they are answered.

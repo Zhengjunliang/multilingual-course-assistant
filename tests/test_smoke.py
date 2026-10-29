@@ -1,7 +1,6 @@
 """Guards on the project skeleton itself, so a broken setup fails loudly."""
 
-import subprocess
-import sys
+import ast
 from pathlib import Path
 
 import pytest
@@ -18,16 +17,23 @@ def test_django_system_checks_pass() -> None:
     call_command("check")
 
 
-def test_rag_package_stays_free_of_django() -> None:
-    """The pipeline must run standalone from the CLI — see rag/__init__.py."""
-    probe = subprocess.run(
-        [sys.executable, "-c", "import rag, sys; print('django' in sys.modules)"],
-        cwd=BASE_DIR,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    assert probe.stdout.strip() == "False"
+def test_rag_package_stays_free_of_django_and_celery() -> None:
+    """The pipeline must run standalone from the CLI — see rag/__init__.py. A
+    worker runs it (apps/qa/tasks.py), and the pipeline knows nothing of that
+    either. Every module is read rather than imported: importing them all
+    would load the models' libraries for a question about two names."""
+    imported = {
+        (path.relative_to(BASE_DIR).as_posix(), name.split(".")[0])
+        for path in (BASE_DIR / "rag").rglob("*.py")
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        for name in (
+            [alias.name for alias in node.names]
+            if isinstance(node, ast.Import)
+            else [node.module or ""]
+        )
+    }
+    assert {(path, name) for path, name in imported if name in {"django", "celery"}} == set()
 
 
 @pytest.mark.parametrize("value", ["", "data/qdrant"], ids=["empty", "directory"])

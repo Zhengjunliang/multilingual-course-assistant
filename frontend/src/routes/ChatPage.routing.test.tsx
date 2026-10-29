@@ -61,6 +61,7 @@ const STORED: ConversationDetail = {
       created_at: STORED_ROW.created_at,
     },
   ],
+  answering: null,
 };
 
 /** What `GET /api/conversations` answers; a question on `/` adds to it, as the server does. */

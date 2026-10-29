@@ -2,45 +2,57 @@
  * A server-sent-event reader over `fetch`.
  *
  * `EventSource` cannot be used here: it only issues GET requests, and `/api/ask`
- * is a POST that carries a JSON body (and, from the login stage on, a CSRF
- * header). Reading the body stream by hand also buys the two things the browser
- * API hides — an `AbortController`, which is what returns the server's process
- * lock the moment a reader navigates away, and a `TextDecoder` in streaming
- * mode, without which a multi-byte character split across two network chunks
- * arrives as mojibake.
+ * is a POST that carries a JSON body and a CSRF header. Reading the body stream
+ * by hand also buys the two things the browser API hides — an
+ * `AbortController`, which closes the connection the moment a reader navigates
+ * away, and a `TextDecoder` in streaming mode, without which a multi-byte
+ * character split across two network chunks arrives as mojibake.
  *
  * The framing this parses is the one `apps/qa/contract.py` writes:
  *
- *     event: token\ndata: {"text": "An ORM "}\n\n
+ *     id: 1730200004390-0\nevent: token\ndata: {"text": "An ORM "}\n\n
  *
- * A `data:` field ends at the first newline and the payload is always JSON, so
- * a frame is exactly two lines and the blank line after it is the delimiter.
+ * A frame is its lines up to a blank one, each a field named before its first
+ * colon, in whatever order (the WHATWG HTML standard, section "Server-sent
+ * events", outside the repository). A line that opens with the colon is a
+ * comment: the server sends one to keep a quiet connection open.
  */
 
 import type { AnswerEvent } from "./contract";
 
 const FRAME_DELIMITER = "\n\n";
-const EVENT_FIELD = "event: ";
-const DATA_FIELD = "data: ";
 
 export interface SseFrame {
   name: string;
   data: string;
+  /** What to send back as `Last-Event-ID` to be given the frames after this one. */
+  id: string | null;
 }
 
 /**
- * One raw frame, or `null` when the text is not one.
+ * One raw frame, or `null` when the text is not one: a comment alone, or a
+ * frame without its `event` or `data` field, which the server never writes.
  *
- * Only the first newline is looked for, so a third line is not refused: it
- * lands inside `data`, where `readAnswerEvents` fails to parse it as JSON.
+ * A field the standard defines but the server never writes (`retry`), or one it
+ * does not define, is ignored, as the standard says; a second `data` line joins
+ * the first with a newline, as it says too.
  */
 function parseFrame(frame: string): SseFrame | null {
-  const newline = frame.indexOf("\n");
-  if (newline === -1) return null;
-  const nameLine = frame.slice(0, newline);
-  const dataLine = frame.slice(newline + 1);
-  if (!nameLine.startsWith(EVENT_FIELD) || !dataLine.startsWith(DATA_FIELD)) return null;
-  return { name: nameLine.slice(EVENT_FIELD.length), data: dataLine.slice(DATA_FIELD.length) };
+  let name: string | null = null;
+  let data: string | null = null;
+  let id: string | null = null;
+  for (const line of frame.split("\n")) {
+    if (line.startsWith(":")) continue;
+    const colon = line.indexOf(":");
+    const field = colon === -1 ? line : line.slice(0, colon);
+    let value = colon === -1 ? "" : line.slice(colon + 1);
+    if (value.startsWith(" ")) value = value.slice(1);
+    if (field === "event") name = value;
+    else if (field === "data") data = data === null ? value : `${data}\n${value}`;
+    else if (field === "id") id = value;
+  }
+  if (name === null || data === null) return null;
+  return { name, data, id };
 }
 
 /**
@@ -86,9 +98,11 @@ export async function* readAnswerEvents(
   for await (const frame of readFrames(body)) {
     const data: unknown = JSON.parse(frame.data);
     switch (frame.name) {
+      case "queued":
       case "start":
       case "token":
       case "end":
+      case "stopped":
       case "error":
         yield { name: frame.name, data } as AnswerEvent;
         break;

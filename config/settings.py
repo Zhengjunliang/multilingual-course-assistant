@@ -184,10 +184,10 @@ CACHES = {
 # rather than inventing a temporary identity to file it under, which would be a
 # second, weaker account system standing next to this one.
 #
-# Throttling is not deferrable either: one POST occupies the GPU for tens of
-# seconds and answers are served one at a time (apps/qa/engine.py), so without a
-# limit a burst becomes a queue that times out instead of an honest 429. The
-# counters live in the cache above.
+# Throttling is not deferrable either: one POST occupies a worker for tens of
+# seconds (apps/qa/tasks.py), so without a limit one caller's burst fills the
+# global cap below and everyone else is refused. The counters live in the
+# cache above.
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         # DRF's session authentication, with a failed CSRF check refused by its own code.
@@ -207,10 +207,9 @@ REST_FRAMEWORK = {
     # at the rate of its scope; docs/security.md says why anonymous questions
     # get no lower one.
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
-    # ask: the queue waits 90 seconds and an answer takes tens of them, so about
-    # three in flight is all the engine can absorb. Four puts the 429 just past
-    # that boundary rather than behind it, where the caller would be told to
-    # slow down by a service that was not actually full.
+    # ask: an answer takes tens of seconds, so one reader asks a few a minute
+    # at most. Four is the global cap's default (QA_MAX_IN_FLIGHT): one caller
+    # can fill the cap of a single development worker, and no more than that.
     #
     # auth: logging in, registering and the link endpoints are one abuse
     # surface, so they share a bucket, billed by address whoever is signed in
@@ -229,11 +228,11 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "config.errors.api_exception_handler",
 }
 
-# What is deliberately absent: a global cap. Every rate above is per caller,
-# and per-caller limits say nothing about the machine — five accounts at four
-# questions a minute is twenty arriving at an engine that answers about two.
-# `QUEUE_TIMEOUT_SECONDS` (apps/qa/engine.py) is the real capacity control; the
-# rates only stop one caller from being the entire queue.
+# Every rate above is per caller, and per-caller limits say nothing about the
+# machine: five accounts at four questions a minute is twenty arriving at
+# workers that answer a few. The capacity control is the global cap,
+# `QA_MAX_IN_FLIGHT` below, counted in Redis across every web process
+# (apps/qa/inflight.py); the rates only stop one caller from being all of it.
 
 
 # Question answering
@@ -327,7 +326,8 @@ CELERY_TASK_DEFAULT_QUEUE = "default"
 # once done, so a task whose worker goes down with it (the machine, or the
 # worker's main process) is delivered again once the visibility timeout below
 # passes, and fetched one at a time, so a worker never holds a second task
-# while a free one waits. Each task must therefore survive running twice. A
+# while a free one waits. Each task must therefore survive running twice; the
+# one task that must not run twice is acknowledged early (apps/qa/tasks.py). A
 # pool process killed under a task is acknowledged all the same: requeuing
 # it is task_reject_on_worker_lost, left off, since a task that kills its
 # process would then run again and again.
@@ -346,6 +346,11 @@ CELERY_TASK_TIME_LIMIT = 6 * 60
 
 # A schedule's hours are Rome's, not UTC, Celery's default.
 CELERY_TIMEZONE = TIME_ZONE
+
+# A worker logs through LOGGING below, so that a task's lines carry the id of
+# the request that queued it (apps/qa/tasks.py). Left on, Celery would replace
+# the root logger's handlers with its own, whose format has no such field.
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 
 # Beat's schedule, in code rather than a database (no django-celery-beat):
 # what runs and when changes with a commit, never from the admin. One beat

@@ -197,11 +197,12 @@ SPEC: dict[ErrorCode, Spec] = {
         "fixable",
         "Too many requests; retry in {retry_after_seconds} seconds.",
     ),
-    # Busy with someone else's question: the page retries by itself.
+    # As many questions are in flight as the site takes (QA_MAX_IN_FLIGHT): the
+    # page retries by itself.
     ErrorCode.UNAVAILABLE: Spec(
         HTTPStatus.SERVICE_UNAVAILABLE,
         "fixable",
-        "Another question is being answered; retry in {retry_after_seconds} seconds.",
+        "Too many questions are being answered; retry in {retry_after_seconds} seconds.",
     ),
     # A service the answer needs is down, and asking again will not start it.
     ErrorCode.ENGINE_DOWN: Spec(

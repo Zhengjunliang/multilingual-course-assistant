@@ -30,6 +30,15 @@ REST_FRAMEWORK = {
 # site refusing the developer's for a minute.
 CACHES = {"default": {**CACHES["default"], "KEY_PREFIX": "journeys"}}
 
+# The answers in flight count apart for the same reason, under a cap no run
+# reaches: what a journey tests is the page, and the cap is tests/test_qa_api.py's.
+QA_KEY_PREFIX = "journeys:qa"
+QA_MAX_IN_FLIGHT = 1000
+
+# The worker tests/journeys/serve.py starts looks for a question every tenth of
+# a second, where the in-memory broker's default is every second.
+CELERY_BROKER_TRANSPORT_OPTIONS = {"polling_interval": 0.1}
+
 AUTH_PASSWORD_VALIDATORS = [
     validator
     for validator in AUTH_PASSWORD_VALIDATORS

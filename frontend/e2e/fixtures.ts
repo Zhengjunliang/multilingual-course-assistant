@@ -217,6 +217,7 @@ export const CONVERSATION: ConversationDetail = {
       created_at: "2026-10-08T10:00:02Z",
     },
   ],
+  answering: null,
 };
 
 // --- the catalogue the staff pages read ------------------------------------------

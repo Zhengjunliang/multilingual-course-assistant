@@ -17,13 +17,14 @@ from __future__ import annotations
 
 import logging
 import secrets
+from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 from django.utils.log import log_response
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from django.http import HttpRequest, HttpResponseBase
 
@@ -37,6 +38,18 @@ _current: ContextVar[str] = ContextVar("request_id", default=NO_REQUEST)
 def current() -> str:
     """The id of the request this code runs for, or `NO_REQUEST`."""
     return _current.get()
+
+
+@contextmanager
+def serving(request_id: str) -> Iterator[None]:
+    """Run as part of request `request_id`, away from it: the task a request
+    queued, on a worker (apps/qa/tasks.py), logs under the asker's id and
+    reports its failures under it."""
+    token = _current.set(request_id)
+    try:
+        yield
+    finally:
+        _current.reset(token)
 
 
 class RequestIdMiddleware:

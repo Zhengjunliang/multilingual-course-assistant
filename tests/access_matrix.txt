@@ -42,6 +42,8 @@ POST manage:user-deactivate                 deny       deny     deny        deny
 POST manage:user-reset-link                 deny       deny     deny        deny              deny  deny    allow deny     deny
 POST manage:user-sessions-end               deny       deny     deny        deny              deny  deny    allow deny     deny
 GET manage:users                            deny       deny     deny        deny              deny  deny    allow deny     deny
+GET qa:answer-events                        hide       hide     hide        hide              hide  allow   hide  deny     deny
+POST qa:answer-stop                         hide       hide     hide        hide              hide  allow   hide  hide     hide
 POST qa:ask                                 allow      allow    allow       allow             allow allow   allow allow    allow
 DELETE qa:conversation                      hide       hide     hide        hide              hide  allow   hide  deny     deny
 GET qa:conversation                         hide       hide     hide        hide              hide  allow   hide  deny     deny

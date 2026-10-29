@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 from rest_framework import serializers
 
+from apps.qa import inflight
 from apps.qa.conversations import thread
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from config.errors import ErrorCode, FieldReason, fail, field_error
@@ -301,9 +302,10 @@ class ConversationDetailSerializer(ConversationSerializer):
     """
 
     messages = serializers.SerializerMethodField()
+    answering = serializers.SerializerMethodField()
 
     class Meta(ConversationSerializer.Meta):
-        fields = (*ConversationSerializer.Meta.fields, "messages")
+        fields = (*ConversationSerializer.Meta.fields, "messages", "answering")
 
     def get_messages(self, conversation: Conversation) -> list[ReturnDict[str, Any]]:
         messages = Message.objects.filter(conversation=conversation)
@@ -311,3 +313,9 @@ class ConversationDetailSerializer(ConversationSerializer):
             MessageSerializer(message).data
             for message in thread(conversation.current_leaf_id, messages)
         ]
+
+    def get_answering(self, conversation: Conversation) -> uuid.UUID | None:
+        """The answer a worker is writing into this conversation, if any: the
+        page reopens it from its stream rather than from the rows, which hold
+        nothing of it until it ends (apps/qa/views.py)."""
+        return inflight.answering(conversation.pk)

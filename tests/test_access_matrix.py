@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import difflib
 import os
+import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -41,13 +42,14 @@ from test_route_permissions import DELEGATED, routes, served
 from test_sources_api import PDF, SHA, write_sidecar
 
 from apps.catalog.models import Importance, ReadingItem
-from apps.qa import sources
+from apps.qa import inflight, sources
+from apps.qa.contract import QueuedEvent
 from apps.qa.models import Conversation, Message
 from apps.roles.invitations import invite
 from apps.roles.registry import Role
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from apps.accounts.models import User
 
@@ -60,15 +62,15 @@ type Row = tuple[str, str]  # (route name, method)
 
 
 def targets(
-    w: World, conversation: Conversation, book: ReadingItem
+    w: World, conversation: Conversation, book: ReadingItem, answer: uuid.UUID
 ) -> dict[str, dict[str, object]]:
     """The object each route with parameters is asked about.
 
     PPM's current edition, which its teachers and B047's secretariat may act
     on, with one section of its syllabus, a book of its reading list and an
     invitation to teach it; B047, with an invitation to its secretariat; the
-    student's account, and a conversation of theirs; the deck of the `deck`
-    fixture.
+    student's account, a conversation of theirs and an answer being written
+    for them; the deck of the `deck` fixture.
     """
     edition = {"pk": w.ppm_old.pk}
     programme = {"code": w.b047.code}
@@ -100,8 +102,16 @@ def targets(
         "manage:user-reset-link": account,
         "manage:user-sessions-end": account,
         "qa:conversation": {"pk": conversation.pk},
+        "qa:answer-events": {"pk": answer},
+        "qa:answer-stop": {"pk": answer},
         "qa:source": {"sha256": SHA},
     }
+
+
+def in_flight(answer: uuid.UUID, owner: User) -> None:
+    """`answer`, admitted for `owner` and waiting for a worker (apps/qa/inflight.py)."""
+    queued = QueuedEvent(answer_id=answer, conversation_id=None, question="Quando?")
+    assert inflight.admit(answer, queued, owner=owner.pk, conversation_id=None)
 
 
 def api_rows() -> list[Row]:
@@ -155,9 +165,11 @@ def drift(recorded: str, observed: str) -> list[str]:
     )
 
 
-def status_of(user: User | None, method: str, url: str) -> int:
+def status_of(user: User | None, method: str, url: str, ready: Callable[[], None]) -> int:
     def call() -> int:
         cache.clear()  # the throttle would count every cell of a row otherwise
+        # And the answers in flight with it, which share the cache's database.
+        ready()
         body = "{}" if method in {"POST", "PUT", "PATCH"} else ""
         response = as_user(user).generic(method, url, body, content_type="application/json")
         # A source is a FileResponse, which holds its file open until closed.
@@ -191,7 +203,8 @@ def test_who_may_call_each_route() -> None:
     book = ReadingItem.objects.create(
         edition=w.ppm_old, title="Fondamenti", authors="Rossi", importance=Importance.RECOMMENDED
     )
-    target = targets(w, conversation, book)
+    answer = uuid.uuid4()
+    target = targets(w, conversation, book, answer)
     callers: dict[str, User | None] = {user.username: user for user in everyone(w)}
     callers[ANONYMOUS] = None
 
@@ -203,7 +216,7 @@ def test_who_may_call_each_route() -> None:
         except NoReverseMatch:
             pytest.fail(f"{name}: give it an object to be asked about in targets()")
         for column, user in callers.items():
-            status = status_of(user, method, url)
+            status = status_of(user, method, url, lambda: in_flight(answer, w.student))
             cell = verdict(status)
             if cell is None:
                 odd[(name, method), column] = status

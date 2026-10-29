@@ -1,8 +1,10 @@
 """The process-wide retrieval and generation resources, and the one call that
 uses them.
 
-Django is a long-lived process; the pipeline was written for one-shot CLIs.
-Two things follow from that difference.
+They live in the Celery worker that answers questions (apps/qa/tasks.py),
+never in the web process, which only relays what the worker writes. A worker
+is a long-lived process; the pipeline was written for one-shot CLIs. Two
+things follow from that difference.
 
 **The models load once.** The dense encoder comes from
 `rag.index.cached_dense_encoder` because that cache is its declared owner
@@ -11,10 +13,13 @@ The sparse encoder, the reranker, the Qdrant client and the two LLM clients are
 this process's own: nothing in `rag/` caches them, and nothing in `rag/`
 should, because a CLI that loads one and exits has nothing to share.
 
-**Questions are answered one at a time.** An 8GB card cannot host two
-concurrent rerank-plus-generate passes, so this process serialises them; the
-index is the Qdrant service, which the terminal and the worker query at the
-same time (docker-compose.yml).
+**Retrieval takes turns; generation does not.** The encoders and the
+reranker run on the GPU, so the threads of one worker take them one at a
+time, under a lock held for retrieval alone. Generation runs outside it,
+because generating several answers at once is the model server's job (vLLM
+batches them, Ollama queues them), and a lock here would only serialise what
+that server can overlap. The index is the Qdrant service, which the terminal
+and the worker query at the same time (docker-compose.yml).
 
 Retrieval and generation logic is not reimplemented here. This module routes
 through `rag.agent.route`, retrieves through `rag.search.search` and generates
@@ -26,9 +31,9 @@ belongs to the HTTP layer and never appears in this file.
 The conversation history arrives already sliced, as `rag.answer.Turn` — plain
 data — and the conversation id arrives as a UUID, or None for an anonymous
 question, because this module emits the `start` event and that event carries
-it. Loading either is the view's job
-(apps/qa/conversations.py), and `tests/test_qa_api.py` asserts that answering a
-question touches no database at all.
+it. Loading either is the web view's job, before the question is queued
+(apps/qa/conversations.py), and `tests/test_qa_engine.py` asserts that the
+engine touches no database at all.
 """
 
 from __future__ import annotations
@@ -45,7 +50,7 @@ from rag.chunk import detect_locale
 from rag.search import RELEVANCE_CUTOFF, search
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterator, Sequence
+    from collections.abc import Generator, Sequence
     from uuid import UUID
 
     from qdrant_client import QdrantClient
@@ -62,12 +67,6 @@ if TYPE_CHECKING:
 # defaults rather than a shared constant.
 TOP_K = 5
 
-# How long a request may wait for the one in front of it. Answers take tens of
-# seconds each, so a queue deeper than this belongs to a client that will time
-# out anyway; refusing it with a retry hint beats holding a socket open until
-# the worker is killed.
-QUEUE_TIMEOUT_SECONDS = 90.0
-
 # One message for both LLM roles: the router and the generator talk to the same
 # endpoint, so whichever notices first is reporting the same outage.
 LLM_DOWN = (
@@ -83,20 +82,11 @@ class EngineUnavailableError(Exception):
     """A dependency this endpoint cannot answer without is out of reach.
 
     Deliberately not a DRF exception: the engine knows nothing about HTTP, and
-    choosing what the caller is told is the view's job — a 503 before the first
-    event, an `error` event in the stream after it (apps/qa/views.py). Either
-    way the caller reads a code. The message is for the server log, where the
-    view writes it with the original exception, its `__cause__`: it names the
-    service that is down and the command that starts it, which no caller is
-    shown (#14).
-    """
-
-
-class EngineBusyError(EngineUnavailableError):
-    """Someone else's question is still being answered.
-
-    A subclass rather than a flag because the caller's correct response differs:
-    this one is worth retrying in a moment, an outage is not.
+    what the caller is told is the task's choice, an `error` event with the
+    code `ENGINE_DOWN` (apps/qa/tasks.py). The message is for the server log,
+    where the task writes it with the original exception, its `__cause__`: it
+    names the service that is down and the command that starts it, which no
+    caller is shown (#14).
     """
 
 
@@ -116,6 +106,8 @@ class Engine:
     reranker: Reranker | None
     completer: Completer
     streamer: ChatStreamer
+    # Held for retrieval and nothing else: the module docstring says why.
+    gpu: threading.Lock = field(default_factory=threading.Lock, compare=False, repr=False)
 
     def stream(
         self,
@@ -126,7 +118,7 @@ class Engine:
         *,
         scope: Sequence[EditionKey] | None,
         asked_at: float | None = None,
-    ) -> Iterator[Event]:
+    ) -> Generator[Event, None, None]:
         """Route, retrieve, generate — the read-only three quarters of `rag.agent`.
 
         The deepening loop is not here on purpose: it fetches live pages and
@@ -138,14 +130,15 @@ class Engine:
         `rag.search.search`'s meaning, and is required for the same reason it
         is there: it decides what a caller can read, so every call states it.
 
-        `asked_at` is the `time.monotonic()` reading `StartEvent.search_ms`
-        counts from: `stream_answer` passes the moment the question reached the
-        queue; a direct caller, which has no queue, leaves it to this call.
+        `asked_at` is the `time.time()` reading `StartEvent.search_ms` counts
+        from: the task passes the moment the web process admitted the
+        question, wall-clock time because that moment was read in another
+        process; a direct caller, which has no queue, leaves it to this call.
 
-        Everything up to `StartEvent` can still fail into a status code, which
-        is why routing and retrieval happen before the first `yield` rather than
-        lazily alongside the tokens. After it, the view can report a failure
-        only inside the stream.
+        Everything up to `StartEvent` fails before anything is stored, which is
+        why routing and retrieval happen before the first `yield` rather than
+        lazily alongside the tokens: the task writes the conversation's rows
+        only once `start` exists (apps/qa/tasks.py).
         """
         # Lazy on purpose: `rag/` imports the OpenAI SDK and qdrant-client inside
         # the functions that need them, and Django's startup should not pay for
@@ -156,7 +149,7 @@ class Engine:
         from qdrant_client.http.exceptions import ResponseHandlingException
 
         answer_locale = locale or detect_locale(question)
-        started = time.monotonic() if asked_at is None else asked_at
+        started = time.time() if asked_at is None else asked_at
 
         try:
             # An unusable router *reply* is already a routing decision — `route`
@@ -178,7 +171,7 @@ class Engine:
             # follows docs/development.md, runs `rag.index` under its default
             # `--collection slides`, and has no `unifi_web` at all. Dropping what
             # is absent keeps such a question answerable from the half that
-            # exists, instead of turning a perfectly good slides corpus into a 503.
+            # exists, instead of turning a perfectly good slides corpus into an outage.
             available = tuple(
                 name for name in collections_for(decision) if self.client.collection_exists(name)
             )
@@ -191,20 +184,22 @@ class Engine:
             # No `except ValueError` around this: with the collections checked
             # above, the remaining ones are payload drift and mismatched reranker
             # output — real defects, which deserve a traceback in the log rather
-            # than a 503 telling the caller to rebuild an index that is fine.
-            hits = search(
-                self.client,
-                # Retrieval runs on the rewritten query; generation below keeps
-                # the student's original wording, which is what must be answered.
-                decision.query,
-                self.dense,
-                self.sparse,
-                self.reranker,
-                scope=scope,
-                limit=TOP_K,
-                min_score=RELEVANCE_CUTOFF,
-                collections=available,
-            )
+            # than an outage telling the caller to rebuild an index that is fine.
+            with self.gpu:
+                hits = search(
+                    self.client,
+                    # Retrieval runs on the rewritten query; generation below
+                    # keeps the student's original wording, which is what must
+                    # be answered.
+                    decision.query,
+                    self.dense,
+                    self.sparse,
+                    self.reranker,
+                    scope=scope,
+                    limit=TOP_K,
+                    min_score=RELEVANCE_CUTOFF,
+                    collections=available,
+                )
         except ResponseHandlingException as exc:
             # qdrant-client wraps two failures in this one class: the transport
             # (the server is down or unreachable) and a 200 reply it could not
@@ -222,7 +217,7 @@ class Engine:
             locale=answer_locale,
             route=decision,
             citations=[Citation.of(hit) for hit in hits],
-            search_ms=round((time.monotonic() - started) * 1000),
+            search_ms=round((time.time() - started) * 1000),
         )
 
         try:
@@ -263,7 +258,7 @@ def build_retrieval() -> Retrieval:
     """The Qdrant service, the two encoders and the reranker.
 
     The Qdrant client connects on first use, so an unreachable server surfaces
-    on the first question, as a 503 from `Engine.stream`, and a server that
+    on the first question, as `ENGINE_DOWN` from `Engine.stream`, and a server that
     comes back needs no rebuild.
     """
     from rag.index import build_sparse_encoder, cached_dense_encoder, open_client
@@ -309,8 +304,8 @@ def build_engine() -> Engine:
         # is never dropped by a failure after it.
         retrieval: Retrieval = import_string(settings.QA_RETRIEVAL)()
     except Exception as exc:
-        # Converting the failure is what makes it a 503 the caller can wait out
-        # rather than a 500; its traceback reaches the log as this error's cause.
+        # Converting the failure is what makes it an `ENGINE_DOWN` the caller can wait out
+        # rather than an `INTERNAL`; its traceback reaches the log as this error's cause.
         raise EngineUnavailableError("The question service could not start.") from exc
     return Engine(
         client=retrieval.client,
@@ -328,7 +323,7 @@ class _Holder:
 
     A holder rather than a module global that gets rebound: `global` is what
     ruff's PLW0603 objects to, and a slot reads the same. Tests fill it with a
-    stub engine to keep the view under test away from any model load.
+    stub engine to keep the task under test away from any model load.
     """
 
     engine: Engine | None = None
@@ -338,54 +333,15 @@ class _Holder:
 _HOLDER = _Holder()
 
 
-def stream_answer(
-    question: str,
-    conversation_id: UUID | None,
-    locale: str | None = None,
-    history: Sequence[Turn] = (),
-    *,
-    scope: Sequence[EditionKey] | None,
-) -> Generator[Event, None, None]:
-    """One question at a time, on the one set of models this process loaded.
+def loaded_engine() -> Engine:
+    """This process's engine, built by the first caller.
 
-    Typed as a generator rather than an iterator because `close()` is part of
-    what the caller is handed, not an implementation detail: it is the only way
-    to give the lock back without reading the stream to its end.
-
-    **Nothing here runs until the caller asks for the first event.** A generator
-    body starts on the first `next()`, so that call is where the lock is taken —
-    which is deliberate: it lets the caller run routing and retrieval while it
-    can still answer with a status code (apps/qa/views.py), and it means a
-    generator built and dropped without being read costs nothing.
-
-    The lock is released by the `finally` below on all three ways out: the
-    stream ended, it raised, or the caller closed it. That last one is the
-    everyday case — a reader who navigates away — and it does more than free the
-    queue: the generator is suspended on a `yield`, so closing it also stops
-    pulling tokens from a model nobody is listening to.
-
-    The lock covers the build as well, because two first requests arriving
-    together must not each load a reranker. A failed build is not cached — the
-    slot stays empty, so the next request tries again once whatever broke has
-    been fixed.
-
-    The wait is bounded because the rate limit alone cannot bound it: the limit
-    is per client address, while the queue is per process, and an answer takes
-    tens of seconds. Waiting without a ceiling turns a burst into sockets held
-    until the worker is killed — which reaches the caller as a dropped
-    connection, the one outcome worse than a refusal.
-
-    The clock for `StartEvent.search_ms` starts before the lock, so the queue
-    and the build are in the seconds the reader is shown.
+    The lock covers the build, because two first questions arriving together
+    on two threads must not each load a reranker. A failed build is not
+    cached: the slot stays empty, so the next question tries again once
+    whatever broke has been fixed.
     """
-    asked_at = time.monotonic()
-    if not _HOLDER.lock.acquire(timeout=QUEUE_TIMEOUT_SECONDS):
-        raise EngineBusyError("The question service is busy answering another question.")
-    try:
+    with _HOLDER.lock:
         if _HOLDER.engine is None:
             _HOLDER.engine = build_engine()
-        yield from _HOLDER.engine.stream(
-            question, conversation_id, locale, history, scope=scope, asked_at=asked_at
-        )
-    finally:
-        _HOLDER.lock.release()
+        return _HOLDER.engine

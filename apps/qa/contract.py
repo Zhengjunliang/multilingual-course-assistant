@@ -13,22 +13,37 @@ define them would split one wire shape across two files. `apps/qa/engine.py`
 yields these models and never sees the framing; `apps/qa/views.py` frames them
 and never builds one.
 
-A stream is one `start`, any number of `token`s, and one terminator::
+A stream is one `queued`, one `start`, any number of `token`s, and one
+terminator, each event under the id it has in the answer's Redis stream
+(apps/qa/inflight.py)::
 
+    id: 1730200000000-0
+    event: queued
+    data: {"answer_id": "9b2e…", "conversation_id": "3f1c9a52-…", "question": "..."}
+
+    id: 1730200004211-0
     event: start
     data: {"question": "...", "conversation_id": "3f1c9a52-…", "locale": "en",
            "route": {...}, "citations": [...]}
 
+    id: 1730200004390-0
     event: token
     data: {"text": "An ORM "}
 
+    id: 1730200009120-0
     event: end
     data: {}
 
-`end` is the completion signal. A stream that stops without it failed — either
-`error` arrived in its place or the connection dropped — which lets a client
-treat both the same way instead of inferring failure from a sentence that
-happens to end mid-word.
+The id is what a reader who lost the connection sends back as
+`Last-Event-ID`, to be given the events after it (apps/qa/views.py). A line
+that starts with a colon is a comment the server sends while nothing else is
+to be said, to keep the connection open; a client skips it.
+
+`end` is the completion signal, and `stopped` and `error` are the two ways an
+answer ends without it: someone asked it to stop, or it failed. A stream that
+stops with none of the three lost its connection, which lets a client tell an
+answer that stopped from one it can still resume instead of inferring either
+from a sentence that happens to end mid-word.
 
 This module is the single source for that shape. The frontend reads it:
 adding a field is additive there, renaming one breaks it.
@@ -128,6 +143,25 @@ class Event(BaseModel):
     NAME: ClassVar[str]
 
 
+class QueuedEvent(Event):
+    """The question was admitted and waits for a worker. Always first.
+
+    `answer_id` names the answer everywhere it is kept: the stream its events
+    are read back from after a reload, and the stop endpoint
+    (apps/qa/views.py). It is the stored answer's id too, once the worker has
+    written it. `conversation_id` is `StartEvent`'s, known this early, so that
+    a new conversation is a place to come back to while its first question
+    still waits; `question` is the question as asked, so that a reader who
+    reloads while it waits sees what it is waiting for.
+    """
+
+    NAME = "queued"
+
+    answer_id: UUID
+    conversation_id: UUID | None
+    question: str
+
+
 class StartEvent(Event):
     """Everything known before a single token exists.
 
@@ -155,12 +189,12 @@ class StartEvent(Event):
     sends it back as `history` (apps/qa/serializers.py).
 
     `search_ms` is how long the reader waited for this event, in milliseconds:
-    from the question reaching the engine to `start` going out. The wait behind
-    another question and the first question's model loading are in it, as well
-    as routing and retrieval: the interface counts the seconds from the moment
-    the question is asked, and a total that left the queue out would fold a
-    count of 50 into "15". It is stored with the answer so a reopened
-    conversation shows the same number rather than none.
+    from the question being admitted (`queued`) to `start` going out. The wait
+    for a worker is in it, as well as routing and retrieval: the interface
+    counts the seconds from the moment the question is asked, and a total that
+    left the queue out would fold a count of 50 into "15". It is stored with
+    the answer so a reopened conversation shows the same number rather than
+    none.
     """
 
     NAME = "start"
@@ -191,13 +225,22 @@ class EndEvent(Event):
     NAME = "end"
 
 
+class StoppedEvent(Event):
+    """The answer was stopped before its end: by the stop button, or, for a
+    visitor, by leaving. Empty, like `end`. What was written before it is kept
+    as an unfinished answer (apps/qa/tasks.py)."""
+
+    NAME = "stopped"
+
+
 class ErrorEvent(Event):
     """The answer failed after the response had already started.
 
     By then there is no status code left to send, so this stands in for the one
-    the same failure would have produced a moment earlier — apps/qa/views.py
-    draws that line — and carries the body it would have: `ENGINE_DOWN` for a
-    service that is down, `INTERNAL` for a defect, under the id of the request
+    the same failure would have produced before the stream opened, and carries
+    the body it would have: `ENGINE_DOWN` for a service that is down,
+    `CONVERSATION_GONE` for a conversation deleted while its question waited,
+    `INTERNAL` for a defect, under the id of the request that asked
     (config/errors.py).
     """
 
@@ -206,14 +249,24 @@ class ErrorEvent(Event):
     error: ErrorBody
 
 
-def sse(name: str, data: str) -> str:
+# The events after which an answer has nothing more to say.
+TERMINAL = frozenset({EndEvent.NAME, StoppedEvent.NAME, ErrorEvent.NAME})
+
+# A comment line: sent while nothing else is, so that the connection is never
+# idle long enough for a proxy to close it, and so that a reader who left is
+# noticed (apps/qa/views.py).
+KEEPALIVE = ": keepalive\n\n"
+
+
+def sse(name: str, data: str, event_id: str | None = None) -> str:
     """One event, framed.
 
     `data` must already be JSON. A `data:` field ends at the first newline, and
     JSON is the reason no payload here can contain one outside a string literal
     — which is why every event in this module is a model rather than raw text.
     """
-    return f"event: {name}\ndata: {data}\n\n"
+    framed = f"event: {name}\ndata: {data}\n\n"
+    return framed if event_id is None else f"id: {event_id}\n{framed}"
 
 
 def sse_event(event: Event) -> str:

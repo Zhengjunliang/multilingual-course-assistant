@@ -4,16 +4,18 @@ Every query the answer path makes is in this module, and it makes them for one
 reason each: find or start the thread, slice the history the prompt gets, write
 the two rows, settle the assistant row when the stream ends. `thread` is how a
 conversation is read in order, here and in the detail the sidebar opens. HTTP is not
-mentioned here and neither is the engine — the view calls these in order, and
-what crosses into `rag/` is `Turn`, two strings on a frozen model.
+mentioned here and neither is the engine. The web view opens the thread and
+slices the history before it queues the question (apps/qa/views.py); the
+worker writes the rows and settles them (apps/qa/tasks.py). What crosses into
+`rag/` is `Turn`, two strings on a frozen model.
 
 **Where the writes happen matters more than what they write.** Both rows are
 created after the engine's first event has been pulled, never before. Until that
-`next()` returns, the question can still fail into a 503 — a stopped model
-server, a stopped Qdrant service — and a question that was refused
-before it was ever asked should leave nothing behind. Created earlier, every
-503 would deposit a question with no answer under it, and the next turn's
-history would be built around the hole.
+`next()` returns, the question can still fail — a stopped model server, a
+stopped Qdrant service, a stop asked while it waited — and a question that was
+never answered should leave nothing behind. Created earlier, every such failure
+would deposit a question with no answer under it, and the next turn's history
+would be built around the hole.
 """
 
 from __future__ import annotations
@@ -35,7 +37,7 @@ if TYPE_CHECKING:
 
 class ConversationGoneError(Exception):
     """The conversation was deleted while it was being read, or while its
-    question waited for the engine."""
+    question waited for a worker."""
 
 
 class BrokenThreadError(Exception):
@@ -130,39 +132,42 @@ def recent_turns(conversation: Conversation) -> list[Turn]:
     return turns
 
 
-def record_exchange(conversation: Conversation, start: StartEvent) -> UUID:
-    """Write the question and the empty answer; return the answer row's id.
+def record_exchange(conversation_id: UUID, start: StartEvent, answer_pk: UUID) -> None:
+    """Write the question and the empty answer, the answer under `answer_pk`.
 
-    Only the id travels onward. The stream that fills the row in runs for tens
-    of seconds, and a model instance held across it would be a snapshot going
-    steadily more stale — `settle` writes by primary key for that reason.
+    `answer_pk` is the answer's id everywhere: the web process chose it when
+    it admitted the question, and it already names the answer's stream and
+    stop flag (apps/qa/inflight.py), so the row takes it too and a reload
+    finds the one through the other. The stream that fills the row in runs for
+    tens of seconds, and a model instance held across it would be a snapshot
+    going steadily more stale — `settle` writes by primary key for that reason.
 
-    The question hangs from the leaf the locked row holds, not the one
-    `conversation` was read with: a question that waited for the engine holds
-    a copy older than an exchange another tab wrote meanwhile, and hung from
-    that copy's leaf it would fork the thread. The answer hangs from the
-    question and becomes the leaf, in the same lock, so every parent is a row
-    of the same conversation.
+    The question hangs from the leaf the locked row holds, read under the
+    lock: the web process read the conversation before the question waited
+    for a worker, and another tab may have written an exchange meanwhile. Hung
+    from the leaf read then, it would fork the thread. The answer hangs from
+    the question and becomes the leaf, in the same lock, so every parent is a
+    row of the same conversation.
 
     `citations`, `route` and `search_ms` are stored now rather than at the end
     because now is when they exist: they arrive in the `start` event, which is
     not repeated. Reopening this conversation later replays it from these
     columns.
 
-    The question may have waited up to the queue timeout for the engine, and
-    the student may have deleted the conversation meanwhile — after Stop, or
-    from another tab. The row lock is the one the delete takes
-    (apps/qa/conversation_views.py): taken after the delete, the conversation
-    is gone and `ConversationGoneError` is raised before anything is written;
-    taken before it, the two rows are written and the delete, which waits,
-    removes them with the conversation.
+    The question may have waited for a worker, and the student may have
+    deleted the conversation meanwhile — after Stop, or from another tab. The
+    row lock is the one the delete takes (apps/qa/conversation_views.py):
+    taken after the delete, the conversation is gone and
+    `ConversationGoneError` is raised before anything is written; taken before
+    it, the two rows are written and the delete, which waits, removes them
+    with the conversation.
     """
     with transaction.atomic():
-        locked = Conversation.objects.select_for_update().filter(pk=conversation.pk).first()
+        locked = Conversation.objects.select_for_update().filter(pk=conversation_id).first()
         if locked is None:
-            raise ConversationGoneError(conversation.pk)
+            raise ConversationGoneError(conversation_id)
         question = Message.objects.create(
-            conversation=conversation,
+            conversation=locked,
             parent_id=locked.current_leaf_id,
             role=Message.Role.USER,
             text=start.question,
@@ -170,7 +175,8 @@ def record_exchange(conversation: Conversation, start: StartEvent) -> UUID:
             complete=True,
         )
         answer = Message.objects.create(
-            conversation=conversation,
+            id=answer_pk,
+            conversation=locked,
             parent=question,
             role=Message.Role.ASSISTANT,
             text="",
@@ -180,8 +186,7 @@ def record_exchange(conversation: Conversation, start: StartEvent) -> UUID:
             route=start.route.model_dump(mode="json"),
             search_ms=start.search_ms,
         )
-        Conversation.objects.filter(pk=conversation.pk).update(current_leaf=answer)
-    return answer.pk
+        Conversation.objects.filter(pk=conversation_id).update(current_leaf=answer)
 
 
 def settle(answer_pk: UUID, text: str, *, complete: bool) -> None:

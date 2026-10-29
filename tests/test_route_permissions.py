@@ -74,6 +74,11 @@ OPEN: dict[str, str] = {
         "an anonymous student may ask campus questions; AskView stores nothing for them "
         "and answers them from no course material"
     ),
+    "qa:answer-stop": (
+        "an anonymous student may stop the answer they asked for; its id is the credential, "
+        "sent in their own stream alone, and StopAnswerView answers NOT_FOUND to anyone "
+        "but the signed-in owner of a stored one"
+    ),
     "api-unmatched": (
         "an /api/ path no view has: ApiNotFound answers NOT_FOUND before reading who asks"
     ),
