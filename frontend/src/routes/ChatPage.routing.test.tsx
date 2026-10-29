@@ -81,8 +81,8 @@ let requested: string[] = [];
 let rechecked = 0;
 /**
  * Whether the server still holds the reader's session, for the tests that
- * mount the real provider. Without one it refuses everything but `me` and the
- * sign-out as unauthenticated.
+ * mount the real provider. Without one it refuses everything but `me` as
+ * unauthenticated, the sign-out included.
  */
 let signedIn = true;
 /** Whose that session is: the reader's, unless a test signs another account in. */

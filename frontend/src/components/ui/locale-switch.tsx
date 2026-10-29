@@ -2,13 +2,12 @@
  * The language menu: a globe and the language in use, opening on the languages
  * the product speaks, each written in itself.
  *
- * It exists in several frames and must not exist twice in the source: the sign-in
+ * It exists in two frames and must not exist twice in the source: the sign-in
  * pages and the visitor's header, which remember the choice on this screen
  * only (i18n/index.ts), because before a session there is nothing to write to.
- * Signed in, the language is the account menu's «Lingua» (AccountMenu.tsx),
- * which writes it to the account (`User.locale`) and names each language the
- * same way (`endonym`, i18n/index.ts), and this menu again on the account's
- * page (routes/AccountPage.tsx), which writes it there too.
+ * Signed in, the language is the account menu's «Lingua» (AccountMenu.tsx)
+ * alone, which writes it to the account (`User.locale`) and names each
+ * language the same way (`endonym`, i18n/index.ts).
  *
  * A globe and a menu rather than a row of codes, the way MDN and GitHub Docs
  * offer their languages: a row grows with every language, and `zh-hans` means

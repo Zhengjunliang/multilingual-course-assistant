@@ -41,7 +41,8 @@ interface AuthLayoutProps {
 }
 
 /**
- * The frame around the two forms that come before a session (#183): the
+ * The frame around the two forms that come before a session (#183), and the
+ * pages of a forgotten password, a reset link and an invitation: the
  * form on a card with no border, lifted by `shadow-overlay`, the living cat's
  * head sitting on the card's top edge, its chin on the edge and the bubble's
  * tail hooked over it, as the author chose on a prototype after Darin
@@ -54,8 +55,9 @@ interface AuthLayoutProps {
  * The language switch is here as well as in the application header, and it has
  * to be: before a login there is no account to read `User.locale` from, and a
  * student who cannot read the login page cannot get past it. This one
- * remembers the choice on this screen only (i18n/index.ts): there is no
- * account yet to save it to.
+ * remembers the choice on this screen only (i18n/index.ts), never on an
+ * account, even for a reader the invitation page finds signed in: an
+ * account's language is the account menu's (components/AccountMenu.tsx).
  *
  * Behind it all stands the room (features/entry/Room.tsx), kept clear of the
  * card's column; on a phone, under it.

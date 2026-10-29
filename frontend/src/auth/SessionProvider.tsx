@@ -10,8 +10,9 @@
  * The account's `locale` drives the interface, so this is also where i18next is
  * pointed at a language once a reader signs in, and where that language is
  * remembered on this screen (i18n/index.ts). `User.locale` is the single
- * source for a signed-in reader; the switch in the header writes to the
- * account and the account writes back here.
+ * source for a signed-in reader; the account menu's «Lingua»
+ * (components/AccountMenu.tsx) writes to the account and the account writes
+ * back here.
  */
 
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
