@@ -60,10 +60,12 @@ def summaries(owner: AbstractBaseUser | AnonymousUser) -> QuerySet[Conversation]
     source skip it for the one before.
 
     A conversation with no messages is left out, everywhere, not only from the
-    list: a question refused with a 503 leaves one behind, since the engine
-    needs an id before it can fail. Deleting it would mean a write on every
-    outage; listing it would mean a row that opens onto nothing; and its id
-    never reached the client, which saw no `start` event.
+    list: a first question that failed before its answer began leaves one
+    behind, since the view opens it before the question is queued
+    (apps/qa/views.py). Deleting it would mean a write on every outage, and
+    listing it would mean a row that opens onto nothing. Its id reaches the
+    client in `queued`, but the page goes to its address only on `start`, by
+    which time the worker has written its first rows (apps/qa/tasks.py).
 
     Pinning is a flag and the pinned rows are ordered like the rest, so pinning
     moves a row into its group and reorders nothing, as in LibreChat and

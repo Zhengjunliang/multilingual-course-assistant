@@ -28,29 +28,41 @@ async function collect<T>(source: AsyncGenerator<T>): Promise<T[]> {
   return out;
 }
 
-// The three frames of apps/qa/contract.py's docstring. `token` and `end` are
-// copied from it verbatim; `start` cannot be, because the docstring abbreviates
-// its route and citations as `{...}` and `[...]`, which is not JSON. The field
-// names below are the ones the docstring lists, in its order.
+// Frames of apps/qa/contract.py's docstring. `token` and `end` are copied from
+// it verbatim; `start` cannot be, because the docstring abbreviates its route
+// and citations as `{...}` and `[...]`, which is not JSON. The field names
+// below are the ones the docstring lists, in its order.
 const START_FRAME =
-  'event: start\ndata: {"question": "What is an ORM?", ' +
+  'id: 1730200004211-0\nevent: start\ndata: {"question": "What is an ORM?", ' +
   '"conversation_id": "3f1c9a52-6b0e-4d7a-9c1e-2a5b8d4f0e17", ' +
   '"locale": "en", "route": {"target": "slides", "query": "ORM", "fresh": false, ' +
   '"reason": "course material"}, "citations": []}\n\n';
-const TOKEN_FRAME = 'event: token\ndata: {"text": "An ORM "}\n\n';
-const END_FRAME = "event: end\ndata: {}\n\n";
+const TOKEN_FRAME = 'id: 1730200004390-0\nevent: token\ndata: {"text": "An ORM "}\n\n';
+const END_FRAME = "id: 1730200009120-0\nevent: end\ndata: {}\n\n";
 
 describe("readFrames", () => {
-  // "Has no newline" is narrower than "is not two lines" on purpose: a third
-  // line is not rejected, it lands inside `data`. Saying "two lines" here would
-  // promise a check the implementation does not make.
   it.each([
-    ["has no newline", "event: end\n\n"],
-    ["opens with a field other than event", 'id: 1\ndata: {"text": "x"}\n\n'],
-    ["follows event with a field other than data", 'event: token\nfoo: {"text": "x"}\n\n'],
+    ["has no data field", "event: end\n\n"],
+    ["has no event field", 'id: 1-0\ndata: {"text": "x"}\n\n'],
+    ["names its data field otherwise", 'event: token\nfoo: {"text": "x"}\n\n'],
+    ["is a comment alone", ": keepalive\n\n"],
   ])("drops a frame that %s and still delivers the next one", async (_, malformed) => {
     const frames = await collect(readFrames(streamOf([malformed + TOKEN_FRAME])));
     expect(frames.map((frame) => frame.name)).toEqual(["token"]);
+  });
+
+  it("reads the fields in any order, past a comment line, with the id", async () => {
+    // The standard names fields, it does not order them: a reader that took
+    // the first line for the event would drop every frame the server writes.
+    const frames = await collect(
+      readFrames(streamOf([': keepalive\ndata: {"text": "x"}\nevent: token\nid: 7-1\n\n'])),
+    );
+    expect(frames).toEqual([{ name: "token", data: '{"text": "x"}', id: "7-1" }]);
+  });
+
+  it("gives a frame without an id a null one", async () => {
+    const frames = await collect(readFrames(streamOf(["event: end\ndata: {}\n\n"])));
+    expect(frames).toEqual([{ name: "end", data: "{}", id: null }]);
   });
 
   it("releases three frames arriving in one chunk", async () => {
@@ -64,7 +76,7 @@ describe("readFrames", () => {
     const frames = await collect(
       readFrames(streamOf(['event: token\ndata: {"te', 'xt": "An ORM "}\n\n'])),
     );
-    expect(frames).toEqual([{ name: "token", data: '{"text": "An ORM "}' }]);
+    expect(frames).toEqual([{ name: "token", data: '{"text": "An ORM "}', id: null }]);
   });
 
   it("never releases a frame that has no blank line after it", async () => {
@@ -81,27 +93,40 @@ describe("readFrames", () => {
     const frames = await collect(
       readFrames(byteStreamOf([bytes.slice(0, split), bytes.slice(split)])),
     );
-    expect(frames).toEqual([{ name: "token", data: '{"text": "è"}' }]);
+    expect(frames).toEqual([{ name: "token", data: '{"text": "è"}', id: null }]);
   });
 });
 
 describe("readAnswerEvents", () => {
-  it("routes the four names of the contract and carries their payloads through", async () => {
+  it("routes the six names of the contract and carries their payloads through", async () => {
     const events = await collect(
       readAnswerEvents(
         streamOf([
+          'event: queued\ndata: {"answer_id": "9b2e", "conversation_id": null, "question": "q"}\n\n',
           START_FRAME,
           TOKEN_FRAME,
           'event: error\ndata: {"detail": "gone"}\n\n',
+          "event: stopped\ndata: {}\n\n",
           END_FRAME,
         ]),
       ),
     );
-    expect(events.map((event) => event.name)).toEqual(["start", "token", "error", "end"]);
+    expect(events.map((event) => event.name)).toEqual([
+      "queued",
+      "start",
+      "token",
+      "error",
+      "stopped",
+      "end",
+    ]);
+    expect(events[0]).toEqual({
+      name: "queued",
+      data: { answer_id: "9b2e", conversation_id: null, question: "q" },
+    });
     // Every field of START_FRAME is asserted here, and that is the point of
     // spelling the fixture out: without this the payload could be `{}` and the
     // suite would stay green while the fixture's comment claimed otherwise.
-    expect(events[0]).toEqual({
+    expect(events[1]).toEqual({
       name: "start",
       data: {
         question: "What is an ORM?",
@@ -111,9 +136,9 @@ describe("readAnswerEvents", () => {
         citations: [],
       },
     });
-    expect(events[1]).toEqual({ name: "token", data: { text: "An ORM " } });
-    expect(events[2]).toEqual({ name: "error", data: { detail: "gone" } });
-    expect(events[3]).toEqual({ name: "end", data: {} });
+    expect(events[2]).toEqual({ name: "token", data: { text: "An ORM " } });
+    expect(events[3]).toEqual({ name: "error", data: { detail: "gone" } });
+    expect(events[5]).toEqual({ name: "end", data: {} });
   });
 
   it("drops an unknown event and delivers the ones around it", async () => {

@@ -6,7 +6,7 @@ text and asked whether every model the Python side declares, and every field
 inside it, still appears in the matching declaration. That is enough to catch
 the failure that actually happens — a field added or renamed on one side only —
 without dragging a TypeScript toolchain into the Python suite, the same trade
-`tests/test_smoke.py` makes when it probes for Django with a subprocess.
+`tests/test_smoke.py` makes when it reads `rag/`'s imports rather than running them.
 
 What it deliberately does not check is the types. A `number` where the server
 sends a string is the frontend's own `tsc` problem; this gate exists so that the
@@ -34,7 +34,9 @@ from apps.qa.contract import (
     Citation,
     EndEvent,
     ErrorEvent,
+    QueuedEvent,
     StartEvent,
+    StoppedEvent,
     TokenEvent,
 )
 from apps.qa.models import HISTORY_WINDOW_TURNS
@@ -42,6 +44,7 @@ from apps.qa.serializers import (
     MAX_HISTORY_ANSWER_CHARS,
     MAX_QUESTION_CHARS,
     AskRequest,
+    ConversationDetailSerializer,
     ConversationSerializer,
     CourseNameSerializer,
     MessageSerializer,
@@ -65,9 +68,11 @@ CONVERSATION_MIRROR = API / "conversations.ts"
 MIRRORED: tuple[type[BaseModel], ...] = (
     RouteDecision,
     Citation,
+    QueuedEvent,
     StartEvent,
     TokenEvent,
     EndEvent,
+    StoppedEvent,
     ErrorEvent,
 )
 
@@ -149,8 +154,14 @@ def test_the_conversation_mirror_declares_exactly_the_serializers_fields() -> No
     }
 
     declared = {name: fields(declaration(conversations, name)) for name in mirrored}
+    # The detail extends the summary, as its serializer extends the summary's,
+    # so its interface declares only the fields it adds.
+    opening = "export interface ConversationDetail extends ConversationSummary {"
+    detail = conversations[conversations.index(opening) :].split("\n}", 1)[0]
 
     assert declared == {name: set(serializer().fields) for name, serializer in mirrored.items()}
+    added = set(ConversationDetailSerializer().fields) - set(ConversationSerializer().fields)
+    assert fields(detail) == added
 
 
 def test_the_request_mirror_keeps_the_servers_caps() -> None:

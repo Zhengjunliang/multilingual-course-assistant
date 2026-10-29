@@ -1,26 +1,26 @@
-"""The process-wide engine: one at a time, one build, and no database.
+"""The worker's engine: retrieval one at a time, generation side by side, one
+build, and no database.
 
 **No `django_db` marker anywhere, and that is the point of the file.**
 pytest-django refuses any query a test without the marker attempts, so these
 tests do not merely avoid the database — they prove the engine layer never
-reaches one. tests/test_qa_api.py used to carry that promise for the whole
-endpoint; the conversation stage made the endpoint write rows, and rather than
-weaken the claim to nothing it was narrowed to the layer where it is still true
-and still load-bearing: `apps/qa/engine.py` receives a sliced history and an
-integer, and looks nothing up.
+reaches one. `apps/qa/engine.py` receives a sliced history and a conversation
+id, and looks nothing up; the task around it writes the rows
+(tests/test_qa_api.py).
 
-The rest is the serialisation. One card cannot host two concurrent
-rerank-and-generate passes, so answers queue — and nothing in the HTTP tests
-would notice if that lock were deleted, because a test client asks one question
-at a time. These use threads and a fake clock instead.
+The rest is the concurrency of one worker's threads. One card cannot run two
+retrievals at once, and a model server can generate two answers at once, so
+the lock covers retrieval alone — and nothing in the HTTP tests would notice
+if it were deleted or widened, because they answer one question at a time.
+These use threads instead.
 """
 
 import threading
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 import pytest
@@ -29,64 +29,32 @@ from test_index import StubDense, StubSparse, make_chunk
 from test_qa_api import ORM_TEXT, SLIDES_ROUTE, ScriptedStreamer
 
 from apps.qa import engine as engine_module
-from apps.qa.contract import EndEvent, Event, StartEvent
-from apps.qa.engine import Engine
+from apps.qa.engine import Engine, EngineUnavailableError
 from rag.agent import RouteDecision
 from rag.answer import Turn
-from rag.chunk import EditionKey
 from rag.index import ensure_collection, index_chunks, open_client
+
+if TYPE_CHECKING:
+    from qdrant_client import QdrantClient
+
+    from apps.qa.contract import StartEvent
 
 CONVERSATION_ID = UUID("3f1c9a52-6b0e-4d7a-9c1e-2a5b8d4f0e17")
 
 
-class CountingEngine:
-    """An engine that records whether two answers were ever in flight at once.
-
-    It sleeps rather than yielding instantly on purpose: with no work inside
-    the critical section, threads would serialise by accident and the test
-    would pass against a missing lock.
-    """
-
-    def __init__(self) -> None:
-        self.guard = threading.Lock()
-        self.inside = 0
-        self.peak_concurrency = 0
-        self.calls = 0
-
-    def stream(
-        self,
-        question: str,
-        conversation_id: UUID | None,
-        locale: str | None = None,
-        history: Sequence[Turn] = (),
-        *,
-        scope: Sequence[EditionKey] | None,
-        asked_at: float | None = None,
-    ) -> Iterator[Event]:
-        with self.guard:
-            self.inside += 1
-            self.calls += 1
-            self.peak_concurrency = max(self.peak_concurrency, self.inside)
-        time.sleep(0.02)
-        with self.guard:
-            self.inside -= 1
-        yield StartEvent(
-            question=question,
-            conversation_id=conversation_id,
-            locale=locale or "en",
-            route=RouteDecision.model_validate_json(SLIDES_ROUTE),
-            citations=[],
-            search_ms=0,
-        )
-        yield EndEvent()
-
-
-def drain(question: str = "What is an ORM?") -> None:
-    """Consume a whole stream. The threads below must go through this rather
-    than through `stream_answer` directly: calling a generator function only
-    builds the generator, so a thread that stopped there would take no lock and
-    the two tests would pass against a deleted one."""
-    list(engine_module.stream_answer(question, CONVERSATION_ID, scope=None))
+def stub_engine(tmp_path: Path) -> Engine:
+    """An engine over a one-chunk temporary index, with no GPU and no network."""
+    qdrant = open_client(tmp_path / "qdrant")
+    ensure_collection(qdrant, StubDense().dimension())
+    index_chunks(qdrant, [make_chunk(0, ORM_TEXT)], StubDense(), StubSparse())
+    return Engine(
+        client=qdrant,
+        dense=StubDense(),
+        sparse=StubSparse(),
+        reranker=None,
+        completer=ScriptedCompleter([SLIDES_ROUTE]),
+        streamer=ScriptedStreamer(["An answer."]),
+    )
 
 
 def test_the_engine_answers_without_touching_the_database(tmp_path: Path) -> None:
@@ -97,17 +65,7 @@ def test_the_engine_answers_without_touching_the_database(tmp_path: Path) -> Non
     what lets the pipeline be evaluated with no web stack at all, and this test
     turns red the day an ORM import creeps into `apps/qa/engine.py`.
     """
-    qdrant = open_client(tmp_path / "qdrant")
-    ensure_collection(qdrant, StubDense().dimension())
-    index_chunks(qdrant, [make_chunk(0, ORM_TEXT)], StubDense(), StubSparse())
-    engine = Engine(
-        client=qdrant,
-        dense=StubDense(),
-        sparse=StubSparse(),
-        reranker=None,
-        completer=ScriptedCompleter([SLIDES_ROUTE]),
-        streamer=ScriptedStreamer(["An answer."]),
-    )
+    engine = stub_engine(tmp_path)
 
     events = list(
         engine.stream(
@@ -117,123 +75,147 @@ def test_the_engine_answers_without_touching_the_database(tmp_path: Path) -> Non
             scope=None,
         )
     )
-    qdrant.close()
+    engine.client.close()
 
     assert [type(event).NAME for event in events] == ["start", "token", "end"]
     assert cast("StartEvent", events[0]).conversation_id == CONVERSATION_ID
 
 
-def test_the_search_time_spans_routing_and_retrieval(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("asked_at", "readings", "expected_ms"),
+    [
+        pytest.param(None, [10.0, 11.4996], 1500, id="read-by-the-call"),
+        # The task passes the admission's reading: the wait for a worker, and
+        # the first build of the models, are in what the reader waited.
+        pytest.param(10.0, [40.0], 30_000, id="from-the-admission"),
+    ],
+)
+def test_the_search_time_counts_from_when_the_question_was_asked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    asked_at: float | None,
+    readings: list[float],
+    expected_ms: int,
 ) -> None:
-    """`search_ms` is read before the router is asked and again when `start`
-    goes out. The clock is the engine module's own, so the stub moves no other
-    code's time."""
-    readings = iter([10.0, 11.4996])
-    monkeypatch.setattr(engine_module, "time", SimpleNamespace(monotonic=lambda: next(readings)))
-    qdrant = open_client(tmp_path / "qdrant")
-    ensure_collection(qdrant, StubDense().dimension())
-    index_chunks(qdrant, [make_chunk(0, ORM_TEXT)], StubDense(), StubSparse())
-    engine = Engine(
-        client=qdrant,
-        dense=StubDense(),
-        sparse=StubSparse(),
-        reranker=None,
-        completer=ScriptedCompleter([SLIDES_ROUTE]),
-        streamer=ScriptedStreamer(["An answer."]),
-    )
+    """`search_ms` ends when `start` goes out and begins at `asked_at`, or
+    when the call began if there is none. The clock is the engine module's
+    own, so the stub moves no other code's time."""
+    clock = iter(readings)
+    monkeypatch.setattr(engine_module, "time", SimpleNamespace(time=lambda: next(clock)))
+    engine = stub_engine(tmp_path)
 
-    start = next(iter(engine.stream("What is an ORM?", CONVERSATION_ID, scope=None)))
-    qdrant.close()
-
-    assert cast("StartEvent", start).search_ms == 1500
-
-
-def test_the_search_time_counts_the_first_build(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Through `stream_answer`, the seconds start before the lock: the first
-    question waits for the models to load, and the reader counted that wait
-    too. The fake build moves the clock by half a minute."""
-    clock = [10.0]
-    monkeypatch.setattr(engine_module, "time", SimpleNamespace(monotonic=lambda: clock[0]))
-    qdrant = open_client(tmp_path / "qdrant")
-    ensure_collection(qdrant, StubDense().dimension())
-    index_chunks(qdrant, [make_chunk(0, ORM_TEXT)], StubDense(), StubSparse())
-
-    def slow_build() -> Engine:
-        clock[0] += 30.0
-        return Engine(
-            client=qdrant,
-            dense=StubDense(),
-            sparse=StubSparse(),
-            reranker=None,
-            completer=ScriptedCompleter([SLIDES_ROUTE]),
-            streamer=ScriptedStreamer(["An answer."]),
-        )
-
-    monkeypatch.setattr(engine_module, "build_engine", slow_build)
-
-    events = engine_module.stream_answer("What is an ORM?", CONVERSATION_ID, scope=None)
+    events = engine.stream("What is an ORM?", CONVERSATION_ID, scope=None, asked_at=asked_at)
     try:
         start = next(events)
     finally:
         events.close()
-        qdrant.close()
+        engine.client.close()
 
-    assert cast("StartEvent", start).search_ms == 30_000
-
-
-def test_a_stream_nobody_reads_takes_no_lock() -> None:
-    """A generator body does not run until the first `next()`, which is what
-    lets the view do routing and retrieval at the last moment a status code is
-    still available. Building one and dropping it must cost nothing."""
-    engine_module._HOLDER.engine = cast("Engine", CountingEngine())
-
-    unread = engine_module.stream_answer("What is an ORM?", CONVERSATION_ID, scope=None)
-    try:
-        assert engine_module._HOLDER.lock.acquire(blocking=False)
-        engine_module._HOLDER.lock.release()
-    finally:
-        unread.close()
+    assert cast("StartEvent", start).search_ms == expected_ms
 
 
-def test_answers_never_overlap() -> None:
-    """The serialisation is the whole design — one 8GB card, one answer at a time —
-    and nothing in the HTTP tests would notice if the lock were deleted.
+def test_retrieval_takes_turns_and_generation_does_not(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two answers on two threads of one worker: their retrievals never
+    overlap, and their generations must, since each waits for the other at a
+    barrier that breaks after five seconds. A lock widened over generation
+    breaks it; a lock deleted lets two retrievals in at once.
 
-    Driven through `stream_answer` rather than HTTP: the claim is about the
-    module's own guard, and threads plus a test client would only add noise.
+    The retrieval sleeps rather than returning at once on purpose: with no
+    work inside the critical section, threads would serialise by accident and
+    the test would pass against a missing lock.
     """
-    engine = CountingEngine()
-    engine_module._HOLDER.engine = cast("Engine", engine)
+    guard = threading.Lock()
+    inside = [0]
+    peak = [0]
 
-    threads = [threading.Thread(target=drain) for _ in range(4)]
+    def counted_search(*_args: object, **_kwargs: object) -> list[object]:
+        with guard:
+            inside[0] += 1
+            peak[0] = max(peak[0], inside[0])
+        time.sleep(0.05)
+        with guard:
+            inside[0] -= 1
+        return []
+
+    both_generating = threading.Barrier(2, timeout=5)
+
+    def side_by_side(*_args: object) -> Iterator[str]:
+        both_generating.wait()
+        yield "An answer."
+
+    decision = RouteDecision.model_validate_json(SLIDES_ROUTE)
+    monkeypatch.setattr(engine_module, "route", lambda *_args: decision)
+    monkeypatch.setattr(engine_module, "search", counted_search)
+    monkeypatch.setattr(engine_module, "answer", side_by_side)
+    engine = Engine(
+        client=cast("QdrantClient", SimpleNamespace(collection_exists=lambda _name: True)),
+        dense=StubDense(),
+        sparse=StubSparse(),
+        reranker=None,
+        completer=ScriptedCompleter([]),
+        streamer=ScriptedStreamer([]),
+    )
+    failures: list[BaseException] = []
+
+    def answer_one() -> None:
+        try:
+            list(engine.stream("What is an ORM?", None, scope=None))
+        except BaseException as exc:  # reported below, in the test's own thread
+            failures.append(exc)
+
+    threads = [threading.Thread(target=answer_one) for _ in range(2)]
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
 
-    assert engine.calls == 4
-    assert engine.peak_concurrency == 1
+    assert failures == []
+    assert peak[0] == 1
 
 
-def test_two_first_requests_build_one_engine(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The lock covers the build, not only the call: two requests arriving
-    before anything is loaded must not each pay for a reranker."""
+def test_two_first_questions_build_one_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The lock covers the build: two questions taken by two threads before
+    anything is loaded must not each pay for a reranker."""
     builds: list[int] = []
+    built = cast("Engine", object())
 
     def slow_build() -> Engine:
         builds.append(1)
         time.sleep(0.05)
-        return cast("Engine", CountingEngine())
+        return built
 
     monkeypatch.setattr(engine_module, "build_engine", slow_build)
+    loaded: list[Engine] = []
 
-    threads = [threading.Thread(target=drain) for _ in range(3)]
+    threads = [
+        threading.Thread(target=lambda: loaded.append(engine_module.loaded_engine()))
+        for _ in range(3)
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
 
     assert len(builds) == 1
+    assert loaded == [built, built, built]
+
+
+def test_a_failed_build_is_tried_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A service down while the worker starts is no reason to refuse every
+    later question: the slot stays empty, and the next one builds again."""
+    outcomes: list[Engine | Exception] = [EngineUnavailableError("down"), cast("Engine", object())]
+
+    def build() -> Engine:
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(engine_module, "build_engine", build)
+
+    with pytest.raises(EngineUnavailableError):
+        engine_module.loaded_engine()
+    engine = engine_module.loaded_engine()
+
+    assert outcomes == []
+    assert engine_module.loaded_engine() is engine

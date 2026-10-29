@@ -50,7 +50,22 @@ export interface Citation {
   fetch_date: string | null;
 }
 
-/** Everything known before a single token exists. Arrives first, always. */
+/**
+ * The question was admitted and waits for a worker. Arrives first, always.
+ *
+ * `answer_id` names the answer wherever it is kept: the stream a reload reads
+ * it back from (`GET /api/answers/<id>/events`) and the stop endpoint
+ * (`POST /api/answers/<id>/stop`). `conversation_id` is `StartEvent`'s, known
+ * this early; `question` is the question as asked, for a reader who reloads
+ * while it waits.
+ */
+export interface QueuedEvent {
+  answer_id: string;
+  conversation_id: string | null;
+  question: string;
+}
+
+/** Everything known before a single token exists. Follows `queued`. */
 export interface StartEvent {
   question: string;
   /**
@@ -63,7 +78,7 @@ export interface StartEvent {
   locale: string;
   route: RouteDecision;
   citations: Citation[];
-  /** Routing and retrieval, in milliseconds; the wait for the engine is not in it. */
+  /** Milliseconds from the question's admission to this event: the wait for a worker is in it. */
   search_ms: number;
 }
 
@@ -76,23 +91,31 @@ export interface TokenEvent {
 export type EndEvent = Record<string, never>;
 
 /**
- * The answer failed after the response had already started: the body the same
- * failure would have carried a moment earlier, a 503 `ENGINE_DOWN` or a 500
- * `INTERNAL`.
+ * The answer was stopped before its end: by the stop endpoint, or, for a
+ * visitor, by leaving. Empty, like `end`; what was written is kept unfinished.
+ */
+export type StoppedEvent = Record<string, never>;
+
+/**
+ * The answer failed after the response had already started: `ENGINE_DOWN` for
+ * a service that is down, `CONVERSATION_GONE` for a conversation deleted while
+ * its question waited, `INTERNAL` for a defect.
  */
 export interface ErrorEvent {
   error: ErrorBody;
 }
 
 /**
- * A stream is one `start`, any number of `token`s, and one terminator. A stream
- * that stops without `end` or `error` failed — the client treats a dropped
- * connection and an `error` event the same way.
+ * A stream is one `queued`, one `start`, any number of `token`s, and one
+ * terminator: `end`, `stopped` or `error`. A stream that stops with none of
+ * them lost its connection, and a signed-in reader can resume it.
  */
 export type AnswerEvent =
+  | { name: "queued"; data: QueuedEvent }
   | { name: "start"; data: StartEvent }
   | { name: "token"; data: TokenEvent }
   | { name: "end"; data: EndEvent }
+  | { name: "stopped"; data: StoppedEvent }
   | { name: "error"; data: ErrorEvent };
 
 export type AnswerEventName = AnswerEvent["name"];

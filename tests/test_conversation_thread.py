@@ -87,16 +87,16 @@ def start_event(question: str) -> StartEvent:
 
 
 def test_a_question_hangs_from_the_leaf_the_locked_row_holds() -> None:
-    """A question that waited for the engine holds a copy of its conversation
-    read before an exchange another tab wrote meanwhile. Hung from that copy's
-    leaf it would fork the thread; hung from the locked row's, it follows the
-    exchange it did not see."""
+    """The web process read the conversation before its question waited for a
+    worker, and another tab may have written an exchange meanwhile. Hung from
+    the leaf read then, the question would fork the thread; hung from the
+    locked row's, it follows the exchange it did not see."""
     conversation = Conversation.objects.create(owner=owner(), locale="it")
-    stale = Conversation.objects.get(pk=conversation.pk)
+    first, second = uuid.uuid4(), uuid.uuid4()
 
-    first = record_exchange(stale, start_event("Prima?"))
+    record_exchange(conversation.pk, start_event("Prima?"), first)
     with CaptureQueriesContext(connection) as captured:
-        second = record_exchange(stale, start_event("Seconda?"))
+        record_exchange(conversation.pk, start_event("Seconda?"), second)
 
     # Read under the lock, before anything is written: two questions reading
     # the same leaf would both hang from it, and the second to set the leaf

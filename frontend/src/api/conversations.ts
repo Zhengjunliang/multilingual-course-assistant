@@ -67,6 +67,13 @@ export interface StoredMessage {
 
 export interface ConversationDetail extends ConversationSummary {
   messages: StoredMessage[];
+  /**
+   * The answer a worker is writing into this conversation, `null` when none
+   * is. Its question and answer are in `messages` only once the worker has
+   * begun, and whole only once it ends, so the page reads it from its stream
+   * instead (`GET /api/answers/<id>/events`).
+   */
+  answering: string | null;
 }
 
 export function listConversations(): Promise<ConversationSummary[]> {

@@ -1,22 +1,33 @@
 """HTTP surface for question answering.
 
-One endpoint, one method, one media type: `POST /api/ask` replies with a stream
-of server-sent events (apps/qa/contract.py owns their shape). There is no
-non-streaming form of it. An answer takes tens of seconds to generate, and a
-caller left holding an open socket in silence for all of them is the problem
-this endpoint exists to remove — a second, buffered spelling of the same call
-would only be a slower way to get the same bytes.
+`POST /api/ask` replies with a stream of server-sent events (apps/qa/contract.py
+owns their shape), and two endpoints act on an answer once it exists:
+`GET /api/answers/<id>/events` reads its stream again, after a reload or a
+dropped connection, and `POST /api/answers/<id>/stop` stops it. There is no
+non-streaming form of the first. An answer takes tens of seconds to generate,
+and a caller left holding an open socket in silence for all of them is the
+problem this endpoint exists to remove — a second, buffered spelling of the
+same call would only be a slower way to get the same bytes.
 
-The view's whole job is translation: a validated request in, an event stream
-out. Nothing here knows how routing, retrieval or generation work.
+**This process answers nothing itself.** A question is admitted under the
+global cap, queued for a worker (apps/qa/tasks.py), and the response relays
+the answer's stream as the worker writes it (apps/qa/inflight.py). Nothing
+here knows how routing, retrieval or generation work, and nothing here loads
+a model.
 
 **Where a status code stops being available.** Response headers leave with the
-first byte of the body, so only a failure that happens before the first event
-can still be a 503. That is why the engine's generator is primed here rather
-than handed straight to Django: the first `next()` is what runs routing and
-retrieval, and until it returns nothing has been sent. Everything after it — a
-model server that dies halfway through an answer — travels as an `error` event
-under a 200 that was already committed.
+first byte of the body, and the body begins as soon as the question is queued:
+its first event, `queued`, names the answer, which is what the stop button
+needs, and the keepalives that follow it are how a reader who left is noticed
+while the question still waits. So only what is decided before that is a
+status code — a malformed question, the rate limit, a full cap — and
+everything after it travels as an `error` event under a 200, an engine that is
+down before the answer began included. Dify and OpenAI's background responses
+name the answer in their stream's first event too (outside the repository).
+
+**Leaving the page.** A signed-in student's answer is written to its end and
+stored, whoever is still reading it. A visitor's is stored nowhere, so a
+visitor who leaves stops it, and its place under the cap is free again.
 
 **CSRF, for a caller with a session and for one without.** A logged-in request
 is checked by the session authentication, the project-wide default
@@ -27,39 +38,37 @@ browser sends the token as `X-CSRFToken`, the header Django's
 `CSRF_HEADER_NAME` names by default, reading it from the cookie
 `GET /api/auth/me` issues to anyone. Nothing about the stream is special here.
 
-**WSGI is a load-bearing assumption, and this is the file it bears on.** Under
-`WSGI_APPLICATION` a synchronous iterator is consumed on the thread that served
-the request, so the response body, the queue lock it holds and the database
-connection it writes through all belong to one thread. Django runs a
-synchronous `StreamingHttpResponse` iterator in a thread pool under ASGI
-instead — and its database connections are thread-local, so the settling write
-below would open a connection on a pool thread that `close_old_connections`
-never reaches. That is one leaked connection per answered question. Moving this
-project to ASGI starts here.
+**Under WSGI an open stream holds a thread.** A synchronous iterator is
+consumed on the thread that served the request, for as long as the answer is
+being written, so a deployment sizes its threads for the streams open at once
+(#41). The relay below touches no database, which is what would let it run
+unchanged on ASGI's thread pool.
 """
 
 from __future__ import annotations
 
 import contextvars
 import logging
+import re
+import time
+import uuid
 from typing import TYPE_CHECKING, Any, cast
 
 from django.http import StreamingHttpResponse
+from redis.exceptions import RedisError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import BaseRenderer, JSONRenderer
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import AllowAnyWithCsrf
-from apps.qa.contract import EndEvent, ErrorEvent, StartEvent, TokenEvent, sse, sse_event
-from apps.qa.conversations import (
-    ConversationGoneError,
-    open_conversation,
-    recent_turns,
-    record_exchange,
-    settle,
-)
-from apps.qa.engine import EngineBusyError, EngineUnavailableError, stream_answer
+from apps.qa import inflight
+from apps.qa.contract import KEEPALIVE, TERMINAL, ErrorEvent, QueuedEvent, sse, sse_event
+from apps.qa.conversations import ConversationGoneError, open_conversation, recent_turns
 from apps.qa.serializers import AskRequest
+from apps.qa.tasks import TIME_LIMIT_SECONDS, AnswerJob, enqueue
 from config.errors import ErrorCode, error_body, fail
+from config.request_id import current
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Mapping
@@ -68,14 +77,23 @@ if TYPE_CHECKING:
     from rest_framework.request import Request
 
     from apps.accounts.models import User
-    from apps.qa.contract import Event
 
 logger = logging.getLogger(__name__)
 
-# How long a question refused behind another one is told to wait (`UNAVAILABLE`).
-# A minute is long enough that a retry is not simply requeued behind the same
-# work. An outage (`ENGINE_DOWN`) names no wait: asking again will not end it.
+# How long a question refused at the cap is told to wait (`UNAVAILABLE`). A
+# place comes free when an answer ends, which takes tens of seconds, so a
+# minute is long enough that a retry does not meet the same full cap. An
+# outage (`ENGINE_DOWN`) names no wait: asking again will not end it.
 RETRY_AFTER_SECONDS = 60
+
+# The longest a relay waits on an answer: its wait for a worker, the longest
+# the worker may take, and a margin. A worker that died is noticed long before
+# (`inflight.probe`); this bounds a writer that holds its lease and writes
+# nothing.
+RELAY_LIMIT_SECONDS = inflight.QUEUED_LEASE_SECONDS + TIME_LIMIT_SECONDS + 30
+
+# A stream entry's id, which is what `Last-Event-ID` sends back.
+EVENT_ID = re.compile(r"\d+-\d+")
 
 
 class ServerSentEventRenderer(BaseRenderer):
@@ -87,7 +105,7 @@ class ServerSentEventRenderer(BaseRenderer):
     it. The successful response is built below as a `StreamingHttpResponse` and
     never passes through a renderer at all; what reaches this one is only the
     error bodies (config/errors.py) — 400 from the serializer, 429 from the
-    throttle, 503 from the engine — framed as the `error` event a failure inside
+    throttle, 503 from the cap — framed as the `error` event a failure inside
     the stream is.
     """
 
@@ -106,120 +124,111 @@ class ServerSentEventRenderer(BaseRenderer):
         return sse(ErrorEvent.NAME, JSONRenderer().render(data).decode())
 
 
-class _EventStream:
-    """The response body — and the one thing here that must not be a generator.
+class _Relay:
+    """The response body: the answer's stream, read from Redis as the worker
+    writes it, from the entry after `after` ("0" for the first).
 
-    Django calls `close()` on whatever it was handed once the request ends, and
-    a reader who navigates away is exactly that: a close, arriving early. `rest`
-    is where the queue lock is released, so that close has to reach it.
+    Not a generator, because Django calls `close()` on whatever it was handed
+    once the request ends — a reader who navigates away is exactly that, a
+    close arriving early — and closing a generator that was never iterated
+    runs nothing. Closing is how a visitor's leaving stops their answer
+    (`stops_on_leave`); a signed-in student's goes on.
 
-    A generator would not deliver it. Closing one that was never iterated does
-    nothing at all — its body never ran, so it has no `finally` to run — while
-    `rest` has already been primed by the view and is holding the lock by then.
-    A client that hangs up before reading a single byte would strand it, and
-    every later question with it. A class closes `rest` unconditionally.
-
-    Closing `rest` is also what stops generation: it is suspended on a `yield`
-    inside `rag.answer`, so a reader who leaves takes the model with them
-    instead of leaving it writing for nobody.
-
-    It is also where the answer is saved, because this object is the only thing
-    that sees every way a stream can stop: an `end` event, an `error` event in
-    its place, or a reader who left. All three settle the row — what differs is
-    only whether the text in it is complete. An anonymous answer has no row,
-    `answer_pk` is None, and the stream is the same without the write.
+    Between two events it waits on the stream. A wait that comes back empty
+    sends a keepalive and asks whether the writer is alive
+    (`inflight.probe`): a writer whose lease ran out, or a stream gone, ends
+    the response with `ENGINE_DOWN`, as does an answer past the longest one
+    may take, so that no response is held open for nothing.
 
     Everything it runs, runs in a copy of the view's context. Under WSGI the
     body is read after the response has left the middleware, which has reset
     the request's id by then (config/request_id.py): without the copy, the
-    lines the stream writes and the id its `error` event carries would name no
+    lines the relay writes and the id its `error` event carries would name no
     request.
     """
 
-    def __init__(
-        self, first: Event, rest: Generator[Event, None, None], answer_pk: UUID | None
-    ) -> None:
-        self._first = first
-        self._rest = rest
-        self._answer_pk = answer_pk
-        self._parts: list[str] = []
-        self._settled = False
+    def __init__(self, answer_id: UUID, after: str, *, stops_on_leave: bool) -> None:
+        self._answer_id = answer_id
+        self._after = after
+        self._stops_on_leave = stops_on_leave
+        self._ended = False
         self._context = contextvars.copy_context()
         self._frames = self._framed()
 
-    def __iter__(self) -> _EventStream:
+    def __iter__(self) -> _Relay:
         return self
 
     def __next__(self) -> str:
         return self._context.run(next, self._frames)
 
     def _framed(self) -> Generator[str, None, None]:
-        yield sse_event(self._first)
-        complete = False
+        deadline = time.monotonic() + RELAY_LIMIT_SECONDS
         try:
-            for event in self._rest:
-                if isinstance(event, TokenEvent):
-                    self._parts.append(event.text)
-                elif isinstance(event, EndEvent):
-                    complete = True
-                yield sse_event(event)
-        except Exception as exc:
-            # In the place `end` would have taken. The engine's message names
-            # what is down and goes to the log, with its cause (#14); anything
-            # else is a defect, whose traceback would otherwise reach the
-            # server's console without the request's id.
-            code = (
-                ErrorCode.ENGINE_DOWN
-                if isinstance(exc, EngineUnavailableError)
-                else ErrorCode.INTERNAL
-            )
-            failure = ErrorEvent.model_validate(error_body(code))
-            logger.exception(
-                "the stream ended in %s: %s", failure.error.code, failure.error.message
-            )
-            yield sse_event(failure)
-        # Reached only once `rest` has ended, which means its `finally` has already
-        # returned the queue lock. Settling before this point would put a
-        # database round trip inside everyone else's wait.
-        self._settle(complete=complete)
+            while True:
+                entries = inflight.read(self._answer_id, self._after)
+                for entry in entries:
+                    self._after = entry.id
+                    self._ended = entry.name in TERMINAL
+                    yield sse(entry.name, entry.data, entry.id)
+                    if self._ended:
+                        return
+                if entries:
+                    continue
+                state = inflight.probe(self._answer_id, self._after)
+                if state == "more":
+                    continue
+                if state != "alive":
+                    logger.error("answer %s lost its writer (%s)", self._answer_id, state)
+                elif time.monotonic() > deadline:
+                    logger.error("answer %s passed the longest a relay waits", self._answer_id)
+                else:
+                    yield KEEPALIVE
+                    continue
+                yield self._outage()
+                return
+        except RedisError:
+            logger.exception("the stream of answer %s could not be read", self._answer_id)
+            yield self._outage()
+
+    def _outage(self) -> str:
+        self._ended = True
+        return sse_event(ErrorEvent.model_validate(error_body(ErrorCode.ENGINE_DOWN)))
 
     def close(self) -> None:
         self._context.run(self._close)
 
     def _close(self) -> None:
-        # Same ordering, same reason, and here it is the expensive case: `rest`
-        # is suspended mid-answer and still holding the lock, so it is closed
-        # first and written about second.
-        self._rest.close()
         self._frames.close()
-        self._settle(complete=False)
+        if self._stops_on_leave and not self._ended:
+            try:
+                inflight.stop(self._answer_id)
+            except RedisError:
+                # Its lease ends in half a minute without a worker's renewal.
+                logger.exception("could not stop answer %s", self._answer_id)
 
-    def _settle(self, *, complete: bool) -> None:
-        """Once, whichever of the three endings arrives first.
 
-        Django calls `close()` on every response, including one that finished
-        normally, so without the guard a completed answer would be marked
-        incomplete a moment after being marked complete.
-
-        A failure here is logged rather than raised: this runs while the
-        response is being closed, and an exception escaping that path replaces
-        an answer the reader already has with a traceback.
-        """
-        if self._settled or self._answer_pk is None:
-            return
-        self._settled = True
-        try:
-            settle(self._answer_pk, "".join(self._parts), complete=complete)
-        except Exception:
-            logger.exception("could not settle answer %s", self._answer_pk)
+def _streaming(relay: _Relay) -> StreamingHttpResponse:
+    return StreamingHttpResponse(
+        relay,
+        content_type="text/event-stream",
+        headers={
+            # An answer is not reusable, and anything that buffers this
+            # response delivers it as one block at the end — precisely the
+            # behaviour the stream exists to remove. nginx reads the second
+            # header; where nothing proxies this, it costs nothing.
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 class AskView(APIView):
     """POST a question, read the answer as it is written.
 
-    The reply is `text/event-stream`: one `start` event carrying the routing
-    decision and the excerpts the answer will be grounded in, then one `token`
-    event per piece of generated text, then `end`.
+    The reply is `text/event-stream`: one `queued` event naming the answer,
+    one `start` event carrying the routing decision and the excerpts the
+    answer will be grounded in, then one `token` event per piece of generated
+    text, then `end`.
 
     Anyone may ask. A logged-in caller's question and answer are filed in a
     conversation, which supplies the next question's history. An anonymous
@@ -236,7 +245,7 @@ class AskView(APIView):
     permission_classes = (AllowAnyWithCsrf,)
 
     # Its own bucket, separate from the login endpoints': what limits this one
-    # is a GPU that answers about two questions a minute, and what limits those
+    # is the questions a minute the workers can answer, and what limits those
     # is how fast a password can be guessed. A single rate covering both would
     # be wrong for whichever it was not chosen for (config/settings.py). The
     # scoped throttle counts a logged-in caller by account and an anonymous one
@@ -252,69 +261,93 @@ class AskView(APIView):
         if request.user.is_authenticated:
             # The cast is the one apps/accounts/views.py explains: pyright has
             # no django-stubs plugin, so `request.user` is the abstract base to it.
-            conversation = open_conversation(cast("User", request.user), validated["conversation"])
+            user = cast("User", request.user)
+            conversation = open_conversation(user, validated["conversation"])
             try:
                 history = recent_turns(conversation)
             # Deleted after the serializer found it: the refusal of an unknown
-            # id, as below.
+            # id (apps/qa/serializers.py), one error, whenever it is found.
             except ConversationGoneError:
                 fail(ErrorCode.CONVERSATION_GONE)
-            conversation_id = conversation.pk
+            owner, conversation_id = user.pk, conversation.pk
             # Every edition until the caller's own scope is computed from their
             # programme, which is `#36` (docs/data-model.md).
             scope = None
         else:
-            conversation = None
             history = validated["history"]
-            conversation_id = None
+            owner, conversation_id = None, None
             # No edition: course material is for students with an account, and
             # an empty scope skips the slides collection without querying it.
-            scope = ()
+            scope = []
 
-        events = stream_answer(
-            validated["question"], conversation_id, validated["locale"], history, scope=scope
+        answer_id = uuid.uuid4()
+        job = AnswerJob(
+            answer_id=answer_id,
+            question=validated["question"],
+            locale=validated["locale"],
+            history=history,
+            scope=scope,
+            conversation_id=conversation_id,
+            asked_at=time.time(),
+            request_id=current(),
         )
-        try:
-            # Routing and retrieval happen inside this call — see the module
-            # docstring: it is the last moment a status code is still on offer.
-            first = next(events)
-        # Order matters: the busy case is a subclass of the other one. Two codes
-        # because the caller acts differently: a queue clears on its own, a
-        # model server that is not running does not, and retrying it is a wait
-        # that never ends. Raised inside the `except`, so the engine's error,
-        # and its cause, are in the log line for the 503 (config/errors.py).
-        except EngineBusyError:
+        queued = QueuedEvent(
+            answer_id=answer_id, conversation_id=conversation_id, question=job.question
+        )
+        if not inflight.admit(answer_id, queued, owner=owner, conversation_id=conversation_id):
             fail(ErrorCode.UNAVAILABLE, retry_after_seconds=RETRY_AFTER_SECONDS)
-        except EngineUnavailableError:
-            fail(ErrorCode.ENGINE_DOWN)
+        try:
+            enqueue(job)
+        except Exception:
+            # The broker is down: the question never reached a queue, so it
+            # gives its place back and leaves no stream for anyone to wait on.
+            inflight.abandon(answer_id, conversation_id=conversation_id)
+            raise
+        return _streaming(_Relay(answer_id, "0", stops_on_leave=owner is None))
 
-        # Written here and not a line earlier. Everything above could still have
-        # ended as a 503, and a question refused before it was asked must leave
-        # nothing behind (apps/qa/conversations.py).
-        #
-        # The cast states what apps/qa/contract.py already does: a stream is one
-        # `start`, then tokens, then a terminator.
-        answer_pk = None
-        if conversation is not None:
-            try:
-                answer_pk = record_exchange(conversation, cast("StartEvent", first))
-            except ConversationGoneError:
-                # Closed here rather than left to garbage collection: closing is
-                # what runs the engine's `finally` and frees the one answer slot.
-                events.close()
-                # The serializer's own refusal of an unknown id
-                # (apps/qa/serializers.py): one error, whenever it is found.
-                fail(ErrorCode.CONVERSATION_GONE)
 
-        return StreamingHttpResponse(
-            _EventStream(first, events, answer_pk),
-            content_type="text/event-stream",
-            headers={
-                # An answer is not reusable, and anything that buffers this
-                # response delivers it as one block at the end — precisely the
-                # behaviour the stream exists to remove. nginx reads the second
-                # header; where nothing proxies this, it costs nothing.
-                "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no",
-            },
-        )
+class AnswerEventsView(APIView):
+    """GET an answer's events again: after a reload, or after the connection
+    dropped.
+
+    For the signed-in student who asked it only. A visitor's answer is stored
+    nowhere and stops when they leave, so there is nothing to come back to.
+    `Last-Event-ID`, the header the SSE standard names for this, resumes after
+    the event it names; without it, the stream is read from its start, which
+    is what a reloaded page needs. A stream that is gone, or someone else's, is
+    the 404 of an answer that does not exist: whose answers exist is not
+    something to learn by asking.
+    """
+
+    renderer_classes = (JSONRenderer, ServerSentEventRenderer)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request: Request, pk: UUID) -> StreamingHttpResponse:
+        if inflight.owner(pk) != str(request.user.pk):
+            fail(ErrorCode.NOT_FOUND)
+        after = request.headers.get("Last-Event-ID")
+        if after is not None and not EVENT_ID.fullmatch(after):
+            fail(ErrorCode.MALFORMED_REQUEST)
+        return _streaming(_Relay(pk, after or "0", stops_on_leave=False))
+
+
+class StopAnswerView(APIView):
+    """POST to stop an answer being written: 204, and 204 again for one that
+    already stopped or ended, as OpenAI's cancel of a background response is
+    safe to repeat (outside the repository).
+
+    A signed-in student's answer is stopped by the student who asked, nobody
+    else. A visitor's is stopped by whoever holds its id: the id travels only
+    in the asker's own stream, and nothing of the answer is stored where
+    another caller could reach it, so knowing the id is the credential. The
+    worker notices within a second and keeps what it wrote (apps/qa/tasks.py).
+    """
+
+    permission_classes = (AllowAnyWithCsrf,)
+
+    def post(self, request: Request, pk: UUID) -> Response:
+        owner = inflight.owner(pk)
+        if owner is None or owner not in ("", str(request.user.pk)):
+            fail(ErrorCode.NOT_FOUND)
+        inflight.stop(pk)
+        return Response(status=204)
