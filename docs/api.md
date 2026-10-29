@@ -28,7 +28,7 @@ A session lives by its account's tier, a staff one (a superuser or the holder of
 
 A reset link is made by a superuser and handed over in person; the site sends no mail. Its token is the holder's only credential, so it travels in a body, never in a URL a log keeps, and the server stores its digest alone. A link works once within 24 hours, and a newer link of the account voids it; a token that opens no link, unknown, used, replaced or expired, is the one 404 `LINK_EXPIRED` whichever, and a new password the rules refuse is the 400 `INVALID_ARGUMENT` of registering, which leaves the link working ([apps/accounts/links.py](../apps/accounts/links.py)).
 
-An invitation is made by whoever may grant its role on its scope (section *Catalogue API*), handed over the same way, and its token travels and is stored as a reset link's. It works once within 72 hours, and only while its maker may grant the role there: a token that opens none, unknown, used, revoked, expired, or made by an account deactivated or without that grant, is the one 404 `LINK_EXPIRED`. Signed out, the account's fields are checked first, as `register` checks them, and a refusal is that 400, which leaves the invitation working; signed in, an account holding the role there is a 409 `ROLE_ALREADY_HELD`, which leaves it working too. The role is granted as the maker's grant ([apps/roles/invitations.py](../apps/roles/invitations.py)).
+An invitation is made by whoever may grant its role on its scope (section *Catalogue API*), handed over the same way, and its token travels and is stored as a reset link's. It works once within 72 hours, and only while its maker may grant the role there: a token that opens none, unknown, used, revoked, expired, or made by an account deactivated or without that grant, is the one 404 `LINK_EXPIRED`. A body that makes an account has its fields checked first, as `register` checks them, whoever is signed in, and a refusal is that 400, which leaves the invitation working; a body that names the signed-in account, when it holds the role there, is a 409 `ROLE_ALREADY_HELD`, which leaves it working too. The role is granted as the maker's grant ([apps/roles/invitations.py](../apps/roles/invitations.py)).
 
 A superuser manages every account from the site, under `/api/admin/users`, by the rules `/admin/` keeps too ([apps/accounts/manage_views.py](../apps/accounts/manage_views.py)); any other caller gets a 403 `PERMISSION_DENIED`.
 
@@ -156,7 +156,7 @@ Every error of an `/api/` path answers one body, built by `api_exception_handler
 | ---- | ------ | ---- | ----- | ------ |
 | `INVALID_ARGUMENT` | 400 | fixable | fields were rejected, each named in `fields` | |
 | `MALFORMED_REQUEST` | 400 | failure | the request cannot be read: a body that is not JSON or a form past one of Django's `DATA_UPLOAD_MAX_*` limits, a `Host` the site does not serve | |
-| `WRONG_CREDENTIALS` | 400 | fixable | the login's username or password is wrong; not a 401, on which the page signs its reader out | |
+| `WRONG_CREDENTIALS` | 400 | fixable | the login's username or password is wrong, or the password a signed-in account confirms a change with; not a 401, on which the page signs its reader out | |
 | `UNAUTHENTICATED` | 401 | fixable | the request needs a session and has none: never had one, past its tier's limits, or ended by another request while it ran | |
 | `PERMISSION_DENIED` | 403 | fixable | the signed-in user lacks the permission | |
 | `CSRF_FAILED` | 403 | failure | the CSRF token is missing or does not match; reloading the page fixes it | |

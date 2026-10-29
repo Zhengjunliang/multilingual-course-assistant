@@ -190,9 +190,11 @@ REST_FRAMEWORK = {
     # that boundary rather than behind it, where the caller would be told to
     # slow down by a service that was not actually full.
     #
-    # auth: logging in and registering are one abuse surface, so they share a
-    # bucket. `ScopedRateThrottle` bills an unauthenticated caller by address,
-    # which is the setting below finally carrying weight.
+    # auth: logging in, registering and the link endpoints are one abuse
+    # surface, so they share a bucket, billed by address whoever is signed in
+    # (`AddressRateThrottle`, apps/accounts/views.py), which is the setting
+    # below finally carrying weight. A view that asks a signed-in caller's
+    # password again is billed by account at the same rate.
     "DEFAULT_THROTTLE_RATES": {"ask": "4/min", "auth": "5/min"},
     # Without this, DRF's default is to trust a client-supplied
     # X-Forwarded-For as the throttle identity, so
