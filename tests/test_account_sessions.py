@@ -8,7 +8,7 @@ without: a superuser changes an account through `/admin/` or the site's own
 API (apps/accounts/manage_views.py), two doors to the rules of
 apps/accounts/services.py, and a rule is tested at both. A session's age is
 moved back in its stored data, not by a frozen clock: the limits are read off
-that data.
+that data. An expired session's row is deleted at night (apps/accounts/tasks.py).
 """
 
 from __future__ import annotations
@@ -28,10 +28,12 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import AccountSession, User
 from apps.accounts.sessions import AUTH_AT, SEEN_AT, USER_AGENT_MAX_LENGTH, public_id
+from apps.accounts.tasks import clear_expired_sessions
 from apps.catalog.models import Course, CourseEdition, DegreeProgramme
 from apps.qa.models import Conversation
 from apps.roles.models import RoleAssignment
 from apps.roles.registry import Role
+from config.celery import app
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -597,6 +599,22 @@ def test_the_device_list_shows_the_accounts_live_sessions_and_marks_the_callers(
     fields = {"id", "current", "user_agent", "ip", "authenticated_at", "last_activity"}
     assert set(rows[0]) == fields
     assert key(phone) not in str(rows)
+
+
+def test_beat_deletes_the_sessions_past_their_expiry_every_night(ada: User) -> None:
+    """Django leaves an expired row in place until something deletes it. The
+    task is called directly, the way Celery's testing guide advises (outside
+    the repository); the worker that runs it is checked by hand. The schedule
+    is the one beat reads, and the name it sends must be one the app
+    registered, or no worker would know it."""
+    laptop, tablet = signed_in(ada), signed_in(ada)
+    past = timezone.now() - MINUTE
+    AccountSession.objects.filter(session_key=key(tablet)).update(expire_date=past)
+
+    clear_expired_sessions()
+
+    assert list(AccountSession.objects.values_list("session_key", flat=True)) == [key(laptop)]
+    assert app.conf.beat_schedule["clear-expired-sessions"]["task"] in app.tasks
 
 
 NEW_PASSWORD = "lamp-orbit-quietly-87"
