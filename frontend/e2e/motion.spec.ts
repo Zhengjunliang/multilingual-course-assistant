@@ -148,14 +148,14 @@ test.describe("the chat mid-answer", () => {
   }
 
   test("while the search runs: nothing moves", async ({ page, api }) => {
-    api.holdAnswer([]);
+    api.holdAnswer(campusStream(uuidOf(7)).slice(0, 1));
     await ask(page);
     await expect(page.locator(".shimmer")).toBeVisible();
     expect(await moved(page)).toEqual([]);
   });
 
   test("before the first word: nothing moves", async ({ page, api }) => {
-    api.holdAnswer(campusStream(uuidOf(7)).slice(0, 1));
+    api.holdAnswer(campusStream(uuidOf(7)).slice(0, 2));
     await ask(page);
     // The fixture's search took 2400 ms, which the line shows as 3 s.
     await expect(page.getByText(it.process.done.replace("{{seconds}}", "3"))).toBeVisible();
@@ -163,7 +163,7 @@ test.describe("the chat mid-answer", () => {
   });
 
   test("while the words arrive: nothing moves", async ({ page, api }) => {
-    api.holdAnswer(campusStream(uuidOf(7)).slice(0, 2));
+    api.holdAnswer(campusStream(uuidOf(7)).slice(0, 3));
     await ask(page);
     // The answer's own words for a screen reader; the composer's foot says it too.
     await expect(page.getByRole("article").getByText(it.status.streaming)).toBeAttached();

@@ -113,15 +113,13 @@ export default function ShellLayout() {
   // Leaving a deleted conversation is decided here, where the list is, and
   // only once the server has said it is gone: navigating first would show an
   // empty page for a conversation that may still exist. `replace` so the back
-  // button does not lead to it. The conversation being answered is the open
-  // one, so leaving it is also what stops its answer (ChatPage.tsx resets on
-  // the way to `/`), as the confirmation told the reader
-  // (ConversationSidebar.tsx): once the delete has gone through, and not
-  // before, since a delete the server refuses leaves the conversation open
-  // and its answer still arriving. The one exception is a conversation being
-  // left: for the moment the next one takes to load, the answer runs on, and
-  // the next one's arrival stops it (ChatPage.tsx, `adopt`). Any other
-  // conversation leaves the answer be.
+  // button does not lead to it. An answer being written into it is stopped
+  // by the server with it (apps/qa/conversation_views.py), as the
+  // confirmation told the reader (ConversationSidebar.tsx), and leaving it
+  // resets the page (ChatPage.tsx), which gives up a question still waiting
+  // for room: once the delete has gone through, and not before, since a
+  // delete the server refuses leaves the conversation open and its answer
+  // still arriving.
   const onDelete = useCallback(
     async (id: string) => {
       try {

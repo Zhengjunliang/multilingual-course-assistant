@@ -97,7 +97,8 @@ export function ProcessLine({
   const seconds = useSeconds(running && route === null);
 
   if (route === null) {
-    // Refused before `start` — a 503, a dead server — says so under the
+    // Failed before `start` — a 503 from a server full of questions, an
+    // `error` event from a worker that could not search — says so under the
     // answer; there was no search to report.
     if (!running) return null;
     return (

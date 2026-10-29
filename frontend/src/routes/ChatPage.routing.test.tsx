@@ -76,6 +76,8 @@ let readFails = false;
 let pinFailures = 0;
 /** Whether `POST /api/ask` is refused, as a server error would. */
 let askFails = false;
+/** The answer a worker is writing into conversation 7, its question still waiting; `null` for none. */
+let writing: string | null = null;
 /** Every request made, as `METHOD path`. */
 let requested: string[] = [];
 /** How many times the page asked the session provider who is signed in. */
@@ -96,8 +98,9 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-/** An answer stream in the framing `api/sse.ts` reads: `start`, then `end`. */
-function answerStream(conversationId: string | null, question: string): Response {
+/** An answer stream in the framing `api/sse.ts` reads: `queued`, `start`, then `end`. */
+function answerStream(conversationId: string | null, question: string, answerId: string): Response {
+  const queued = { answer_id: answerId, conversation_id: conversationId, question };
   const start = {
     question,
     conversation_id: conversationId,
@@ -106,7 +109,11 @@ function answerStream(conversationId: string | null, question: string): Response
     citations: [],
     search_ms: 1200,
   };
-  const body = `event: start\ndata: ${JSON.stringify(start)}\n\nevent: end\ndata: {}\n\n`;
+  const body = [
+    `event: queued\ndata: ${JSON.stringify(queued)}\n\n`,
+    `event: start\ndata: ${JSON.stringify(start)}\n\n`,
+    "event: end\ndata: {}\n\n",
+  ].join("");
   return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
 }
 
@@ -127,7 +134,10 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return listFails ? codedRefusal("INTERNAL") : json(conversations);
   }
   if (method === "GET" && path === `/api/conversations/${ID_7}`) {
-    return readFails ? codedRefusal("INTERNAL") : json(STORED);
+    return readFails ? codedRefusal("INTERNAL") : json({ ...STORED, answering: writing });
+  }
+  if (method === "GET" && writing !== null && path === `/api/answers/${writing}/events`) {
+    return answerStream(ID_7, "E un DAO?", writing);
   }
   if (method === "DELETE" && path.startsWith("/api/conversations/")) {
     if (deleteFails) return codedRefusal("INTERNAL");
@@ -161,12 +171,12 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
       history?: unknown;
     };
     // A visitor's question is filed nowhere, as the server has it.
-    if (history !== undefined) return answerStream(null, question);
+    if (history !== undefined) return answerStream(null, question, uuidOf(31));
     conversations = [
       summary({ id: ID_9, created_at: "2026-09-29T09:00:00Z", title: question }),
       ...conversations,
     ];
-    return answerStream(ID_9, question);
+    return answerStream(ID_9, question, uuidOf(31));
   }
   return codedRefusal("NOT_FOUND");
 }
@@ -291,6 +301,7 @@ describe("the chat page's address", () => {
     deleteFails = false;
     askFails = false;
     readFails = false;
+    writing = null;
     vi.stubGlobal("fetch", fakeApi);
   });
 
@@ -442,6 +453,20 @@ describe("the chat page's address", () => {
     unmount();
 
     expect({ receding, after }).toEqual({ receding: true, after: false });
+  });
+
+  it("reads back an answer that was waiting for a worker, and lists its conversation again once it ends", async () => {
+    // The list was read before the question's rows were written, so it is
+    // behind until the answer ends.
+    writing = uuidOf(32);
+    const before = requested.length;
+    const { container, unmount } = page(`/chat/${ID_7}`);
+    await settle();
+    const asked = container.querySelector("main")?.textContent?.includes("E un DAO?");
+    const lists = requested.slice(before).filter((call) => call === "GET /api/conversations");
+    unmount();
+
+    expect({ asked, lists: lists.length }).toEqual({ asked: true, lists: 2 });
   });
 
   it.each([

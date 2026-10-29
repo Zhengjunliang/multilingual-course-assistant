@@ -552,8 +552,7 @@ describe("a question answered on a worker", () => {
     serve({ [EVENTS]: [QUEUED + STARTED + FIRST + REST + ENDED] });
     const { unmount } = mount(<Probe visitor={false} />);
 
-    act(() => hook.adopt(detail([...EARLIER, ...writing], ANSWER)));
-    await settle();
+    await act(() => hook.adopt(detail([...EARLIER, ...writing], ANSWER)));
     const { waiting, turns } = hook;
     unmount();
 
@@ -571,8 +570,7 @@ describe("a question answered on a worker", () => {
     serve({});
     const { unmount } = mount(<Probe visitor={false} />);
 
-    act(() => hook.adopt(detail(EARLIER, null)));
-    await settle();
+    await act(() => hook.adopt(detail(EARLIER, null)));
     const { waiting, turns } = hook;
     unmount();
 

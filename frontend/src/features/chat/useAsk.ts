@@ -229,9 +229,10 @@ export function useAsk(visitor: boolean) {
   }, [halt]);
 
   // An answer still being written comes back from its stream, from the start:
-  // its rows hold nothing of it until the end, or are not there yet.
+  // its rows hold nothing of it until the end, or are not there yet. Resolves
+  // once that answer has settled, at once when there is none.
   const adopt = useCallback(
-    (conversation: ConversationDetail) => {
+    async (conversation: ConversationDetail): Promise<void> => {
       const controller = renew();
       const live = conversation.answering;
       opened.current = conversation.id;
@@ -245,12 +246,12 @@ export function useAsk(visitor: boolean) {
       if (live === null) return;
 
       const page = { setState, opened, answering, signal: controller.signal };
-      void resumeAnswer(live, null, controller.signal)
-        .then((stream) => read(page, `live-${live}`, stream, true))
-        .catch((error: unknown) => {
-          if (controller.signal.aborted) return;
-          failed(page, `live-${live}`, asApiError(error));
-        });
+      try {
+        await read(page, `live-${live}`, await resumeAnswer(live, null, controller.signal), true);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        failed(page, `live-${live}`, asApiError(error));
+      }
     },
     [renew],
   );
