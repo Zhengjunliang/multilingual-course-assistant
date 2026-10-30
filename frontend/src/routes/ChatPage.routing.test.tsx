@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { routes } from "@/App";
 import type { Account } from "@/api/account";
+import { MAX_ADDED_EDITIONS } from "@/api/client";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
 import type { ScopeCourse } from "@/api/scope";
 import { SessionContext, SessionProvider } from "@/auth/SessionProvider";
@@ -1130,6 +1131,35 @@ describe("what a question searches", () => {
     ]);
     expect(asked.map((body) => body.added_editions)).toEqual([[41]]);
     expect(label).toBe(i18n.t("scope.added", { count: 1 }));
+  });
+
+  it("offers no further edition once the conversation adds as many as a question carries", async () => {
+    const years = Array.from({ length: MAX_ADDED_EDITIONS + 1 }, (_, index) => index + 1);
+    scope = [
+      {
+        ...PPM,
+        editions: years.map((id) => ({
+          id,
+          academic_year: `${1970 + id}-${1971 + id}`,
+          state: "past" as const,
+          default: false,
+        })),
+      },
+    ];
+    storedAdded = years.slice(0, MAX_ADDED_EDITIONS);
+    const { container, unmount } = page(`/chat/${ID_7}`, DECLARED);
+    await settle();
+    act(() => {
+      button(container)?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, ctrlKey: false }),
+      );
+    });
+    const boxes = [...document.body.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]')];
+    const fixed = boxes.filter((box) => box.hasAttribute("data-disabled")).length;
+    const last = boxes.at(-1)?.getAttribute("aria-checked");
+    unmount();
+
+    expect({ fixed, last }).toEqual({ fixed: 1, last: "false" });
   });
 
   it("points an account with no programme and no role to the account page", async () => {

@@ -7,7 +7,8 @@
  * a box to tick. An edition a question searches in any case, a course's
  * current one or a teacher's not started yet, is ticked and cannot be
  * unticked; the others, a past year or, for staff, one not started yet, are
- * the conversation's to add. The choice goes with the next question, as
+ * the conversation's to add, as many as one question carries
+ * (`MAX_ADDED_EDITIONS`). The choice goes with the next question, as
  * ChatGPT's and Open WebUI's composers carry the tools chosen in theirs
  * (outside the repository).
  *
@@ -20,6 +21,7 @@ import { Library } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { MAX_ADDED_EDITIONS } from "@/api/client";
 import type { ScopeCourse } from "@/api/scope";
 import { buttonVariants } from "@/components/ui/button";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
@@ -48,6 +50,8 @@ export function ScopeButton({ courses, declared, added, onChoose }: ScopeButtonP
   }
 
   const shown = shownAdded(courses, added);
+  // As many as one question carries: the rest wait until one is taken out.
+  const full = shown.length >= MAX_ADDED_EDITIONS;
   return (
     <DropdownMenu
       trigger={
@@ -69,7 +73,7 @@ export function ScopeButton({ courses, declared, added, onChoose }: ScopeButtonP
           label: edition.academic_year,
           detail: t(`scope.state.${edition.state}`),
           checked: edition.default || shown.includes(edition.id),
-          disabled: edition.default,
+          disabled: edition.default || (full && !shown.includes(edition.id)),
           onCheckedChange: () => onChoose(toggled(courses, added, edition.id)),
         })),
       }))}
