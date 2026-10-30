@@ -27,6 +27,7 @@ function answerPath(id: string): string {
 export const MAX_QUESTION_CHARS = 1000;
 export const HISTORY_WINDOW_TURNS = 3;
 export const MAX_HISTORY_ANSWER_CHARS = 4000;
+export const MAX_ADDED_EDITIONS = 50;
 
 /** One earlier exchange, as an anonymous client sends it back. */
 export interface HistoryTurn {
@@ -53,7 +54,8 @@ export interface AskBody {
   /**
    * The editions this question and the conversation's later ones search
    * besides the default, by id: omitted keeps what the conversation holds,
-   * `[]` clears it. One outside the caller's boundary is a 403. Signed in only.
+   * `[]` clears it, at most `MAX_ADDED_EDITIONS`. One outside the caller's
+   * boundary is a 403. Signed in only.
    */
   added_editions?: number[];
   /** Omitted means "decide for me" — the engine detects it from the question. */

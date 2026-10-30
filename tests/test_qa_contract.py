@@ -41,6 +41,7 @@ from apps.qa.contract import (
 )
 from apps.qa.models import HISTORY_WINDOW_TURNS
 from apps.qa.serializers import (
+    MAX_ADDED_EDITIONS,
     MAX_HISTORY_ANSWER_CHARS,
     MAX_QUESTION_CHARS,
     AskRequest,
@@ -170,6 +171,7 @@ def test_the_request_mirror_keeps_the_servers_caps() -> None:
         "MAX_QUESTION_CHARS": MAX_QUESTION_CHARS,
         "HISTORY_WINDOW_TURNS": HISTORY_WINDOW_TURNS,
         "MAX_HISTORY_ANSWER_CHARS": MAX_HISTORY_ANSWER_CHARS,
+        "MAX_ADDED_EDITIONS": MAX_ADDED_EDITIONS,
     }
 
     declared = {
