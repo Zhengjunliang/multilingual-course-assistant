@@ -582,3 +582,71 @@ describe("a question answered on a worker", () => {
     });
   });
 });
+
+describe("the editions a conversation adds", () => {
+  beforeEach(() => {
+    sent = [];
+    vi.stubGlobal("fetch", fakeAsk);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** What each question asked carried, `undefined` for none. */
+  const carried = () => sent.map((body) => body.added_editions);
+
+  it("go with the next question once chosen, and with no later one", async () => {
+    const { unmount } = mount(<Probe visitor={false} />);
+    await act(() => hook.submit("Che cos'è un ORM?"));
+    await settle();
+    act(() => hook.choose([7, 9]));
+    await act(() => hook.submit("E una migrazione?"));
+    await settle();
+    await act(() => hook.submit("E un indice?"));
+    await settle();
+    unmount();
+
+    expect(carried()).toEqual([undefined, [7, 9], undefined]);
+  });
+
+  it("go again with the next question when the last was refused before `start`", async () => {
+    // The server stores them with the question's rows, which a refusal never writes.
+    let refuse = true;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      if (!refuse) return fakeAsk(input, init);
+      refuse = false;
+      sent.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+      return new Response(codedFrame("ENGINE_DOWN"), {
+        status: 503,
+        headers: { "Content-Type": "text/event-stream", "X-Request-ID": ID },
+      });
+    });
+    const { unmount } = mount(<Probe visitor={false} />);
+    act(() => hook.choose([7]));
+    await act(() => hook.submit("Che cos'è un ORM?"));
+    await settle();
+    await act(() => hook.submit("Che cos'è un ORM?"));
+    await settle();
+    unmount();
+
+    expect(carried()).toEqual([[7], [7]]);
+  });
+
+  it("come back with their conversation, and a new conversation has none", async () => {
+    const { unmount } = mount(<Probe visitor={false} />);
+    await act(() => hook.adopt({ ...detail(EARLIER, null), added_editions: [7] }));
+    const opened = hook.added;
+    await act(() => hook.submit("E se pago in ritardo?"));
+    await settle();
+    act(() => hook.reset());
+    const fresh = hook.added;
+    unmount();
+
+    expect({ opened, fresh, carried: carried() }).toEqual({
+      opened: [7],
+      fresh: [],
+      carried: [undefined],
+    });
+  });
+});

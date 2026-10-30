@@ -52,4 +52,5 @@ DELETE qa:conversation                      hide       hide     hide        hide
 GET qa:conversation                         hide       hide     hide        hide              hide  allow   hide  deny     deny
 PATCH qa:conversation                       hide       hide     hide        hide              hide  allow   hide  deny     deny
 GET qa:conversations                        allow      allow    allow       allow             allow allow   allow deny     deny
+GET qa:scope                                allow      allow    allow       allow             allow allow   allow deny     deny
 GET qa:source                               allow      allow    allow       hide              allow hide    allow deny     deny

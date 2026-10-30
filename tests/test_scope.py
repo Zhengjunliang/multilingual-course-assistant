@@ -47,10 +47,10 @@ def offer(programme: str, course: str, *academic_years: str) -> list[CourseEditi
     ]
 
 
-def declare(user: User, programme: str) -> None:
-    """`user` says they study in `programme`, as registration records it."""
+def declare(user: User, programme: str, year: int | None = None) -> None:
+    """`user` says they study in `programme`, in `year` if given, as registration records it."""
     StudentProgramme.objects.create(
-        user=user, programme=DegreeProgramme.objects.get(code=programme)
+        user=user, programme=DegreeProgramme.objects.get(code=programme), year_of_study=year
     )
 
 

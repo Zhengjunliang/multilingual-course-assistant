@@ -44,6 +44,7 @@ import type { Citation, RouteDecision } from "@/api/contract";
 import type { ConversationDetail, StoredMessage } from "@/api/conversations";
 import { ApiError } from "@/api/http";
 import { follow } from "./follow";
+import { sameEditions } from "./scope";
 
 export const MAX_BUSY_RETRIES = 2;
 
@@ -93,7 +94,24 @@ interface AskState {
   turns: Turn[];
   waiting: Waiting;
   conversationId: string | null;
+  /** The editions the conversation searches besides the default, by id, as the reader chose them (scope.ts). */
+  added: readonly number[];
+  /**
+   * The same, as the server last stored them: a question carries the choice
+   * only when the two differ. Sent unchanged, a choice would undo one made
+   * since in another tab, and name editions the account may no longer read,
+   * which the server refuses.
+   */
+  stored: readonly number[];
 }
+
+const NEW_CONVERSATION: AskState = {
+  turns: [],
+  waiting: { phase: "idle" },
+  conversationId: null,
+  added: [],
+  stored: [],
+};
 
 function blankTurn(key: string, question: string): Turn {
   return {
@@ -188,11 +206,7 @@ function sleep(seconds: number, signal: AbortSignal): Promise<void> {
 
 /** `visitor`: nobody is signed in, so nothing is stored and the history travels. */
 export function useAsk(visitor: boolean) {
-  const [state, setState] = useState<AskState>({
-    turns: [],
-    waiting: { phase: "idle" },
-    conversationId: null,
-  });
+  const [state, setState] = useState<AskState>(NEW_CONVERSATION);
   const abort = useRef<AbortController | null>(null);
   /**
    * The id the next request will carry.
@@ -242,10 +256,12 @@ export function useAsk(visitor: boolean) {
         ),
         waiting: { phase: live === null ? "idle" : "queued" },
         conversationId: conversation.id,
+        added: conversation.added_editions,
+        stored: conversation.added_editions,
       });
       if (live === null) return;
 
-      const page = { setState, opened, answering, signal: controller.signal };
+      const page = { setState, opened, answering, signal: controller.signal, sent: null };
       try {
         await read(page, `live-${live}`, await resumeAnswer(live, null, controller.signal), true);
       } catch (error) {
@@ -259,8 +275,12 @@ export function useAsk(visitor: boolean) {
   const reset = useCallback(() => {
     halt();
     opened.current = null;
-    setState({ turns: [], waiting: { phase: "idle" }, conversationId: null });
+    setState(NEW_CONVERSATION);
   }, [halt]);
+
+  const choose = useCallback((added: readonly number[]) => {
+    setState((current) => ({ ...current, added }));
+  }, []);
 
   // The server is told and not waited for: a stop that never arrives leaves a
   // student's answer to finish and be stored, which the next reading of the
@@ -278,10 +298,15 @@ export function useAsk(visitor: boolean) {
   const submit = useCallback(
     async (question: string): Promise<ApiError | null> => {
       const controller = renew();
-      const page = { setState, opened, answering, signal: controller.signal };
+      const sent = visitor || sameEditions(state.added, state.stored) ? null : state.added;
+      const page = { setState, opened, answering, signal: controller.signal, sent };
       const body = visitor
         ? { question, history: historyOf(state.turns) }
-        : { question, conversation_id: opened.current };
+        : {
+            question,
+            conversation_id: opened.current,
+            ...(sent === null ? {} : { added_editions: [...sent] }),
+          };
 
       const key = `live-${Date.now()}`;
       setState((current) => ({
@@ -318,10 +343,10 @@ export function useAsk(visitor: boolean) {
         }
       }
     },
-    [visitor, state.turns, renew],
+    [visitor, state.turns, state.added, state.stored, renew],
   );
 
-  return { ...state, submit, adopt, reset, stop };
+  return { ...state, submit, adopt, reset, stop, choose };
 }
 
 /** What an answer's stream writes to: the hook's state, the ids it keeps by hand, and its request's signal. */
@@ -330,6 +355,13 @@ interface Page {
   opened: { current: string | null };
   answering: { current: string | null };
   signal: AbortSignal;
+  /**
+   * The editions the question carried, `null` when it carried none. The
+   * server stores them as it writes the question's rows, which is when it
+   * sends `start` (apps/qa/tasks.py): a question refused before then left
+   * them unstored, and the next one carries them again.
+   */
+  sent: readonly number[] | null;
 }
 
 function patch(page: Page, key: string, change: Partial<Turn>): void {
@@ -388,10 +420,12 @@ async function read(page: Page, key: string, stream: Answering, resumable: boole
           locale: event.locale,
         });
         page.opened.current = event.conversation_id;
+        const { sent } = page;
         page.setState((current) => ({
           ...current,
           conversationId: event.conversation_id,
           waiting: { phase: "streaming" },
+          stored: sent ?? current.stored,
         }));
       },
       text: (answer) => patch(page, key, { answer }),

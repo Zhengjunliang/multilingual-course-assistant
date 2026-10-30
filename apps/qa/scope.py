@@ -24,11 +24,13 @@ An account with neither a programme nor a role has an empty boundary, and its
 questions are answered from the campus pages alone, as a visitor's are. The
 declared programme is the student's own word: it keeps a search consistent
 and protects nothing (docs/data-model.md, scope invariant 3). The year of
-study orders the course list and decides nothing here.
+study orders the course list a conversation adds from (apps/qa/scope_views.py)
+and decides nothing here.
 """
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from django.db.models import Exists, OuterRef, Q
@@ -66,6 +68,22 @@ def boundary(user: User) -> QuerySet[CourseEdition]:
         timezone.localdate(),
     )
     return editions.filter((Exists(declared) & started) | Q(pk__in=viewed))
+
+
+class EditionState(StrEnum):
+    """Where a row of `boundary` stands in its course's years, on the day it was read."""
+
+    CURRENT = "current"
+    PAST = "past"
+    # Not started yet: a member of staff's, since a programme lists started editions only.
+    UPCOMING = "upcoming"
+
+
+def state(edition: CourseEdition) -> EditionState:
+    """Where a row of `boundary` stands, read from its marks."""
+    if getattr(edition, IS_CURRENT):
+        return EditionState.CURRENT
+    return EditionState.PAST if getattr(edition, IS_PAST) else EditionState.UPCOMING
 
 
 def is_default(edition: CourseEdition) -> bool:
