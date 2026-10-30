@@ -334,12 +334,25 @@ describe("the ratings page", () => {
   });
 
   it("reads the first page when the address names one the ratings no longer reach", async () => {
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      if (!String(input).includes("page=")) await held;
+      return fakeApi(input);
+    });
     const { container, router, unmount } = await open("/staff/feedback?reason=incorrect&page=2");
+    // Nothing is said missing while the first page is read.
+    const meanwhile = container.textContent;
+    release();
+    await settle();
     const address = router.state.location.search;
     const listed = [...container.querySelectorAll("tbody a")].map((link) => link.textContent);
     unmount();
 
-    expect({ address, listed, asked }).toEqual({
+    expect({ meanwhile, address, listed, asked }).toEqual({
+      meanwhile: "",
       address: "?reason=incorrect",
       listed: ["Che cos'è un ORM?"],
       asked: [
