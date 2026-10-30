@@ -12,7 +12,7 @@
  * query, the API's own (`?rating=down&page=2`), so Back from a rating
  * returns to the list as it was left, its row marked
  * (features/staff/openedRow.ts); a value the filters do not offer reads as
- * no filter. The list stays shown while another is read (`useLoad`'s
+ * no filter, and a page past the last as the first. The list stays shown while another is read (`useLoad`'s
  * `keep`), and a filter changed goes back to the first page. The languages
  * offered are the interface's, as the pipeline names them; a question in
  * another is listed under all of them.
@@ -23,7 +23,7 @@
 
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 
 import type { RouteDecision } from "@/api/contract";
 import { FEEDBACK_REASONS } from "@/api/conversations";
@@ -38,6 +38,7 @@ import { useSession } from "@/auth/useSession";
 import { Chip } from "@/components/ui/chip";
 import { Select } from "@/components/ui/field";
 import { useLoad } from "@/features/staff/context";
+import { isNotFound } from "@/features/staff/errors";
 import { FeedbackTable } from "@/features/staff/FeedbackTable";
 import { useOpenedRow } from "@/features/staff/openedRow";
 import { PageHead, Pager } from "@/features/staff/page";
@@ -87,8 +88,13 @@ function Ratings() {
   const { opened, open } = useOpenedRow(ratings.data !== null);
   useCrumbs({ kind: "feedback" });
 
-  if (ratings.error !== null)
+  if (ratings.error !== null) {
+    // A page the ratings no longer reach, as Back or a reload brings one once
+    // some are gone: the first, with the same filters.
+    if (page > 1 && isNotFound(ratings.error))
+      return <Navigate replace to={{ search: feedbackSearch({ ...query, page: 1 }) }} />;
     return <LoadFailure error={ratings.error} back={back} onRetry={() => void ratings.reload()} />;
+  }
   if (ratings.data === null) return null;
   const { count, results, previous, next } = ratings.data;
   /** The list narrowed by `change`, from its first page. */
