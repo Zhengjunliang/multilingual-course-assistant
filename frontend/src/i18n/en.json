@@ -137,6 +137,17 @@
   "visitor": {
     "courseMaterial": "Course material is for students with an account."
   },
+  "scope": {
+    "current": "Courses: current",
+    "added": "Courses: current +{{count}}",
+    "head": "Every question searches your courses' current editions. Add another year to this conversation.",
+    "declare": "Say which degree programme you study in to search its slides too",
+    "state": {
+      "current": "current",
+      "past": "past",
+      "upcoming": "not started"
+    }
+  },
   "status": {
     "streaming": "Writing the answer…",
     "retrying": "Retrying in {{seconds}} seconds ({{attempt}} of {{total}}).",

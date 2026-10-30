@@ -137,6 +137,17 @@
   "visitor": {
     "courseMaterial": "课程资料仅对有账号的学生开放。"
   },
+  "scope": {
+    "current": "课程：当前学年",
+    "added": "课程：当前学年 +{{count}}",
+    "head": "每个问题都会检索你所学课程的当前学年。可以为本对话加入其他学年。",
+    "declare": "填写你的专业，即可同时检索课程讲义",
+    "state": {
+      "current": "进行中",
+      "past": "往届",
+      "upcoming": "未开始"
+    }
+  },
   "status": {
     "streaming": "正在写回答…",
     "retrying": "{{seconds}} 秒后重试（第 {{attempt}} 次，共 {{total}} 次）。",

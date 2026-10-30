@@ -38,6 +38,8 @@ import { useSession } from "@/auth/useSession";
 import { Composer } from "@/features/chat/Composer";
 import { writeDraft } from "@/features/chat/draft";
 import { spokenNotice } from "@/features/chat/notice";
+import { ScopeButton } from "@/features/chat/ScopeButton";
+import { useScope } from "@/features/chat/scope";
 import { TurnView } from "@/features/chat/TurnView";
 import { Unreadable } from "@/features/chat/Unreadable";
 import { useAsk } from "@/features/chat/useAsk";
@@ -70,6 +72,7 @@ export default function ChatPage() {
   const visitor = account === null;
   const ask = useAsk(visitor);
   const { turns, waiting, submit, adopt, reset, stop } = ask;
+  const scope = useScope(visitor);
   const loaded = useRef<string | null>(null);
   // The navigation that last opened what the page holds.
   const visited = useRef(visit);
@@ -226,6 +229,16 @@ export default function ChatPage() {
       rise={landed}
       draftAt={pathname}
       draftBy={account?.id ?? null}
+      scope={
+        account !== null && (
+          <ScopeButton
+            courses={scope.data}
+            declared={account.programme !== null}
+            added={ask.added}
+            onChoose={ask.choose}
+          />
+        )
+      }
     />
   );
 
