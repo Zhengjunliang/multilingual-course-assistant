@@ -428,6 +428,37 @@
         "locale": "Lingua"
       }
     },
+    "materials": {
+      "title": "Materiale",
+      "add": "Carica PDF",
+      "drop": "Trascina qui i PDF, uno o più. Gli studenti li vedono citati quando sono pronti.",
+      "sending_one": "Invio di {{count}} file…",
+      "sending_other": "Invio di {{count}} file…",
+      "unsent": "Alcuni file non sono stati caricati",
+      "notPdf": "Non è un PDF.",
+      "empty": "Nessun materiale.",
+      "file": "File",
+      "state": "Stato",
+      "uploadedBy": "Caricato da {{name}}",
+      "imported": "Importato dalla riga di comando",
+      "replaceTitle": "Sostituire il materiale?",
+      "replaceBody": "L'edizione ha già un materiale con questo nome: il nuovo file ne è la versione successiva, e quella attuale resta in uso finché il nuovo non è pronto.",
+      "replace": "Sostituisci",
+      "status": {
+        "queued": "In coda",
+        "parsing": "Lettura",
+        "chunking": "Suddivisione",
+        "indexing": "Indicizzazione",
+        "ready": "Pronto",
+        "failed": "Non riuscito"
+      },
+      "failure": {
+        "unreadable": "Il file non si può leggere: è protetto o non contiene testo.",
+        "incomplete": "Il file è stato letto solo in parte.",
+        "interrupted": "L'elaborazione si è interrotta prima di finire.",
+        "internal": "Un errore del server ha interrotto l'elaborazione."
+      }
+    },
     "mine": {
       "title": "I miei insegnamenti",
       "sub": "Gli insegnamenti di cui sei docente, con tutte le loro edizioni: puoi modificarle tutte.",

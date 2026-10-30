@@ -16,6 +16,7 @@ import type { Account, AccountSession, Session } from "@/api/account";
 import type { ListPage, ManagedUser } from "@/api/admin";
 import type {
   Course,
+  CourseMaterial,
   Edition,
   Invitation,
   InvitationGrant,
@@ -31,6 +32,7 @@ import {
   EDITION,
   EDITION_READ,
   INVITATION,
+  MATERIALS,
   PENDING,
   PROGRAMME,
   READINGS,
@@ -161,6 +163,7 @@ export class Api {
     for (const { id } of [EDITION, EDITION_READ]) {
       this.json<Syllabus>(`/api/catalog/editions/${id}/syllabus`, SYLLABUS);
       this.json<ReadingItem[]>(`/api/catalog/editions/${id}/readings`, READINGS);
+      this.json<CourseMaterial[]>(`/api/catalog/editions/${id}/materials`, MATERIALS);
     }
   }
 

@@ -7,7 +7,7 @@
  */
 
 import type { Editor } from "@tiptap/react";
-import { act, useCallback } from "react";
+import { act, type ReactElement, useCallback } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { vi } from "vitest";
 
@@ -155,7 +155,12 @@ export function open(editable: boolean) {
     { path: "/", element: <Content editable={editable} /> },
     { path: "/away", element: <main>Altrove</main> },
   ]);
-  const mounted = mount(
+  return { ...mountForReader(<RouterProvider router={router} />), router };
+}
+
+/** `element` in the session of a teacher of edition 5, with the toasts a page has. */
+export function mountForReader(element: ReactElement) {
+  return mount(
     <SessionContext
       value={{
         account: READER,
@@ -167,11 +172,10 @@ export function open(editable: boolean) {
         recheck: async () => {},
       }}
     >
-      <RouterProvider router={router} />
+      {element}
       <Toaster />
     </SessionContext>,
   );
-  return { ...mounted, router };
 }
 
 export async function settle() {

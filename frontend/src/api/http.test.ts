@@ -144,4 +144,10 @@ describe("the token a write carries", () => {
 
     expect(writeHeaders()["X-CSRFToken"]).toBe(token);
   });
+
+  it("goes with a form without a type, which the browser writes with the parts' boundary", () => {
+    vi.stubGlobal("document", { cookie: "csrftoken=plain" });
+
+    expect(writeHeaders(new FormData())).toEqual({ "X-CSRFToken": "plain" });
+  });
 });

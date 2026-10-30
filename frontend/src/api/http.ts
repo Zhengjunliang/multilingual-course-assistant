@@ -87,8 +87,13 @@ export function csrfToken(): string | null {
   return cookie("__Host-csrftoken") ?? cookie("csrftoken");
 }
 
-export function writeHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { "Content-Type": JSON_TYPE };
+/**
+ * A write's headers for its `body`: JSON's type, but for a form, whose type
+ * the browser writes itself with the boundary between its parts.
+ */
+export function writeHeaders(body?: RequestInit["body"]): Record<string, string> {
+  const headers: Record<string, string> =
+    body instanceof FormData ? {} : { "Content-Type": JSON_TYPE };
   const token = csrfToken();
   if (token !== null) headers["X-CSRFToken"] = token;
   return headers;
@@ -203,7 +208,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     credentials: "same-origin",
     headers: {
       Accept: JSON_TYPE,
-      ...(method === "GET" ? {} : writeHeaders()),
+      ...(method === "GET" ? {} : writeHeaders(init.body)),
       ...init.headers,
     },
   });

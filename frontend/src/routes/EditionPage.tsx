@@ -1,7 +1,8 @@
 /**
  * `/staff/editions/:id`: one academic year of a course, its syllabus, its
- * reading list and who teaches it, each a tab under the page's head that
- * counts what it holds: the sections written, the books, the teachers.
+ * reading list, its material and who teaches it, each a tab under the page's
+ * head that counts what it holds: the sections written, the books, the
+ * files, the teachers.
  *
  * An edition outside the caller's scope is a 404, and the page says "not
  * found". Its head names the year, whether it is current and, where it was
@@ -13,19 +14,22 @@
  * either; the invitations not accepted yet are under the teachers. The
  * syllabus and the books are read beside the edition, so their tabs can count
  * them, and written on their own (features/staff/content/), by whoever holds
- * `edition.edit_content`. The path it was reached through is `?programme=`,
- * or the teacher's own courses when no programme the reader may view lists
- * it (features/staff/crumbs.ts).
+ * `edition.edit_content`. The material tab is there only for whoever holds
+ * `edition.manage_materials`, its list read once the edition says so
+ * (features/staff/content/MaterialPanel.tsx). The path the page was reached
+ * through is `?programme=`, or the teacher's own courses when no programme
+ * the reader may view lists it (features/staff/crumbs.ts).
  */
 
 import { useCallback, useMemo } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router-dom";
 
-import { listReadings, readEdition } from "@/api/catalog";
+import { listMaterials, listReadings, readEdition } from "@/api/catalog";
 import { Chip } from "@/components/ui/chip";
 import { Tabs } from "@/components/ui/tabs";
 import { useMembers } from "@/features/staff/actions";
+import { MaterialPanel } from "@/features/staff/content/MaterialPanel";
 import { ReadingList } from "@/features/staff/content/ReadingList";
 import { SyllabusPanel } from "@/features/staff/content/SyllabusPanel";
 import { useSyllabus } from "@/features/staff/content/syllabus";
@@ -53,6 +57,12 @@ export default function EditionPage() {
   const data = edition.data;
   const assigns = data?.permissions.includes("edition.assign_teacher") ?? false;
   const edits = data?.permissions.includes("edition.edit_content") ?? false;
+  const manages = data?.permissions.includes("edition.manage_materials") ?? false;
+  const loadMaterials = useCallback(
+    () => (manages ? listMaterials(Number(id)) : Promise.resolve([])),
+    [id, manages],
+  );
+  const materials = useLoad(loadMaterials);
   const object = data === null ? "" : `${data.course.name} · ${data.academic_year}`;
   const scope = useMemo(() => ({ kind: "edition", id: Number(id) }) as const, [id]);
   const members = useMembers({
@@ -163,6 +173,22 @@ export default function EditionPage() {
               />
             ),
           },
+          ...(manages
+            ? [
+                {
+                  value: "materials",
+                  label: t("staff.materials.title"),
+                  count: materials.data?.length,
+                  content: (
+                    <MaterialPanel
+                      edition={data.id}
+                      materials={materials}
+                      reloadPage={edition.reload}
+                    />
+                  ),
+                },
+              ]
+            : []),
           {
             value: "teachers",
             label: t("staff.edition.teachers"),

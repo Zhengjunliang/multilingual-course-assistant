@@ -11,6 +11,7 @@ import type { Account, AccountSession, Session } from "@/api/account";
 import type { ManagedUser } from "@/api/admin";
 import type {
   Course,
+  CourseMaterial,
   Edition,
   Invitation,
   InvitationGrant,
@@ -269,7 +270,12 @@ export const EDITION: Edition = {
   period: "first_semester",
   is_current: true,
   teachers: [STAFF_MEMBER],
-  permissions: ["edition.view", "edition.assign_teacher", "edition.edit_content"],
+  permissions: [
+    "edition.view",
+    "edition.assign_teacher",
+    "edition.edit_content",
+    "edition.manage_materials",
+  ],
 };
 
 /** An edition the staff account teaches, and so edits, but may not assign teachers on. */
@@ -281,7 +287,7 @@ export const EDITION_READ: Edition = {
   period: "first_semester",
   is_current: false,
   teachers: [STAFF_MEMBER],
-  permissions: ["edition.view", "edition.edit_content"],
+  permissions: ["edition.view", "edition.edit_content", "edition.manage_materials"],
 };
 
 /** The edition's invitations not accepted yet: one still good, one expired. */
@@ -336,6 +342,30 @@ export const READINGS: ReadingItem[] = [
     isbn: "978-3540408673",
     url: "",
     importance: "recommended",
+  },
+];
+
+/** One file of each settled state: a list on its way would be read again every few seconds. */
+export const MATERIALS: CourseMaterial[] = [
+  {
+    id: 51,
+    source_file: "02-Scansione.pdf",
+    status: "failed",
+    failure: "unreadable",
+    uploaded_by: STAFF.username,
+    created_at: "2026-10-30T09:05:00Z",
+    started_at: "2026-10-30T09:05:01Z",
+    finished_at: "2026-10-30T09:05:04Z",
+  },
+  {
+    id: 50,
+    source_file: "01-Introduzione.pdf",
+    status: "ready",
+    failure: "",
+    uploaded_by: null,
+    created_at: "2026-10-30T09:00:00Z",
+    started_at: "2026-10-30T09:00:01Z",
+    finished_at: "2026-10-30T09:00:31Z",
   },
 ];
 
