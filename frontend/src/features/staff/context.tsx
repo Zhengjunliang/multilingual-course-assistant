@@ -43,14 +43,18 @@ export interface Loaded<T> {
  * must be stable. `keep` is for a list whose `load` changes with its filter:
  * the last answer stays shown until the new one arrives, rather than the
  * list emptying at each letter of a search (outside the repository: TanStack
- * Query, `placeholderData: keepPreviousData`).
+ * Query, `placeholderData: keepPreviousData`). What is kept is the data, never
+ * a refusal: a list read again is not still refused.
  */
 export function useLoad<T>(load: () => Promise<T>, { keep = false } = {}): Loaded<T> {
   const { forget } = useSession();
-  const [state, setState] = useState<{ data: T | null; error: unknown }>({
-    data: null,
-    error: null,
-  });
+  // `of`: the `load` that answered, so another one's answer is told apart in
+  // the render that changes `load`, before any effect could clear it.
+  const [state, setState] = useState<{
+    data: T | null;
+    error: unknown;
+    of: (() => Promise<T>) | null;
+  }>({ data: null, error: null, of: null });
   // Only the latest read is shown: an answer that arrives after the page moved
   // on to another object, or after a later read, is dropped.
   const latest = useRef(0);
@@ -60,30 +64,31 @@ export function useLoad<T>(load: () => Promise<T>, { keep = false } = {}): Loade
     return load().then(
       (data) => {
         if (latest.current !== mine) return false;
-        setState({ data, error: null });
+        setState({ data, error: null, of: load });
         return true;
       },
       (error: unknown) => {
         if (latest.current !== mine) return false;
         if (isSessionLost(error)) forget();
-        setState({ data: null, error });
+        setState({ data: null, error, of: load });
         return false;
       },
     );
   }, [load, forget]);
 
   useEffect(() => {
-    // Another object's page shows nothing of the last one while it is read:
-    // the same page, reached again for another id through the history.
-    if (!keep)
-      setState((shown) =>
-        shown.data === null && shown.error === null ? shown : { data: null, error: null },
-      );
     void read();
     return () => {
       latest.current += 1;
     };
-  }, [read, keep]);
+  }, [read]);
 
-  return { ...state, reload: read };
+  // Another object's page shows nothing of the last one while it is read:
+  // the same page, reached again for another id through the history.
+  const current = state.of === load;
+  return {
+    data: current || keep ? state.data : null,
+    error: current ? state.error : null,
+    reload: read,
+  };
 }
