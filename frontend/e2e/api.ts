@@ -21,12 +21,14 @@ import type {
   Invitation,
   InvitationGrant,
   Programme,
+  ProgrammeName,
   ReadingItem,
   StudyPlanCourse,
   Syllabus,
 } from "@/api/catalog";
 import type { AnswerEvent } from "@/api/contract";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
+import type { ScopeCourse } from "@/api/scope";
 import {
   COURSE,
   EDITION,
@@ -35,8 +37,10 @@ import {
   MATERIALS,
   PENDING,
   PROGRAMME,
+  PROGRAMMES,
   READINGS,
   RESET_FOR,
+  SCOPE,
   SESSIONS,
   STUDY_PLAN,
   SYLLABUS,
@@ -63,6 +67,8 @@ export class Api {
 
   constructor(private readonly page: Page) {
     this.json<Session>("/api/auth/me", VISITOR);
+    // Registration offers them to a visitor, the account page to an account.
+    this.json<ProgrammeName[]>("/api/auth/programmes", PROGRAMMES);
     // A link's lookup is a `POST`: its token goes in a body (src/api/account.ts).
     this.on("POST", "/api/auth/reset/lookup", () => ({ json: RESET_FOR }));
     this.on("POST", "/api/auth/invitation/lookup", () => ({
@@ -139,6 +145,7 @@ export class Api {
     this.json<Session>("/api/auth/me", session);
     this.json<ConversationSummary[]>("/api/conversations", []);
     this.json<AccountSession[]>("/api/auth/sessions", SESSIONS);
+    this.json<ScopeCourse[]>("/api/scope", SCOPE);
   }
 
   /** One stored conversation, listed in the sidebar and readable at `/chat/<id>`. */
