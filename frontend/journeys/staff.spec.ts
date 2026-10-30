@@ -4,7 +4,8 @@
  * list are all the server's (apps/roles/). Material uploaded: the file
  * stored, its ingest run on the worker over the journeys' stub pipeline
  * (tests/journeys/ingest.py), the row read again until it is ready, and the
- * file served to a student whose answer lists it among its sources.
+ * file served to a student who adds its year to a conversation and whose
+ * answer lists it among its sources.
  */
 
 import { randomUUID } from "node:crypto";
@@ -38,7 +39,7 @@ test("the secretariat assigns a teacher to an edition, and the teacher finds it 
   await own.close();
 });
 
-test("the secretariat uploads a PDF to an edition, and once it is ready a student's answer opens it", async ({
+test("the secretariat uploads a PDF to a past edition, and a student who adds that year opens it from an answer", async ({
   page,
   browser,
 }) => {
@@ -62,8 +63,11 @@ test("the secretariat uploads a PDF to an edition, and once it is ready a studen
       "",
     ].join("\n"),
   );
-  await page.goto("/staff/courses/B003370");
-  await page.getByRole("link", { name: "2026-2027" }).click();
+  // Ricerca operativa, in B047, which demo-secretariat runs and demo-student
+  // declares: a first-semester course, so its 2025-2026 edition has been past
+  // since 2026-09-14 and a question searches it only once it is added.
+  await page.goto("/staff/courses/B000072");
+  await page.getByRole("link", { name: "2025-2026" }).click();
   await page.getByRole("tab", { name: it.staff.materials.title }).click();
   await page
     .locator('input[type="file"]')
@@ -75,6 +79,15 @@ test("the secretariat uploads a PDF to an edition, and once it is ready a studen
   const own = await browser.newContext({ storageState: STUDENT });
   const student = await own.newPage();
   await student.goto("/");
+  await student.getByRole("button", { name: it.scope.current }).click();
+  await student
+    .getByRole("group", { name: "FONDAMENTI DI RICERCA OPERATIVA" })
+    .getByRole("menuitemcheckbox", { name: /^2025-2026/ })
+    .click();
+  await student.keyboard.press("Escape");
+  await expect(
+    student.getByRole("button", { name: it.scope.added.replace("{{count}}", "1") }),
+  ).toBeVisible();
   await ask(student, `Che cos'è il test di Turing? ${randomUUID().slice(0, 8)}`);
   await student.getByRole("button", { name: new RegExp(`^${it.sources.title} \\(`) }).click();
   const source = student
