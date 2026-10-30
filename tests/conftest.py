@@ -18,6 +18,8 @@ Celery's broker is the opposite: no test may reach the developer's, where
 their own worker would take a queued question and answer it with the real
 models. It is Kombu's in-memory transport instead, named in the environment
 because Celery reads `CELERY_BROKER_URL` from there before its settings.
+The developer's uploaded material is out of reach the same way: `MATERIALS_ROOT`
+is a temporary directory for the whole run, one per xdist worker.
 
 This lives in a conftest rather than in the file that first needed it because an
 autouse fixture only applies to the module that defines it. A second test file
@@ -60,6 +62,12 @@ def _redis_database_of_its_own(worker_id: str) -> Iterator[None]:
 def _broker_in_memory() -> Iterator[None]:
     with pytest.MonkeyPatch.context() as patch:
         patch.setenv("CELERY_BROKER_URL", "memory://")
+        yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _materials_out_of_the_repository(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    with override_settings(MATERIALS_ROOT=tmp_path_factory.mktemp("materials")):
         yield
 
 
