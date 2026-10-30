@@ -141,7 +141,7 @@ Beat is one process that queues each scheduled task when it falls due; it runs n
 | A global cap on the questions in flight | a sorted set of leases in Redis | ✅ `apps/qa/inflight.py` |
 | Ingesting uploaded course material | a worker on `ingest` | ✅ `apps/materials/tasks.py` |
 | Failing an ingest whose worker died | beat, then a worker on `default` | ✅ `apps/materials/tasks.py` |
-| Bounding a document's parse time and pages | the ingest task | 🔜 M5 #36 |
+| Bounding a document's parse time and pages | the upload for its pages, the ingest task for its parse time | ✅ `apps/materials/services.py`, `apps/materials/ingest.py` |
 | Snapshotting the Qdrant index | beat, then a worker on `default` | 🔜 M5 #122 |
 | The deepening agent on the web (`rag/agent.py`) | a worker, over the answer streams | 🔜 M7, no issue |
 | The load test | the whole stack on MICC | 🔜 M6 #41 |
