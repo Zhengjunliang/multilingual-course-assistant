@@ -1542,7 +1542,8 @@ def test_a_follow_up_stays_in_the_same_conversation(index: QdrantClient) -> None
 def test_a_follow_up_carries_the_earlier_questions_to_the_router(
     index: QdrantClient,
 ) -> None:
-    """The point of the whole stage: "it" has no antecedent without them."""
+    """The point of the whole stage: "it" has no antecedent without them. The
+    answer keeps them as they were given, for the page that reads its rating."""
     install_engine(index, SLIDES_ROUTE, ["An answer."])
     conversation_id = start_of(events(ask()))["conversation_id"]
 
@@ -1552,6 +1553,11 @@ def test_a_follow_up_carries_the_earlier_questions_to_the_router(
     router_prompt = engine.completer.questions[-1]  # pyright: ignore[reportAttributeAccessIssue]
     # The order, not the template's wording: that is rag.agent's, pinned in tests/test_agent.py.
     assert router_prompt.index("What is an ORM?") < router_prompt.index("How does it differ?")
+    answers = Message.objects.filter(role=Message.Role.ASSISTANT)
+    assert [answer.history for answer in answers] == [
+        [],
+        [{"question": "What is an ORM?", "answer": "An answer."}],
+    ]
 
 
 def test_the_history_window_stops_at_its_limit(index: QdrantClient) -> None:

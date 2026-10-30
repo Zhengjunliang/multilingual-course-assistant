@@ -18,7 +18,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django.db import transaction
-from django.shortcuts import get_object_or_404
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import JSONParser
@@ -27,7 +26,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsSuperuser
-from apps.qa.conversations import ConversationGoneError
 from apps.qa.feedback_serializers import (
     FeedbackDetailSerializer,
     FeedbackRequest,
@@ -142,18 +140,8 @@ class FeedbackListView(ListAPIView[Feedback]):
 
 class FeedbackDetailView(RetrieveAPIView[Feedback]):
     """`GET`: one rating, by its answer's id, with that answer and the history
-    its question was asked with."""
+    its prompt was given."""
 
     permission_classes = (IsAuthenticated, IsSuperuser)
     serializer_class = FeedbackDetailSerializer
-
-    def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        feedback = get_object_or_404(
-            Feedback.objects.select_related("answer__parent"), pk=kwargs["pk"]
-        )
-        try:
-            return Response(self.get_serializer(feedback).data)
-        # Its conversation deleted between the two reads: missing, as it is
-        # to the next one.
-        except ConversationGoneError:
-            fail(ErrorCode.NOT_FOUND)
+    queryset = Feedback.objects.select_related("answer__parent")

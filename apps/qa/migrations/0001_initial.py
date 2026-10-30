@@ -93,6 +93,10 @@ class Migration(migrations.Migration):
                     "request_id",
                     models.CharField(blank=True, max_length=32, verbose_name="request id"),
                 ),
+                (
+                    "history",
+                    models.JSONField(blank=True, default=list, verbose_name="prompt history"),
+                ),
                 ("created_at", models.DateTimeField(auto_now_add=True, verbose_name="created at")),
                 (
                     "conversation",

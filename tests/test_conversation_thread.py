@@ -94,9 +94,9 @@ def test_a_question_hangs_from_the_leaf_the_locked_row_holds() -> None:
     conversation = Conversation.objects.create(owner=owner(), locale="it")
     first, second = uuid.uuid4(), uuid.uuid4()
 
-    record_exchange(conversation.pk, start_event("Prima?"), first, request_id="")
+    record_exchange(conversation.pk, start_event("Prima?"), first, request_id="", history=[])
     with CaptureQueriesContext(connection) as captured:
-        record_exchange(conversation.pk, start_event("Seconda?"), second, request_id="")
+        record_exchange(conversation.pk, start_event("Seconda?"), second, request_id="", history=[])
 
     # Read under the lock, before anything is written: two questions reading
     # the same leaf would both hang from it, and the second to set the leaf

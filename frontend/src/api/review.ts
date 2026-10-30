@@ -58,7 +58,7 @@ export interface FeedbackDetail {
   updated_at: string;
   question: string;
   answer: RatedAnswer;
-  /** The exchanges the question was asked with, oldest first, cut as the prompt was. */
+  /** The exchanges its prompt was given, oldest first, as the answer stored them. */
   history: HistoryTurn[];
 }
 

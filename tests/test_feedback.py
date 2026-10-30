@@ -17,8 +17,7 @@ from test_conversation_list import START, client, owner, started, turn, web
 from test_error_contract import refused
 
 from apps.accounts.models import User
-from apps.qa import feedback_views
-from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Feedback, Message
+from apps.qa.models import Conversation, Feedback, Message
 
 pytestmark = pytest.mark.django_db
 
@@ -261,46 +260,33 @@ def test_the_list_narrows_by_rating_reason_scenario_and_language(
     assert listed["count"] == len(expected)
 
 
-def test_a_rating_opened_shows_the_history_its_question_was_asked_with() -> None:
-    """Cut by the window the prompt was: the exchanges before the question,
-    `HISTORY_WINDOW_TURNS` of them at most, and nothing after the answer."""
+def test_a_rating_opened_shows_the_history_its_prompt_was_given() -> None:
+    """The one stored with the answer, not the thread above its question: an
+    exchange another tab wrote while the question waited for a worker is in
+    the thread and was not in the prompt."""
     conversation = started(0)
-    for minute in range(1, 6):
+    for minute in range(1, 4):
         turn(conversation, minute, [web()], question=f"Domanda {minute}?")
-    rated_answer = Message.objects.get(conversation=conversation, parent__text="Domanda 4?")
-    Message.objects.filter(pk=rated_answer.pk).update(request_id="b" * 32)
+    rated_answer = answer_of(conversation)
+    given = [{"question": "Domanda 1?", "answer": ""}]
+    Message.objects.filter(pk=rated_answer.pk).update(request_id="b" * 32, history=given)
     Feedback.objects.create(
         answer=rated_answer, rating="down", reason="other", comment="Boh.", locale="it"
     )
 
     detail = root().get(f"{LIST}/{rated_answer.pk}").json()
 
-    assert detail["question"] == "Domanda 4?"
-    assert [each["question"] for each in detail["history"]] == [
-        f"Domanda {minute}?" for minute in range(4 - HISTORY_WINDOW_TURNS, 4)
-    ]
+    assert detail["question"] == "Domanda 3?"
+    assert detail["history"] == given
     assert (detail["comment"], detail["comment_locale"]) == ("Boh.", "it")
     assert detail["answer"]["request_id"] == "b" * 32
     assert not IDENTITY & (set(detail) | set(detail["answer"]))
 
 
-def test_a_rating_unknown_or_deleted_while_opened_is_not_found(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Its conversation deleted after the rating was read and before its
-    history was: the 404 the next read gets, not a 500."""
+def test_a_rating_unknown_or_withdrawn_is_not_found() -> None:
     conversation = started(0)
     turn(conversation, 1, [web()], question="E poi?")
     answer = answer_of(conversation)
-    Feedback.objects.create(answer=answer, rating="up")
-    found = feedback_views.get_object_or_404
-
-    def then_deleted(*args: Any, **kwargs: Any) -> Feedback:
-        feedback = found(*args, **kwargs)
-        Conversation.objects.filter(pk=conversation.pk).delete()
-        return feedback
-
-    monkeypatch.setattr(feedback_views, "get_object_or_404", then_deleted)
 
     for pk in (answer.conversation_id, answer.pk):
         response = root().get(f"{LIST}/{pk}")

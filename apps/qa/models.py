@@ -199,6 +199,14 @@ class Message(models.Model):
     # read beside what the server did to produce the answer it rates. Empty on
     # a student's turn and on an answer stored before the column existed.
     request_id = models.CharField(max_length=32, blank=True, verbose_name=_("request id"))
+    # The earlier exchanges this answer's prompt was given (`AnswerJob.history`,
+    # each a `rag.answer.Turn` as JSON). The web process read them when it
+    # admitted the question; the thread the question is written under can have
+    # grown by the time a worker writes it, from another tab, or an answer
+    # stopped can have settled, so the page that reads a rating shows these,
+    # not the thread. Empty on a student's turn and on an answer stored before
+    # the column existed.
+    history = models.JSONField(default=list, blank=True, verbose_name=_("prompt history"))
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("created at"))
 
     class Meta:

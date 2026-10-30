@@ -6,8 +6,8 @@
  * by the chat's own turn (features/chat/TurnView.tsx), the question, where it
  * was searched, the answer with its pills and its sources, so a rating is
  * never read through a second drawing of an answer; above it, folded, the
- * exchanges its question was asked with, as plain text, as the model received
- * them; and the id of the request that produced it, which files its log
+ * exchanges its prompt was given, as plain text, as the model received them;
+ * and the id of the request that produced it, which files its log
  * lines. Nothing names the student or the conversation (FeedbackPage.tsx).
  *
  * The address is the rating's, its answer's id, so it opens from a link as

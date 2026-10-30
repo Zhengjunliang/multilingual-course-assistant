@@ -226,6 +226,7 @@ def _generate(job: AnswerJob, heartbeat: _Heartbeat) -> Event:
                     start,
                     job.answer_id,
                     request_id=job.request_id,
+                    history=job.history,
                     added_editions=job.added_editions,
                 )
                 stored = True
