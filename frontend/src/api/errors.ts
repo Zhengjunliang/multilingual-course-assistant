@@ -38,6 +38,7 @@ export const ERROR_CODES = {
   ACCOUNT_STILL_ACTIVE: { status: 409, kind: "fixable", dataKeys: [] },
   ROLES_HELD: { status: 409, kind: "fixable", dataKeys: [] },
   LAST_SUPERUSER: { status: 409, kind: "fixable", dataKeys: [] },
+  MATERIAL_EXISTS: { status: 409, kind: "fixable", dataKeys: ["material"] },
   RESOURCE_EXHAUSTED: { status: 429, kind: "fixable", dataKeys: ["retry_after_seconds"] },
   UNAVAILABLE: { status: 503, kind: "fixable", dataKeys: ["retry_after_seconds"] },
   ENGINE_DOWN: { status: 503, kind: "failure", dataKeys: [] },

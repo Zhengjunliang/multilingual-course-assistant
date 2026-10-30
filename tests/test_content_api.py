@@ -1,4 +1,4 @@
-"""An edition's content through the API: its syllabus, section by section, and its books.
+"""An edition's content through the API: its syllabus by section, its books and its material.
 
 Asked by the callers of `world()` (tests/test_roles.py). Who may call each
 route on one edition is tests/access_matrix.txt; this file is about which
@@ -9,18 +9,23 @@ transaction rolled back after it, as in tests/test_catalog_api.py.
 
 from __future__ import annotations
 
+import hashlib
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from test_catalog_api import as_user, code_of, rolled_back
 from test_error_contract import refused
 from test_roles import world
 
 from apps.catalog.content_views import EditionReadingView
 from apps.catalog.models import ReadingItem, Syllabus
+from apps.materials.models import CourseMaterial, MaterialFailure, MaterialStatus
+from apps.materials.tasks import ingest_material
 
 if TYPE_CHECKING:
     from django.http.response import HttpResponseBase
+    from rest_framework.test import APIClient
 
     from apps.accounts.models import User
     from apps.catalog.models import CourseEdition
@@ -309,3 +314,138 @@ def test_a_book_is_reached_through_its_own_edition_only() -> None:
         "list, by a teacher of PPM": (404, "NOT_FOUND"),
     }
     assert ReadingItem.objects.get(pk=ia_book.pk).year is None
+
+
+DECK = b"%PDF-1.7 Elettrostatica"
+DECK_NAME = "01-Elettrostatica.pdf"
+
+
+def materials(edition: CourseEdition) -> str:
+    return f"/api/catalog/editions/{edition.pk}/materials"
+
+
+def upload(
+    client: APIClient, edition: CourseEdition, data: bytes = DECK, name: str = DECK_NAME
+) -> HttpResponseBase:
+    file = SimpleUploadedFile(name, data, content_type="application/pdf")
+    return client.post(materials(edition), {"file": file}, format="multipart")
+
+
+def test_material_is_uploaded_on_every_edition_of_a_course_one_teaches() -> None:
+    w = world()
+    cases: dict[str, tuple[User | None, CourseEdition]] = {
+        "teacher, the year before the one assigned": (w.newcomer, w.ppm_old),
+        "secretariat, an edition of their programme": (w.secretariat, w.ppm_new),
+        "superuser": (w.root, w.ia),
+        "teacher, another course": (w.newcomer, w.ia),
+        "student": (w.student, w.ppm_old),
+        "anonymous": (None, w.ppm_old),
+    }
+
+    def post(user: User | None, edition: CourseEdition) -> tuple[int, Any, int]:
+        status, body = answer(upload(as_user(user), edition))
+        if status == 202:
+            body = {key: body[key] for key in ("source_file", "status", "failure", "uploaded_by")}
+        return status, body, CourseMaterial.objects.filter(edition=edition).count()
+
+    seen = {case: rolled_back(lambda args=args: post(*args)) for case, args in cases.items()}
+
+    def queued(by: str) -> tuple[int, dict[str, str], int]:
+        row = {"source_file": DECK_NAME, "status": "queued", "failure": "", "uploaded_by": by}
+        return 202, row, 1
+
+    assert seen == {
+        "teacher, the year before the one assigned": queued("newcomer"),
+        "secretariat, an edition of their programme": queued("secretariat"),
+        "superuser": queued("root"),
+        "teacher, another course": (404, "NOT_FOUND", 0),
+        "student": (404, "NOT_FOUND", 0),
+        "anonymous": (401, "UNAUTHENTICATED", 0),
+    }
+
+
+def test_an_upload_answers_before_its_ingest_is_queued(
+    django_capture_on_commit_callbacks: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The ingest is queued once the row is committed, and runs on a worker, not in the request."""
+    w = world()
+    queued: list[int] = []
+    monkeypatch.setattr(ingest_material, "delay", queued.append)
+
+    with django_capture_on_commit_callbacks(execute=False) as callbacks:
+        response = upload(as_user(w.newcomer), w.ppm_new)
+    waiting = list(queued)
+    for callback in callbacks:
+        callback()
+
+    assert response.status_code == 202
+    assert waiting == []
+    assert CourseMaterial.objects.get().status == MaterialStatus.QUEUED
+    assert queued == [response.json()["id"]]  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def test_the_same_file_twice_on_an_edition_is_refused_with_the_material_it_is() -> None:
+    """Whatever it is called; on another edition it is a material of its own, over one file."""
+    w = world()
+    client = as_user(w.secretariat)
+
+    first = upload(client, w.ppm_old)
+    again = upload(client, w.ppm_old, name="Elettrostatica (copia).pdf")
+    elsewhere = upload(client, w.ppm_new)
+
+    error = again.json()["error"]  # pyright: ignore[reportAttributeAccessIssue]
+    assert (first.status_code, elsewhere.status_code) == (202, 202)
+    assert (again.status_code, error["code"], error["data"]) == (
+        409,
+        "MATERIAL_EXISTS",
+        {"material": first.json()["id"]},  # pyright: ignore[reportAttributeAccessIssue]
+    )
+    stored = {row.file.name for row in CourseMaterial.objects.all()}
+    assert stored == {f"{hashlib.sha256(DECK).hexdigest()}.pdf"}
+    assert CourseMaterial.objects.count() == 2
+
+
+def test_the_list_shows_how_far_each_ingest_got_newest_first() -> None:
+    w = world()
+    for name, status, failure in (
+        ("01-Intro.pdf", MaterialStatus.READY, ""),
+        ("02-Scansione.pdf", MaterialStatus.FAILED, MaterialFailure.UNREADABLE),
+    ):
+        CourseMaterial.objects.create(
+            edition=w.ppm_old,
+            sha256=hashlib.sha256(name.encode()).hexdigest(),
+            source_file=name,
+            status=status,
+            failure=failure,
+        )
+
+    status, listed = answer(as_user(w.newcomer).get(materials(w.ppm_old)))
+
+    assert status == 200
+    assert [(row["source_file"], row["status"], row["failure"]) for row in listed] == [
+        ("02-Scansione.pdf", "failed", "unreadable"),
+        ("01-Intro.pdf", "ready", ""),
+    ]
+    assert {row["uploaded_by"] for row in listed} == {None}
+
+
+@pytest.mark.parametrize(
+    ("body", "codes"),
+    [
+        pytest.param({}, {"file": ["REQUIRED"]}, id="no-file"),
+        pytest.param(
+            {"file": SimpleUploadedFile(DECK_NAME, b"", content_type="application/pdf")},
+            {"file": ["REQUIRED"]},
+            id="empty",
+        ),
+    ],
+)
+def test_an_upload_is_refused_when_its_file_is_missing_or_empty(
+    body: dict[str, object], codes: object
+) -> None:
+    w = world()
+
+    seen = answer(as_user(w.newcomer).post(materials(w.ppm_old), body, format="multipart"))
+
+    assert seen == (400, codes)
+    assert not CourseMaterial.objects.exists()

@@ -200,6 +200,7 @@
     "ACCOUNT_STILL_ACTIVE": "Disattiva l'account prima di eliminarlo.",
     "ROLES_HELD": "Hai un ruolo nello staff: chiedi che ti venga revocato prima di eliminare l'account.",
     "LAST_SUPERUSER": "Sei l'ultimo amministratore attivo: prima rendi amministratore un altro account.",
+    "MATERIAL_EXISTS": "Questo file è già tra i materiali dell'edizione.",
     "RESOURCE_EXHAUSTED": "Troppe richieste. Riprova tra {{retry_after_seconds}} secondi.",
     "UNAVAILABLE": "Il servizio sta rispondendo ad altre domande. Riprova tra poco.",
     "ENGINE_DOWN": "Il servizio delle risposte non è disponibile. Riprova più tardi.",

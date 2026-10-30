@@ -17,6 +17,8 @@ GET catalog:edition                         allow      allow    allow       hide
 DELETE catalog:edition-invitation           allow      allow    allow       hide              allow hide    allow deny     deny
 GET catalog:edition-invitations             allow      allow    allow       hide              allow hide    allow deny     deny
 POST catalog:edition-invitations            allow      allow    allow       hide              allow hide    allow deny     deny
+GET catalog:edition-materials               allow      allow    allow       hide              allow hide    allow deny     deny
+POST catalog:edition-materials              allow      allow    allow       hide              allow hide    allow deny     deny
 DELETE catalog:edition-reading              allow      allow    allow       hide              allow hide    allow deny     deny
 PATCH catalog:edition-reading               allow      allow    allow       hide              allow hide    allow deny     deny
 GET catalog:edition-readings                allow      allow    allow       hide              allow hide    allow deny     deny

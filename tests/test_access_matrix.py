@@ -5,8 +5,9 @@ it; this file records what the declarations add up to. A row is a method of a
 DRF route, as the URL tree resolves them, asked about one fixed object; a
 column is a caller of `world()` (tests/test_roles.py), and `anonymous`. A cell
 is what the caller got: `deny` (401 for a caller not signed in, 403 for one
-who is), `hide` (404), or `allow`, which counts a 400 or a 409 too: the request
-reached the handler, and a body the handler refuses is not an access refused.
+who is), `hide` (404), or `allow`, which counts a 400, a 409 or a 415 too: the
+request reached the handler, and a body the handler refuses, or one of a type
+it does not read, such as the JSON sent to an upload, is not an access refused.
 Any other status is a finding of its own.
 
 A change of access, on purpose or not, shows up as a diff of the file. After an
@@ -96,6 +97,7 @@ def targets(
         "catalog:edition-syllabus-section": {**edition, "section": "prerequisiti"},
         "catalog:edition-readings": edition,
         "catalog:edition-reading": {**edition, "item": book.pk},
+        "catalog:edition-materials": edition,
         "manage:user": account,
         "manage:user-activate": account,
         "manage:user-deactivate": account,
@@ -135,7 +137,7 @@ def verdict(status: int) -> str | None:
         return "deny"
     if status == 404:
         return "hide"
-    if 200 <= status < 300 or status in (400, 409):
+    if 200 <= status < 300 or status in (400, 409, 415):
         return "allow"
     return None
 

@@ -1,13 +1,14 @@
 """The SPA's copy of the catalogue API's shapes must not drift from the serializers.
 
-`apps/catalog/serializers.py`, `apps/catalog/content_serializers.py` and
-`apps/catalog/invitation_serializers.py` are the single source and
-`frontend/src/api/catalog.ts` its shadow on the client, read as text the way
-tests/test_qa_contract.py reads the answer stream's mirror: the fields a
-serializer declares and the field names of the interface of the same name are
-one set, so neither side can add a field the other lacks. The permission
-names, the code sources, the syllabus sections, the importances and the
-roles are compared both ways, since the SPA matches them as strings: a misspelt
+`apps/catalog/serializers.py`, `apps/catalog/content_serializers.py`,
+`apps/catalog/invitation_serializers.py` and `apps/materials/serializers.py`
+are the single source and `frontend/src/api/catalog.ts` its shadow on the
+client, read as text the way tests/test_qa_contract.py reads the answer
+stream's mirror: the fields a serializer declares and the field names of the
+interface of the same name are one set, so neither side can add a field the
+other lacks. The permission names, the code sources, the syllabus sections,
+the importances, the roles and a material's statuses and failures are
+compared both ways, since the SPA matches them as strings: a misspelt
 permission would hide a button without any type error. The languages a book
 may be written in are held one way only, inside Django's table: a Django that
 adds a language leaves the form a language short, never offering one the
@@ -46,6 +47,8 @@ from apps.catalog.serializers import (
     StaffMemberSerializer,
     StudyPlanCourseSerializer,
 )
+from apps.materials.models import MaterialFailure, MaterialStatus
+from apps.materials.serializers import MaterialSerializer
 from apps.roles.registry import Permission, Role
 
 MIRROR = Path(__file__).resolve().parent.parent / "frontend" / "src" / "api" / "catalog.ts"
@@ -68,6 +71,7 @@ MIRRORED = {
     "Invitation": InvitationSerializer,
     "NewInvitation": NewInvitationSerializer,
     "InvitationGrant": InvitationGrantSerializer,
+    "CourseMaterial": MaterialSerializer,
 }
 
 
@@ -99,6 +103,8 @@ def test_the_mirror_names_every_closed_set(mirror: str) -> None:
         union(mirror, "TeachingPeriod"),
         union(mirror, "Importance"),
         union(mirror, "InvitedRole"),
+        union(mirror, "MaterialStatus"),
+        union(mirror, "MaterialFailure"),
     ) == (
         set(Permission),
         set(CodeSource.values),
@@ -106,6 +112,8 @@ def test_the_mirror_names_every_closed_set(mirror: str) -> None:
         set(TeachingPeriod.values),
         set(Importance.values),
         set(Role.values),
+        set(MaterialStatus.values),
+        set(MaterialFailure.values),
     )
 
 

@@ -200,6 +200,7 @@
     "ACCOUNT_STILL_ACTIVE": "Deactivate the account before deleting it.",
     "ROLES_HELD": "You hold a staff role: ask for it to be revoked before deleting your account.",
     "LAST_SUPERUSER": "You are the last active administrator: make another account an administrator first.",
+    "MATERIAL_EXISTS": "This file is already among the edition's material.",
     "RESOURCE_EXHAUSTED": "Too many requests. Try again in {{retry_after_seconds}} seconds.",
     "UNAVAILABLE": "The service is busy answering other questions. Try again in a moment.",
     "ENGINE_DOWN": "The answering service is not available. Try again later.",
