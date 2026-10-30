@@ -15,7 +15,7 @@ This file holds the decisions taken without the supervisor that the thesis argue
 3. **Only a superuser reads the ratings, on a page of the site that names no student.** It lists them newest first, filtered by rating, reason, scenario and language, and opens one with its question, answer, citations, routing decision, request id, and the history its question was asked with, cut by the window the prompt was; neither the page nor its endpoints return an account or a conversation.
    **Why:** Open WebUI reads its ratings on an admin-only page (Admin Panel → Evaluations → Feedback), and Onyx's query history can be set to `anonymized` (`QueryHistoryType`, `backend/onyx/configs/constants.py`; outside the repository: their source). A bad answer is read to improve retrieval and prompts, which takes what was asked and answered, not who asked it; the study's export leaves the identity out as well (#141), and its consent comes from #140.
    **The price:** a student whose ratings point at one problem cannot be asked about it, and a teacher does not read the ratings of their course.
-   **Status:** ✅ `apps/qa/feedback_views.py`.
+   **Status:** ✅ `apps/qa/feedback_views.py`, `frontend/src/routes/FeedbackPage.tsx`, `frontend/src/routes/FeedbackDetailPage.tsx`.
 
 ## 2026-10-30 — A student declares a programme, a question searches what its account may read, and a conversation keeps the years it adds
 

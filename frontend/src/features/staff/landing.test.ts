@@ -64,15 +64,15 @@ describe("the Gestione group", () => {
       "the superuser",
       account([], true),
       [B047, B222],
-      ["programmes", "users"],
+      ["programmes", "users", "feedback"],
       "/staff/programmes",
     ],
-    // The accounts last, after the courses the account teaches.
+    // The accounts and the ratings last, after the courses the account teaches.
     [
       "the superuser who teaches",
       account([{ role: "teacher", edition: 3 }], true),
       [B047, B222],
-      ["programmes", "mine", "users"],
+      ["programmes", "mine", "users", "feedback"],
       "/staff/programmes",
     ],
     // The superuser's items do not wait for the list; nobody else's can be known before it.
@@ -80,7 +80,7 @@ describe("the Gestione group", () => {
       "the superuser, before the list",
       account([], true),
       null,
-      ["programmes", "users"],
+      ["programmes", "users", "feedback"],
       "/staff/programmes",
     ],
     ["secretariat, before the list", account([SECRETARIAT]), null, [], null],
@@ -107,10 +107,11 @@ describe("the Gestione counts", () => {
       { key: "programme", count: 12 },
       { key: "mine", count: 2 },
     ]);
-    // The accounts are counted on their own page alone.
+    // The accounts and the ratings are counted on their own pages alone.
     expect(managementItems(account([], true), [B047, B222])).toMatchObject([
       { key: "programmes", count: 2 },
       { key: "users", count: null },
+      { key: "feedback", count: null },
     ]);
   });
 
@@ -118,6 +119,7 @@ describe("the Gestione counts", () => {
     expect(managementItems(account([], true), null)).toMatchObject([
       { key: "programmes", count: null },
       { key: "users", count: null },
+      { key: "feedback", count: null },
     ]);
   });
 });

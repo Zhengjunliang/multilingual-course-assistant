@@ -7,9 +7,11 @@
  * names the student who rated.
  */
 
+import type { ListPage } from "./admin";
 import type { HistoryTurn } from "./client";
 import type { Citation, RouteDecision } from "./contract";
 import type { FeedbackReason } from "./conversations";
+import { request } from "./http";
 
 /** The rows of a page of ratings: the server's `FeedbackPagination.page_size`. */
 export const FEEDBACK_PAGE_SIZE = 50;
@@ -21,6 +23,8 @@ export interface FeedbackRow {
   rating: "up" | "down";
   reason: FeedbackReason | "";
   comment: string;
+  /** The language the comment is written in; `""` without one. */
+  comment_locale: string;
   updated_at: string;
   question: string;
   /** Where the answer was searched, the scenario; `null` for an answer stored without a route. */
@@ -56,4 +60,36 @@ export interface FeedbackDetail {
   answer: RatedAnswer;
   /** The exchanges the question was asked with, oldest first, cut as the prompt was. */
   history: HistoryTurn[];
+}
+
+/** What the list is narrowed to, each `""` for every value. */
+export interface FeedbackQuery {
+  rating: FeedbackRow["rating"] | "";
+  reason: FeedbackReason | "";
+  target: RouteDecision["target"] | "";
+  /** The language the question was asked in, a BCP-47 primary subtag. */
+  locale: string;
+  /** From 1. */
+  page: number;
+}
+
+const FEEDBACK = "/api/admin/feedback";
+
+/** The query a list of ratings is asked for with, and its page's address keeps: `rating=down&page=2`. */
+export function feedbackSearch({ page, ...filters }: FeedbackQuery): string {
+  const query = new URLSearchParams();
+  for (const [name, value] of Object.entries(filters)) if (value !== "") query.set(name, value);
+  if (page > 1) query.set("page", String(page));
+  return query.toString();
+}
+
+/** One page of the ratings, newest first. */
+export function listFeedback(query: FeedbackQuery): Promise<ListPage<FeedbackRow>> {
+  const search = feedbackSearch(query);
+  return request<ListPage<FeedbackRow>>(search === "" ? FEEDBACK : `${FEEDBACK}?${search}`);
+}
+
+/** A rating, by its answer's id; 404 once withdrawn or deleted with its conversation. */
+export function getFeedback(id: string): Promise<FeedbackDetail> {
+  return request<FeedbackDetail>(`${FEEDBACK}/${encodeURIComponent(id)}`);
 }

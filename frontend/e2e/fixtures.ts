@@ -25,6 +25,7 @@ import type {
 } from "@/api/catalog";
 import type { AnswerEvent, Citation, RouteDecision } from "@/api/contract";
 import type { ConversationDetail } from "@/api/conversations";
+import type { FeedbackDetail, FeedbackRow } from "@/api/review";
 import type { ScopeCourse } from "@/api/scope";
 import { uuidOf } from "@/test/conversations";
 
@@ -253,6 +254,57 @@ export const CONVERSATION: ConversationDetail = {
   answering: null,
   added_editions: [],
 };
+
+// --- the ratings the superuser reads ----------------------------------------------
+
+/** The campus answer, rated down with a reason and a comment, after one earlier exchange. */
+export const RATING: FeedbackDetail = {
+  id: CAMPUS_ANSWER_ID,
+  rating: "down",
+  reason: "not_answered",
+  comment: "Non dice come si arriva a Sol.",
+  comment_locale: "it",
+  created_at: "2026-10-08T10:01:00Z",
+  updated_at: "2026-10-08T10:01:00Z",
+  question: CAMPUS_QUESTION,
+  answer: {
+    text: `${CAMPUS_ANSWER} ${WEB_CITATION.marker}`,
+    locale: "it",
+    complete: true,
+    citations: [WEB_CITATION],
+    route: CAMPUS_ROUTE,
+    search_ms: 2400,
+    request_id: "4bf92f3577b34da6a3ce929d0e0e4736",
+    created_at: "2026-10-08T10:00:02Z",
+  },
+  history: [{ question: "Che cos'è Sol?", answer: "Il servizio online per gli studenti." }],
+};
+
+/** It, and a rating up of an answer in English stored without a route. */
+export const RATINGS: FeedbackRow[] = [
+  {
+    id: RATING.id,
+    rating: RATING.rating,
+    reason: RATING.reason,
+    comment: RATING.comment,
+    comment_locale: RATING.comment_locale,
+    updated_at: RATING.updated_at,
+    question: RATING.question,
+    target: CAMPUS_ROUTE.target,
+    locale: "it",
+  },
+  {
+    id: uuidOf(3),
+    rating: "up",
+    reason: "",
+    comment: "",
+    comment_locale: "",
+    updated_at: "2026-10-07T16:00:00Z",
+    question: "What is an ORM?",
+    target: null,
+    locale: "en",
+  },
+];
 
 // --- the catalogue the staff pages read ------------------------------------------
 

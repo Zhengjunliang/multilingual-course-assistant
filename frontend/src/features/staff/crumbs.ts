@@ -13,11 +13,13 @@
  * teacher, who views no programme — an edition sits under the teacher's own
  * courses.
  *
- * The accounts' page stands alone, under no programme.
+ * The accounts' page stands alone, under no programme, and so do the ratings,
+ * a rating under their list, named by its question.
  *
  * The trail also names its area, the Gestione item it starts from, whose icon
  * leads the breadcrumb: "I miei insegnamenti" for a page reached through the
- * teacher's own courses, the accounts for theirs, the programmes otherwise.
+ * teacher's own courses, the accounts and the ratings for theirs, the
+ * programmes otherwise.
  * A key and not the icon, so the trail stays plain data (routes/shell.ts
  * carries it as text).
  */
@@ -40,6 +42,8 @@ export type StaffPage =
   | { kind: "edition"; course: Named; year: string; programme: ProgrammeName | null }
   | { kind: "mine" }
   | { kind: "users" }
+  | { kind: "feedback" }
+  | { kind: "rating"; question: string }
   | { kind: "notFound" };
 
 export function programmeLabel(programme: ProgrammeName): string {
@@ -84,6 +88,7 @@ export function area(page: StaffPage, root: ManagementKey | null): ManagementKey
     (page.kind === "notFound" && root === "mine");
   if (mine) return "mine";
   if (page.kind === "users") return "users";
+  if (page.kind === "feedback" || page.kind === "rating") return "feedback";
   return root === "programme" ? "programme" : "programmes";
 }
 
@@ -119,6 +124,10 @@ export function crumbs(page: StaffPage, root: ManagementKey | null, t: TFunction
       return [{ label: t("staff.nav.mine") }];
     case "users":
       return [{ label: t("staff.nav.users") }];
+    case "feedback":
+      return [{ label: t("staff.nav.feedback") }];
+    case "rating":
+      return [{ label: t("staff.nav.feedback"), to: "/staff/feedback" }, { label: page.question }];
     case "notFound":
       return [...(root === "mine" ? [mine] : []), { label: t("staff.refusal.notFound") }];
   }

@@ -300,7 +300,8 @@
       "management": "Management",
       "programme": "Degree programme",
       "mine": "My courses",
-      "users": "Accounts"
+      "users": "Accounts",
+      "feedback": "Ratings"
     },
     "programmes": {
       "title": "Degree programmes",
@@ -532,6 +533,43 @@
       "done": "Role revoked",
       "gone": "{{username}} no longer held this role: it had been revoked elsewhere."
     },
+    "pager": {
+      "label": "Pages",
+      "page": "Page {{page}} of {{pages}}",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "feedback": {
+      "title": "Ratings",
+      "sub": "How students rated the answers, newest first. None says who gave it.",
+      "count_one": "{{count}} rating",
+      "count_other": "{{count}} ratings",
+      "question": "Question",
+      "rating": "Rating",
+      "reason": "Reason",
+      "target": "Source",
+      "locale": "Language",
+      "allRatings": "All",
+      "allReasons": "All",
+      "allTargets": "All",
+      "allLocales": "All",
+      "noReason": "No reason",
+      "none": "No ratings.",
+      "noneMatching": "No rating matches the filters.",
+      "rated": "Rated on {{date}}",
+      "comment": "Comment",
+      "answer": "The rated answer",
+      "history_one": "{{count}} earlier exchange",
+      "history_other": "{{count}} earlier exchanges",
+      "historyHint": "As the model received them with the question.",
+      "request": "Request ID",
+      "noRequest": "Not recorded",
+      "where": {
+        "slides": "Course material",
+        "unifi_web": "University pages",
+        "both": "Both sources"
+      }
+    },
     "users": {
       "title": "Accounts",
       "state": "State",
@@ -549,10 +587,6 @@
       "isInactive": "Deactivated",
       "none": "No account matches.",
       "actions": "Actions for {{username}}",
-      "pages": "Pages",
-      "page": "Page {{page}} of {{pages}}",
-      "previous": "Previous",
-      "next": "Next",
       "gone": "The account {{username}} is no longer there: it was deleted elsewhere.",
       "failed": "The action did not go through",
       "deactivate": {

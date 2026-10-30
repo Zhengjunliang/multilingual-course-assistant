@@ -21,13 +21,11 @@
  * server, which would refuse it.
  */
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { listUsers, USER_PAGE_SIZE } from "@/api/admin";
 import { useSession } from "@/auth/useSession";
-import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/field";
 import { Tabs } from "@/components/ui/tabs";
 import { ToggleGroup } from "@/components/ui/toggle-group";
@@ -35,7 +33,7 @@ import { type AccountChange, useAccountActions } from "@/features/staff/AccountA
 import { AccountTable } from "@/features/staff/AccountTable";
 import { useLoad } from "@/features/staff/context";
 import { useInvitations } from "@/features/staff/Invitations";
-import { PageHead } from "@/features/staff/page";
+import { PageHead, Pager } from "@/features/staff/page";
 import { LoadFailure } from "@/features/staff/Refusal";
 import { StaffNotFound } from "./StaffLanding";
 import { useCrumbs, useShell } from "./shell";
@@ -86,7 +84,6 @@ function Accounts({ self }: { self: number }) {
     return <LoadFailure error={users.error} back={back} onRetry={() => void users.reload()} />;
   if (users.data === null) return null;
   const { count } = users.data;
-  const pages = Math.max(1, Math.ceil(count / USER_PAGE_SIZE));
 
   return (
     <>
@@ -130,36 +127,14 @@ function Accounts({ self }: { self: number }) {
                   />
                 </div>
                 <AccountTable users={shown} self={self} menu={actions.menu} />
-                {pages > 1 && (
-                  <nav
-                    aria-label={t("staff.users.pages")}
-                    className="flex items-center justify-end gap-tight"
-                  >
-                    <span className="text-caption text-muted tabular-nums">
-                      {t("staff.users.page", { page, pages })}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={users.data.previous === null}
-                      onClick={() => setPage(page - 1)}
-                    >
-                      <ChevronLeft aria-hidden className="size-icon" />
-                      {t("staff.users.previous")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={users.data.next === null}
-                      onClick={() => setPage(page + 1)}
-                    >
-                      {t("staff.users.next")}
-                      <ChevronRight aria-hidden className="size-icon" />
-                    </Button>
-                  </nav>
-                )}
+                <Pager
+                  page={page}
+                  count={count}
+                  size={USER_PAGE_SIZE}
+                  previous={users.data.previous !== null}
+                  next={users.data.next !== null}
+                  onPage={setPage}
+                />
               </div>
             ),
           },

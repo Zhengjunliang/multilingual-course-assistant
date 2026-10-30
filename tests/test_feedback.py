@@ -172,6 +172,8 @@ def rated(
     rating: str,
     *,
     reason: str = "",
+    comment: str = "",
+    comment_locale: str = "",
     target: str = "unifi_web",
     locale: str = "it",
     question: str = "Che cos'è un ORM?",
@@ -182,7 +184,9 @@ def rated(
     answer = answer_of(conversation)
     route = {"target": target, "query": question, "fresh": False, "reason": "test"}
     Message.objects.filter(pk=answer.pk).update(route=route, request_id="a" * 32)
-    Feedback.objects.create(answer=answer, rating=rating, reason=reason)
+    Feedback.objects.create(
+        answer=answer, rating=rating, reason=reason, comment=comment, locale=comment_locale
+    )
     Feedback.objects.filter(pk=answer.pk).update(updated_at=START + timedelta(minutes=minute))
     return answer
 
@@ -198,16 +202,27 @@ def page(query: str = "") -> dict[str, Any]:
 
 def test_the_list_reads_newest_first_counted_and_without_a_name() -> None:
     older = rated(0, "up", question="Quando si paga?")
-    newer = rated(5, "down", reason="incorrect", target="slides", locale="en")
+    newer = rated(
+        5,
+        "down",
+        reason="incorrect",
+        comment="说错了",
+        comment_locale="zh",
+        target="slides",
+        locale="en",
+    )
 
     listed = page()
 
     assert listed["count"] == 2
     assert [row["id"] for row in listed["results"]] == [str(newer.pk), str(older.pk)]
     first = listed["results"][0]
-    assert {key: first[key] for key in ("rating", "reason", "target", "locale")} == {
+    keys = ("rating", "reason", "comment", "comment_locale", "target", "locale")
+    assert {key: first[key] for key in keys} == {
         "rating": "down",
         "reason": "incorrect",
+        "comment": "说错了",
+        "comment_locale": "zh",
         "target": "slides",
         "locale": "en",
     }
