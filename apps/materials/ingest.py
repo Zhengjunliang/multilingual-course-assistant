@@ -47,9 +47,10 @@ class Parser(Protocol):
 
 # Docling's `document_timeout` for one material (#36): the longest of the 31
 # PPM decks took 100 s on the laptop's GPU and the next 29 s, against a median
-# of 5 s. A deck stopped there fails `timed_out` and is indexed not at all;
-# on the solo pool of a Windows worker it is the only clock there is
-# (apps/materials/tasks.py).
+# of 5 s. A deck stopped there fails `timed_out` and is indexed not at all.
+# Docling checks it while it converts the pages; the formulas it decodes after
+# them run past it, bounded only by the task's limits (apps/materials/tasks.py),
+# which the solo pool of a Windows worker does not enforce (#237).
 PARSE_TIMEOUT_SECONDS = 300
 
 

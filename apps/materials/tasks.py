@@ -62,7 +62,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # A deck takes seconds on the laptop's GPU, a long scan under OCR a few
-# minutes, and parsing stops at five (`PARSE_TIMEOUT_SECONDS`,
+# minutes, and converting its pages stops at five (`PARSE_TIMEOUT_SECONDS`,
 # apps/materials/ingest.py); past twenty the task is stopped, and five later
 # killed. Both stay under the broker's visibility timeout, an hour on Redis,
 # and the solo pool of a Windows worker enforces neither (config/settings.py).
