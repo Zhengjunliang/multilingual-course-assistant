@@ -30,7 +30,7 @@ from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from rag.answer import Turn
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Iterable
+    from collections.abc import Collection, Iterable, Sequence
     from uuid import UUID
 
     from apps.accounts.models import User
@@ -104,10 +104,21 @@ def open_conversation(owner: User, existing: Conversation | None) -> Conversatio
 
 
 def recent_turns(conversation: Conversation) -> list[Turn]:
-    """The last few completed exchanges of the thread, oldest first.
+    """The history the next question of `conversation` is asked with.
 
     The thread ends at the leaf `conversation` was read with, so the history is
     the conversation as the question's sender last saw it.
+    """
+    return window(
+        thread(conversation.current_leaf_id, Message.objects.filter(conversation=conversation))
+    )
+
+
+def window(path: Sequence[Message]) -> list[Turn]:
+    """The last few completed exchanges of `path`, oldest first: what a
+    question asked after its last message is given as history. The page that
+    reads a rating cuts the history its answer was given here too
+    (apps/qa/feedback_views.py), so it shows what the prompt held.
 
     An unfinished answer is included deliberately. It is what the student
     actually saw — a stream that died halfway is still on their screen — so
@@ -119,9 +130,7 @@ def recent_turns(conversation: Conversation) -> list[Turn]:
     rather than paired with the next answer, which belongs to a different
     question.
     """
-    recent = thread(
-        conversation.current_leaf_id, Message.objects.filter(conversation=conversation)
-    )[-HISTORY_WINDOW_TURNS * 2 :]
+    recent = path[-HISTORY_WINDOW_TURNS * 2 :]
 
     turns: list[Turn] = []
     asked: Message | None = None
@@ -144,9 +153,11 @@ def record_exchange(
     start: StartEvent,
     answer_pk: UUID,
     *,
+    request_id: str,
     added_editions: Collection[int] | None = None,
 ) -> None:
-    """Write the question and the empty answer, the answer under `answer_pk`.
+    """Write the question and the empty answer, the answer under `answer_pk`
+    and with the id of the request that asked (`Message.request_id`).
 
     `answer_pk` is the answer's id everywhere: the web process chose it when
     it admitted the question, and it already names the answer's stream and
@@ -202,6 +213,7 @@ def record_exchange(
             citations=[citation.model_dump(mode="json") for citation in start.citations],
             route=start.route.model_dump(mode="json"),
             search_ms=start.search_ms,
+            request_id=request_id,
         )
         Conversation.objects.filter(pk=conversation_id).update(current_leaf=answer)
         if added_editions is not None:

@@ -46,6 +46,8 @@ POST manage:user-reset-link                 deny       deny     deny        deny
 POST manage:user-sessions-end               deny       deny     deny        deny              deny  deny    allow deny     deny
 GET manage:users                            deny       deny     deny        deny              deny  deny    allow deny     deny
 GET qa:answer-events                        hide       hide     hide        hide              hide  allow   hide  deny     deny
+DELETE qa:answer-feedback                   hide       hide     hide        hide              hide  allow   hide  deny     deny
+PUT qa:answer-feedback                      hide       hide     hide        hide              hide  allow   hide  deny     deny
 POST qa:answer-stop                         hide       hide     hide        hide              hide  allow   hide  hide     hide
 POST qa:ask                                 allow      allow    allow       allow             allow allow   allow allow    allow
 DELETE qa:conversation                      hide       hide     hide        hide              hide  allow   hide  deny     deny
@@ -54,3 +56,5 @@ PATCH qa:conversation                       hide       hide     hide        hide
 GET qa:conversations                        allow      allow    allow       allow             allow allow   allow deny     deny
 GET qa:scope                                allow      allow    allow       allow             allow allow   allow deny     deny
 GET qa:source                               allow      allow    allow       hide              allow hide    allow deny     deny
+GET review:feedback                         deny       deny     deny        deny              deny  deny    allow deny     deny
+GET review:feedback-item                    deny       deny     deny        deny              deny  deny    allow deny     deny

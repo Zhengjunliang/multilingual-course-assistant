@@ -17,7 +17,7 @@ from rest_framework import serializers
 
 from apps.qa import inflight
 from apps.qa.conversations import thread
-from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
+from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Feedback, Message
 from config.errors import ErrorCode, FieldReason, fail, field_error
 from rag.answer import Turn
 from rag.chunk import normalize_locale
@@ -191,6 +191,15 @@ class AskRequest(serializers.Serializer):
         return attrs
 
 
+class StoredFeedbackSerializer(serializers.ModelSerializer[Feedback]):
+    """A student's rating of an answer, as they read it back under the answer
+    (apps/qa/feedback_views.py)."""
+
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
+        model = Feedback
+        fields = ("rating", "reason", "comment")
+
+
 class MessageSerializer(serializers.ModelSerializer[Message]):
     """One stored turn, in the shape the interface already knows how to draw.
 
@@ -200,7 +209,13 @@ class MessageSerializer(serializers.ModelSerializer[Message]):
     exactly the same code as a live one, pills, sources and process line
     included, instead of a second rendering path for history that would drift
     from the first.
+
+    `feedback` is the owner's rating of an answer, null when there is none and
+    on a question: the owner is the only reader of a conversation, so it is
+    theirs.
     """
+
+    feedback = StoredFeedbackSerializer(read_only=True, allow_null=True)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Message
@@ -214,6 +229,7 @@ class MessageSerializer(serializers.ModelSerializer[Message]):
             "route",
             "search_ms",
             "created_at",
+            "feedback",
         )
 
 
@@ -334,7 +350,7 @@ class ConversationDetailSerializer(ConversationSerializer):
         fields = (*ConversationSerializer.Meta.fields, "messages", "answering", "added_editions")
 
     def get_messages(self, conversation: Conversation) -> list[ReturnDict[str, Any]]:
-        messages = Message.objects.filter(conversation=conversation)
+        messages = Message.objects.filter(conversation=conversation).select_related("feedback")
         return [
             MessageSerializer(message).data
             for message in thread(conversation.current_leaf_id, messages)

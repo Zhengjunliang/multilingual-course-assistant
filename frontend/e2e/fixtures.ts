@@ -235,6 +235,7 @@ export const CONVERSATION: ConversationDetail = {
       route: null,
       search_ms: null,
       created_at: "2026-10-08T10:00:00Z",
+      feedback: null,
     },
     {
       id: CAMPUS_ANSWER_ID,
@@ -246,6 +247,7 @@ export const CONVERSATION: ConversationDetail = {
       route: CAMPUS_ROUTE,
       search_ms: 2400,
       created_at: "2026-10-08T10:00:02Z",
+      feedback: null,
     },
   ],
   answering: null,

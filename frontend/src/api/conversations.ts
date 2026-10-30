@@ -48,6 +48,33 @@ export interface ConversationSummary {
   last_source: ConversationSource | null;
 }
 
+/** Why an answer is rated down, as `Feedback.Reason` keys it (apps/qa/models.py); the interface words each. */
+export const FEEDBACK_REASONS = ["incorrect", "not_answered", "wrong_language", "other"] as const;
+export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
+
+/** How long a comment may be (`MAX_COMMENT_CHARS`, apps/qa/models.py). */
+export const MAX_COMMENT_CHARS = 1024;
+
+/** A student's rating of an answer, as they read it back under it. */
+export interface StoredFeedback {
+  rating: "up" | "down";
+  /** `""` when none was given, and always on a rating up. */
+  reason: FeedbackReason | "";
+  /** `""` when none was given, and always on a rating up. */
+  comment: string;
+}
+
+/** A rating as it is sent: the whole of it, which replaces any before (`FeedbackRequest`). */
+export interface FeedbackBody {
+  rating: "up" | "down";
+  /** Only with a rating down. */
+  reason?: FeedbackReason;
+  /** Only with a rating down. */
+  comment?: string;
+  /** The interface's language, which the comment is written in; required with one. */
+  locale?: string;
+}
+
 export interface StoredMessage {
   id: string;
   role: "user" | "assistant";
@@ -63,6 +90,8 @@ export interface StoredMessage {
   /** `StartEvent.search_ms`; `null` on a question. */
   search_ms: number | null;
   created_at: string;
+  /** The owner's rating of an answer; `null` when there is none, and on a question. */
+  feedback: StoredFeedback | null;
 }
 
 export interface ConversationDetail extends ConversationSummary {

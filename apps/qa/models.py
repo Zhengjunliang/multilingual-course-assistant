@@ -1,8 +1,9 @@
-"""Conversations, and the messages that make one.
+"""Conversations, the messages that make one, and a student's rating of an answer.
 
-Two models and no more. What a follow-up needs is the previous questions and
-answers in order; everything else a chat product usually stores — titles,
-folders, sharing, edits — is a feature this thesis is not making a claim about.
+What a follow-up needs is the previous questions and answers in order;
+everything else a chat product usually stores — titles, folders, sharing,
+edits — is a feature this thesis is not making a claim about. The rating is
+the one addition, because the evaluation reads it (`Feedback`).
 The one thing an owner sets on a conversation is whether it is pinned. What a
 sidebar row shows besides — its title and that title's language, when it last
 moved, what its last answer drew on — is derived from the messages rather than
@@ -162,6 +163,8 @@ class Message(models.Model):
         related_name="messages",
         verbose_name=_("conversation"),
     )
+    # See `Conversation.current_leaf_id`.
+    conversation_id: uuid.UUID
     # A message removed would take everything after it in the thread along,
     # the leaf included, which `Conversation.current_leaf` refuses: a
     # conversation is deleted whole.
@@ -191,6 +194,11 @@ class Message(models.Model):
     search_ms = models.PositiveIntegerField(
         null=True, blank=True, verbose_name=_("search time (ms)")
     )
+    # The id of the request that asked for this answer (config/request_id.py),
+    # which files its log lines and, with #26, names its trace: a rating is
+    # read beside what the server did to produce the answer it rates. Empty on
+    # a student's turn and on an answer stored before the column existed.
+    request_id = models.CharField(max_length=32, blank=True, verbose_name=_("request id"))
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("created at"))
 
     class Meta:
@@ -206,3 +214,77 @@ class Message(models.Model):
 
     def __str__(self) -> str:
         return f"{self.role}: {self.text[:60]}"
+
+
+# How long a thumbs-down comment may be, as LibreChat caps its feedback text
+# (outside the repository): room for what went wrong, not for an essay.
+MAX_COMMENT_CHARS = 1024
+
+
+class Feedback(models.Model):
+    """A student's rating of one answer of their own conversation.
+
+    Keyed by the answer, so an answer has one rating at most: a conversation
+    has one owner, who is the only one who can read its answers, so the rater
+    is `answer.conversation.owner` and a column naming them would be a second
+    copy of that, free to disagree with it — vercel/chatbot keys its votes by
+    chat and message for the same reason (outside the repository). A table of
+    its own rather than columns on `Message`, as Open WebUI, Dify and Onyx keep
+    one: a rating is changed and withdrawn without writing to the answer, and
+    the page that reads the ratings queries one table. It goes with its answer,
+    so with the conversation: a deleted conversation is deleted outright
+    (docs/decisions.md, 2026-10-30, *A student rates an answer up or down*).
+
+    A thumbs down may say why, by one of `Reason`'s keys, and add a comment in
+    the language it was written in (`locale`, the rag namespace, as
+    `Message.locale`); a thumbs up carries neither, which the constraints hold.
+    """
+
+    class Rating(models.TextChoices):
+        UP = "up", _("thumbs up")
+        DOWN = "down", _("thumbs down")
+
+    class Reason(models.TextChoices):
+        INCORRECT = "incorrect", _("incorrect")
+        NOT_ANSWERED = "not_answered", _("does not answer the question")
+        WRONG_LANGUAGE = "wrong_language", _("wrong language")
+        OTHER = "other", _("other")
+
+    answer = models.OneToOneField(
+        Message,
+        primary_key=True,
+        on_delete=models.CASCADE,
+        related_name="feedback",
+        verbose_name=_("answer"),
+    )
+    # See `Conversation.current_leaf_id`.
+    answer_id: uuid.UUID
+    rating = models.CharField(max_length=8, choices=Rating.choices, verbose_name=_("rating"))
+    reason = models.CharField(
+        max_length=16, choices=Reason.choices, blank=True, verbose_name=_("reason")
+    )
+    comment = models.CharField(max_length=MAX_COMMENT_CHARS, blank=True, verbose_name=_("comment"))
+    # Set with the comment and empty without it.
+    locale = models.CharField(max_length=16, blank=True, verbose_name=_("language"))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("created at"))
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_("updated at"))
+
+    class Meta:
+        # The page that reads them shows the latest first.
+        ordering = ("-updated_at", "-answer")
+        constraints = (
+            models.CheckConstraint(
+                condition=models.Q(rating="down") | models.Q(reason="", comment=""),
+                name="qa_feedback_why_only_down",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(comment="", locale="")
+                | (~models.Q(comment="") & ~models.Q(locale="")),
+                name="qa_feedback_locale_with_comment",
+            ),
+        )
+        verbose_name = _("feedback")
+        verbose_name_plural = _("feedback")
+
+    def __str__(self) -> str:
+        return f"{self.rating}: {self.answer_id}"
