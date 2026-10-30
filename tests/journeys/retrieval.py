@@ -3,9 +3,16 @@ stub encoders of tests/test_index.py over an in-memory index holding one slides
 excerpt and one web page, so a student, whose scope is every edition, is
 answered from both, and an anonymous visitor, whose scope is none, from the page.
 
+The index is the run's one, which the journeys' ingest writes into too
+(tests/journeys/ingest.py), so a file uploaded in a journey is among the next
+answer's sources. Both run on the worker of tests/journeys/serve.py, one task
+at a time.
+
 No model loads and the developer's Qdrant is never opened: what the journeys
 check is that the two sides of `/api/ask` agree, not what retrieval finds.
 """
+
+from functools import cache
 
 from qdrant_client import QdrantClient
 
@@ -15,11 +22,17 @@ from tests.journeys.fake_llm import PAGE
 from tests.test_index import StubDense, StubSparse, make_chunk, make_web_chunk
 
 
-def build_retrieval() -> Retrieval:
+@cache
+def index() -> QdrantClient:
+    """The run's index, with its two excerpts, built when first asked for."""
     client = QdrantClient(location=":memory:")
     dense, sparse = StubDense(), StubSparse()
     ensure_collection(client, dense.dimension())
     ensure_collection(client, dense.dimension(), WEB_COLLECTION)
     index_chunks(client, [make_chunk()], dense, sparse)
     index_chunks(client, [make_web_chunk("cd" * 32, "crawl", PAGE)], dense, sparse, WEB_COLLECTION)
-    return Retrieval(client=client, dense=dense, sparse=sparse, reranker=None)
+    return client
+
+
+def build_retrieval() -> Retrieval:
+    return Retrieval(client=index(), dense=StubDense(), sparse=StubSparse(), reranker=None)

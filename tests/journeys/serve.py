@@ -8,10 +8,11 @@ test database created afresh (`mca_journeys`, tests/journeys/settings.py),
 stays off, as in the configuration CI checks, and with DEBUG off Django serves
 no static files otherwise (config/settings.py, section "Static files").
 
-Questions are answered by a Celery worker this process starts beside the
-server, on the `qa` queue (apps/qa/tasks.py), through a broker in memory: one
-process, so the worker answers from the same database and the same stub
-retrieval, and no broker the developer runs hands a run's questions to their
+Questions are answered, and uploads ingested, by a Celery worker this process
+starts beside the server, on the `qa` and `ingest` queues (apps/qa/tasks.py,
+apps/materials/tasks.py), through a broker in memory: one process, so the
+worker answers from the same database and the same stub index the ingest
+writes into, and no broker the developer runs hands a run's tasks to their
 own worker, which would answer from the real index.
 """
 
@@ -36,7 +37,7 @@ if __name__ == "__main__":
     from config.celery import app
 
     # Solo, as on a Windows worker; no ping, which needs a task the app lacks.
-    worker = start_worker(app, pool="solo", perform_ping_check=False, queues=["qa"])
+    worker = start_worker(app, pool="solo", perform_ping_check=False, queues=["qa", "ingest"])
     # Celery annotates the context manager as the iterable it was written as.
     with worker:  # pyright: ignore[reportGeneralTypeIssues]
         call_command(

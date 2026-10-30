@@ -1,5 +1,6 @@
 """The site the browser journeys run against (frontend/playwright.journeys.config.ts):
-config/settings.py with the retrieval swapped for stubs, a database of its own,
+config/settings.py with the retrieval and the ingest swapped for stubs, a
+database and a directory of uploaded material of its own,
 rate limits a whole suite from one address fits under, counted apart from the
 developer's own site, and no request to Pwned Passwords.
 
@@ -11,10 +12,18 @@ breached-password check is tested there too, against a fake range
 it out of the machine.
 """
 
+import tempfile
+from pathlib import Path
+
 from config.settings import *  # noqa: F403
 from config.settings import AUTH_PASSWORD_VALIDATORS, CACHES, DATABASES, REST_FRAMEWORK
 
 QA_RETRIEVAL = "tests.journeys.retrieval.build_retrieval"
+MATERIALS_PIPELINE = "tests.journeys.ingest.build_pipeline"
+
+# A directory of the run's own, never the developer's data/materials: the
+# database is created afresh, so files of a run before would name no row.
+MATERIALS_ROOT = Path(tempfile.mkdtemp(prefix="mca-journeys-materials-"))
 
 # Created afresh by tests/journeys/serve.py on every run, beside the developer's
 # `mca` and pytest's `test_mca*`, neither of which a run touches.
