@@ -61,6 +61,9 @@ class MaterialStorage(FileSystemStorage):
             super()._clear_cached_properties(setting, **kwargs)  # pyright: ignore[reportArgumentType]
 
 
+material_storage = MaterialStorage()
+
+
 def material_name(instance: CourseMaterial, filename: str) -> str:
     """`<sha256>.pdf`, whatever the uploaded file was called; its name is `source_file`."""
     return f"{instance.sha256}.pdf"
@@ -106,7 +109,7 @@ class CourseMaterial(models.Model):
         related_name="+",
         verbose_name=_("uploaded by"),
     )
-    file = models.FileField(storage=MaterialStorage(), upload_to=material_name)
+    file = models.FileField(storage=material_storage, upload_to=material_name)
     sha256 = models.CharField(max_length=64, verbose_name=_("SHA-256"))
     source_file = models.CharField(
         max_length=255,
@@ -130,6 +133,8 @@ class CourseMaterial(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("uploaded at"))
     started_at = models.DateTimeField(null=True, blank=True, verbose_name=_("started at"))
     finished_at = models.DateTimeField(null=True, blank=True, verbose_name=_("finished at"))
+    # The column Django adds for the key, declared for the type checker, which does not see it.
+    edition_id: int
 
     class Meta:
         ordering = ("-created_at", "-pk")

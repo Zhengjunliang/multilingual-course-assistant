@@ -29,6 +29,7 @@ from rag.probe import ParsePlan, Pipeline
 
 if TYPE_CHECKING:
     from docling.document_converter import DocumentConverter
+    from docling_core.types.doc.document import DoclingDocument
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -192,11 +193,18 @@ CLASSIC = ParsePlan(pipeline="classic", ocr=False, formula=False, reason="manual
 
 
 class StubConverter:
-    """Answers `convert` with a fixed status, or raises; docling's own result, minus the models."""
+    """Answers `convert` with a fixed status and document, or raises; docling's own result,
+    minus the models. The document is empty unless one is given."""
 
-    def __init__(self, status: str = "success", error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        status: str = "success",
+        error: Exception | None = None,
+        document: "DoclingDocument | None" = None,
+    ) -> None:
         self.status = status
         self.error = error
+        self.document = document
         self.calls = 0
 
     def convert(self, source: Path) -> SimpleNamespace:
@@ -207,8 +215,21 @@ class StubConverter:
         if self.error is not None:
             raise self.error
         return SimpleNamespace(
-            status=ConversionStatus(self.status), document=DoclingDocument(name=source.stem)
+            status=ConversionStatus(self.status),
+            document=self.document or DoclingDocument(name=source.stem),
         )
+
+
+def encrypted_pdf() -> bytes:
+    """One blank page behind a user password, which nothing here knows."""
+    # RC4 because pypdf writes AES only with `cryptography`, which nothing here installs.
+    password = "secret"
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.encrypt(user_password=password, algorithm="RC4-128")
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
 
 
 def stored_pdf(tmp_path: Path) -> Path:
@@ -279,15 +300,31 @@ def test_only_a_clean_conversion_is_returned(
         )
 
 
-def test_an_encrypted_pdf_is_unreadable_before_any_model_loads(tmp_path: Path) -> None:
-    # RC4 because pypdf writes AES only with `cryptography`, which nothing here installs.
-    password = "secret"
+def test_the_worker_decodes_formulas_on_whatever_the_probe_routes(tmp_path: Path) -> None:
+    """A blank page has no text layer, so the probe asks for OCR and no formulas."""
     writer = PdfWriter()
     writer.add_blank_page(width=200, height=200)
-    writer.encrypt(user_password=password, algorithm="RC4-128")
-    pdf = tmp_path / "locked.pdf"
+    pdf = tmp_path / "scan.pdf"
     with pdf.open("wb") as handle:
         writer.write(handle)
+    converter = StubConverter()
+
+    parsed = parse_pdf(
+        pdf,
+        course="B028451",
+        academic_year="2025-2026",
+        source_file="scan.pdf",
+        converters={"classic-ocr-formula": cast("DocumentConverter", converter)},
+        formula=True,
+    )
+
+    assert parsed.meta.parse_variant == "classic-ocr-formula"
+    assert converter.calls == 1
+
+
+def test_an_encrypted_pdf_is_unreadable_before_any_model_loads(tmp_path: Path) -> None:
+    pdf = tmp_path / "locked.pdf"
+    pdf.write_bytes(encrypted_pdf())
     converters: dict[str, DocumentConverter] = {}
 
     with pytest.raises(UnreadablePdfError):

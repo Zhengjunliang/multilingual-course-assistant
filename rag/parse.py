@@ -23,7 +23,7 @@ import hashlib
 import logging
 import time
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -139,9 +139,9 @@ def build_converter(
 
     Both enrichments default off here against Docling's own default for OCR, because
     a CLI run pays the model download and load in full. That reasoning does not carry
-    over to the Celery worker in M5: a long-lived process pays the load once, and
-    Docling triggers the formula model per detected formula region, so leaving it on
-    server-side costs nothing on documents that have no formulas.
+    over to the material ingest's worker: a long-lived process pays the load once, and
+    Docling triggers the formula model per detected formula region, so it parses with
+    formulas on (`parse_pdf`'s `formula`) at no cost to documents that have none.
 
     Picture description belongs here too and is not implemented yet — M3 will attach
     `do_picture_description` with `PictureDescriptionApiOptions` pointing at the vLLM
@@ -224,6 +224,7 @@ def parse_pdf(
     source_file: str,
     converters: dict[str, DocumentConverter],
     plan: ParsePlan | None = None,
+    formula: bool = False,
 ) -> ParsedPdf:
     """One PDF of an edition -> its DoclingDocument and provenance, or an error.
 
@@ -233,6 +234,9 @@ def parse_pdf(
     and table models, which a directory run or a long-lived worker pays once.
     `source_file` is the name the provenance records, which is not the path's
     when the file on disk is named by its digest (apps/materials/models.py).
+    `formula` decodes formulas on the classic pipeline whatever the profile
+    says, as the resident worker does (`build_converter`); it also halves the
+    variants that worker keeps a converter for.
 
     Only a clean conversion is returned, by the rule `rag.live` applies to a
     fetched page: a conversion that stops part way comes back from docling as
@@ -249,6 +253,8 @@ def parse_pdf(
         # own errors on a broken one: a DependencyError for an AES-encrypted
         # file without `cryptography`, a KeyError or ValueError on a mangled table.
         raise UnreadablePdfError(pdf.name) from exc
+    if formula and plan.pipeline == "classic" and not plan.formula:
+        plan = replace(plan, formula=True, reason=f"{plan.reason} + formulas always on")
     variant = variant_of(plan)
     if plan.pipeline == "vlm" and not cuda_available():
         # granite-docling generates DocTags autoregressively, thousands of

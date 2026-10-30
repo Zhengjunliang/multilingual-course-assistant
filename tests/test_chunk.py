@@ -82,7 +82,8 @@ def build_document():  # DoclingDocument return type stays a lazy import
     return document
 
 
-def make_chunks(meta: ParsedMeta | None = None) -> list[Chunk]:
+def word_chunker():  # HybridChunker return type stays a lazy import
+    """Docling's own chunker over a tokenizer that counts words, so no model downloads."""
     from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
     from docling_core.transforms.chunker.tokenizer.base import BaseTokenizer
 
@@ -96,8 +97,11 @@ def make_chunks(meta: ParsedMeta | None = None) -> list[Chunk]:
         def get_tokenizer(self) -> object:
             return self
 
-    chunker = HybridChunker(tokenizer=WordTokenizer())
-    return chunk_document(build_document(), chunker, meta or make_meta(), "en")
+    return HybridChunker(tokenizer=WordTokenizer())
+
+
+def make_chunks(meta: ParsedMeta | None = None) -> list[Chunk]:
+    return chunk_document(build_document(), word_chunker(), meta or make_meta(), "en")
 
 
 def merge_sort_chunk(chunks: list[Chunk]) -> Chunk:
