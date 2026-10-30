@@ -12,18 +12,14 @@ an answer up or down*).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from rest_framework import serializers
 
-from apps.qa.conversations import thread, window
 from apps.qa.models import MAX_COMMENT_CHARS, Feedback, Message
 from apps.qa.serializers import TurnSerializer
 from config.errors import FieldReason, field_error
 from rag.chunk import normalize_locale
-
-if TYPE_CHECKING:
-    from rest_framework.utils.serializer_helpers import ReturnDict
 
 
 class FeedbackRequest(serializers.Serializer):
@@ -131,18 +127,18 @@ class RatedAnswerSerializer(serializers.ModelSerializer[Message]):
 
 class FeedbackDetailSerializer(serializers.ModelSerializer[Feedback]):
     """One rating opened: what it says and the comment's language, the answer
-    whole, and the history its question was asked with.
+    whole, and the history its prompt was given.
 
-    The history is what the prompt held, cut from the thread above the question
-    by the same window the question was asked with (`window`): a follow-up
-    such as "and the second one?" reads only beside it.
+    The history is the one stored with the answer (`Message.history`), what
+    the prompt held, not the thread above the question, which can have grown
+    meanwhile: a follow-up such as "and the second one?" reads only beside it.
     """
 
     id = serializers.UUIDField(source="answer_id", read_only=True)
     comment_locale = serializers.CharField(source="locale", read_only=True)
     question = serializers.SerializerMethodField()
     answer = RatedAnswerSerializer(read_only=True)
-    history = serializers.SerializerMethodField()
+    history = TurnSerializer(source="answer.history", many=True, read_only=True)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Feedback
@@ -161,12 +157,3 @@ class FeedbackDetailSerializer(serializers.ModelSerializer[Feedback]):
 
     def get_question(self, feedback: Feedback) -> str:
         return question_of(feedback)
-
-    def get_history(self, feedback: Feedback) -> list[ReturnDict[str, Any]]:
-        """Raises `ConversationGoneError` for a conversation deleted since the
-        rating was read, as `ConversationDetailSerializer.get_messages` does."""
-        question = feedback.answer.parent
-        if question is None:
-            return []
-        messages = Message.objects.filter(conversation_id=feedback.answer.conversation_id)
-        return [TurnSerializer(turn).data for turn in window(thread(question.parent_id, messages))]
