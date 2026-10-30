@@ -246,8 +246,13 @@ export function Composer({
             a touch screen has not got. The
             keys are a reminder for the eye: Enter and Shift+Enter are in the
             list of keys (ShortcutsDialog.tsx), which a screen reader reaches,
-            so the caps are hidden from it here as everywhere (kbd.tsx). */}
-        <p className="flex min-h-icon-lg flex-wrap items-center gap-tight px-hair text-caption text-muted">
+            so the caps are hidden from it here as everywhere (kbd.tsx).
+            One line at every width, as the toolbar under ChatGPT's and
+            Claude's fields (outside the repository): a line that wrapped
+            would change the box's height as a question is sent, and the box
+            would jump in the middle of its travel. So the keys give way on a
+            narrow window, and a long text ends in an ellipsis. */}
+        <p className="flex min-h-icon-lg items-center gap-tight px-hair text-caption text-muted">
           {scope}
           <span role="status" className={missing ? "" : "sr-only"}>
             {missing ? t("ask.empty") : ""}
@@ -255,11 +260,14 @@ export function Composer({
           {!missing && waiting.phase === "streaming" && (
             <>
               <Spinner />
-              {t("status.streaming")}
+              <span className="truncate">{t("status.streaming")}</span>
             </>
           )}
           {!missing && !busy && (
-            <span aria-hidden className="flex items-center gap-hair pointer-coarse:hidden">
+            <span
+              aria-hidden
+              className="flex items-center gap-hair whitespace-nowrap max-sm:hidden pointer-coarse:hidden"
+            >
               <Kbd>{t("keys.enter")}</Kbd>
               {t("ask.toSend")}
               <span className="px-hair">·</span>

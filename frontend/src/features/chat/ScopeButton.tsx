@@ -43,7 +43,7 @@ export function ScopeButton({ courses, declared, added, onChoose }: ScopeButtonP
   if (courses === null) return null;
   if (courses.length === 0) {
     return declared ? null : (
-      <Link to="/account" className="font-medium text-ink underline">
+      <Link to="/account" className="truncate font-medium text-ink underline">
         {t("scope.declare")}
       </Link>
     );
@@ -60,7 +60,10 @@ export function ScopeButton({ courses, declared, added, onChoose }: ScopeButtonP
           {shown.length === 0 ? t("scope.current") : t("scope.added", { count: shown.length })}
         </>
       }
-      triggerClassName={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full")}
+      triggerClassName={cn(
+        buttonVariants({ variant: "ghost", size: "sm" }),
+        "shrink-0 rounded-full",
+      )}
       side="top"
       align="start"
       head={<span className="block max-w-80 text-caption text-muted">{t("scope.head")}</span>}
