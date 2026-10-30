@@ -194,6 +194,7 @@
     "METHOD_NOT_ALLOWED": "$t(errors.INTERNAL)",
     "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
+    "CONTENT_TOO_LARGE": "The file is too large: at most {{max_mib}} MB.",
     "ROLE_ALREADY_HELD": "This user already holds this role here.",
     "LAST_TEACHER": "This is the edition's last teacher: assign another first, or ask the teaching secretariat.",
     "SELF_NOT_ALLOWED": "Not on your own account: another administrator can do it.",
@@ -224,12 +225,17 @@
       "TOO_COMMON": "This password is too common.",
       "BREACHED": "This password has appeared in a data breach: choose another.",
       "TOO_SIMILAR": "The password is too similar to the username.",
+      "TOO_MANY_PAGES": "At most {{max_pages}} pages: split the file.",
       "username": {
         "INVALID": "Use only letters, digits and @ . + - _",
         "ALREADY_EXISTS": "This username is taken."
       },
       "title": {
         "ALREADY_EXISTS": "This title is already on the list."
+      },
+      "file": {
+        "INVALID": "Not a PDF.",
+        "REQUIRED": "The file is empty."
       }
     }
   },
@@ -435,7 +441,6 @@
       "sending_one": "Sending {{count}} file…",
       "sending_other": "Sending {{count}} files…",
       "unsent": "Some files were not uploaded",
-      "notPdf": "Not a PDF.",
       "empty": "No material.",
       "file": "File",
       "state": "Status",
@@ -455,6 +460,7 @@
       "failure": {
         "unreadable": "The file cannot be read: it is protected or holds no text.",
         "incomplete": "The file was read only in part.",
+        "timed_out": "Reading the file took too long: try splitting it.",
         "interrupted": "The processing stopped before it finished.",
         "internal": "An error on the server stopped the processing."
       }

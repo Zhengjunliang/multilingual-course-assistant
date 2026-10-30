@@ -13,9 +13,11 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from test_parse import blank_pdf
 
 from apps.catalog.models import Course, CourseEdition
 from apps.materials.models import CourseMaterial, MaterialStatus
+from apps.materials.services import MAX_PDF_PAGES, MAX_UPLOAD_BYTES
 from apps.materials.tasks import ingest_material
 
 if TYPE_CHECKING:
@@ -43,9 +45,9 @@ def test_each_pdf_is_added_once_and_its_ingest_queued_after_the_commit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A nested `.PDF` is found as `rag.parse` finds it; anything else is not a material."""
-    (tmp_path / "01-Intro.pdf").write_bytes(b"%PDF-1.7 intro")
+    (tmp_path / "01-Intro.pdf").write_bytes(blank_pdf(title="intro"))
     (tmp_path / "topic").mkdir()
-    (tmp_path / "topic" / "02-Django.PDF").write_bytes(b"%PDF-1.7 django")
+    (tmp_path / "topic" / "02-Django.PDF").write_bytes(blank_pdf(title="django"))
     (tmp_path / "notes.txt").write_text("not a deck", encoding="utf-8")
     queued: list[int] = []
     monkeypatch.setattr(ingest_material, "delay", queued.append)
@@ -71,9 +73,35 @@ def test_two_files_of_one_name_stop_the_run_before_either_is_added(
     """In one run they would be two versions of one material, and the first would be lost."""
     for topic in ("html", "css"):
         (tmp_path / topic).mkdir()
-        (tmp_path / topic / "esercizi.pdf").write_bytes(f"%PDF-1.7 {topic}".encode())
+        (tmp_path / topic / "esercizi.pdf").write_bytes(blank_pdf(title=topic))
 
     with pytest.raises(CommandError, match=r"esercizi\.pdf"):
+        run(tmp_path)
+
+    assert not CourseMaterial.objects.exists()
+
+
+@pytest.mark.parametrize(
+    ("data", "reason"),
+    [
+        pytest.param(b"PK\x03\x04 an archive", "no PDF signature", id="not-a-pdf"),
+        pytest.param(blank_pdf(MAX_PDF_PAGES + 1), "301 pages, over 300", id="too-many-pages"),
+        # Its length alone, the file never read: zeros past the limit.
+        pytest.param(None, "over 50 MiB", id="too-large"),
+    ],
+)
+def test_a_file_an_upload_would_refuse_stops_the_run_before_any_is_added(
+    edition: CourseEdition, tmp_path: Path, data: bytes | None, reason: str
+) -> None:
+    """The command checks what the upload checks (tests/test_materials_upload.py)."""
+    (tmp_path / "01-Intro.pdf").write_bytes(blank_pdf(title="intro"))
+    with (tmp_path / "02-Refused.pdf").open("wb") as refused:
+        if data is None:
+            refused.truncate(MAX_UPLOAD_BYTES + 1)
+        else:
+            refused.write(data)
+
+    with pytest.raises(CommandError, match=rf"02-Refused\.pdf: {reason}"):
         run(tmp_path)
 
     assert not CourseMaterial.objects.exists()
@@ -82,7 +110,7 @@ def test_two_files_of_one_name_stop_the_run_before_either_is_added(
 def test_an_edition_that_does_not_exist_stops_the_run(
     edition: CourseEdition, tmp_path: Path
 ) -> None:
-    (tmp_path / "01-Intro.pdf").write_bytes(b"%PDF-1.7 intro")
+    (tmp_path / "01-Intro.pdf").write_bytes(blank_pdf(title="intro"))
 
     with pytest.raises(CommandError, match="no edition of B028451 in 2024-2025"):
         run(tmp_path, year="2024-2025")

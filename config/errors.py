@@ -81,6 +81,7 @@ class ErrorCode(StrEnum):
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_ACCEPTABLE = "NOT_ACCEPTABLE"
     UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
+    CONTENT_TOO_LARGE = "CONTENT_TOO_LARGE"
     ROLE_ALREADY_HELD = "ROLE_ALREADY_HELD"
     LAST_TEACHER = "LAST_TEACHER"
     SELF_NOT_ALLOWED = "SELF_NOT_ALLOWED"
@@ -108,6 +109,7 @@ class FieldReason(StrEnum):
     TOO_COMMON = "TOO_COMMON"
     BREACHED = "BREACHED"
     TOO_SIMILAR = "TOO_SIMILAR"
+    TOO_MANY_PAGES = "TOO_MANY_PAGES"
 
 
 @dataclass(frozen=True)
@@ -169,6 +171,11 @@ SPEC: dict[ErrorCode, Spec] = {
     ),
     ErrorCode.UNSUPPORTED_MEDIA_TYPE: Spec(
         HTTPStatus.UNSUPPORTED_MEDIA_TYPE, "failure", "The body's media type is not supported."
+    ),
+    # An upload past its limit (apps/materials/views.py), refused before its body is
+    # read; RFC 9110, section 15.5.14 (outside the repository) names the status.
+    ErrorCode.CONTENT_TOO_LARGE: Spec(
+        HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "fixable", "The body is over {max_mib} MiB."
     ),
     # A conflict with no field to correct; a taken username is a field's (ALREADY_EXISTS).
     ErrorCode.ROLE_ALREADY_HELD: Spec(
@@ -233,6 +240,7 @@ FIELD_SPEC: dict[FieldReason, frozenset[str]] = {
     FieldReason.TOO_COMMON: frozenset(),
     FieldReason.BREACHED: frozenset(),
     FieldReason.TOO_SIMILAR: frozenset(),
+    FieldReason.TOO_MANY_PAGES: frozenset({"max_pages"}),
 }
 
 # A missing row would surface as a KeyError in the middle of answering an
@@ -417,8 +425,9 @@ EXCEPTION_MAP: tuple[tuple[type[Exception], ErrorCode], ...] = (
     (exceptions.Throttled, ErrorCode.RESOURCE_EXHAUSTED),
 )
 
-# A throttle that cannot say how long to wait: every rate is per minute
-# (config/settings.py, `DEFAULT_THROTTLE_RATES`), so a minute is its window.
+# A throttle that cannot say how long to wait: a minute, the shortest window
+# of a rate (config/settings.py, `DEFAULT_THROTTLE_RATES`), so the reader is
+# told to come back too early rather than too late.
 THROTTLE_WINDOW_SECONDS = 60
 
 # The challenge a 401 carries (RFC 9110, 11.6.1). The credential is the session

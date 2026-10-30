@@ -85,6 +85,7 @@ class MaterialFailure(models.TextChoices):
 
     UNREADABLE = "unreadable", _("the file could not be read")
     INCOMPLETE = "incomplete", _("the file was read only in part")
+    TIMED_OUT = "timed_out", _("the file took too long to read")
     INTERRUPTED = "interrupted", _("the ingest stopped before it finished")
     INTERNAL = "internal", _("an error on the server")
 

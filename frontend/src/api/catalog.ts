@@ -280,8 +280,24 @@ export interface ReadingDraft {
 /** How far a material's ingest has got, its steps in the order they run. */
 export type MaterialStatus = "queued" | "parsing" | "chunking" | "indexing" | "ready" | "failed";
 
-/** Why an ingest failed: the file's (`unreadable`, `incomplete`), the clock's or the server's. */
-export type MaterialFailure = "unreadable" | "incomplete" | "interrupted" | "internal";
+/**
+ * Why an ingest failed: the file's (`unreadable`, `incomplete`, `timed_out`), the
+ * clock's or the server's.
+ */
+export type MaterialFailure =
+  | "unreadable"
+  | "incomplete"
+  | "timed_out"
+  | "interrupted"
+  | "internal";
+
+/**
+ * The largest upload the server takes, in MiB (`MAX_UPLOAD_BYTES`,
+ * apps/materials/services.py). The tab checks each file against it before
+ * sending, as Open WebUI's does: the server refuses a larger body before
+ * reading it, which a browser still sending it may report as a network error.
+ */
+export const MAX_UPLOAD_MIB = 50;
 
 /** A PDF on an edition (apps/materials/serializers.py), and the state of its ingest. */
 export interface CourseMaterial {
@@ -508,7 +524,9 @@ export function listMaterials(edition: number): Promise<CourseMaterial[]> {
 
 /**
  * Sends one PDF, which the server answers with 202 and its row, `queued`,
- * before the ingest begins; 409 `MATERIAL_EXISTS` when the edition holds the same bytes.
+ * before the ingest begins; 409 `MATERIAL_EXISTS` when the edition holds the
+ * same bytes, 413 past `MAX_UPLOAD_MIB`, and a 400 on `file` for a file that is
+ * not a PDF by its content or has too many pages.
  */
 export function uploadMaterial(edition: number, file: File): Promise<CourseMaterial> {
   const form = new FormData();

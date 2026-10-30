@@ -121,18 +121,14 @@ export function MaterialPanel({ edition, materials, reloadPage }: MaterialPanelP
         <div role="alert" className="flex flex-col gap-tight sm:px-snug sm:pb-snug">
           <Banner tone="warn" icon={CircleAlert} heading={t("staff.materials.unsent")} />
           <ul className="flex flex-col gap-hair text-body">
-            {unsent.map(({ id, name, text }) => (
+            {unsent.map(({ id, name, sentence, reference }) => (
               <li key={id}>
                 <span className="font-semibold text-ink">{name}</span>
                 {" · "}
-                <span className="text-warn-ink">
-                  {text === null
-                    ? t("staff.materials.notPdf")
-                    : t(text.sentence.key, text.sentence.values)}
-                </span>
-                {text !== null && text.reference !== null && (
+                <span className="text-warn-ink">{t(sentence.key, sentence.values)}</span>
+                {reference !== null && (
                   <span className="block text-caption text-muted">
-                    {t(text.reference.key, text.reference.values)}
+                    {t(reference.key, reference.values)}
                   </span>
                 )}
               </li>

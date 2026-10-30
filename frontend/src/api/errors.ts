@@ -32,6 +32,7 @@ export const ERROR_CODES = {
   METHOD_NOT_ALLOWED: { status: 405, kind: "failure", dataKeys: [] },
   NOT_ACCEPTABLE: { status: 406, kind: "failure", dataKeys: [] },
   UNSUPPORTED_MEDIA_TYPE: { status: 415, kind: "failure", dataKeys: [] },
+  CONTENT_TOO_LARGE: { status: 413, kind: "fixable", dataKeys: ["max_mib"] },
   ROLE_ALREADY_HELD: { status: 409, kind: "fixable", dataKeys: [] },
   LAST_TEACHER: { status: 409, kind: "fixable", dataKeys: [] },
   SELF_NOT_ALLOWED: { status: 409, kind: "fixable", dataKeys: [] },
@@ -63,6 +64,7 @@ export const FIELD_REASONS = {
   TOO_COMMON: { dataKeys: [] },
   BREACHED: { dataKeys: [] },
   TOO_SIMILAR: { dataKeys: [] },
+  TOO_MANY_PAGES: { dataKeys: ["max_pages"] },
 } as const satisfies Record<string, { dataKeys: readonly string[] }>;
 
 export type FieldReason = keyof typeof FIELD_REASONS;
@@ -84,6 +86,7 @@ export type LocalCode = (typeof LOCAL_CODES)[number];
 export const FIELD_OVERRIDES = {
   username: ["INVALID", "ALREADY_EXISTS"],
   title: ["ALREADY_EXISTS"],
+  file: ["INVALID", "REQUIRED"],
 } as const satisfies Record<string, readonly FieldReason[]>;
 
 /** Numbers stay numbers, for the page to format in its own language. */

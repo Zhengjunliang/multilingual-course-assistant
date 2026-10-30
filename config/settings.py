@@ -217,7 +217,12 @@ REST_FRAMEWORK = {
     # (`AddressRateThrottle`, apps/accounts/views.py), which is the setting
     # below finally carrying weight. A view that asks a signed-in caller's
     # password again is billed by account at the same rate.
-    "DEFAULT_THROTTLE_RATES": {"ask": "4/min", "auth": "5/min"},
+    #
+    # upload: an account's material uploads (apps/materials/views.py), each
+    # one an ingest on the GPU. A course's decks are a few dozen files sent at
+    # once, so the window is an hour, as LibreChat's upload limit is a
+    # quarter of one at 50 (outside the repository).
+    "DEFAULT_THROTTLE_RATES": {"ask": "4/min", "auth": "5/min", "upload": "200/hour"},
     # Without this, DRF's default is to trust a client-supplied
     # X-Forwarded-For as the throttle identity, so
     # `curl -H "X-Forwarded-For: <anything>"` earns a fresh bucket on every

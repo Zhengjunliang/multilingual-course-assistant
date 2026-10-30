@@ -10,7 +10,7 @@
 import { act, useCallback } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { type CourseMaterial, listMaterials } from "@/api/catalog";
+import { type CourseMaterial, listMaterials, MAX_UPLOAD_MIB } from "@/api/catalog";
 import { codedRefusal } from "@/test/refusal";
 import { useLoad } from "../context";
 import { BASE, button, mountForReader, settle, text } from "./harness";
@@ -37,6 +37,9 @@ const NEXT: Partial<Record<CourseMaterial["status"], CourseMaterial["status"]>> 
 /** The name of a file the edition holds the bytes of. */
 const HELD_BYTES = "same-bytes.pdf";
 
+/** The name of a file of more pages than the server takes. */
+const TOO_LONG = "long.pdf";
+
 const server = {
   rows: [] as CourseMaterial[],
   reads: 0,
@@ -55,6 +58,10 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   const file = (init.body as FormData).get("file") as File;
   server.sent.push(file.name);
   if (file.name === HELD_BYTES) return codedRefusal("MATERIAL_EXISTS", { data: { material: 1 } });
+  if (file.name === TOO_LONG)
+    return codedRefusal("INVALID_ARGUMENT", {
+      fields: [{ field: "file", reason: "TOO_MANY_PAGES", data: { max_pages: 300 } }],
+    });
   const row: CourseMaterial = {
     ...INTRO,
     id: 10 + server.sent.length,
@@ -146,11 +153,15 @@ describe("the material tab", () => {
   });
 
   it("says why each file was not sent, and sends the rest", async () => {
+    const huge = pdf("huge.pdf");
+    Object.defineProperty(huge, "size", { value: MAX_UPLOAD_MIB * 1024 * 1024 + 1 });
     const { unmount } = mountForReader(<Tab />);
     await settle();
     choose([
       pdf(HELD_BYTES),
       new File(["notes"], "notes.txt", { type: "text/plain" }),
+      huge,
+      pdf(TOO_LONG),
       pdf("03-ORM.pdf"),
     ]);
     await settle();
@@ -161,10 +172,12 @@ describe("the material tab", () => {
     unmount();
 
     expect(seen).toEqual({
-      sent: [HELD_BYTES, "03-ORM.pdf"],
+      sent: [HELD_BYTES, TOO_LONG, "03-ORM.pdf"],
       unsent: [
         "notes.txt · Non è un PDF.",
+        "huge.pdf · Il file è troppo grande: al massimo 50 MB.",
         `${HELD_BYTES} · Questo file è già tra i materiali dell'edizione.`,
+        `${TOO_LONG} · Al massimo 300 pagine: dividi il file.`,
       ],
     });
   });

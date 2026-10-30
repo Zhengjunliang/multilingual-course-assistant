@@ -9,7 +9,8 @@ interface of the same name are one set, so neither side can add a field the
 other lacks. The permission names, the code sources, the syllabus sections,
 the importances, the roles and a material's statuses and failures are
 compared both ways, since the SPA matches them as strings: a misspelt
-permission would hide a button without any type error. The languages a book
+permission would hide a button without any type error. So is the upload
+limit the material tab checks a file against before sending it. The languages a book
 may be written in are held one way only, inside Django's table: a Django that
 adds a language leaves the form a language short, never offering one the
 server refuses.
@@ -49,6 +50,7 @@ from apps.catalog.serializers import (
 )
 from apps.materials.models import MaterialFailure, MaterialStatus
 from apps.materials.serializers import MaterialSerializer
+from apps.materials.services import MAX_UPLOAD_BYTES, MIB
 from apps.roles.registry import Permission, Role
 
 MIRROR = Path(__file__).resolve().parent.parent / "frontend" / "src" / "api" / "catalog.ts"
@@ -115,6 +117,14 @@ def test_the_mirror_names_every_closed_set(mirror: str) -> None:
         set(MaterialStatus.values),
         set(MaterialFailure.values),
     )
+
+
+def test_the_mirror_checks_an_upload_against_the_servers_limit(mirror: str) -> None:
+    """A smaller limit in the tab refuses decks the server takes; a larger one sends files
+    the server cuts off unread."""
+    (mib,) = re.findall(r"^export const MAX_UPLOAD_MIB = (\d+);$", mirror, re.MULTILINE)
+
+    assert int(mib) * MIB == MAX_UPLOAD_BYTES
 
 
 def test_the_mirror_offers_only_languages_the_server_accepts_for_a_book(mirror: str) -> None:

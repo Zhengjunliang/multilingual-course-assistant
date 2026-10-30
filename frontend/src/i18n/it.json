@@ -194,6 +194,7 @@
     "METHOD_NOT_ALLOWED": "$t(errors.INTERNAL)",
     "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
+    "CONTENT_TOO_LARGE": "Il file è troppo grande: al massimo {{max_mib}} MB.",
     "ROLE_ALREADY_HELD": "Questo utente ha già questo ruolo qui.",
     "LAST_TEACHER": "È l'ultimo docente di questa edizione: prima assegnane un altro, o chiedi alla segreteria didattica.",
     "SELF_NOT_ALLOWED": "Non sul tuo account: può farlo un altro amministratore.",
@@ -224,12 +225,17 @@
       "TOO_COMMON": "Questa password è troppo comune.",
       "BREACHED": "Questa password è comparsa in una violazione di dati: scegline un'altra.",
       "TOO_SIMILAR": "La password è troppo simile al nome utente.",
+      "TOO_MANY_PAGES": "Al massimo {{max_pages}} pagine: dividi il file.",
       "username": {
         "INVALID": "Usa solo lettere, numeri e i segni @ . + - _",
         "ALREADY_EXISTS": "Questo nome utente è già in uso."
       },
       "title": {
         "ALREADY_EXISTS": "Questo titolo è già nell'elenco."
+      },
+      "file": {
+        "INVALID": "Non è un PDF.",
+        "REQUIRED": "Il file è vuoto."
       }
     }
   },
@@ -435,7 +441,6 @@
       "sending_one": "Invio di {{count}} file…",
       "sending_other": "Invio di {{count}} file…",
       "unsent": "Alcuni file non sono stati caricati",
-      "notPdf": "Non è un PDF.",
       "empty": "Nessun materiale.",
       "file": "File",
       "state": "Stato",
@@ -455,6 +460,7 @@
       "failure": {
         "unreadable": "Il file non si può leggere: è protetto o non contiene testo.",
         "incomplete": "Il file è stato letto solo in parte.",
+        "timed_out": "La lettura del file ha richiesto troppo tempo: prova a dividerlo.",
         "interrupted": "L'elaborazione si è interrotta prima di finire.",
         "internal": "Un errore del server ha interrotto l'elaborazione."
       }

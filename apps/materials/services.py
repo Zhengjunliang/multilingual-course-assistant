@@ -7,6 +7,10 @@ already on the edition are refused with the row they are, decided by the
 unique constraint in a savepoint of its own, so two uploads of one file at
 once cannot both pass a check made first. On another edition they are a row
 of their own, over the file already stored.
+
+What may be a material is checked before any of that, by each way in: its
+bytes against `MAX_UPLOAD_BYTES` before the file is read, then the file
+itself by `check_pdf`.
 """
 
 from __future__ import annotations
@@ -14,10 +18,12 @@ from __future__ import annotations
 import hashlib
 from functools import partial
 from pathlib import PurePath
-from typing import TYPE_CHECKING, cast
+from typing import IO, TYPE_CHECKING, cast
 
 import psycopg
 from django.db import IntegrityError, transaction
+from pypdf import PdfReader
+from pypdf.errors import DependencyError, FileNotDecryptedError
 
 from apps.materials.models import CourseMaterial, material_name, material_storage
 from apps.materials.tasks import ingest_material
@@ -28,6 +34,58 @@ if TYPE_CHECKING:
 
     from apps.accounts.models import User
     from apps.catalog.models import CourseEdition
+
+# The largest of the 31 PPM decks the worker ingested for #35, with a margin
+# (#36): 28.1 MiB and 110 pages, against 1.4 MiB and 38 pages for the median
+# deck. The caps of a page fetched live (rag/live.py) budget one answer, and
+# would refuse one of these decks and cut half of them short.
+MIB = 1024 * 1024
+MAX_UPLOAD_BYTES = 50 * MIB
+MAX_PDF_PAGES = 300
+
+# libmagic's rule for a PDF (outside the repository): `%PDF-` within the first 1024 bytes.
+_SIGNATURE_WINDOW = 1024
+
+
+class UnacceptedFileError(Exception):
+    """The file cannot be a material, whatever its name says."""
+
+
+class NotAPdfError(UnacceptedFileError):
+    """No PDF signature where one goes, or pypdf cannot open the file."""
+
+
+class TooManyPagesError(UnacceptedFileError):
+    """A PDF past `MAX_PDF_PAGES`: refused, never cut short, as a deck missing its end misleads."""
+
+
+def check_pdf(upload: File) -> None:
+    """Refuse a file that is not a PDF by its content, or one past `MAX_PDF_PAGES`.
+
+    A signature alone proves nothing (OWASP's File Upload Cheat Sheet,
+    outside the repository), so the file must also open. pypdf reads the page
+    tree, not the pages, which takes milliseconds on a deck. A PDF locked by a
+    password, or by a cipher pypdf needs `cryptography` for, cannot be
+    counted and is let through: it is a PDF, and its ingest fails it
+    `unreadable`, as it does any file docling cannot open.
+    """
+    stream = cast("IO[bytes]", upload)
+    stream.seek(0)
+    signed = b"%PDF-" in stream.read(_SIGNATURE_WINDOW)
+    stream.seek(0)
+    if not signed:
+        raise NotAPdfError("no PDF signature")
+    try:
+        pages = len(PdfReader(stream).pages)
+    except (FileNotDecryptedError, DependencyError):
+        return
+    except Exception as exc:
+        # pypdf raises more than its own errors on a broken file (rag/parse.py, `parse_pdf`).
+        raise NotAPdfError("pypdf cannot open it") from exc
+    finally:
+        stream.seek(0)
+    if pages > MAX_PDF_PAGES:
+        raise TooManyPagesError(f"{pages} pages, over {MAX_PDF_PAGES}")
 
 
 class MaterialExistsError(Exception):

@@ -12,32 +12,47 @@
  * A file named as a material the edition holds is that material's next
  * version, so it waits for the reader's word while the others go at once;
  * the current version keeps answering until the new one is ready. What was
- * not sent, a file that is not a PDF or one the server refused, is kept with
- * why until the next files are chosen.
+ * not sent, a file that is not a PDF by its name, one past `MAX_UPLOAD_MIB`
+ * or one the server refused, is kept with why until the next files are chosen.
  */
 
 import { useEffect, useRef, useState } from "react";
 
-import { type CourseMaterial, uploadMaterial } from "@/api/catalog";
-import type { ErrorText } from "@/lib/errorText";
+import { type CourseMaterial, MAX_UPLOAD_MIB, uploadMaterial } from "@/api/catalog";
+import type { Sentence } from "@/lib/errorText";
 import { type Loaded, useFailure } from "../context";
 import { isNotFound } from "../errors";
 
 /** How often a list with a row on its way is read again. */
 export const POLL_MS = 2500;
 
-/** A file not sent, and why: null for one that is not a PDF. */
+/** A file not sent, and why. */
 export interface Unsent {
   /** Two files of one name may be refused, each for its own reason. */
   id: number;
   name: string;
-  text: ErrorText | null;
+  sentence: Sentence;
+  /** The code and the request id of a refusal the reader can only report; null otherwise. */
+  reference: Sentence | null;
 }
 
 const settled = (material: CourseMaterial) =>
   material.status === "ready" || material.status === "failed";
 
 const isPdf = (file: File) => file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+
+// The server's own sentences for the same refusals: a file it reads as no PDF, a body past its limit.
+const NOT_PDF: Sentence = { key: "errors.field.file.INVALID", values: {} };
+const TOO_LARGE: Sentence = {
+  key: "errors.CONTENT_TOO_LARGE",
+  values: { max_mib: MAX_UPLOAD_MIB },
+};
+
+/** Why `file` is not sent at all, or null for a file that goes. */
+function refusalOf(file: File): Sentence | null {
+  if (!isPdf(file)) return NOT_PDF;
+  return file.size > MAX_UPLOAD_MIB * 1024 * 1024 ? TOO_LARGE : null;
+}
 
 /** Reads `materials` again every `POLL_MS` while one of its rows is on its way. */
 export function usePolling({ data: rows, reload }: Loaded<CourseMaterial[]>) {
@@ -79,17 +94,23 @@ export function useUploads(
   const [unsent, setUnsent] = useState<Unsent[]>([]);
   const [replacing, setReplacing] = useState<File[]>([]);
 
-  const unsentFile = (file: File, text: ErrorText | null): Unsent => {
+  const unsentFile = (file: File, sentence: Sentence, reference: Sentence | null): Unsent => {
     ids.current += 1;
-    return { id: ids.current, name: file.name, text };
+    return { id: ids.current, name: file.name, sentence, reference };
   };
 
   const sendOne = async (file: File) => {
     try {
       await uploadMaterial(edition, file);
     } catch (error) {
-      if (isNotFound(error)) await reloadPage();
-      else setUnsent((shown) => [...shown, unsentFile(file, fail(error))]);
+      if (isNotFound(error)) {
+        await reloadPage();
+        return;
+      }
+      // A refused file is a refused `file` field: its sentence says why.
+      const text = fail(error, { shownFields: ["file"] });
+      const sentence = text.fieldSentences.file?.[0] ?? text.sentence;
+      setUnsent((shown) => [...shown, unsentFile(file, sentence, text.reference)]);
       return;
     }
     await materials.reload();
@@ -114,10 +135,13 @@ export function useUploads(
     take: (files) => {
       if (files.length === 0) return;
       const held = new Set((materials.data ?? []).map((material) => material.source_file));
-      const pdfs = files.filter(isPdf);
-      setUnsent(files.filter((file) => !isPdf(file)).map((file) => unsentFile(file, null)));
-      setReplacing(pdfs.filter((file) => held.has(file.name)));
-      send(pdfs.filter((file) => !held.has(file.name)));
+      const refused = files.map((file) => [file, refusalOf(file)] as const);
+      const going = refused.flatMap(([file, why]) => (why === null ? [file] : []));
+      setUnsent(
+        refused.flatMap(([file, why]) => (why === null ? [] : [unsentFile(file, why, null)])),
+      );
+      setReplacing(going.filter((file) => held.has(file.name)));
+      send(going.filter((file) => !held.has(file.name)));
     },
     replace: () => {
       send(replacing);

@@ -10,7 +10,9 @@ nobody as its uploader: the same bytes on the edition are skipped, a name
 the edition holds is that material's next version, and every other file is a
 new material, its ingest queued for the worker. The points a deck parsed from
 the command line left in the index go once its material is ready, replaced
-by name (`rag.index.replace_slides_sources`).
+by name (`rag.index.replace_slides_sources`). A file an upload would refuse,
+past `MAX_UPLOAD_BYTES` or refused by `check_pdf`, stops the run before any
+file is added, as two files of one name do.
 
 Not one transaction: each material is committed, and its ingest queued, as
 it is added, so a run that stops has queued what it reached, and runs again
@@ -27,11 +29,30 @@ from django.core.files import File
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.catalog.models import CourseEdition
-from apps.materials.services import MaterialExistsError, create_material
+from apps.materials.services import (
+    MAX_UPLOAD_BYTES,
+    MIB,
+    MaterialExistsError,
+    UnacceptedFileError,
+    check_pdf,
+    create_material,
+)
 from rag.probe import collect_pdfs
 
 if TYPE_CHECKING:
     from django.core.management.base import CommandParser
+
+
+def _refusal(pdf: Path) -> str | None:
+    """Why an upload of `pdf` would be refused, or None."""
+    if pdf.stat().st_size > MAX_UPLOAD_BYTES:
+        return f"{pdf.name}: over {MAX_UPLOAD_BYTES // MIB} MiB"
+    with pdf.open("rb") as handle:
+        try:
+            check_pdf(File(handle, name=pdf.name))
+        except UnacceptedFileError as exc:
+            return f"{pdf.name}: {exc}"
+    return None
 
 
 class Command(BaseCommand):
@@ -60,6 +81,8 @@ class Command(BaseCommand):
         names = Counter(pdf.name for pdf in pdfs)
         if twice := sorted(name for name, count in names.items() if count > 1):
             raise CommandError(f"more than one file named {', '.join(twice)}")
+        if refused := [reason for pdf in pdfs if (reason := _refusal(pdf))]:
+            raise CommandError(f"refused: {'; '.join(refused)}")
         queued = skipped = 0
         for pdf in pdfs:
             with pdf.open("rb") as handle:

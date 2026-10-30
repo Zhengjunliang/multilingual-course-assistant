@@ -194,6 +194,7 @@
     "METHOD_NOT_ALLOWED": "$t(errors.INTERNAL)",
     "NOT_ACCEPTABLE": "$t(errors.INTERNAL)",
     "UNSUPPORTED_MEDIA_TYPE": "$t(errors.INTERNAL)",
+    "CONTENT_TOO_LARGE": "文件太大，最多 {{max_mib}} MB。",
     "ROLE_ALREADY_HELD": "该用户在这里已有此角色。",
     "LAST_TEACHER": "这是这个版本的最后一位教师：请先指派另一位，或请教学秘书处处理。",
     "SELF_NOT_ALLOWED": "不能对自己的账号这样做，请另一位管理员来做。",
@@ -224,12 +225,17 @@
       "TOO_COMMON": "这个密码太常见了。",
       "BREACHED": "这个密码在数据泄露中出现过，请换一个。",
       "TOO_SIMILAR": "密码和用户名太相似了。",
+      "TOO_MANY_PAGES": "最多 {{max_pages}} 页，请拆分文件。",
       "username": {
         "INVALID": "只能使用字母、数字和 @ . + - _",
         "ALREADY_EXISTS": "这个用户名已被占用。"
       },
       "title": {
         "ALREADY_EXISTS": "书目中已有这个书名。"
+      },
+      "file": {
+        "INVALID": "不是 PDF。",
+        "REQUIRED": "文件是空的。"
       }
     }
   },
@@ -435,7 +441,6 @@
       "sending_one": "正在上传 {{count}} 个文件…",
       "sending_other": "正在上传 {{count}} 个文件…",
       "unsent": "有文件没有上传",
-      "notPdf": "不是 PDF。",
       "empty": "还没有资料。",
       "file": "文件",
       "state": "状态",
@@ -455,6 +460,7 @@
       "failure": {
         "unreadable": "文件无法读取：受保护，或没有文字。",
         "incomplete": "文件只读出了一部分。",
+        "timed_out": "读取文件用时过长，请尝试拆分。",
         "interrupted": "处理在完成之前中断了。",
         "internal": "服务器出错，处理中断。"
       }

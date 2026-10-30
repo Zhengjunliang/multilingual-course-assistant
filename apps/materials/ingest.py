@@ -45,6 +45,14 @@ class Parser(Protocol):
     ) -> ParsedPdf: ...
 
 
+# Docling's `document_timeout` for one material (#36): the longest of the 31
+# PPM decks took 100 s on the laptop's GPU and the next 29 s, against a median
+# of 5 s. A deck stopped there fails `timed_out` and is indexed not at all;
+# on the solo pool of a Windows worker it is the only clock there is
+# (apps/materials/tasks.py).
+PARSE_TIMEOUT_SECONDS = 300
+
+
 @dataclass(frozen=True)
 class Pipeline:
     parse: Parser
@@ -58,8 +66,9 @@ def build_pipeline() -> Pipeline:
     """The Qdrant service with its slides collection, the encoders, the chunker and the parser.
 
     The parser decodes formulas on every file, as docs/docling-pipeline.md
-    decides for a resident process, and builds a converter for each variant
-    as it first comes up: two at most, with OCR and without.
+    decides for a resident process, stops one at `PARSE_TIMEOUT_SECONDS`, and
+    builds a converter for each variant as it first comes up: two at most,
+    with OCR and without.
     """
     from rag.chunk import DEFAULT_MAX_TOKENS, DEFAULT_TOKENIZER, build_chunker, build_tokenizer
     from rag.index import build_sparse_encoder, cached_dense_encoder, ensure_collection, open_client
@@ -69,7 +78,9 @@ def build_pipeline() -> Pipeline:
         dense = cached_dense_encoder()
         ensure_collection(client, dense.dimension())
         return Pipeline(
-            parse=partial(parse_pdf, converters={}, formula=True),
+            parse=partial(
+                parse_pdf, converters={}, formula=True, document_timeout=PARSE_TIMEOUT_SECONDS
+            ),
             chunker=build_chunker(build_tokenizer(DEFAULT_TOKENIZER, DEFAULT_MAX_TOKENS)),
             dense=dense,
             sparse=build_sparse_encoder(),

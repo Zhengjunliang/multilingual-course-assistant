@@ -91,6 +91,10 @@ class IncompletePdfError(Exception):
     """Docling converted the PDF only in part; a half-converted document is never stored."""
 
 
+class PdfTimeoutError(IncompletePdfError):
+    """Docling stopped at the document timeout, part way through the PDF."""
+
+
 @dataclass(frozen=True)
 class ParsedPdf:
     document: DoclingDocument
@@ -131,8 +135,9 @@ def build_converter(
 
     `device` and `document_timeout` are classic-pipeline knobs for the live
     ingest path (`rag.live`), where parsing must stay off the GPU and inside a
-    step budget. Both default to leaving docling's own behaviour untouched, so
-    every existing call is unchanged. `device=None` means exactly that and is
+    step budget; the material ingest sets the timeout too (apps/materials/ingest.py).
+    Both default to leaving docling's own behaviour untouched, so the CLI's
+    calls are unchanged. `device=None` means exactly that and is
     not the same as `device="auto"`: `AcceleratorOptions` is a `BaseSettings`,
     so constructing one at all overrides whatever `DOCLING_DEVICE` says, even
     with docling's own sentinel value.
@@ -225,6 +230,7 @@ def parse_pdf(
     converters: dict[str, DocumentConverter],
     plan: ParsePlan | None = None,
     formula: bool = False,
+    document_timeout: float | None = None,
 ) -> ParsedPdf:
     """One PDF of an edition -> its DoclingDocument and provenance, or an error.
 
@@ -236,14 +242,17 @@ def parse_pdf(
     when the file on disk is named by its digest (apps/materials/models.py).
     `formula` decodes formulas on the classic pipeline whatever the profile
     says, as the resident worker does (`build_converter`); it also halves the
-    variants that worker keeps a converter for.
+    variants that worker keeps a converter for. `document_timeout` is
+    `build_converter`'s, for the converters built here.
 
     Only a clean conversion is returned, by the rule `rag.live` applies to a
     fetched page: a conversion that stops part way comes back from docling as
     PARTIAL_SUCCESS, with a truncated document and no exception, and indexing
-    it would freeze the missing pages out of the index unnoticed.
+    it would freeze the missing pages out of the index unnoticed. One stopped
+    by the timeout is told apart by the error docling files for it, of the
+    category TIMEOUT.
     """
-    from docling.datamodel.base_models import ConversionStatus
+    from docling.datamodel.base_models import ConversionStatus, FailureCategory
     from docling.exceptions import ConversionError
 
     try:
@@ -263,7 +272,12 @@ def parse_pdf(
         # rather than refuse — the run is valid, just far too slow to iterate on.
         logger.warning("%s: no CUDA device, vlm will take minutes per page", pdf.name)
     if variant not in converters:
-        converters[variant] = build_converter(plan.pipeline, ocr=plan.ocr, formula=plan.formula)
+        converters[variant] = build_converter(
+            plan.pipeline,
+            ocr=plan.ocr,
+            formula=plan.formula,
+            document_timeout=document_timeout,
+        )
 
     started = time.perf_counter()
     try:
@@ -272,6 +286,8 @@ def parse_pdf(
         raise UnreadablePdfError(pdf.name) from exc
     elapsed = time.perf_counter() - started
     if result.status != ConversionStatus.SUCCESS:
+        if any(error.category == FailureCategory.TIMEOUT for error in result.errors):
+            raise PdfTimeoutError(f"{pdf.name}: stopped after {elapsed:.0f} s")
         raise IncompletePdfError(f"{pdf.name}: conversion {result.status}")
     meta = ParsedMeta(
         source_file=source_file,

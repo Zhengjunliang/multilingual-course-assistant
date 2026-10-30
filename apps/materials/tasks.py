@@ -52,7 +52,7 @@ from apps.materials.models import (
 from config.celery import app
 from rag.chunk import EditionKey, chunk_document, document_locale
 from rag.index import delete_material, replace_slides_sources, upsert_chunks
-from rag.parse import IncompletePdfError, UnreadablePdfError
+from rag.parse import IncompletePdfError, PdfTimeoutError, UnreadablePdfError
 
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
@@ -61,10 +61,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# A deck takes about thirty seconds on the laptop's GPU, a long scan under
-# OCR a few minutes; past twenty the task is stopped, and five later killed.
-# Both stay under the broker's visibility timeout, an hour on Redis, and the
-# solo pool of a Windows worker enforces neither (config/settings.py).
+# A deck takes seconds on the laptop's GPU, a long scan under OCR a few
+# minutes, and parsing stops at five (`PARSE_TIMEOUT_SECONDS`,
+# apps/materials/ingest.py); past twenty the task is stopped, and five later
+# killed. Both stay under the broker's visibility timeout, an hour on Redis,
+# and the solo pool of a Windows worker enforces neither (config/settings.py).
 SOFT_TIME_LIMIT_SECONDS = 20 * 60
 TIME_LIMIT_SECONDS = 25 * 60
 
@@ -75,7 +76,7 @@ STALLED_AFTER = timedelta(seconds=TIME_LIMIT_SECONDS + 5 * 60)
 RUNNING = (MaterialStatus.PARSING, MaterialStatus.CHUNKING, MaterialStatus.INDEXING)
 
 # Failures that are the file's, not the server's: logged without alarm.
-_THE_FILES = (MaterialFailure.UNREADABLE, MaterialFailure.INCOMPLETE)
+_THE_FILES = (MaterialFailure.UNREADABLE, MaterialFailure.INCOMPLETE, MaterialFailure.TIMED_OUT)
 
 
 @app.task(queue="ingest", soft_time_limit=SOFT_TIME_LIMIT_SECONDS, time_limit=TIME_LIMIT_SECONDS)
@@ -196,6 +197,9 @@ def _fail(
 def _failure_of(exc: Exception) -> MaterialFailure:
     if isinstance(exc, UnreadablePdfError):
         return MaterialFailure.UNREADABLE
+    # Before its base, IncompletePdfError.
+    if isinstance(exc, PdfTimeoutError):
+        return MaterialFailure.TIMED_OUT
     if isinstance(exc, IncompletePdfError):
         return MaterialFailure.INCOMPLETE
     if isinstance(exc, SoftTimeLimitExceeded):
