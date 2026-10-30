@@ -110,6 +110,22 @@ An anonymous caller has no stored conversation: it omits `conversation_id`, gets
 
 The deepening loop is not in this endpoint: it fetches pages and writes to the shared index, up to 3 fetches, so it runs only from `rag.agent` on the command line. Its web path is a task on the worker that answers the questions, its events over the same streams (🔜 M7, no issue).
 
+## Answer ratings
+
+A signed-in student rates the complete answers of their own conversations, up or down; a rating down may add one reason and a comment ([decisions.md](decisions.md), 2026-10-30, *A student rates an answer up or down*). A superuser reads every rating on a page of its own, which names no student.
+
+| Method and path | Does |
+| --------------- | ---- |
+| `PUT /api/answers/<id>/feedback` | stores the rating of the answer `<id>` whole, replacing any before, and answers with it (200): `{"rating": "up" \| "down", "reason", "comment", "locale"}`, the last three only with `"down"` and all optional; a JSON body only (any other is 415) |
+| `DELETE /api/answers/<id>/feedback` | withdraws it: 204, whether or not there was one |
+| `GET /api/admin/feedback` | the ratings, newest first, 50 to a page with their `count`; `?rating=`, `?reason=`, `?target=` (`slides`, `unifi_web` or `both`, where the answer was searched) and `?locale=` (the language it was asked and answered in) narrow them, and a value none can match narrows to nothing; a row is `id` (the answer's), `rating`, `reason`, `comment`, `updated_at`, `question`, `target` and `locale` |
+| `GET /api/admin/feedback/<id>` | one rating, by its answer's id: the row's fields but `target` and `locale`, the comment's `comment_locale`, `created_at`, `answer` (`text`, `locale`, `complete`, `citations`, `route`, `search_ms`, `request_id`, `created_at`) and `history`, the `{"question", "answer"}` exchanges its question was asked with, oldest first, cut by the window the prompt was (3, `HISTORY_WINDOW_TURNS`) |
+
+- `reason` is one of `incorrect`, `not_answered`, `wrong_language` and `other` (`Feedback.Reason`, [apps/qa/models.py](../apps/qa/models.py)), `""` when none was given. `comment` is at most 1024 characters, and `locale` the language it is written in, the interface's, normalized as a question's `locale` is; a comment without a `locale` is a 400 `REQUIRED` on `locale`, and a `locale` without a comment is not kept. A rating up with a `reason` or a `comment` is a 400 `INVALID` on that field, and turning a rating up clears both.
+- Only a complete answer of the caller's own conversation is rated: anyone else's answer, a question, an answer being written or stopped halfway, and an unknown id are all a 404 `NOT_FOUND`, to a `PUT` and a `DELETE` alike, and before the body is read. A conversation's deletion takes its ratings with it.
+- A reopened conversation (`GET /api/conversations/<id>`) carries each message's `feedback`, `{"rating", "reason", "comment"}` or `null`, always `null` on a question.
+- The two `/api/admin/feedback` paths answer a superuser only: anyone else is a 403 `PERMISSION_DENIED`, and anyone not signed in a 401. Neither returns an account or a conversation.
+
 ## Catalogue API
 
 What staff see and change, each within the scopes their roles cover ([apps/roles/scopes.py](../apps/roles/scopes.py)): a teacher every edition of a course they are assigned to an edition of, past and later years included, secretariat staff their programme and every edition of every course it offers, the superuser everything; what each role may do there is [apps/roles/registry.py](../apps/roles/registry.py), a teacher assigning teachers on the current edition and the later ones only, never on a past one ([data-model.md](data-model.md), invariant 2). Every programme and edition carries `permissions`, what the caller holds on it, which is what a page reads to decide what to offer; an edition also carries `is_current`, worked out on the day of the request from the editions' teaching starts ([data-model.md](data-model.md), invariant 2), which nothing in the API changes.

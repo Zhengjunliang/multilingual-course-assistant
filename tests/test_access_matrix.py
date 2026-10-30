@@ -45,7 +45,7 @@ from test_sources_api import SHA, stored
 from apps.catalog.models import Importance, ReadingItem
 from apps.qa import inflight
 from apps.qa.contract import QueuedEvent
-from apps.qa.models import Conversation, Message
+from apps.qa.models import Conversation, Feedback, Message
 from apps.roles.invitations import invite
 from apps.roles.registry import Role
 
@@ -63,15 +63,15 @@ type Row = tuple[str, str]  # (route name, method)
 
 
 def targets(
-    w: World, conversation: Conversation, book: ReadingItem, answer: uuid.UUID
+    w: World, conversation: Conversation, book: ReadingItem, answer: uuid.UUID, rated: Message
 ) -> dict[str, dict[str, object]]:
     """The object each route with parameters is asked about.
 
     PPM's current edition, which its teachers and B047's secretariat may act
     on, with one section of its syllabus, a book of its reading list and an
     invitation to teach it; B047, with an invitation to its secretariat; the
-    student's account, a conversation of theirs and an answer being written
-    for them; a deck of that edition, ready.
+    student's account, a conversation of theirs, an answer being written for
+    them and one stored and rated; a deck of that edition, ready.
     """
     edition = {"pk": w.ppm_old.pk}
     programme = {"code": w.b047.code}
@@ -106,6 +106,8 @@ def targets(
         "qa:conversation": {"pk": conversation.pk},
         "qa:answer-events": {"pk": answer},
         "qa:answer-stop": {"pk": answer},
+        "qa:answer-feedback": {"pk": rated.pk},
+        "review:feedback-item": {"pk": rated.pk},
         "qa:source": {"sha256": SHA},
     }
 
@@ -187,14 +189,23 @@ def test_who_may_call_each_route() -> None:
     conversation = Conversation.objects.create(owner=w.student, locale="it")
     # A conversation with no messages is missing to its owner too
     # (apps/qa/conversation_views.py, `summaries`).
-    Message.objects.create(
+    asked = Message.objects.create(
         conversation=conversation, role=Message.Role.USER, text="Quando?", locale="it"
     )
+    rated = Message.objects.create(
+        conversation=conversation,
+        parent=asked,
+        role=Message.Role.ASSISTANT,
+        text="A giugno.",
+        locale="it",
+        complete=True,
+    )
+    Feedback.objects.create(answer=rated, rating=Feedback.Rating.UP)
     book = ReadingItem.objects.create(
         edition=w.ppm_old, title="Fondamenti", authors="Rossi", importance=Importance.RECOMMENDED
     )
     answer = uuid.uuid4()
-    target = targets(w, conversation, book, answer)
+    target = targets(w, conversation, book, answer, rated)
     callers: dict[str, User | None] = {user.username: user for user in everyone(w)}
     callers[ANONYMOUS] = None
 

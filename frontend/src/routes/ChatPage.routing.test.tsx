@@ -50,6 +50,7 @@ const STORED: ConversationDetail = {
       route: null,
       search_ms: null,
       created_at: STORED_ROW.created_at,
+      feedback: null,
     },
     {
       id: uuidOf(2),
@@ -61,6 +62,7 @@ const STORED: ConversationDetail = {
       route: null,
       search_ms: null,
       created_at: STORED_ROW.created_at,
+      feedback: null,
     },
   ],
   answering: null,

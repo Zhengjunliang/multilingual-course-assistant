@@ -225,6 +225,7 @@ def _generate(job: AnswerJob, heartbeat: _Heartbeat) -> Event:
                     job.conversation_id,
                     start,
                     job.answer_id,
+                    request_id=job.request_id,
                     added_editions=job.added_editions,
                 )
                 stored = True

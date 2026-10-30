@@ -20,6 +20,8 @@ body's fields against the DRF serializers, and the caps a client stays inside
 against the constants the server enforces. So are the conversation endpoints,
 in `frontend/src/api/conversations.ts`, whose shapes are DRF serializers too:
 by their field names, as tests/test_catalog_contract.py holds the catalogue's.
+So is a rating, the student's in the same file and the superuser's page's in
+`frontend/src/api/review.ts`, with the reasons a rating down may give.
 """
 
 from __future__ import annotations
@@ -39,7 +41,14 @@ from apps.qa.contract import (
     StoppedEvent,
     TokenEvent,
 )
-from apps.qa.models import HISTORY_WINDOW_TURNS
+from apps.qa.feedback_serializers import (
+    FeedbackDetailSerializer,
+    FeedbackRequest,
+    FeedbackRowSerializer,
+    RatedAnswerSerializer,
+)
+from apps.qa.feedback_views import FeedbackPagination
+from apps.qa.models import HISTORY_WINDOW_TURNS, MAX_COMMENT_CHARS, Feedback
 from apps.qa.serializers import (
     MAX_ADDED_EDITIONS,
     MAX_HISTORY_ANSWER_CHARS,
@@ -50,6 +59,7 @@ from apps.qa.serializers import (
     CourseNameSerializer,
     MessageSerializer,
     SourceSerializer,
+    StoredFeedbackSerializer,
     TurnSerializer,
 )
 from rag.agent import RouteDecision
@@ -61,6 +71,7 @@ API = Path(__file__).resolve().parent.parent / "frontend" / "src" / "api"
 MIRROR = API / "contract.ts"
 REQUEST_MIRROR = API / "client.ts"
 CONVERSATION_MIRROR = API / "conversations.ts"
+REVIEW_MIRROR = API / "review.ts"
 
 # Every model that crosses the wire. `RouteDecision` is here because `StartEvent`
 # embeds it verbatim rather than copying its fields (apps/qa/contract.py), so the
@@ -152,6 +163,8 @@ def test_the_conversation_mirror_declares_exactly_the_serializers_fields() -> No
         "ConversationSource": SourceSerializer,
         "CourseName": CourseNameSerializer,
         "StoredMessage": MessageSerializer,
+        "StoredFeedback": StoredFeedbackSerializer,
+        "FeedbackBody": FeedbackRequest,
     }
 
     declared = {name: fields(declaration(conversations, name)) for name in mirrored}
@@ -180,3 +193,33 @@ def test_the_request_mirror_keeps_the_servers_caps() -> None:
     }
 
     assert {name: declared.get(name) for name in caps} == caps
+
+
+def test_the_review_mirror_declares_exactly_the_serializers_fields() -> None:
+    review = REVIEW_MIRROR.read_text(encoding="utf-8")
+    mirrored = {
+        "FeedbackRow": FeedbackRowSerializer,
+        "RatedAnswer": RatedAnswerSerializer,
+        "FeedbackDetail": FeedbackDetailSerializer,
+    }
+
+    declared = {name: fields(declaration(review, name)) for name in mirrored}
+
+    assert declared == {name: set(serializer().fields) for name, serializer in mirrored.items()}
+    page = re.search(r"^export const FEEDBACK_PAGE_SIZE = (\d+);$", review, re.MULTILINE)
+    assert page is not None
+    assert int(page[1]) == FeedbackPagination.page_size
+
+
+def test_the_conversation_mirror_keeps_the_reasons_and_the_comments_cap() -> None:
+    conversations = CONVERSATION_MIRROR.read_text(encoding="utf-8")
+
+    reasons = re.search(
+        r"^export const FEEDBACK_REASONS = \[(.*)\] as const;$", conversations, re.MULTILINE
+    )
+    cap = re.search(r"^export const MAX_COMMENT_CHARS = (\d+);$", conversations, re.MULTILINE)
+
+    assert reasons is not None
+    assert re.findall(r'"(\w+)"', reasons[1]) == Feedback.Reason.values
+    assert cap is not None
+    assert int(cap[1]) == MAX_COMMENT_CHARS

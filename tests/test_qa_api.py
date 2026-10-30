@@ -1459,13 +1459,18 @@ def test_a_question_starts_a_conversation_and_the_start_event_names_it(
 
 
 def test_a_finished_answer_is_stored_whole_and_marked_complete(index: QdrantClient) -> None:
+    """Under the id of the request that asked, which files its log lines: the
+    answer's alone, since the question is not what the server produced."""
     install_engine(index, SLIDES_ROUTE, ["An ORM ", "maps objects."])
-    events(ask())
+    response = ask()
+    events(response)
 
     assert turns_of(only_conversation()) == [
         ("user", "What is an ORM?", True),
         ("assistant", "An ORM maps objects.", True),
     ]
+    by_role = dict(Message.objects.values_list("role", "request_id"))
+    assert by_role == {"user": "", "assistant": response["X-Request-ID"]}
 
 
 def test_a_generation_failure_keeps_the_fragment_and_marks_it_incomplete(

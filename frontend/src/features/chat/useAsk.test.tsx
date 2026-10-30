@@ -402,6 +402,7 @@ function row(
     route: answer ? ROUTE : null,
     search_ms: answer ? 40 : null,
     created_at: "2026-10-29T10:00:00Z",
+    feedback: null,
   };
 }
 
