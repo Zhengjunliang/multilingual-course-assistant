@@ -30,6 +30,7 @@ from apps.materials import tasks
 from apps.materials.ingest import Pipeline
 from apps.materials.models import CourseMaterial, MaterialFailure, MaterialStatus
 from apps.materials.tasks import STALLED_AFTER, fail_stalled, ingest_material
+from config.celery import app
 from rag.chunk import Chunk
 from rag.index import COLLECTION, ensure_collection
 from rag.parse import parse_pdf
@@ -361,6 +362,8 @@ def test_a_material_deleted_while_it_was_indexed_leaves_no_point(
 
 
 def test_the_sweep_fails_what_lost_its_worker_and_nothing_else(edition: CourseEdition) -> None:
+    """Called directly, as tests/test_account_sessions.py calls the session purge; the
+    schedule is the one beat reads, and the name it sends one the app registered."""
     now = timezone.now()
     long_ago, lately = now - STALLED_AFTER - timedelta(minutes=1), now - timedelta(minutes=5)
     rows = {
@@ -390,6 +393,7 @@ def test_the_sweep_fails_what_lost_its_worker_and_nothing_else(edition: CourseEd
     assert {key: row.status for key, row in after.items() if key != "lost"} == {
         key: status for key, (status, _started) in rows.items() if key != "lost"
     }
+    assert app.conf.beat_schedule["fail-stalled-materials"]["task"] in app.tasks
 
 
 def test_the_ingest_has_a_queue_and_limits_of_its_own() -> None:
