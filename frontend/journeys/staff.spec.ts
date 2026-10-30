@@ -44,9 +44,24 @@ test("the secretariat uploads a PDF to an edition, and once it is ready a studen
 }) => {
   // The run's first ingest imports docling, about ten seconds on a laptop.
   test.setTimeout(60_000);
-  // Bytes of its own, so a retry against the run's database is not a 409.
+  // Bytes of its own, so a retry against the run's database is not a 409: one
+  // blank page, a PDF pypdf opens as the upload asks (apps/materials/services.py),
+  // which finds its objects without the cross-reference table this one lacks.
   const name = `journey-${randomUUID().slice(0, 8)}.pdf`;
-  const bytes = Buffer.from(`%PDF-1.4\n% ${name}\n%%EOF\n`);
+  const bytes = Buffer.from(
+    [
+      "%PDF-1.4",
+      `% ${name}`,
+      "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj",
+      "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj",
+      "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj",
+      "trailer<</Root 1 0 R>>",
+      "startxref",
+      "0",
+      "%%EOF",
+      "",
+    ].join("\n"),
+  );
   await page.goto("/staff/courses/B003370");
   await page.getByRole("link", { name: "2026-2027" }).click();
   await page.getByRole("tab", { name: it.staff.materials.title }).click();

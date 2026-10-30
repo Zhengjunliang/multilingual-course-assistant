@@ -17,6 +17,7 @@ from pypdf import PdfWriter
 from rag.parse import (
     IncompletePdfError,
     ParsedMeta,
+    PdfTimeoutError,
     UnreadablePdfError,
     build_converter,
     main,
@@ -201,23 +202,51 @@ class StubConverter:
         status: str = "success",
         error: Exception | None = None,
         document: "DoclingDocument | None" = None,
+        *,
+        timed_out: bool = False,
     ) -> None:
         self.status = status
         self.error = error
         self.document = document
+        self.timed_out = timed_out
         self.calls = 0
 
     def convert(self, source: Path) -> SimpleNamespace:
-        from docling.datamodel.base_models import ConversionStatus
+        from docling.datamodel.base_models import (
+            ConversionStatus,
+            DoclingComponentType,
+            ErrorItem,
+            FailureCategory,
+        )
         from docling_core.types.doc.document import DoclingDocument
 
         self.calls += 1
         if self.error is not None:
             raise self.error
+        # What docling files when it stops at `document_timeout`, beside a PARTIAL_SUCCESS.
+        timeout = ErrorItem(
+            component_type=DoclingComponentType.PIPELINE,
+            module_name="StandardPdfPipeline",
+            error_message="Pipeline stage timeout",
+            category=FailureCategory.TIMEOUT,
+        )
         return SimpleNamespace(
             status=ConversionStatus(self.status),
             document=self.document or DoclingDocument(name=source.stem),
+            errors=[timeout] if self.timed_out else [],
         )
+
+
+def blank_pdf(pages: int = 1, *, title: str = "") -> bytes:
+    """A PDF of blank pages, its title making the bytes of one apart from another's."""
+    writer = PdfWriter()
+    for _ in range(pages):
+        writer.add_blank_page(width=200, height=200)
+    if title:
+        writer.add_metadata({"/Title": title})
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
 
 
 def encrypted_pdf() -> bytes:
@@ -278,6 +307,11 @@ def test_a_parsed_pdf_records_its_edition_and_the_name_it_was_uploaded_as(
     ("converter", "error"),
     [
         pytest.param(StubConverter("partial_success"), IncompletePdfError, id="stopped-part-way"),
+        pytest.param(
+            StubConverter("partial_success", timed_out=True),
+            PdfTimeoutError,
+            id="stopped-by-the-timeout",
+        ),
         pytest.param(None, UnreadablePdfError, id="refused-by-docling"),
     ],
 )
@@ -298,6 +332,31 @@ def test_only_a_clean_conversion_is_returned(
             converters={"classic": cast("DocumentConverter", stub)},
             plan=CLASSIC,
         )
+
+
+def test_a_converter_built_for_a_caller_stops_at_its_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The material ingest's clock (apps/materials/ingest.py) reaches the converter it builds."""
+    built: list[float | None] = []
+
+    def build(pipeline: Pipeline, **options: object) -> StubConverter:
+        built.append(cast("float | None", options["document_timeout"]))
+        return StubConverter()
+
+    monkeypatch.setattr("rag.parse.build_converter", build)
+
+    parse_pdf(
+        stored_pdf(tmp_path),
+        course="B028451",
+        academic_year="2025-2026",
+        source_file="deck.pdf",
+        converters={},
+        plan=CLASSIC,
+        document_timeout=300,
+    )
+
+    assert built == [300]
 
 
 def test_the_worker_decodes_formulas_on_whatever_the_probe_routes(tmp_path: Path) -> None:

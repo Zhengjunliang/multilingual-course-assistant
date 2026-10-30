@@ -16,6 +16,7 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from test_catalog_api import as_user, code_of, rolled_back
 from test_error_contract import refused
+from test_parse import blank_pdf
 from test_roles import world
 
 from apps.catalog.content_views import EditionReadingView
@@ -316,7 +317,7 @@ def test_a_book_is_reached_through_its_own_edition_only() -> None:
     assert ReadingItem.objects.get(pk=ia_book.pk).year is None
 
 
-DECK = b"%PDF-1.7 Elettrostatica"
+DECK = blank_pdf(title="Elettrostatica")
 DECK_NAME = "01-Elettrostatica.pdf"
 
 

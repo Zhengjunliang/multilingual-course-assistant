@@ -188,6 +188,18 @@ def test_a_failed_ingest_says_why_and_leaves_no_point(
     assert worker.points(material) == []
 
 
+def test_timeout_marks_failed_and_indexes_nothing(edition: CourseEdition, worker: Worker) -> None:
+    """Docling hands back what it parsed before the clock ran out, and none of it is kept."""
+    material = upload(edition, FIRST)
+    worker.converter = StubConverter("partial_success", document=build_document(), timed_out=True)
+
+    ingest_material(material.pk)
+
+    material.refresh_from_db()
+    assert (material.status, material.failure) == (MaterialStatus.FAILED, MaterialFailure.TIMED_OUT)
+    assert worker.points(material) == []
+
+
 class LosesItsDeletes:
     """The index, until its first delete: the one that would drop the older points."""
 

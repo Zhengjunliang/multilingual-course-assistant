@@ -64,6 +64,7 @@ class Migration(migrations.Migration):
                         choices=[
                             ("unreadable", "the file could not be read"),
                             ("incomplete", "the file was read only in part"),
+                            ("timed_out", "the file took too long to read"),
                             ("interrupted", "the ingest stopped before it finished"),
                             ("internal", "an error on the server"),
                         ],
@@ -132,7 +133,13 @@ class Migration(migrations.Migration):
                             models.Q(
                                 (
                                     "failure__in",
-                                    ["unreadable", "incomplete", "interrupted", "internal"],
+                                    [
+                                        "unreadable",
+                                        "incomplete",
+                                        "timed_out",
+                                        "interrupted",
+                                        "internal",
+                                    ],
                                 ),
                                 ("status", "failed"),
                             ),

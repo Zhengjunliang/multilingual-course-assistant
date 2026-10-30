@@ -7,12 +7,18 @@ caller may not see is a 404, whatever the upload. Both methods need
 uploaded each file and why an ingest failed. An upload answers 202 with the row,
 `queued`, before any parsing: the ingest runs on a worker (apps/materials/tasks.py),
 and the page reads the row again until it is `ready` or `failed`.
+
+An upload is limited three ways (#36): its body to `MAX_UPLOAD_BYTES`, a 413
+before a byte of it is read; its file to a PDF of `MAX_PDF_PAGES` at most
+(apps/materials/serializers.py); and an account to the `upload` rate
+(config/settings.py), counted on `POST` alone, since the page lists the
+material again every few seconds while an ingest runs.
 """
 
 from __future__ import annotations
 
 from types import MappingProxyType
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser
@@ -21,14 +27,23 @@ from rest_framework.response import Response
 from apps.catalog.content_views import EditionContentView
 from apps.materials.models import CourseMaterial
 from apps.materials.serializers import MaterialSerializer, MaterialUploadSerializer
-from apps.materials.services import MaterialExistsError, create_material
+from apps.materials.services import MAX_UPLOAD_BYTES, MIB, MaterialExistsError, create_material
 from apps.roles.registry import Permission
 from config.errors import ErrorCode, fail
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
+    from rest_framework.throttling import BaseThrottle
 
     from apps.accounts.models import User
+
+
+def _content_length(request: Request) -> int:
+    """The body's length as WSGI reads it: a header that is no number is no body (`WSGIRequest`)."""
+    try:
+        return int(request.META.get("CONTENT_LENGTH") or 0)
+    except ValueError:
+        return 0
 
 
 class EditionMaterialsView(EditionContentView):
@@ -42,6 +57,21 @@ class EditionMaterialsView(EditionContentView):
         {"GET": Permission.EDITION_MANAGE_MATERIALS, "POST": Permission.EDITION_MANAGE_MATERIALS}
     )
     parser_classes = (MultiPartParser,)
+    throttle_scope = "upload"
+
+    def initial(self, request: Request, *args: Any, **kwargs: Any) -> None:
+        # Before authentication, whose CSRF check reads `request.POST` and so
+        # parses the multipart body, writing a large file out to disk. Django
+        # reads no further than the length (`LimitedStream`), so refused here,
+        # none of it is read. The body is the file and a multipart envelope of
+        # a few hundred bytes, so a file within that much of the limit passes
+        # the page's check and is refused here: a gap no real deck lands in.
+        if _content_length(request) > MAX_UPLOAD_BYTES:
+            fail(ErrorCode.CONTENT_TOO_LARGE, max_mib=MAX_UPLOAD_BYTES // MIB)
+        super().initial(request, *args, **kwargs)
+
+    def get_throttles(self) -> list[BaseThrottle]:
+        return super().get_throttles() if self.request.method == "POST" else []
 
     def get(self, request: Request, pk: int) -> Response:
         materials = CourseMaterial.objects.filter(edition=self.scope).select_related("uploaded_by")
