@@ -1,9 +1,10 @@
 # Background tasks
 
-This file owns what runs beside the web process: Redis and what each of its databases holds, the Celery worker with its queues, pools and time limits, beat and its schedule, how a question is answered on a worker, and which work of the project goes to one. The values themselves are the sections "Cache", "Question answering" and "Background tasks" of [config/settings.py](../config/settings.py), each with its reason beside it; the commands that start the worker and beat are in [development.md](development.md), section "Daily loop". The wire shape of an answer's events is [api.md](api.md), section "Question-answering API".
+This file owns what runs beside the web process: Redis and what each of its databases holds, the Celery worker with its queues, pools and time limits, beat and its schedule, how a question is answered and a course material ingested on a worker, and which work of the project goes to one. The values themselves are the sections "Cache", "Question answering", "Course material" and "Background tasks" of [config/settings.py](../config/settings.py), each with its reason beside it; the commands that start the worker and beat are in [development.md](development.md), section "Daily loop". The wire shape of an answer's events is [api.md](api.md), section "Question-answering API".
 
 - ✅ Redis is a compose service (`docker-compose.yml`) and holds the throttle counters (`config/settings.py`, section "Cache"). A worker runs the tasks queued on `default` (`config/celery.py`), and beat queues the nightly purge of expired sessions (`apps/accounts/tasks.py`).
 - ✅ Questions are answered on a worker consuming `qa` (`apps/qa/tasks.py`), under a global cap counted in Redis, and their events travel through a Redis stream per answer, which a reload reads again and a stop endpoint ends (`apps/qa/inflight.py`, `apps/qa/views.py`).
+- ✅ Course material is ingested on a worker consuming `ingest`, one material at a time, and beat fails every ten minutes the ingests whose worker died (`apps/materials/tasks.py`).
 
 ## Topology
 
@@ -19,7 +20,7 @@ flowchart TB
       CA[["site data (db 1)<br/>throttle counters, global cap, stop flags"]]
       ST[["streams (db 1)<br/>answer events"]]
     end
-    WK["Celery worker<br/>engine: encoders + reranker (GPU)"]
+    WK["Celery worker<br/>engine: encoders + reranker (GPU)<br/>ingest: Docling + encoders (GPU)"]
     BT["Celery beat<br/>the schedule"]
     PG[("PostgreSQL")]
     QD[("Qdrant")]
@@ -53,13 +54,13 @@ The broker and the site's data are kept in two databases because `cache.clear()`
 
 ## Queues, pools and time limits
 
-**Queues are named by the work they hold.** Short tasks go to `default`; a long kind of work gets a queue and a worker of its own, so it never waits behind another kind: `qa` holds the questions. Dify splits its queues the same way (dataset, mail, workflow runs and others, in its `api/docker/entrypoint.sh`, outside the repository).
+**Queues are named by the work they hold.** Short tasks go to `default`; a long kind of work gets a queue and a worker of its own, so it never waits behind another kind: `qa` holds the questions, `ingest` the course material. Dify splits its queues the same way (dataset, mail, workflow runs and others, in its `api/docker/entrypoint.sh`, outside the repository).
 
 **Acknowledged late, fetched one at a time.** A worker acknowledges a task once it is done, and takes one task at a time, so it never holds a second while another worker is free (Celery's Optimizing guide, outside the repository). A task whose worker goes down with it, the machine or the worker's main process, is then delivered again once the visibility timeout passes (below); a pool process killed under a task is acknowledged all the same, since requeuing it (`task_reject_on_worker_lost`, left off) would run a task that kills its process again and again. The price is that every task must be safe to run twice: the session purge is, since a second run finds nothing to delete. The one exception is a question, acknowledged as it starts (section *A question on a worker*).
 
-**Pools.** Celery has not supported Windows since version 4 (its FAQ, outside the repository), and its default pool, prefork, does not work reliably there: the development worker uses `solo`, one task at a time in the worker's own process, and consumes both queues. On Linux, `default` keeps prefork, and `qa` gets a worker of its own on the threads pool, so that its threads share one copy of the models while each waits on the LLM server: `celery -A config worker -Q qa -P threads --disable-prefetch`, its thread count read by Celery's command line from `CELERY_WORKER_CONCURRENCY`, which is the worker's environment and not the site's settings. Deploying both workers is 🔜 M6 #41, and so is the measurement that sets that count.
+**Pools.** Celery has not supported Windows since version 4 (its FAQ, outside the repository), and its default pool, prefork, does not work reliably there: the development worker uses `solo`, one task at a time in the worker's own process, and consumes all three queues, so on the laptop a question waits while a material is ingested: its 8 GB card peaks at 7761 MiB answering a question ([experiment-log.md](experiment-log.md), 2026-08-21), which leaves no room for a second process with models of its own. On Linux, `default` keeps prefork, and `qa` gets a worker of its own on the threads pool, so that its threads share one copy of the models while each waits on the LLM server: `celery -A config worker -Q qa -P threads --disable-prefetch`, its thread count read by Celery's command line from `CELERY_WORKER_CONCURRENCY`, which is the worker's environment and not the site's settings. `ingest` gets a worker of its own on prefork with one process, `celery -A config worker -Q ingest -c 1`: one material at a time keeps two versions of a file in upload order (section *A material on a worker*), and prefork enforces the ingest's time limits. Deploying the three workers is 🔜 M6 #41, and so is the measurement that sets the thread count.
 
-**Time limits.** Every task has a soft limit of 5 minutes, which raises inside the task so it can clean up, and a hard one of 6, which kills it. Only the prefork pool enforces them (Celery's Workers guide, outside the repository): `solo` and `threads` ignore them, so the question task, which runs on those pools, checks its own 5 minutes between two events (`TIME_LIMIT_SECONDS`, `apps/qa/tasks.py`). Both limits stay far under the broker's visibility timeout, one hour on Redis: a task unacknowledged past it is delivered to a second worker while the first runs it.
+**Time limits.** Every task has a soft limit of 5 minutes, which raises inside the task so it can clean up, and a hard one of 6, which kills it. Only the prefork pool enforces them (Celery's Workers guide, outside the repository): `solo` and `threads` ignore them, so the question task, which runs on those pools, checks its own 5 minutes between two events (`TIME_LIMIT_SECONDS`, `apps/qa/tasks.py`). The ingest task has 20 and 25 minutes of its own (`apps/materials/tasks.py`), enforced by the Linux worker; on `solo`, a parse that hangs holds the laptop's worker until it ends, and bounding a document's parse is 🔜 M5 #36. Both limits stay far under the broker's visibility timeout, one hour on Redis: a task unacknowledged past it is delivered to a second worker while the first runs it.
 
 ## A question on a worker
 
@@ -110,6 +111,15 @@ A signed-in student's answer goes on when the page closes, and is stored when it
 
 The stop button calls `POST /api/answers/<id>/stop`, which sets the answer's stop flag for 10 minutes, as Dify's `generate_task_stopped` lives (outside the repository). The heartbeat finds it within a second, and the worker ends the answer with `stopped`, keeping what it wrote with `complete=false`; stopped before `start`, it writes nothing. Closing the connection stops a visitor's answer the same way, since nobody else will read it, while a signed-in student's goes on to its end; deleting a conversation stops the answer being written into it. The Vercel AI SDK draws the same line: in a resumable stream an abort only disconnects, and stopping is an endpoint of its own (outside the repository).
 
+## A material on a worker
+
+✅ `apps/materials/tasks.py` ingests one material through the steps of `rag/` on the resources `apps/materials/ingest.py` builds once per worker; the row is the one record of how far it got (`apps/materials/models.py`).
+
+- **Each step in the row.** The task is queued once the material's row is committed, and writes `parsing`, `chunking` and `indexing` into it as it reaches each, then `ready`, or `failed` with a code: `unreadable` and `incomplete` are the file's, `interrupted` the time limit's or a lost worker's, `internal` the server's. Only a clean conversion is indexed (`rag.parse.parse_pdf`).
+- **A failure leaves no point.** The points are written once every chunk is embedded, and on any failure those of the material's digest in its edition are deleted (`rag.index.delete_material`), so an older version under the same name goes on answering.
+- **A new version replaces the old once ready.** Writing its points drops those of the same name in the edition, and its row then deletes the older rows of that name, with their files unless another edition holds the same bytes. Versions are taken in upload order because the `ingest` worker takes one material at a time, first in first out; a second process on `ingest` would break that order.
+- **Twice is harmless.** A redelivered task starts over and writes the same points under the same ids, a `ready` material is left alone, and a row deleted meanwhile stops the ingest at its next step, taking what was indexed with it.
+
 ## Beat
 
 Beat is one process that queues each scheduled task when it falls due; it runs no task itself. Exactly one runs, since two would queue every task twice. The schedule is `CELERY_BEAT_SCHEDULE` in `config/settings.py`, in code rather than in a database (no django-celery-beat), so what runs and when changes with a commit, never from the admin. Its hours are Rome's (`CELERY_TIMEZONE`). Beat keeps the time of each task's last run in `celerybeat-schedule` in the directory it starts in, which git ignores.
@@ -117,6 +127,7 @@ Beat is one process that queues each scheduled task when it falls due; it runs n
 | Task | When | Why |
 | ---- | ---- | --- |
 | `apps.accounts.tasks.clear_expired_sessions` | 04:00 every night | Django keeps an expired session's row until something deletes it, and asks for `clearsessions` to be run regularly |
+| `apps.materials.tasks.fail_stalled` | every 10 minutes | A worker that dies under a material leaves its row in a running state; past the ingest's hard limit and 5 minutes more, the row is marked failed, `interrupted` |
 
 ## What goes to a worker
 
@@ -128,7 +139,8 @@ Beat is one process that queues each scheduled task when it falls due; it runs n
 | Resuming an answer after a reload | a Redis stream per answer | ✅ `apps/qa/inflight.py` |
 | Stopping an answer from the stop button | a stop endpoint, then the worker | ✅ `apps/qa/views.py` |
 | A global cap on the questions in flight | a sorted set of leases in Redis | ✅ `apps/qa/inflight.py` |
-| Ingesting uploaded course material | a worker | 🔜 M5 #35 |
+| Ingesting uploaded course material | a worker on `ingest` | ✅ `apps/materials/tasks.py` |
+| Failing an ingest whose worker died | beat, then a worker on `default` | ✅ `apps/materials/tasks.py` |
 | Bounding a document's parse time and pages | the ingest task | 🔜 M5 #36 |
 | Snapshotting the Qdrant index | beat, then a worker on `default` | 🔜 M5 #122 |
 | The deepening agent on the web (`rag/agent.py`) | a worker, over the answer streams | 🔜 M7, no issue |

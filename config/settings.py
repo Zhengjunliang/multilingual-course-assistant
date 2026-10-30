@@ -262,6 +262,11 @@ QA_MAX_IN_FLIGHT = env.qa_max_in_flight
 # data/, which git ignores, as everything derived from course material is.
 MATERIALS_ROOT = BASE_DIR / "data" / "materials"
 
+# The callable that builds what an ingest runs on (apps/materials/ingest.py),
+# named by dotted path as QA_RETRIEVAL is, for the same reason: the browser
+# journeys point it at stubs.
+MATERIALS_PIPELINE = "apps.materials.ingest.build_pipeline"
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -370,6 +375,11 @@ CELERY_BEAT_SCHEDULE = {
     "clear-expired-sessions": {
         "task": "apps.accounts.tasks.clear_expired_sessions",
         "schedule": crontab(hour=4, minute=0),
+    },
+    # A material whose worker died under it is marked failed (apps/materials/tasks.py).
+    "fail-stalled-materials": {
+        "task": "apps.materials.tasks.fail_stalled",
+        "schedule": crontab(minute="*/10"),
     },
 }
 # No result backend is configured, so a task's return value is never stored.

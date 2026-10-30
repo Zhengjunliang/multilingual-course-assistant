@@ -74,7 +74,7 @@ Each lesson's numbers are in [experiment-log.md](experiment-log.md), entries of 
 - **Formula placeholders underestimate the loss**: with enrichment off, some formulas leave no placeholder at all, so the loss can only be judged by running the enrichment once and comparing. VLM-generated LaTeX has trustworthy values but hallucinated symbols.
 - **Dead chunks**: sections whose only content under the heading is `<!-- image -->` — and they are the course's core, such as `Django's ORM`, `CRUD examples`, `Components of a Database`. A student asking how Django's ORM works finds an empty chunk in the index. They are the denominator of the picture-description ablation (`#28`).
 - **Batch vision and generation work belongs on the server**: the VLM and picture description generate autoregressively, a local GPU fed one page at a time is latency-bound, and the one lever that works is batching — vLLM's continuous batching on MICC. Locally only single-document comparisons run.
-- **One switch, two defaults, on purpose**: formula enrichment is off by default in the `rag/parse.py` command line (each run would pay the model download and load again), and on in the resident Celery worker (loaded once, then gating itself per item at almost no cost; 🔜 M5 `#35`).
+- **One switch, two defaults, on purpose**: formula enrichment is off by default in the `rag/parse.py` command line (each run would pay the model download and load again), and on in the resident Celery worker that ingests uploaded material, loaded once and then gating itself per item at almost no cost (✅ `apps/materials/ingest.py`, through `parse_pdf`'s `formula`).
 
 ## 3. Step 2 · chunking
 

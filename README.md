@@ -73,7 +73,7 @@ uv run python manage.py createsuperuser
 uv run python manage.py runserver  # http://127.0.0.1:8000/
 ```
 
-The site answers once it has an index, a model and a worker, which answers the questions: `uv run celery -A config worker -P solo -Q default,qa -l info`, in a second terminal. Course PDFs are not part of the repository, so you index your own, and generation calls any OpenAI-compatible server, a local Ollama by default: both steps, and the development loop, are in [docs/development.md](docs/development.md).
+The site answers once it has an index, a model and a worker, which answers the questions and ingests uploaded material: `uv run celery -A config worker -P solo -Q default,qa,ingest -l info`, in a second terminal. Course PDFs are not part of the repository, so you index your own, and generation calls any OpenAI-compatible server, a local Ollama by default: both steps, and the development loop, are in [docs/development.md](docs/development.md).
 
 ## Thesis
 
