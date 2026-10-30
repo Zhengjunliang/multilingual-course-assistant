@@ -963,7 +963,7 @@ describe("rating an answer", () => {
     expect(thumbs).toBeNull();
   });
 
-  it("puts the thumbs back as stored when the server refuses, asks no more why, and says so with a way to try again", async () => {
+  it("puts the thumbs back as stored when the server refuses, asks no more why, and trying again is the press again", async () => {
     serve(codedRefusal("INTERNAL"));
     const { container, unmount } = rated({
       feedback: { rating: "up", reason: "", comment: "" },
@@ -976,11 +976,27 @@ describe("rating an answer", () => {
       form: container.querySelector("form"),
       toast: document.body.querySelector("[data-sonner-toast]")?.textContent ?? "",
     };
+    serve();
+    const retry = [...document.body.querySelectorAll("[data-sonner-toast] button")].find(
+      (button) => button.textContent === i18n.t("answer.rate.retry"),
+    );
+    act(() => (retry as HTMLButtonElement | undefined)?.click());
+    await settle();
+    const retried = {
+      sent,
+      pressed: pressed(container),
+      why: container.querySelector("legend")?.textContent,
+    };
     unmount();
 
     expect(seen.pressed).toEqual({ up: "true", down: "false" });
     expect(seen.form).toBeNull();
     expect(seen.toast).toContain(i18n.t("answer.rate.failed"));
     expect(seen.toast).toContain(i18n.t("answer.rate.retry"));
+    expect(retried).toEqual({
+      sent: [{ method: "PUT", url: PATH, body: { rating: "down" } }],
+      pressed: { up: "false", down: "true" },
+      why: i18n.t("answer.rate.why"),
+    });
   });
 });

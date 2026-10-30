@@ -95,7 +95,14 @@ export function RateAnswer({ answerId, stored, question }: RateAnswerProps) {
         }
         toast.error(t("answer.rate.failed"), {
           description: question,
-          action: { label: t("answer.rate.retry"), onClick: () => save(body, thanks) },
+          action: {
+            label: t("answer.rate.retry"),
+            // The press again, which a thumb down alone asks why of.
+            onClick: () => {
+              if (body?.rating === "down" && !thanks) setAsking(true);
+              save(body, thanks);
+            },
+          },
         });
       }
     });
