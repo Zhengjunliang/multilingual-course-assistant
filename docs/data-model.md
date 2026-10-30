@@ -50,6 +50,7 @@ erDiagram
 - The scope applies to the slides branches only, as a filter on each branch's own query ([docling-pipeline.md](docling-pipeline.md), section 4.1, the fusion on the client).
 - In the web collection, `course` is a site-section slug such as `ingegneria` (values listed in [docling-pipeline.md](docling-pipeline.md), section 3.6), not a course key; a scope never matches it.
 - Re-indexing a slides file writes its new points, then deletes the others under (`source_file`, `course`, `academic_year`) (`rag/index.py`): the source file within its edition is the identity, and `source_sha256` only says whether the content changed, so another edition of the same PDF is never touched ([decisions.md](decisions.md), 2026-09-28, *Slides points carry their edition, and a re-index replaces a source file within it*, point 2).
+- One uploaded material's points are those of its digest in its edition, (`source_sha256`, `course`, `academic_year`), the key `CourseMaterial` holds as (`edition`, `sha256`); `delete_material` deletes them alone, leaving an older version under the same name and the same PDF in another edition (`rag/index.py`).
 - Indexing a directory also deletes, for each edition the directory holds, the points of files that left it, and skips that when any file failed; a single file never deletes another (`rag/index.py`; [decisions.md](decisions.md), 2026-09-28, *Slides points carry their edition, and a re-index replaces a source file within it*, point 3).
 
 ## `WebSource` and the registry

@@ -57,7 +57,7 @@ from rag.chunk import (
     build_chunker,
     build_tokenizer,
     chunk_document,
-    detect_locale,
+    document_locale,
 )
 from rag.crawl import (
     DEFAULT_SCOPE,
@@ -507,8 +507,7 @@ def parse_page(url: str, response: Response, entry: RegistryEntry) -> ParsedPage
         complete = result.status == ConversionStatus.SUCCESS
         if not complete:
             logger.warning("%s: conversion %s, not storable", url, result.status)
-        locale = meta.lang or detect_locale("\n".join(item.text for item in document.texts))
-        chunks = chunk_document(document, live_chunker(), meta, locale)
+        chunks = chunk_document(document, live_chunker(), meta, document_locale(document, meta))
     except Exception:  # a broken document is one lost candidate, not a lost turn
         logger.warning("%s: parse failed", url)
         return ParsedPage(chunks=[], outlinks=outlinks, complete=False)

@@ -83,11 +83,19 @@ class ParsedMeta(BaseModel):
     content_hash: str | None = None
 
 
+class UnreadablePdfError(Exception):
+    """The PDF could not be opened or converted: encrypted, malformed, or not a PDF."""
+
+
+class IncompletePdfError(Exception):
+    """Docling converted the PDF only in part; a half-converted document is never stored."""
+
+
 @dataclass(frozen=True)
-class ParseResult:
-    source: Path
+class ParsedPdf:
     document: DoclingDocument
-    seconds: float
+    meta: ParsedMeta
+    plan: ParsePlan
 
 
 def normalize_text(text: str) -> str:
@@ -208,11 +216,69 @@ def variant_of(plan: ParsePlan) -> str:
     return "-".join(parts)
 
 
-def parse(pdf: Path, converter: DocumentConverter) -> ParseResult:
+def parse_pdf(
+    pdf: Path,
+    *,
+    course: str,
+    academic_year: str,
+    source_file: str,
+    converters: dict[str, DocumentConverter],
+    plan: ParsePlan | None = None,
+) -> ParsedPdf:
+    """One PDF of an edition -> its DoclingDocument and provenance, or an error.
+
+    The file is profiled and routed (`rag.probe`) unless `plan` forces a
+    configuration. `converters` is the caller's cache, one converter per
+    variant, filled here as variants come up: building one reloads the layout
+    and table models, which a directory run or a long-lived worker pays once.
+    `source_file` is the name the provenance records, which is not the path's
+    when the file on disk is named by its digest (apps/materials/models.py).
+
+    Only a clean conversion is returned, by the rule `rag.live` applies to a
+    fetched page: a conversion that stops part way comes back from docling as
+    PARTIAL_SUCCESS, with a truncated document and no exception, and indexing
+    it would freeze the missing pages out of the index unnoticed.
+    """
+    from docling.datamodel.base_models import ConversionStatus
+    from docling.exceptions import ConversionError
+
+    try:
+        plan = plan or plan_for(probe(pdf))
+    except Exception as exc:
+        # The probe reads nothing but the file, and pypdf raises more than its
+        # own errors on a broken one: a DependencyError for an AES-encrypted
+        # file without `cryptography`, a KeyError or ValueError on a mangled table.
+        raise UnreadablePdfError(pdf.name) from exc
+    variant = variant_of(plan)
+    if plan.pipeline == "vlm" and not cuda_available():
+        # granite-docling generates DocTags autoregressively, thousands of
+        # tokens a page, each one a full forward pass. Measured without CUDA:
+        # over 56 s/page against 0.9 s/page for the classic pipeline. Warn
+        # rather than refuse — the run is valid, just far too slow to iterate on.
+        logger.warning("%s: no CUDA device, vlm will take minutes per page", pdf.name)
+    if variant not in converters:
+        converters[variant] = build_converter(plan.pipeline, ocr=plan.ocr, formula=plan.formula)
+
     started = time.perf_counter()
-    document = converter.convert(pdf).document
+    try:
+        result = converters[variant].convert(pdf)
+    except ConversionError as exc:
+        raise UnreadablePdfError(pdf.name) from exc
     elapsed = time.perf_counter() - started
-    return ParseResult(source=pdf, document=document, seconds=elapsed)
+    if result.status != ConversionStatus.SUCCESS:
+        raise IncompletePdfError(f"{pdf.name}: conversion {result.status}")
+    meta = ParsedMeta(
+        source_file=source_file,
+        source_path=str(pdf.resolve()),
+        source_sha256=sha256_of(pdf),
+        parse_variant=variant,
+        docling_version=docling_version(),
+        course=course,
+        academic_year=academic_year,
+        seconds=round(elapsed, 1),
+        parsed_at=datetime.now(UTC).isoformat(timespec="seconds"),
+    )
+    return ParsedPdf(document=result.document, meta=meta, plan=plan)
 
 
 def persist(document: DoclingDocument, meta: ParsedMeta, out_dir: Path) -> tuple[Path, Path]:
@@ -284,45 +350,26 @@ def main(argv: list[str] | None = None) -> None:
     # reload the layout and table models for every deck in the directory.
     converters: dict[str, DocumentConverter] = {}
 
+    manual_plan = (
+        ParsePlan(
+            pipeline=args.pipeline or "classic", ocr=args.ocr, formula=args.formula, reason="manual"
+        )
+        if manual
+        else None
+    )
     pdfs = list(collect_pdfs(args.target))
     failed = 0
     for pdf in pdfs:
         try:
-            if manual:
-                plan = ParsePlan(
-                    pipeline=args.pipeline or "classic",
-                    ocr=args.ocr,
-                    formula=args.formula,
-                    reason="manual",
-                )
-            else:
-                plan = plan_for(probe(pdf))
-
-            variant = variant_of(plan)
-            if plan.pipeline == "vlm" and not cuda_available():
-                # granite-docling generates DocTags autoregressively, thousands of
-                # tokens a page, each one a full forward pass. Measured without CUDA:
-                # over 56 s/page against 0.9 s/page for the classic pipeline. Warn
-                # rather than refuse — the run is valid, just far too slow to iterate on.
-                logger.warning("%s: no CUDA device, vlm will take minutes per page", pdf.name)
-            if variant not in converters:
-                converters[variant] = build_converter(
-                    plan.pipeline, ocr=plan.ocr, formula=plan.formula
-                )
-
-            result = parse(pdf, converters[variant])
-            meta = ParsedMeta(
-                source_file=pdf.name,
-                source_path=str(pdf.resolve()),
-                source_sha256=sha256_of(pdf),
-                parse_variant=variant,
-                docling_version=docling_version(),
+            parsed = parse_pdf(
+                pdf,
                 course=args.course,
                 academic_year=args.academic_year,
-                seconds=round(result.seconds, 1),
-                parsed_at=datetime.now(UTC).isoformat(timespec="seconds"),
+                source_file=pdf.name,
+                converters=converters,
+                plan=manual_plan,
             )
-            doc_path, _ = persist(result.document, meta, args.out_dir)
+            doc_path, _ = persist(parsed.document, parsed.meta, args.out_dir)
         except Exception:
             # A parse crash on one deck must not lose the rest of an hour-long run.
             logger.exception("%s: parse failed", pdf.name)
@@ -333,10 +380,10 @@ def main(argv: list[str] | None = None) -> None:
             # ASCII only: the Windows console codepage mangles anything else.
             "%s: %s (%s) - %.1fs, %d items -> %s",
             pdf.name,
-            variant,
-            plan.reason,
-            result.seconds,
-            len(result.document.texts),
+            parsed.meta.parse_variant,
+            parsed.plan.reason,
+            parsed.meta.seconds,
+            len(parsed.document.texts),
             doc_path,
         )
 

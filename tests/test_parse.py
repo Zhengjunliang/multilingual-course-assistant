@@ -1,24 +1,34 @@
 """Normalisation has to hold, or lexical retrieval silently misses matches; the CLI
 flag rules and variant names are pure logic guarding user-facing behaviour."""
 
+import hashlib
 import io
 import subprocess
 import sys
 import unicodedata
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import pytest
+from pypdf import PdfWriter
 
 from rag.parse import (
+    IncompletePdfError,
     ParsedMeta,
+    UnreadablePdfError,
     build_converter,
     main,
     normalize_text,
+    parse_pdf,
     persist,
     variant_of,
 )
 from rag.probe import ParsePlan, Pipeline
+
+if TYPE_CHECKING:
+    from docling.document_converter import DocumentConverter
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -176,6 +186,119 @@ def test_parse_requires_the_edition(
     with pytest.raises(SystemExit):
         main(["missing.pdf", *args])
     assert expected in capsys.readouterr().err
+
+
+CLASSIC = ParsePlan(pipeline="classic", ocr=False, formula=False, reason="manual")
+
+
+class StubConverter:
+    """Answers `convert` with a fixed status, or raises; docling's own result, minus the models."""
+
+    def __init__(self, status: str = "success", error: Exception | None = None) -> None:
+        self.status = status
+        self.error = error
+        self.calls = 0
+
+    def convert(self, source: Path) -> SimpleNamespace:
+        from docling.datamodel.base_models import ConversionStatus
+        from docling_core.types.doc.document import DoclingDocument
+
+        self.calls += 1
+        if self.error is not None:
+            raise self.error
+        return SimpleNamespace(
+            status=ConversionStatus(self.status), document=DoclingDocument(name=source.stem)
+        )
+
+
+def stored_pdf(tmp_path: Path) -> Path:
+    """A file named by its digest, as the material store names it; its bytes are never parsed."""
+    path = tmp_path / f"{'ab' * 32}.pdf"
+    path.write_bytes(b"%PDF-1.7")
+    return path
+
+
+def test_a_parsed_pdf_records_its_edition_and_the_name_it_was_uploaded_as(
+    tmp_path: Path,
+) -> None:
+    converter = StubConverter()
+    converters = {"classic": cast("DocumentConverter", converter)}
+    pdf = stored_pdf(tmp_path)
+
+    parsed = parse_pdf(
+        pdf,
+        course="B028451",
+        academic_year="2025-2026",
+        source_file="01-Intro.pdf",
+        converters=converters,
+        plan=CLASSIC,
+    )
+    parse_pdf(
+        pdf,
+        course="B028451",
+        academic_year="2025-2026",
+        source_file="01-Intro.pdf",
+        converters=converters,
+        plan=CLASSIC,
+    )
+
+    assert (parsed.meta.source_file, parsed.meta.course, parsed.meta.academic_year) == (
+        "01-Intro.pdf",
+        "B028451",
+        "2025-2026",
+    )
+    assert parsed.meta.source_sha256 == hashlib.sha256(b"%PDF-1.7").hexdigest()
+    assert parsed.meta.parse_variant == "classic"
+    # The cached converter served both files; no second one was built.
+    assert (list(converters), converter.calls) == (["classic"], 2)
+
+
+@pytest.mark.parametrize(
+    ("converter", "error"),
+    [
+        pytest.param(StubConverter("partial_success"), IncompletePdfError, id="stopped-part-way"),
+        pytest.param(None, UnreadablePdfError, id="refused-by-docling"),
+    ],
+)
+def test_only_a_clean_conversion_is_returned(
+    converter: StubConverter | None, error: type[Exception], tmp_path: Path
+) -> None:
+    """A truncated document indexed would freeze its missing pages out of the index."""
+    from docling.exceptions import ConversionError
+
+    stub = converter or StubConverter(error=ConversionError("Conversion failed"))
+
+    with pytest.raises(error):
+        parse_pdf(
+            stored_pdf(tmp_path),
+            course="B028451",
+            academic_year="2025-2026",
+            source_file="deck.pdf",
+            converters={"classic": cast("DocumentConverter", stub)},
+            plan=CLASSIC,
+        )
+
+
+def test_an_encrypted_pdf_is_unreadable_before_any_model_loads(tmp_path: Path) -> None:
+    # RC4 because pypdf writes AES only with `cryptography`, which nothing here installs.
+    password = "secret"
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.encrypt(user_password=password, algorithm="RC4-128")
+    pdf = tmp_path / "locked.pdf"
+    with pdf.open("wb") as handle:
+        writer.write(handle)
+    converters: dict[str, DocumentConverter] = {}
+
+    with pytest.raises(UnreadablePdfError):
+        parse_pdf(
+            pdf,
+            course="B028451",
+            academic_year="2025-2026",
+            source_file="locked.pdf",
+            converters=converters,
+        )
+    assert converters == {}
 
 
 def classic_pdf_options(**kwargs: object) -> object:

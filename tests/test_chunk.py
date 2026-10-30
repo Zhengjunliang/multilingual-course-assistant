@@ -16,6 +16,7 @@ from rag.chunk import (
     chunk_document,
     collect_documents,
     detect_locale,
+    document_locale,
     furniture_threshold,
     locale_arg,
     meta_path_of,
@@ -213,6 +214,15 @@ def test_furniture_threshold_floors_at_five_pages() -> None:
 )
 def test_the_locale_heuristic_tells_the_corpus_languages_apart(text: str, locale: str) -> None:
     assert detect_locale(text) == locale
+
+
+@pytest.mark.parametrize(
+    ("lang", "locale"),
+    [pytest.param("it", "it", id="declared"), pytest.param(None, "en", id="guessed")],
+)
+def test_a_declared_language_beats_the_guess(lang: str | None, locale: str) -> None:
+    """The document is English; a page that says it is Italian is taken at its word."""
+    assert document_locale(build_document(), make_meta(lang=lang)) == locale
 
 
 def test_locale_arg_normalizes_bcp47_and_rejects_junk() -> None:

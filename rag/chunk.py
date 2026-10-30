@@ -219,6 +219,15 @@ def detect_locale(text: str) -> Locale:
     return "it" if it > en else "en"
 
 
+def document_locale(document: DoclingDocument, meta: ParsedMeta) -> Locale:
+    """The language a document's chunks are recorded in: the one its source declares, else a guess.
+
+    The web parser records `<html lang>` in the sidecar, and a declared
+    language beats the stopword/CJK guess; a PDF declares none.
+    """
+    return meta.lang or detect_locale("\n".join(item.text for item in document.texts))
+
+
 class Chunk(BaseModel):
     """The index payload contract (docs/docling-pipeline.md owns the field table).
 
@@ -436,14 +445,7 @@ def main(argv: list[str] | None = None) -> None:
                 meta_path_of(doc_path).read_text(encoding="utf-8")
             )
             document = DoclingDocument.load_from_json(doc_path)
-            if args.locale != "auto":
-                locale = args.locale
-            elif meta.lang:
-                # The web parser records <html lang>; a declared language beats
-                # the stopword/CJK guess.
-                locale = meta.lang
-            else:
-                locale = detect_locale("\n".join(item.text for item in document.texts))
+            locale = args.locale if args.locale != "auto" else document_locale(document, meta)
             chunks = chunk_document(document, chunker, meta, locale)
         except Exception:
             # One bad artifact must not lose the rest of the corpus run.

@@ -29,6 +29,7 @@ from rag.index import (
     cached_dense_encoder,
     collect_chunk_files,
     delete_by_run,
+    delete_material,
     ensure_collection,
     index_chunks,
     load_chunks,
@@ -187,6 +188,30 @@ def test_slides_reindex_replaces_only_its_edition(client: QdrantClient) -> None:
         ("2024-2025", new, 0),
         ("2025-2026", old, 0),
         ("2025-2026", old, 1),
+    }
+
+
+def test_deleting_a_material_takes_only_its_own_bytes_in_its_own_edition(
+    client: QdrantClient,
+) -> None:
+    """What a failed ingest leaves is removed by its digest: the same PDF in
+    another edition stays, and so does another file of the same edition."""
+    old, other = "ab" * 32, "cd" * 32
+    index_chunks(client, make_deck("2024-2025", old, 2), StubDense(), StubSparse())
+    index_chunks(client, make_deck("2025-2026", old, 1), StubDense(), StubSparse())
+    renamed = [
+        chunk.model_copy(update={"source_file": "other.pdf"})
+        for chunk in make_deck("2024-2025", other, 1)
+    ]
+    index_chunks(client, renamed, StubDense(), StubSparse())
+
+    delete_material(client, old, edition_of("B028451", "2024-2025"))
+
+    points, _ = client.scroll(COLLECTION, limit=100, with_payload=True)
+    chunks = [Chunk.model_validate(point.payload) for point in points]
+    assert {(chunk.academic_year, chunk.source_sha256) for chunk in chunks} == {
+        ("2025-2026", old),
+        ("2024-2025", other),
     }
 
 

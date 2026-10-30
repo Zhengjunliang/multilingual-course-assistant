@@ -55,6 +55,7 @@ PAYLOAD_INDEXES = (
     "course",
     "academic_year",
     "source_file",
+    "source_sha256",
     "url",
     "ingest_source",
     "ingest_run_id",
@@ -363,6 +364,38 @@ def replace_slides_sources(
                 )
             ),
         )
+
+
+def delete_material(
+    client: QdrantClient, sha256: str, edition: EditionKey, collection: str = COLLECTION
+) -> None:
+    """Delete the points of one file in one edition, keyed by (source_sha256, course,
+    academic_year): what a failed ingest leaves behind, or a removed material.
+
+    Narrower than `replace_slides_sources`, which keys on the name: an older
+    version of a file under the same name, still answering while this one was
+    ingested, is not touched, and neither is the same file in another edition.
+    """
+    from qdrant_client import models
+
+    client.delete(
+        collection,
+        points_selector=models.FilterSelector(
+            filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="source_sha256", match=models.MatchValue(value=sha256)
+                    ),
+                    models.FieldCondition(
+                        key="course", match=models.MatchValue(value=edition.course)
+                    ),
+                    models.FieldCondition(
+                        key="academic_year", match=models.MatchValue(value=edition.academic_year)
+                    ),
+                ]
+            )
+        ),
+    )
 
 
 def sync_editions(
