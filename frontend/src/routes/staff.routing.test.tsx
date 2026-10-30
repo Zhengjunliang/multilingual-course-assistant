@@ -125,7 +125,15 @@ const EDITIONS: Edition[] = [
 const PAST = edition(3, "2023-2024", false, ["demo-teacher"]);
 
 function account(username: string, superuser: boolean, roles: Account["roles"]): Account {
-  return { id: 1, username, locale: "it", is_superuser: superuser, roles };
+  return {
+    id: 1,
+    username,
+    locale: "it",
+    is_superuser: superuser,
+    roles,
+    programme: null,
+    year_of_study: null,
+  };
 }
 
 const STUDENT = account("demo-student", false, []);
@@ -358,6 +366,7 @@ function Session({ children }: { children: ReactNode }) {
         register: async () => {},
         logOut: async () => {},
         chooseLocale: async () => {},
+        chooseStudies: async () => {},
         forget: () => {},
         recheck: async () => {
           rechecks += 1;

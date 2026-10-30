@@ -50,6 +50,8 @@ const READER: Account = {
   locale: "it",
   is_superuser: false,
   roles: [],
+  programme: null,
+  year_of_study: null,
 };
 
 /** Each request the page sent: `path` and its body. */
@@ -100,6 +102,7 @@ function Session(props: {
         register: async () => {},
         logOut: props.logOut,
         chooseLocale: async () => {},
+        chooseStudies: async () => {},
         forget: () => {
           props.onForget();
           setAccount(null);

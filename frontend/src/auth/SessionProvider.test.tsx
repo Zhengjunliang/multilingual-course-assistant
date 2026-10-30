@@ -15,7 +15,15 @@ import { mount } from "@/test/mount";
 import { SessionProvider } from "./SessionProvider";
 import { useSession } from "./useSession";
 
-const ACCOUNT: Account = { id: 1, username: "ada", locale: "it", is_superuser: false, roles: [] };
+const ACCOUNT: Account = {
+  id: 1,
+  username: "ada",
+  locale: "it",
+  is_superuser: false,
+  roles: [],
+  programme: null,
+  year_of_study: null,
+};
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

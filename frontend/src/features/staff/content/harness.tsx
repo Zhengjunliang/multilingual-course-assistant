@@ -28,6 +28,8 @@ const READER: Account = {
   locale: "it",
   is_superuser: false,
   roles: [{ role: "teacher", edition: 5 }],
+  programme: null,
+  year_of_study: null,
 };
 export const BASE = "/api/catalog/editions/5";
 
@@ -168,6 +170,7 @@ export function mountForReader(element: ReactElement) {
         register: async () => {},
         logOut: async () => {},
         chooseLocale: async () => {},
+        chooseStudies: async () => {},
         forget: () => {},
         recheck: async () => {},
       }}

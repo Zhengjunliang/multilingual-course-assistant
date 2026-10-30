@@ -62,6 +62,8 @@ const ADMIN: Account = {
   locale: "it",
   is_superuser: true,
   roles: [],
+  programme: null,
+  year_of_study: null,
 };
 
 /** The accounts the server holds now. */
@@ -197,6 +199,7 @@ async function page(reader: Account = ADMIN) {
           register: async () => {},
           logOut: async () => {},
           chooseLocale: async () => {},
+          chooseStudies: async () => {},
           forget: () => {},
           recheck: async () => {},
         }}

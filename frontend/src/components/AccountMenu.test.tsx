@@ -21,7 +21,15 @@ import { ThemeProvider } from "@/theme/ThemeProvider";
 import { AccountMenu } from "./AccountMenu";
 
 function account(superuser: boolean, roles: Account["roles"]): Account {
-  return { id: 1, username: "reader", locale: "it", is_superuser: superuser, roles };
+  return {
+    id: 1,
+    username: "reader",
+    locale: "it",
+    is_superuser: superuser,
+    roles,
+    programme: null,
+    year_of_study: null,
+  };
 }
 
 function menu(
@@ -40,6 +48,7 @@ function menu(
         register: async () => {},
         logOut,
         chooseLocale,
+        chooseStudies: async () => {},
         forget: () => {},
         recheck: async () => {},
       }}

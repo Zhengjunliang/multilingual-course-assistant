@@ -187,6 +187,8 @@ const STUDENT: Account = {
   locale: "it",
   is_superuser: false,
   roles: [],
+  programme: null,
+  year_of_study: null,
 };
 
 interface Page extends Mounted {
@@ -207,6 +209,7 @@ function page(path: string, account: Account | null = STUDENT): Page {
           register: async () => {},
           logOut: async () => {},
           chooseLocale: async () => {},
+          chooseStudies: async () => {},
           forget: () => {},
           recheck: async () => {
             rechecked += 1;
@@ -845,6 +848,7 @@ const ACTIONS = {
   register: async () => {},
   logOut: async () => {},
   chooseLocale: async () => {},
+  chooseStudies: async () => {},
   forget: () => {},
   recheck: async () => {},
 };

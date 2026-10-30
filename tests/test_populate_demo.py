@@ -23,7 +23,7 @@ from django.core.management.base import CommandError
 from django.test import Client
 from pydantic import SecretStr
 
-from apps.accounts.models import User
+from apps.accounts.models import StudentProgramme, User
 from apps.catalog.models import (
     CodeSource,
     Course,
@@ -131,7 +131,7 @@ DEMO: dict[str, Any] = {
             "last_name": "Conti",
             "roles": [{"role": "teacher", "edition": "B028451:2025-2026"}],
         },
-        {"username": "demo-student"},
+        {"username": "demo-student", "programme": "B047", "year_of_study": 3},
     ],
 }
 
@@ -177,6 +177,10 @@ def snapshot() -> dict[str, list[Any]]:
             (u.username, u.get_full_name(), u.is_superuser, u.is_staff, u.has_usable_password())
             for u in User.objects.all()
         ),
+        "declared": sorted(
+            (row.user.username, row.programme.code, row.year_of_study)
+            for row in StudentProgramme.objects.select_related("user", "programme")
+        ),
     }
 
 
@@ -220,6 +224,7 @@ def test_an_empty_database_gets_the_demo_and_a_second_run_changes_nothing(
         ],
         "roles": DEMO_ROLES,
         "accounts": DEMO_ACCOUNTS,
+        "declared": [("demo-student", "B047", 3)],
     }
     assert snapshot() == once
     assert (first.splitlines()[-1], second.splitlines()) == (
@@ -240,14 +245,16 @@ def test_rows_of_its_own_are_kept_and_demo_accounts_made_the_files(
         course=ppm, academic_year="2024-2025", teaching_starts=date(2024, 10, 1)
     )
     b047 = DegreeProgramme.objects.create(code="B047", name="Ingegneria Informatica")
-    # A demo account holding a role the file does not declare, a demo account the file
-    # does not name, and one that is not a demo account.
+    # A demo account holding a role and a programme the file does not declare, a demo
+    # account the file does not name, and one that is not a demo account.
     newcomer = User.objects.create_user(username="demo-teacher", is_superuser=True)
     RoleAssignment.objects.create(user=newcomer, role=Role.SECRETARIAT, programme=b047)
+    StudentProgramme.objects.create(user=newcomer, programme=b047)
     retired = User.objects.create_user(username="demo-staff")
     RoleAssignment.objects.create(user=retired, role=Role.SECRETARIAT, programme=b047)
     staff = User.objects.create_user(username="mrossi")
     RoleAssignment.objects.create(user=staff, role=Role.SECRETARIAT, programme=b047)
+    StudentProgramme.objects.create(user=staff, programme=b047, year_of_study=1)
 
     out = run(tmp_path, monkeypatch, None, DEMO)
     seen = snapshot()
@@ -271,6 +278,7 @@ def test_rows_of_its_own_are_kept_and_demo_accounts_made_the_files(
             ]
         ),
     )
+    assert seen["declared"] == [("demo-student", "B047", 3), ("mrossi", "B047", 1)]
     assert sorted(line for line in out.splitlines() if " role " in line) == [
         "added role demo-secretariat · secretariat · B047",
         "added role demo-teacher · teacher · B028451:2025-2026",

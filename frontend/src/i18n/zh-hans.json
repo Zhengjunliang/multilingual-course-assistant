@@ -108,6 +108,14 @@
       "confirm": "删除"
     }
   },
+  "studies": {
+    "title": "学业",
+    "programme": "专业",
+    "year": "年级",
+    "none": "未填写",
+    "yearN": "{{year}} 年级",
+    "hint": "选填。提问时会检索你所在专业各门课的资料。"
+  },
   "theme": {
     "system": "跟随系统",
     "light": "浅色",

@@ -1977,7 +1977,9 @@
     {
       "username": "demo-student",
       "first_name": "Luca",
-      "last_name": "Verdi"
+      "last_name": "Verdi",
+      "programme": "B047",
+      "year_of_study": 2
     }
   ]
 }

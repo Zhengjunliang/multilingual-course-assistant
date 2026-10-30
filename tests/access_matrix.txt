@@ -7,6 +7,7 @@ GET accounts:me                             allow      allow    allow       allo
 PATCH accounts:me                           allow      allow    allow       allow             allow allow   allow deny     deny
 POST accounts:me-delete                     allow      allow    allow       allow             allow allow   allow deny     deny
 POST accounts:password                      allow      allow    allow       allow             allow allow   allow deny     deny
+GET accounts:programmes                     allow      allow    allow       allow             allow allow   allow allow    allow
 POST accounts:register                      allow      allow    allow       allow             allow allow   allow allow    allow
 POST accounts:reset                         allow      allow    allow       allow             allow allow   allow allow    allow
 POST accounts:reset-lookup                  allow      allow    allow       allow             allow allow   allow allow    allow

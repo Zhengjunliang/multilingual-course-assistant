@@ -35,6 +35,8 @@ export const STUDENT: Account = {
   locale: "it",
   is_superuser: false,
   roles: [],
+  programme: null,
+  year_of_study: null,
 };
 
 /** Secretariat of a programme and teacher of an edition: every staff page has something to show. */
@@ -47,6 +49,8 @@ export const STAFF: Account = {
     { role: "secretariat", programme: "B060" },
     { role: "teacher", edition: 11 },
   ],
+  programme: null,
+  year_of_study: null,
 };
 
 /** The superuser, who also has the accounts' page. */
@@ -56,6 +60,8 @@ export const ADMIN: Account = {
   locale: "it",
   is_superuser: true,
   roles: [],
+  programme: null,
+  year_of_study: null,
 };
 
 /** The student's devices: this one, and a phone. */
@@ -101,7 +107,15 @@ export const USERS: ManagedUser[] = [
   managed(STAFF),
   managed(STUDENT),
   managed(
-    { id: 4, username: "demo-gone", locale: "it", is_superuser: false, roles: [] },
+    {
+      id: 4,
+      username: "demo-gone",
+      locale: "it",
+      is_superuser: false,
+      roles: [],
+      programme: null,
+      year_of_study: null,
+    },
     { is_active: false, last_login: null },
   ),
 ];

@@ -44,11 +44,20 @@ function sidebar(
     <MemoryRouter>
       <SessionContext
         value={{
-          account: { id: 1, username: "reader", locale: "it", is_superuser: false, roles: [] },
+          account: {
+            id: 1,
+            username: "reader",
+            locale: "it",
+            is_superuser: false,
+            roles: [],
+            programme: null,
+            year_of_study: null,
+          },
           logIn: async () => {},
           register: async () => {},
           logOut: async () => {},
           chooseLocale: async () => {},
+          chooseStudies: async () => {},
           forget: () => {},
           recheck: async () => {},
         }}

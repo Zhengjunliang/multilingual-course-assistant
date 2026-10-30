@@ -14,13 +14,15 @@ from typing import TYPE_CHECKING, Any
 
 from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from rest_framework import serializers
 
-from apps.accounts.models import AccountSession, User
+from apps.accounts.models import AccountSession, StudentProgramme, User
 from apps.accounts.passwords import set_password_checked
 from apps.accounts.sessions import public_id
+from apps.catalog.models import FIRST_YEAR_OF_STUDY, LAST_YEAR_OF_STUDY, DegreeProgramme
 from apps.roles.scopes import role_scopes
-from config.errors import ErrorCode, django_field_error, fail
+from config.errors import ErrorCode, FieldReason, django_field_error, fail, field_error
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -38,6 +40,50 @@ def password_field() -> serializers.CharField:
     )
 
 
+def programme_field() -> serializers.Field:
+    """The degree programme an account says it studies in, by its code; null for none."""
+    return serializers.SlugRelatedField(
+        slug_field="code",
+        queryset=DegreeProgramme.objects.all(),
+        allow_null=True,
+        required=False,
+        source="student_programme.programme",
+    )
+
+
+def year_of_study_field() -> serializers.IntegerField:
+    """The year of the programme the account says it is in; null for none said."""
+    return serializers.IntegerField(
+        min_value=FIRST_YEAR_OF_STUDY,
+        max_value=LAST_YEAR_OF_STUDY,
+        allow_null=True,
+        required=False,
+        source="student_programme.year_of_study",
+    )
+
+
+def declared_programme(
+    attrs: dict[str, Any], current: StudentProgramme | None
+) -> dict[str, Any] | None:
+    """What `attrs` declares of a programme, taken out of them; None when they declare nothing.
+
+    A field left out keeps `current`'s value, so a year alone changes the
+    year of the programme declared. Without a programme there is no year: a
+    year given then is refused on `programme`, which is what is missing, and
+    clearing the programme clears the year with it.
+    """
+    if "student_programme" not in attrs:
+        return None
+    given: dict[str, Any] = attrs.pop("student_programme")
+    programme = given.get("programme", current.programme if current else None)
+    if programme is None:
+        if given.get("year_of_study") is not None:
+            raise field_error(FieldReason.REQUIRED, field="programme")
+        return {"programme": None, "year_of_study": None}
+    year = given.get("year_of_study", current.year_of_study if current else None)
+    return {"programme": programme, "year_of_study": year}
+
+
 # `ModelSerializer[User]` rather than a bare `ModelSerializer` in both classes
 # below: the stubs declare the model as a type variable, so an unparameterised
 # subclass has a `Meta.model` the checker cannot reconcile with the base. DRF's
@@ -45,12 +91,13 @@ def password_field() -> serializers.CharField:
 # annotation that happens to be spelled as a base class — nothing about the
 # runtime object differs.
 class UserSerializer(serializers.ModelSerializer[User]):
-    """Who the caller is, and the one thing they may change about it.
+    """Who the caller is, and the few things they may change about it.
 
-    `locale` is writable and nothing else is, which is what makes this serve
-    `PATCH /api/auth/me` as well as `GET`. A second serializer for the update
-    would be the same two rules written twice, free to disagree. `is_superuser`
-    among the read-only fields is what keeps a `PATCH` from granting it.
+    `locale`, `programme` and `year_of_study` are writable and nothing else
+    is, which is what makes this serve `PATCH /api/auth/me` as well as `GET`.
+    A second serializer for the update would be the same rules written twice,
+    free to disagree. `is_superuser` among the read-only fields is what keeps
+    a `PATCH` from granting it.
 
     `roles` names where the caller holds a staff role (apps/roles/scopes.py),
     and only that: what a role allows on a scope is answered per scope, so the
@@ -58,6 +105,8 @@ class UserSerializer(serializers.ModelSerializer[User]):
     """
 
     roles = serializers.SerializerMethodField()
+    programme = programme_field()
+    year_of_study = year_of_study_field()
 
     # The suppression is unavoidable, not laziness: the stubs declare six
     # attributes on `ModelSerializer.Meta`, so any real `Meta` — which sets the
@@ -65,15 +114,29 @@ class UserSerializer(serializers.ModelSerializer[User]):
     # rule is right about the shape and wrong about this use of it.
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = User
-        fields = ("id", "username", "locale", "is_superuser", "roles")
+        fields = ("id", "username", "locale", "is_superuser", "roles", "programme", "year_of_study")
         read_only_fields = ("id", "username", "is_superuser")
 
     def get_roles(self, user: User) -> list[dict[str, object]]:
         return role_scopes(user)
 
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        current = getattr(self.instance, "student_programme", None)
+        declared = declared_programme(attrs, current)
+        return attrs if declared is None else {**attrs, "declared": declared}
 
-class RegisterSerializer(serializers.ModelSerializer[User]):
-    """Open self-registration: anyone who can reach the page can make an account.
+    def update(self, instance: User, validated_data: dict[str, Any]) -> User:
+        """The account as written, read again: the one in hand caches the programme it had."""
+        declared = validated_data.pop("declared", None)
+        with transaction.atomic():
+            user = super().update(instance, validated_data)
+            if declared is not None:
+                StudentProgramme.declare(user, **declared)
+        return User.objects.select_related("student_programme__programme").get(pk=user.pk)
+
+
+class NewAccountSerializer(serializers.ModelSerializer[User]):
+    """An account to make, registering or accepting an invitation.
 
     A `ModelSerializer` so the username rules come from the model itself —
     length, the character validator, and above all uniqueness, which a
@@ -112,6 +175,31 @@ class RegisterSerializer(serializers.ModelSerializer[User]):
         # never the password as typed.
         user: User = validated_data["user"]
         user.save()
+        return user
+
+
+class RegisterSerializer(NewAccountSerializer):
+    """Open self-registration: anyone who can reach the page can make an account.
+
+    With it, optionally, the programme the person says they study in and its year.
+    """
+
+    programme = programme_field()
+    year_of_study = year_of_study_field()
+
+    class Meta(NewAccountSerializer.Meta):  # pyright: ignore[reportIncompatibleVariableOverride]
+        fields = (*NewAccountSerializer.Meta.fields, "programme", "year_of_study")
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        declared = declared_programme(attrs, None)
+        return {**super().validate(attrs), "declared": declared}
+
+    def create(self, validated_data: dict[str, Any]) -> User:
+        declared = validated_data["declared"]
+        with transaction.atomic():
+            user = super().create(validated_data)
+            if declared is not None:
+                StudentProgramme.declare(user, **declared)
         return user
 
 
@@ -179,13 +267,17 @@ class PasswordResetSerializer(LinkSerializer):
     new_password = password_field()
 
 
-class InvitedAccountSerializer(RegisterSerializer):
-    """An invitation's token, and the account accepting it makes, checked as registering does."""
+class InvitedAccountSerializer(NewAccountSerializer):
+    """An invitation's token, and the account accepting it makes, checked as registering does.
+
+    No programme: the account is staff's, and saved by the invitation's acceptance
+    (apps/roles/invitations.py), not here.
+    """
 
     token = serializers.CharField(write_only=True)
 
-    class Meta(RegisterSerializer.Meta):  # pyright: ignore[reportIncompatibleVariableOverride]
-        fields = ("token", *RegisterSerializer.Meta.fields)
+    class Meta(NewAccountSerializer.Meta):  # pyright: ignore[reportIncompatibleVariableOverride]
+        fields = ("token", *NewAccountSerializer.Meta.fields)
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         token = attrs.pop("token")

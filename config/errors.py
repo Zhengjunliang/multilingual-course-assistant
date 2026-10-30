@@ -259,6 +259,8 @@ FIELD_MAP: dict[str, FieldReason] = {
     "no_name": FieldReason.INVALID,
     "not_a_list": FieldReason.INVALID,
     "invalid_choice": FieldReason.INVALID,
+    # A related field's value naming no row: a programme's code, say.
+    "does_not_exist": FieldReason.INVALID,
     "max_string_length": FieldReason.INVALID,
     "null_characters_not_allowed": FieldReason.INVALID,
     "surrogate_characters_not_allowed": FieldReason.INVALID,

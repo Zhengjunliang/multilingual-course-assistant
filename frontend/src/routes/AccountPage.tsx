@@ -1,7 +1,8 @@
 /**
  * `/account`: what belongs to the signed-in account rather than to a
  * conversation or a scope (#167), reached from the account menu: the roles
- * it holds, its password, the devices signed in to it, and deleting it. The
+ * it holds, what it says it studies (#36), its password, the devices signed
+ * in to it, and deleting it. The
  * language is not repeated here: the account menu that leads here sets it,
  * one level up. One page of sections, the way GitHub's
  * and Google's account pages stack theirs, deleting last in the warning's
@@ -37,6 +38,7 @@ import { Chip } from "@/components/ui/chip";
 import { PasswordChange } from "@/features/account/PasswordChange";
 import { PasswordDialog } from "@/features/account/PasswordDialog";
 import { Sessions } from "@/features/account/Sessions";
+import { StudiesChoice } from "@/features/account/StudiesChoice";
 import { clearDraft } from "@/features/chat/draft";
 import { useLoad } from "@/features/staff/context";
 import { Section } from "@/features/staff/page";
@@ -78,6 +80,12 @@ export default function AccountPage() {
           <Roles account={account} />
         </Section>
       )}
+
+      <Section heading={t("studies.title")}>
+        <StudiesChoice
+          studies={{ programme: account.programme, year_of_study: account.year_of_study }}
+        />
+      </Section>
 
       <Section heading={t("account.password.title")}>
         <PasswordChange username={account.username} onChanged={() => void sessions.reload()} />

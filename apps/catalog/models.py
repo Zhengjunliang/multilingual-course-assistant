@@ -51,7 +51,10 @@ _CODE_MESSAGE = _("A code is capital letters and digits, such as B028451.")
 # trailing newline through; `\A…\Z` anchors both ends the way `^…$` does in SQL.
 validate_code = RegexValidator(r"\A[A-Z0-9]+\Z", message=_CODE_MESSAGE, code="code")
 
-_YEAR_OF_STUDY_MESSAGE = _("A year of study is between 1 and 6.")
+# Six is the longest programme there is, a single-cycle master's degree. A
+# student's declared year is held to the same (apps/accounts/models.py).
+FIRST_YEAR_OF_STUDY, LAST_YEAR_OF_STUDY = 1, 6
+YEAR_OF_STUDY_MESSAGE = _("A year of study is between 1 and 6.")
 
 
 def validate_academic_year(value: str) -> None:
@@ -338,9 +341,11 @@ class CurriculumEntry(models.Model):
             "TECNICO APPLICATIVO; empty when it prints none."
         ),
     )
-    # Six is the longest programme there is, a single-cycle master's degree.
     year_of_study = models.PositiveSmallIntegerField(
-        validators=(MinValueValidator(1), MaxValueValidator(6)),
+        validators=(
+            MinValueValidator(FIRST_YEAR_OF_STUDY),
+            MaxValueValidator(LAST_YEAR_OF_STUDY),
+        ),
         verbose_name=_("year of study"),
     )
     ad_code = models.CharField(
@@ -372,9 +377,11 @@ class CurriculumEntry(models.Model):
                 violation_error_message=_CODE_MESSAGE,
             ),
             models.CheckConstraint(
-                condition=models.Q(year_of_study__gte=1, year_of_study__lte=6),
+                condition=models.Q(
+                    year_of_study__gte=FIRST_YEAR_OF_STUDY, year_of_study__lte=LAST_YEAR_OF_STUDY
+                ),
                 name="catalog_entry_year_of_study_range",
-                violation_error_message=_YEAR_OF_STUDY_MESSAGE,
+                violation_error_message=YEAR_OF_STUDY_MESSAGE,
             ),
         )
 

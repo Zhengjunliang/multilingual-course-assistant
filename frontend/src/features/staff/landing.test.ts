@@ -7,7 +7,15 @@ import type { Programme } from "@/api/catalog";
 import { landing, managementItems } from "./landing";
 
 function account(roles: RoleScope[], superuser = false): Account {
-  return { id: 1, username: "reader", locale: "it", is_superuser: superuser, roles };
+  return {
+    id: 1,
+    username: "reader",
+    locale: "it",
+    is_superuser: superuser,
+    roles,
+    programme: null,
+    year_of_study: null,
+  };
 }
 
 function programme(code: string): Programme {
