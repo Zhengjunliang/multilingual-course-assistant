@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { routes } from "@/App";
 import type { Account } from "@/api/account";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
+import type { ScopeCourse } from "@/api/scope";
 import { SessionContext, SessionProvider } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
 import { summary, uuidOf } from "@/test/conversations";
@@ -91,6 +92,12 @@ let rechecked = 0;
 let signedIn = true;
 /** Whose that session is: the reader's, unless a test signs another account in. */
 let sessionOf: Account | null = null;
+/** What `GET /api/scope` answers: no course, unless a test gives the reader some. */
+let scope: ScopeCourse[] = [];
+/** The editions conversation 7 adds, as its stored row holds them. */
+let storedAdded: number[] = [];
+/** The bodies `POST /api/ask` was sent, parsed. */
+let asked: Record<string, unknown>[] = [];
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -135,7 +142,9 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
     return listFails ? codedRefusal("INTERNAL") : json(conversations);
   }
   if (method === "GET" && path === `/api/conversations/${ID_7}`) {
-    return readFails ? codedRefusal("INTERNAL") : json({ ...STORED, answering: writing });
+    return readFails
+      ? codedRefusal("INTERNAL")
+      : json({ ...STORED, answering: writing, added_editions: storedAdded });
   }
   if (method === "GET" && writing !== null && path === `/api/answers/${writing}/events`) {
     return answerStream(ID_7, "E un DAO?", writing);
@@ -165,12 +174,12 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
       );
     return json({ ...row, pinned });
   }
+  if (method === "GET" && path === "/api/scope") return json(scope);
   if (method === "POST" && path === "/api/ask") {
     if (askFails) return codedRefusal("INTERNAL");
-    const { question, history } = JSON.parse(String(init.body)) as {
-      question: string;
-      history?: unknown;
-    };
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    asked.push(body);
+    const { question, history } = body as { question: string; history?: unknown };
     // A visitor's question is filed nowhere, as the server has it.
     if (history !== undefined) return answerStream(null, question, uuidOf(31));
     conversations = [
@@ -1046,5 +1055,91 @@ describe("a session that ends under the page", () => {
     unmount();
 
     expect({ out, back }).toEqual({ out: { signedIn: false, path: "/", typed: "" }, back: "" });
+  });
+});
+
+describe("what a question searches", () => {
+  const PPM: ScopeCourse = {
+    code: "B028451",
+    name: "Progettazione e Produzione Multimediale",
+    locale: "it",
+    year_of_study: 3,
+    editions: [
+      { id: 42, academic_year: "2025-2026", state: "current", default: true },
+      { id: 41, academic_year: "2024-2025", state: "past", default: false },
+    ],
+  };
+  const DECLARED: Account = { ...STUDENT, programme: "B047", year_of_study: 3 };
+
+  beforeEach(() => {
+    conversations = [STORED_ROW];
+    asked = [];
+    scope = [PPM];
+    vi.stubGlobal("fetch", fakeApi);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    scope = [];
+    storedAdded = [];
+  });
+
+  /** The button in the question box's foot that opens the course list. */
+  const button = (container: HTMLElement) =>
+    container.querySelector<HTMLButtonElement>('form button[aria-haspopup="menu"]');
+
+  it("counts the editions the conversation adds, and a new conversation adds none", async () => {
+    storedAdded = [41];
+    const { container, unmount } = page(`/chat/${ID_7}`, DECLARED);
+    await settle();
+    const opened = button(container)?.textContent;
+    openNewConversation(container);
+    await settle();
+    const fresh = button(container)?.textContent;
+    unmount();
+
+    expect({ opened, fresh }).toEqual({
+      opened: i18n.t("scope.added", { count: 1 }),
+      fresh: i18n.t("scope.current"),
+    });
+  });
+
+  it("sends an edition ticked in the list with the next question", async () => {
+    const { container, unmount } = page("/", DECLARED);
+    await settle();
+    act(() => {
+      button(container)?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, ctrlKey: false }),
+      );
+    });
+    const boxes = [...document.body.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]')];
+    // The current edition is searched in any case; the past one is the reader's to add.
+    const offered = boxes.map((box) => ({
+      checked: box.getAttribute("aria-checked"),
+      fixed: box.hasAttribute("data-disabled"),
+    }));
+    act(() => boxes[1]?.click());
+    askFromTheFrontDoor(container);
+    await settle();
+    const label = button(container)?.textContent;
+    unmount();
+
+    expect(offered).toEqual([
+      { checked: "true", fixed: true },
+      { checked: "false", fixed: false },
+    ]);
+    expect(asked.map((body) => body.added_editions)).toEqual([[41]]);
+    expect(label).toBe(i18n.t("scope.added", { count: 1 }));
+  });
+
+  it("points an account with no programme and no role to the account page", async () => {
+    scope = [];
+    const { container, unmount } = page("/", STUDENT);
+    await settle();
+    const hint = container.querySelector('form a[href="/account"]')?.textContent;
+    const list = button(container);
+    unmount();
+
+    expect({ hint, list }).toEqual({ hint: i18n.t("scope.declare"), list: null });
   });
 });

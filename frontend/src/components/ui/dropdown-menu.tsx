@@ -24,6 +24,12 @@
  * the current value; its options are radios with a check on the chosen one,
  * never the accent, since a setting that is true is not where the reader is.
  *
+ * Some options are on or off, several in a section at once, such as the
+ * editions a conversation adds to its search (features/chat/ScopeButton.tsx):
+ * a box at the left, filled in ink when on, and the menu stays open while
+ * the reader goes on choosing. One that is on and cannot be turned off is
+ * shown as it stands, muted.
+ *
  * In a narrow drawer (`inline`, #191) a submenu would open past the screen's
  * edge, so the choice's row opens its options in place instead, under it and
  * indented, as the prototype's phone menu does; the row says so with
@@ -61,11 +67,24 @@ interface MenuChoice {
   onValueChange: (value: string) => void;
 }
 
+interface MenuToggle {
+  key: string;
+  label: string;
+  /** At the right, in `muted`: what the option is. */
+  detail?: string;
+  checked: boolean;
+  /** Shown as it stands, and not to be changed here. */
+  disabled?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}
+
 interface MenuSection {
   key: string;
   /** A small heading over the section's items. */
   label?: string;
-  items: readonly (MenuAction | MenuChoice)[];
+  /** The language the label is written in, when it is data rather than the interface's. */
+  labelLang?: string;
+  items: readonly (MenuAction | MenuChoice | MenuToggle)[];
 }
 
 interface DropdownMenuProps {
@@ -107,6 +126,8 @@ const ITEM =
   "flex h-control-sm cursor-default items-center gap-tight rounded-chip px-tight text-body text-ink outline-none data-highlighted:bg-hover";
 const SURFACE =
   "z-floating flex min-w-56 flex-col rounded-card border border-line bg-surface p-hair shadow-overlay";
+// A long menu scrolls inside the room the screen leaves it rather than running off it.
+const SCROLLS = "max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto";
 const RULE = "-mx-hair my-hair h-px bg-line";
 
 /** The choice's row: its icon, its label and the option chosen. */
@@ -148,6 +169,32 @@ function Options({ item, className }: { item: MenuChoice; className?: string }) 
         </RadixMenu.RadioItem>
       ))}
     </RadixMenu.RadioGroup>
+  );
+}
+
+function Toggle({ item }: { item: MenuToggle }) {
+  return (
+    <RadixMenu.CheckboxItem
+      checked={item.checked}
+      disabled={item.disabled}
+      onCheckedChange={item.onCheckedChange}
+      // Choosing one is not leaving: the reader may go on to the next.
+      onSelect={(event) => event.preventDefault()}
+      className={cn(ITEM, "data-disabled:text-muted")}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "flex size-icon shrink-0 items-center justify-center rounded-chip border",
+          item.checked ? "border-ink bg-ink text-ground" : "border-line",
+          item.disabled && "opacity-60",
+        )}
+      >
+        {item.checked && <Check className="size-3" />}
+      </span>
+      <span className="flex-1">{item.label}</span>
+      {item.detail !== undefined && <span className="text-caption text-muted">{item.detail}</span>}
+    </RadixMenu.CheckboxItem>
   );
 }
 
@@ -246,7 +293,7 @@ export function DropdownMenu({
           align={align}
           sideOffset={8}
           onCloseAutoFocus={() => onCloseAutoFocus?.()}
-          className={cn(SURFACE, fitTrigger && "w-(--radix-dropdown-menu-trigger-width)")}
+          className={cn(SURFACE, SCROLLS, fitTrigger && "w-(--radix-dropdown-menu-trigger-width)")}
         >
           {head !== undefined && (
             <>
@@ -263,6 +310,7 @@ export function DropdownMenu({
                 {section.label !== undefined && (
                   <RadixMenu.Label
                     id={`${id}-${section.key}`}
+                    lang={section.labelLang}
                     className="px-tight pt-tight pb-hair font-semibold text-caption text-muted uppercase"
                   >
                     {section.label}
@@ -271,6 +319,8 @@ export function DropdownMenu({
                 {section.items.map((item) =>
                   "options" in item ? (
                     <ChoiceItem key={item.key} item={item} />
+                  ) : "checked" in item ? (
+                    <Toggle key={item.key} item={item} />
                   ) : (
                     <RadixMenu.Item
                       key={item.key}

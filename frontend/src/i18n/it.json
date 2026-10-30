@@ -137,6 +137,17 @@
   "visitor": {
     "courseMaterial": "Il materiale dei corsi è riservato a chi ha un account."
   },
+  "scope": {
+    "current": "Corsi: attuali",
+    "added": "Corsi: attuali +{{count}}",
+    "head": "Ogni domanda cerca nelle edizioni attuali dei tuoi corsi. Aggiungi un altro anno a questa conversazione.",
+    "declare": "Indica il tuo corso di laurea per cercare anche nelle slide",
+    "state": {
+      "current": "in corso",
+      "past": "passata",
+      "upcoming": "non ancora iniziata"
+    }
+  },
   "status": {
     "streaming": "Sto scrivendo la risposta…",
     "retrying": "Riprovo tra {{seconds}} secondi ({{attempt}} di {{total}}).",

@@ -2,6 +2,7 @@ import { ArrowUp, Square } from "lucide-react";
 import {
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -51,6 +52,12 @@ interface ComposerProps {
   draftAt?: string | null;
   /** The signed-in account the draft is kept for; `null`, a visitor, keeps nothing. */
   draftBy?: number | null;
+  /**
+   * At the start of the foot: what the question searches (ScopeButton.tsx). A
+   * slot, since the course list and the choice are the page's, held with the
+   * thread.
+   */
+  scope?: ReactNode;
 }
 
 export function Composer({
@@ -63,6 +70,7 @@ export function Composer({
   rise = false,
   draftAt = null,
   draftBy = null,
+  scope = null,
 }: ComposerProps) {
   const { t } = useTranslation();
   const [question, setQuestion] = useState(() =>
@@ -233,12 +241,14 @@ export function Composer({
             </Button>
           )}
         </div>
-        {/* The foot: what is missing after an empty press, the answer being
-            written, or else the keys, which a touch screen has not got. The
+        {/* The foot: what the question searches, then what is missing after
+            an empty press, the answer being written, or else the keys, which
+            a touch screen has not got. The
             keys are a reminder for the eye: Enter and Shift+Enter are in the
             list of keys (ShortcutsDialog.tsx), which a screen reader reaches,
             so the caps are hidden from it here as everywhere (kbd.tsx). */}
         <p className="flex min-h-icon-lg flex-wrap items-center gap-tight px-hair text-caption text-muted">
+          {scope}
           <span role="status" className={missing ? "" : "sr-only"}>
             {missing ? t("ask.empty") : ""}
           </span>
