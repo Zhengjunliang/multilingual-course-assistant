@@ -18,7 +18,13 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Citation, RouteDecision } from "@/api/contract";
+import type { StoredFeedback } from "@/api/conversations";
+import { SessionContext } from "@/auth/SessionProvider";
+import { Toaster } from "@/components/ui/sonner";
+import i18n from "@/i18n";
+import { uuidOf } from "@/test/conversations";
 import { mount } from "@/test/mount";
+import { codedRefusal } from "@/test/refusal";
 import { render } from "@/test/render";
 import { TurnView } from "./TurnView";
 import type { Turn } from "./useAsk";
@@ -62,6 +68,8 @@ function turn(overrides: Partial<Turn> = {}): Turn {
     locale: "it",
     complete: true,
     failure: null,
+    answerId: null,
+    feedback: null,
     ...overrides,
   };
 }
@@ -752,5 +760,223 @@ describe("a visitor's turn routed to the slides", () => {
     ["a visitor's campus", turn({ route: { ...ROUTE, target: "unifi_web" } }), true],
   ])("is the only one that says so, not %s turn", (_, shown, visitor) => {
     expect(view(shown, false, false, visitor)).not.toContain("riservato a chi ha un account");
+  });
+});
+
+describe("rating an answer", () => {
+  const ANSWER = uuidOf(2);
+  const PATH = `/api/answers/${ANSWER}/feedback`;
+
+  interface Sent {
+    method: string;
+    url: string;
+    body: unknown;
+  }
+  let sent: Sent[] = [];
+
+  /** The server stores what it is sent, or refuses every save with `refusal`. */
+  function serve(refusal: Response | null = null) {
+    sent = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const body = typeof init.body === "string" ? JSON.parse(init.body) : null;
+      const method = init.method ?? "GET";
+      sent.push({ method, url: String(input), body });
+      if (refusal !== null) return refusal;
+      if (method === "DELETE") return new Response(null, { status: 204 });
+      const stored: StoredFeedback = { reason: "", comment: "", ...body };
+      return Response.json({
+        rating: stored.rating,
+        reason: stored.reason,
+        comment: stored.comment,
+      });
+    });
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function rated(of: Partial<Turn>, visitor = false) {
+    return mount(
+      <MemoryRouter>
+        <SessionContext
+          value={{
+            account: {
+              id: 1,
+              username: "reader",
+              locale: "it",
+              is_superuser: false,
+              roles: [],
+              programme: null,
+              year_of_study: null,
+            },
+            logIn: async () => {},
+            register: async () => {},
+            logOut: async () => {},
+            chooseLocale: async () => {},
+            chooseStudies: async () => {},
+            forget: () => {},
+            recheck: async () => {},
+          }}
+        >
+          <TurnView
+            turn={turn({ answerId: ANSWER, ...of })}
+            live={false}
+            thinking={false}
+            retry={null}
+            visitor={visitor}
+          />
+          <Toaster />
+        </SessionContext>
+      </MemoryRouter>,
+    );
+  }
+
+  /** Lets the saves, which leave one after another, reach the server and come back. */
+  async function settle() {
+    for (let step = 0; step < 4; step += 1) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+  }
+
+  function thumb(container: HTMLElement, way: "up" | "down") {
+    return container.querySelector<HTMLButtonElement>(
+      `button[aria-label="${i18n.t(`answer.rate.${way}`)}"]`,
+    );
+  }
+
+  /** Which thumbs are pressed, as a screen reader is told. */
+  function pressed(container: HTMLElement) {
+    return {
+      up: thumb(container, "up")?.getAttribute("aria-pressed"),
+      down: thumb(container, "down")?.getAttribute("aria-pressed"),
+    };
+  }
+
+  it("saves a thumb up at once, and the same thumb again withdraws it", async () => {
+    serve();
+    const { container, unmount } = rated({});
+
+    act(() => thumb(container, "up")?.click());
+    const pressing = pressed(container);
+    await settle();
+    act(() => thumb(container, "up")?.click());
+    await settle();
+    const after = pressed(container);
+    unmount();
+
+    expect(pressing).toEqual({ up: "true", down: "false" });
+    expect(sent).toEqual([
+      { method: "PUT", url: PATH, body: { rating: "up" } },
+      { method: "DELETE", url: PATH, body: null },
+    ]);
+    expect(after).toEqual({ up: "false", down: "false" });
+  });
+
+  it("replaces a thumb up with a thumb down, which asks why", async () => {
+    serve();
+    const { container, unmount } = rated({
+      feedback: { rating: "up", reason: "", comment: "" },
+    });
+
+    act(() => thumb(container, "down")?.click());
+    await settle();
+    const seen = {
+      pressed: pressed(container),
+      why: container.querySelector("legend")?.textContent,
+      focused: document.activeElement?.tagName,
+    };
+    unmount();
+
+    expect(sent).toEqual([{ method: "PUT", url: PATH, body: { rating: "down" } }]);
+    expect(seen).toEqual({
+      pressed: { up: "false", down: "true" },
+      why: i18n.t("answer.rate.why"),
+      focused: "FORM",
+    });
+  });
+
+  it("sends the reason and the comment it is given, in the interface's language", async () => {
+    serve();
+    const { container, unmount } = rated({});
+
+    act(() => thumb(container, "down")?.click());
+    await settle();
+    act(() => container.querySelector<HTMLInputElement>('input[value="not_answered"]')?.click());
+    const comment = container.querySelector("textarea");
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+    act(() => {
+      setter?.call(comment, "  It talks about another course.  ");
+      comment?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    act(() => container.querySelector<HTMLButtonElement>('button[type="submit"]')?.click());
+    await settle();
+    const seen = {
+      form: container.querySelector("form") !== null,
+      said: container.querySelector('[role="status"]:not(:empty)')?.textContent,
+      pressed: pressed(container),
+    };
+    unmount();
+
+    expect(sent.at(-1)).toEqual({
+      method: "PUT",
+      url: PATH,
+      body: {
+        rating: "down",
+        reason: "not_answered",
+        comment: "It talks about another course.",
+        locale: "it",
+      },
+    });
+    expect(seen).toEqual({
+      form: false,
+      said: i18n.t("answer.rate.sent"),
+      pressed: { up: "false", down: "true" },
+    });
+  });
+
+  it("shows the rating an answer read back was stored with, and asks nothing", () => {
+    const { container, unmount } = rated({
+      feedback: { rating: "down", reason: "incorrect", comment: "" },
+    });
+    const seen = { pressed: pressed(container), form: container.querySelector("form") };
+    unmount();
+
+    expect(seen).toEqual({ pressed: { up: "false", down: "true" }, form: null });
+  });
+
+  it.each<[string, Partial<Turn>, boolean]>([
+    ["to a visitor", {}, true],
+    ["on an answer the server has not named", { answerId: null }, false],
+    [
+      "on an answer that did not finish",
+      { complete: false, failure: { kind: "interrupted" } },
+      false,
+    ],
+  ])("offers no thumbs %s", (_, of, visitor) => {
+    const { container, unmount } = rated(of, visitor);
+    const thumbs = thumb(container, "up") ?? thumb(container, "down");
+    unmount();
+
+    expect(thumbs).toBeNull();
+  });
+
+  it("puts the thumb back when the server refuses, and says so with a way to try again", async () => {
+    serve(codedRefusal("INTERNAL"));
+    const { container, unmount } = rated({});
+
+    act(() => thumb(container, "up")?.click());
+    await settle();
+    const seen = {
+      pressed: pressed(container),
+      toast: document.body.querySelector("[data-sonner-toast]")?.textContent ?? "",
+    };
+    unmount();
+
+    expect(seen.pressed).toEqual({ up: "false", down: "false" });
+    expect(seen.toast).toContain(i18n.t("answer.rate.failed"));
+    expect(seen.toast).toContain(i18n.t("answer.rate.retry"));
   });
 });

@@ -1,6 +1,6 @@
 /**
- * The row under a settled answer: copy it, open its sources, and how long the
- * search took (#180, #193).
+ * The row under a settled answer: copy it, open its sources, how long the
+ * search took, and rate it (#180, #193, #218).
  *
  * ChatGPT, Gemini, claude.ai, Perplexity and Open WebUI all put a copy button
  * under an answer, and ChatGPT, Gemini and Open WebUI the way to its sources
@@ -9,14 +9,15 @@
  * (`withoutMarkers`), which mean nothing outside this page. The sources button
  * shows the marks of up to three of the sources the answer cited, stacked, and
  * how many sources there are in all, cited or not; it opens the panel, and an
- * answer with no sources has none. The search's seconds close the row, as a
- * number only: the process line above the answer says the same in words.
+ * answer with no sources has none. The search's seconds follow, as a number
+ * only: the process line above the answer says the same in words. The thumbs
+ * close the row (`RateAnswer`), so the form a thumb down opens is under them.
  *
  * The row wraps rather than run past a phone's width.
  */
 
 import { Check, Copy, Timer } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Citation } from "@/api/contract";
@@ -43,6 +44,8 @@ interface AnswerActionsProps {
   searchMs: number | null;
   /** A source of the panel is under the pointer or the focus; `null` once none is. */
   onHighlight: (marker: string | null) => void;
+  /** The thumbs, for an answer its reader may rate; shown once it is whole. */
+  rating: ReactNode;
 }
 
 export function AnswerActions({
@@ -52,6 +55,7 @@ export function AnswerActions({
   complete,
   searchMs,
   onHighlight,
+  rating,
 }: AnswerActionsProps) {
   const { t } = useTranslation();
   const { copied, copy } = useCopy();
@@ -119,6 +123,7 @@ export function AnswerActions({
           {t("answer.seconds", { seconds: searchSeconds(searchMs) })}
         </span>
       )}
+      {complete && rating}
     </div>
   );
 }

@@ -42,6 +42,8 @@ function turn(question: string, change: Partial<Turn> = {}): Turn {
     locale: "it",
     complete: true,
     failure: null,
+    answerId: null,
+    feedback: null,
     ...change,
   };
 }
@@ -441,14 +443,18 @@ describe("a question answered on a worker", () => {
     return page;
   }
 
-  it("waits in the queue until `start`, and names its conversation only then", async () => {
+  it("waits in the queue until `start`, naming its answer at once and its conversation only then", async () => {
     const answer = pipe();
     serve({ "POST /api/ask": [answer] });
     const { unmount } = await ask(false);
 
     answer.write(QUEUED);
     await settle();
-    const queued = { waiting: hook.waiting, conversation: hook.conversationId };
+    const queued = {
+      waiting: hook.waiting,
+      conversation: hook.conversationId,
+      answer: hook.turns[0]?.answerId,
+    };
     answer.write(STARTED + FIRST);
     await settle();
     const started = { waiting: hook.waiting, conversation: hook.conversationId };
@@ -459,7 +465,7 @@ describe("a question answered on a worker", () => {
     unmount();
 
     expect({ queued, started, ended }).toEqual({
-      queued: { waiting: { phase: "queued" }, conversation: null },
+      queued: { waiting: { phase: "queued" }, conversation: null, answer: ANSWER },
       started: { waiting: { phase: "streaming" }, conversation: CONVERSATION },
       ended: { phase: "idle" },
     });
@@ -568,11 +574,15 @@ describe("a question answered on a worker", () => {
     expect(waiting).toEqual({ phase: "idle" });
   });
 
-  it("reads a conversation nobody is answering from its rows alone", async () => {
+  it("reads a conversation nobody is answering from its rows alone, its ratings with them", async () => {
     serve({});
     const { unmount } = mount(<Probe visitor={false} />);
+    const feedback = { rating: "down", reason: "incorrect", comment: "" } as const;
+    const rows = EARLIER.map((message) =>
+      message.role === "assistant" ? { ...message, feedback } : message,
+    );
 
-    await act(() => hook.adopt(detail(EARLIER, null)));
+    await act(() => hook.adopt(detail(rows, null)));
     const { waiting, turns } = hook;
     unmount();
 
@@ -581,6 +591,7 @@ describe("a question answered on a worker", () => {
       turns: 1,
       waiting: { phase: "idle" },
     });
+    expect(turns[0]).toMatchObject({ answerId: "a-1", feedback });
   });
 });
 

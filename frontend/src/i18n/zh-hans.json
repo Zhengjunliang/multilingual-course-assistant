@@ -194,7 +194,26 @@
     "copied": "已复制回答",
     "searchTime": "检索用时",
     "seconds": "{{seconds}} 秒",
-    "kept": "你看到的部分已按原样保存。"
+    "kept": "你看到的部分已按原样保存。",
+    "rate": {
+      "up": "好回答",
+      "down": "不好的回答",
+      "why": "哪里有问题？",
+      "comment": "还想补充什么？（选填）",
+      "send": "发送",
+      "close": "关闭",
+      "sent": "谢谢，评分已保存。",
+      "failed": "评分没能保存。",
+      "retry": "重试"
+    }
+  },
+  "feedback": {
+    "reason": {
+      "incorrect": "内容不正确",
+      "not_answered": "没有回答问题",
+      "wrong_language": "语言不对",
+      "other": "其他"
+    }
   },
   "code": {
     "copy": "复制",

@@ -194,7 +194,26 @@
     "copied": "Answer copied",
     "searchTime": "Search time",
     "seconds": "{{seconds}} s",
-    "kept": "What you see has been saved as it is."
+    "kept": "What you see has been saved as it is.",
+    "rate": {
+      "up": "Good answer",
+      "down": "Bad answer",
+      "why": "What went wrong?",
+      "comment": "Anything to add? (optional)",
+      "send": "Send",
+      "close": "Close",
+      "sent": "Thanks, your rating is saved.",
+      "failed": "The rating could not be saved.",
+      "retry": "Try again"
+    }
+  },
+  "feedback": {
+    "reason": {
+      "incorrect": "Incorrect",
+      "not_answered": "Does not answer the question",
+      "wrong_language": "Wrong language",
+      "other": "Other"
+    }
   },
   "code": {
     "copy": "Copy",

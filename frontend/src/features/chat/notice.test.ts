@@ -24,6 +24,8 @@ function turn(overrides: Partial<Turn> = {}): Turn {
     locale: "it",
     complete: false,
     failure: null,
+    answerId: null,
+    feedback: null,
     ...overrides,
   };
 }

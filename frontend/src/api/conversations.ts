@@ -9,6 +9,7 @@
  * from.
  */
 
+import { answerPath } from "./client";
 import type { Citation, RouteDecision } from "./contract";
 import { request } from "./http";
 
@@ -132,4 +133,17 @@ export function pinConversation(id: string, pinned: boolean): Promise<Conversati
 /** Deletes the conversation and its messages for good; the server answers 204. */
 export function deleteConversation(id: string): Promise<void> {
   return request<void>(conversationPath(id), { method: "DELETE" });
+}
+
+/** Rates an answer, replacing any rating before; the server answers with it as stored. */
+export function rateAnswer(answerId: string, body: FeedbackBody): Promise<StoredFeedback> {
+  return request<StoredFeedback>(`${answerPath(answerId)}/feedback`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Withdraws an answer's rating; the server answers 204, a rating already gone included. */
+export function withdrawRating(answerId: string): Promise<void> {
+  return request<void>(`${answerPath(answerId)}/feedback`, { method: "DELETE" });
 }
