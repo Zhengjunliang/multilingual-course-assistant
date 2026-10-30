@@ -3,7 +3,7 @@
 The edition is not a field: the URL names it, and the view resolves it before
 reading the body (apps/materials/views.py). The file's digest and its path on
 disk are not either: the digest is how the server tells two uploads apart,
-and the file leaves only through /api/sources (apps/qa/sources.py).
+and the file leaves only through /api/sources (apps/qa/source_views.py).
 """
 
 from __future__ import annotations
