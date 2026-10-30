@@ -1,4 +1,4 @@
-"""An edition's syllabus and reading list keep their rules in the database.
+"""An edition's syllabus, reading list and material keep their rules in the database.
 
 A refusal is asserted by the name of the constraint PostgreSQL reports, as in
 tests/test_catalog_models.py: a value outside a closed set, an empty section,
@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
 from test_catalog_models import violation
 
 from apps.catalog.models import (
@@ -23,6 +24,7 @@ from apps.catalog.models import (
     Syllabus,
     SyllabusSection,
 )
+from apps.materials.models import CourseMaterial, MaterialFailure, MaterialStatus
 
 pytestmark = pytest.mark.django_db
 
@@ -124,3 +126,72 @@ def test_a_book_needs_no_year_isbn_or_link_and_goes_with_its_edition(
     edition.delete()
 
     assert (ReadingItem.objects.count(), Syllabus.objects.count()) == (0, 0)
+
+
+DIGEST = "0" * 64
+
+
+def material(edition: CourseEdition, **fields: Any) -> CourseMaterial:
+    return CourseMaterial.objects.create(
+        edition=edition,
+        **{"sha256": DIGEST, "source_file": "01-Elettrostatica.pdf", **fields},
+    )
+
+
+@pytest.mark.parametrize(
+    ("fields", "constraint"),
+    [
+        pytest.param(
+            {"sha256": "0" * 63 + "G"}, "materials_material_sha256_format", id="not-a-digest"
+        ),
+        pytest.param({"source_file": ""}, "materials_material_source_file_not_empty", id="no-name"),
+        pytest.param({"status": "deleted"}, "materials_material_status_known", id="unknown-status"),
+        pytest.param(
+            {"status": MaterialStatus.FAILED},
+            "materials_material_failure_iff_failed",
+            id="failed-without-a-reason",
+        ),
+        pytest.param(
+            {"status": MaterialStatus.READY, "failure": MaterialFailure.INTERNAL},
+            "materials_material_failure_iff_failed",
+            id="a-reason-without-a-failure",
+        ),
+        pytest.param(
+            {"status": MaterialStatus.FAILED, "failure": "timeout"},
+            "materials_material_failure_iff_failed",
+            id="an-unknown-reason",
+        ),
+    ],
+)
+def test_a_material_outside_the_rules_is_refused(
+    edition: CourseEdition, fields: dict[str, Any], constraint: str
+) -> None:
+    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+        material(edition, **fields)
+
+    assert violation(excinfo.value).constraint_name == constraint
+
+
+def test_a_material_is_its_bytes_on_its_edition(edition: CourseEdition) -> None:
+    """The same bytes twice on one edition are refused; on another edition, or renamed, allowed.
+
+    A second row under the same name is the next version of a file, which
+    waits beside the one it replaces until its ingest is done.
+    """
+    material(edition)
+    material(edition, sha256="1" * 64)
+    other = CourseEdition.objects.create(course=edition.course, academic_year="2027-2028")
+    material(other)
+
+    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+        material(edition, source_file="Elettrostatica.pdf")
+
+    assert violation(excinfo.value).constraint_name == "materials_material_unique_bytes"
+
+
+def test_an_edition_with_material_is_not_deleted(edition: CourseEdition) -> None:
+    """Its points are in Qdrant, where a cascade in PostgreSQL would leave them."""
+    material(edition)
+
+    with pytest.raises(ProtectedError):
+        edition.delete()

@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "apps.qa",
     "apps.catalog",
     "apps.roles",
+    "apps.materials",
 ]
 
 # One entry that must never be added here: `GZipMiddleware`. It compresses a
@@ -251,6 +252,15 @@ QA_KEY_PREFIX = "qa"
 # together (apps/qa/inflight.py); past it a question is refused at once.
 # config/env.py says why the default is 4.
 QA_MAX_IN_FLIGHT = env.qa_max_in_flight
+
+
+# Course material
+
+# Where an uploaded PDF is kept, named by its digest (apps/materials/models.py).
+# Not MEDIA_ROOT, and no MEDIA_URL: a file leaves only through
+# /api/sources/<sha256> (apps/qa/sources.py), never as a URL of its own. Under
+# data/, which git ignores, as everything derived from course material is.
+MATERIALS_ROOT = BASE_DIR / "data" / "materials"
 
 
 # Password validation
