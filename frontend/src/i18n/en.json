@@ -428,6 +428,37 @@
         "locale": "Language"
       }
     },
+    "materials": {
+      "title": "Material",
+      "add": "Upload PDFs",
+      "drop": "Drop PDFs here, one or more. Students see them cited once they are ready.",
+      "sending_one": "Sending {{count}} file…",
+      "sending_other": "Sending {{count}} files…",
+      "unsent": "Some files were not uploaded",
+      "notPdf": "Not a PDF.",
+      "empty": "No material.",
+      "file": "File",
+      "state": "Status",
+      "uploadedBy": "Uploaded by {{name}}",
+      "imported": "Imported from the command line",
+      "replaceTitle": "Replace the material?",
+      "replaceBody": "The edition holds material of this name: the new file is its next version, and the current one stays in use until the new one is ready.",
+      "replace": "Replace",
+      "status": {
+        "queued": "Queued",
+        "parsing": "Reading",
+        "chunking": "Splitting",
+        "indexing": "Indexing",
+        "ready": "Ready",
+        "failed": "Failed"
+      },
+      "failure": {
+        "unreadable": "The file cannot be read: it is protected or holds no text.",
+        "incomplete": "The file was read only in part.",
+        "interrupted": "The processing stopped before it finished.",
+        "internal": "An error on the server stopped the processing."
+      }
+    },
     "mine": {
       "title": "My courses",
       "sub": "The courses you teach, with all their editions: you can edit every one.",

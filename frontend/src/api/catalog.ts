@@ -500,3 +500,21 @@ export function changeReading(
 export function removeReading(edition: number, id: number): Promise<void> {
   return request<void>(`${CATALOG}/editions/${edition}/readings/${id}`, { method: "DELETE" });
 }
+
+/** The edition's material, newest first, each with the state of its ingest. */
+export function listMaterials(edition: number): Promise<CourseMaterial[]> {
+  return request<CourseMaterial[]>(`${CATALOG}/editions/${edition}/materials`);
+}
+
+/**
+ * Sends one PDF, which the server answers with 202 and its row, `queued`,
+ * before the ingest begins; 409 `MATERIAL_EXISTS` when the edition holds the same bytes.
+ */
+export function uploadMaterial(edition: number, file: File): Promise<CourseMaterial> {
+  const form = new FormData();
+  form.append("file", file);
+  return request<CourseMaterial>(`${CATALOG}/editions/${edition}/materials`, {
+    method: "POST",
+    body: form,
+  });
+}

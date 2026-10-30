@@ -428,6 +428,37 @@
         "locale": "语言"
       }
     },
+    "materials": {
+      "title": "资料",
+      "add": "上传 PDF",
+      "drop": "把 PDF 拖到这里，可以一次多份。就绪后，学生的回答才会引用它们。",
+      "sending_one": "正在上传 {{count}} 个文件…",
+      "sending_other": "正在上传 {{count}} 个文件…",
+      "unsent": "有文件没有上传",
+      "notPdf": "不是 PDF。",
+      "empty": "还没有资料。",
+      "file": "文件",
+      "state": "状态",
+      "uploadedBy": "{{name}} 上传",
+      "imported": "从命令行导入",
+      "replaceTitle": "替换资料？",
+      "replaceBody": "本版本已有同名资料：新文件是它的下一版，新版就绪之前仍然使用当前这一版。",
+      "replace": "替换",
+      "status": {
+        "queued": "排队中",
+        "parsing": "读取中",
+        "chunking": "切分中",
+        "indexing": "索引中",
+        "ready": "就绪",
+        "failed": "失败"
+      },
+      "failure": {
+        "unreadable": "文件无法读取：受保护，或没有文字。",
+        "incomplete": "文件只读出了一部分。",
+        "interrupted": "处理在完成之前中断了。",
+        "internal": "服务器出错，处理中断。"
+      }
+    },
     "mine": {
       "title": "我的课程",
       "sub": "你任教的课程及其全部版本：每一个版本你都能修改。",
