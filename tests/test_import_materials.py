@@ -65,6 +65,20 @@ def test_each_pdf_is_added_once_and_its_ingest_queued_after_the_commit(
     assert again.endswith("B028451:2025-2026: 0 queued, 2 already there\n")
 
 
+def test_two_files_of_one_name_stop_the_run_before_either_is_added(
+    edition: CourseEdition, tmp_path: Path
+) -> None:
+    """In one run they would be two versions of one material, and the first would be lost."""
+    for topic in ("html", "css"):
+        (tmp_path / topic).mkdir()
+        (tmp_path / topic / "esercizi.pdf").write_bytes(f"%PDF-1.7 {topic}".encode())
+
+    with pytest.raises(CommandError, match=r"esercizi\.pdf"):
+        run(tmp_path)
+
+    assert not CourseMaterial.objects.exists()
+
+
 def test_an_edition_that_does_not_exist_stops_the_run(
     edition: CourseEdition, tmp_path: Path
 ) -> None:
