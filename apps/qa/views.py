@@ -64,7 +64,13 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import AllowAnyWithCsrf
 from apps.qa import inflight
 from apps.qa.contract import KEEPALIVE, TERMINAL, ErrorEvent, QueuedEvent, sse, sse_event
-from apps.qa.conversations import ConversationGoneError, open_conversation, recent_turns
+from apps.qa.conversations import (
+    ConversationGoneError,
+    added_to,
+    open_conversation,
+    recent_turns,
+)
+from apps.qa.scope import boundary, search_scope
 from apps.qa.serializers import AskRequest
 from apps.qa.tasks import TIME_LIMIT_SECONDS, AnswerJob, enqueue
 from config.errors import ErrorCode, error_body, fail
@@ -259,10 +265,15 @@ class AskView(APIView):
     text, then `end`.
 
     Anyone may ask. A logged-in caller's question and answer are filed in a
-    conversation, which supplies the next question's history. An anonymous
-    caller's are filed nowhere, the view making no query of its own, and its
-    client sends the history back with each question instead; it is answered
-    from the campus pages alone, never from course material.
+    conversation, which supplies the next question's history, and the course
+    material it searches is computed from the account (apps/qa/scope.py): its
+    default, and the editions the conversation added. A question adding an
+    edition outside the caller's boundary is refused before anything is
+    stored, with one 403 whether the id names another programme's edition or
+    none. An anonymous caller's are filed nowhere, the view making no query of
+    its own, and its client sends the history back with each question
+    instead; it is answered from the campus pages alone, never from course
+    material.
     """
 
     # A tuple because ruff's RUF012 objects to a mutable class attribute, and
@@ -286,11 +297,16 @@ class AskView(APIView):
         payload.is_valid(raise_exception=True)
         validated = payload.validated_data
 
+        added = validated["added_editions"]
         if request.user.is_authenticated:
             # The cast is the one apps/accounts/views.py explains: pyright has
             # no django-stubs plugin, so `request.user` is the abstract base to it.
             user = cast("User", request.user)
-            conversation = open_conversation(user, validated["conversation"])
+            editions = list(boundary(user))
+            if added is not None and not set(added) <= {edition.pk for edition in editions}:
+                fail(ErrorCode.PERMISSION_DENIED)
+            stored = validated["conversation"]
+            conversation = open_conversation(user, stored)
             try:
                 history = recent_turns(conversation)
             # Deleted after the serializer found it: the refusal of an unknown
@@ -298,9 +314,15 @@ class AskView(APIView):
             except ConversationGoneError:
                 fail(ErrorCode.CONVERSATION_GONE)
             owner, conversation_id = user.pk, conversation.pk
-            # Every edition until the caller's own scope is computed from their
-            # programme, which is `#36` (docs/data-model.md).
-            scope = None
+            # What the question names, or else what the conversation holds: a
+            # new one holds nothing, and costs no query to say so.
+            if added is not None:
+                searched = set(added)
+            elif stored is not None:
+                searched = added_to(stored)
+            else:
+                searched = set()
+            scope = search_scope(editions, searched)
         else:
             history = validated["history"]
             owner, conversation_id = None, None
@@ -315,6 +337,7 @@ class AskView(APIView):
             locale=validated["locale"],
             history=history,
             scope=scope,
+            added_editions=added,
             conversation_id=conversation_id,
             asked_at=time.time(),
             request_id=current(),

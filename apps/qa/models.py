@@ -100,6 +100,18 @@ class Conversation(models.Model):
     # does not see it. The thread is walked by these ids, never by loading the
     # related row, so a walk costs no query per step.
     current_leaf_id: uuid.UUID | None
+    # The editions its questions search besides the owner's default, such as a
+    # past year (apps/qa/scope.py): chosen once, they stay for every later
+    # question, and a new conversation starts with none, as Onyx keeps a chat
+    # session's search settings on the session (outside the repository).
+    # Written with the exchange that asked for them, under the row lock
+    # (`record_exchange`).
+    added_editions = models.ManyToManyField(
+        "catalog.CourseEdition",
+        blank=True,
+        related_name="+",
+        verbose_name=_("added editions"),
+    )
 
     class Meta:
         ordering = ("-created_at", "-id")

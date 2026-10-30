@@ -11,6 +11,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
+        ("catalog", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -35,6 +36,15 @@ class Migration(migrations.Migration):
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True, verbose_name="created at")),
                 ("pinned", models.BooleanField(default=False, verbose_name="pinned")),
+                (
+                    "added_editions",
+                    models.ManyToManyField(
+                        blank=True,
+                        related_name="+",
+                        to="catalog.courseedition",
+                        verbose_name="added editions",
+                    ),
+                ),
                 (
                     "owner",
                     models.ForeignKey(

@@ -74,6 +74,8 @@ export interface ConversationDetail extends ConversationSummary {
    * instead (`GET /api/answers/<id>/events`).
    */
   answering: string | null;
+  /** The editions its questions search besides the default, by id (`AskBody.added_editions`). */
+  added_editions: number[];
 }
 
 export function listConversations(): Promise<ConversationSummary[]> {

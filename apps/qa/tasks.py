@@ -76,6 +76,11 @@ class AnswerJob(BaseModel):
     time since it is read in another process (`StartEvent.search_ms`), and
     `request_id` the id of the request that asked, under which the task logs
     and reports its failures (config/request_id.py).
+
+    `scope` is the slides editions the asker may be answered from, computed by
+    the web process (apps/qa/scope.py), empty for a visitor. `added_editions`
+    is what the question set its conversation's added editions to, written
+    with the exchange; None keeps what the conversation holds.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -84,7 +89,8 @@ class AnswerJob(BaseModel):
     question: str
     locale: str | None
     history: list[Turn]
-    scope: list[EditionKey] | None
+    scope: list[EditionKey]
+    added_editions: list[int] | None
     conversation_id: UUID | None
     asked_at: float
     request_id: str
@@ -215,7 +221,12 @@ def _generate(job: AnswerJob, heartbeat: _Heartbeat) -> Event:
             if verdict != "ok":
                 return _halted(job, verdict)
             if job.conversation_id is not None:
-                record_exchange(job.conversation_id, start, job.answer_id)
+                record_exchange(
+                    job.conversation_id,
+                    start,
+                    job.answer_id,
+                    added_editions=job.added_editions,
+                )
                 stored = True
             inflight.emit(job.answer_id, start)
             for event in events:

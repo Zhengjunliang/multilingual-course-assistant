@@ -531,6 +531,8 @@ def test_accepting_makes_an_account_staff_of_the_scope_and_signs_it_in(
             "locale": "en",
             "is_superuser": False,
             "roles": [{"role": "teacher", "edition": w.ppm_old.pk}],
+            "programme": None,
+            "year_of_study": None,
         },
     }
     assert holder.get(ME_URL).json()["authenticated"]
