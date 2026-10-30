@@ -200,6 +200,7 @@
     "ACCOUNT_STILL_ACTIVE": "请先停用这个账号，再删除它。",
     "ROLES_HELD": "你还持有教职角色，请先请人撤销，再删除账号。",
     "LAST_SUPERUSER": "你是最后一个活跃的管理员，请先让另一个账号成为管理员。",
+    "MATERIAL_EXISTS": "这个文件已经在本版本的资料里了。",
     "RESOURCE_EXHAUSTED": "请求太多，请 {{retry_after_seconds}} 秒后再试。",
     "UNAVAILABLE": "服务正在回答其他问题，请稍后再试。",
     "ENGINE_DOWN": "回答服务暂时不可用，请稍后再试。",

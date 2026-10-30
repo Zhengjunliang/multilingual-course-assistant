@@ -1,7 +1,8 @@
 /**
  * `/api/catalog/` — the catalogue the staff pages show, and the staff of each scope.
  *
- * The shapes mirror apps/catalog/serializers.py, which is the single source;
+ * The shapes mirror apps/catalog/serializers.py and, for an edition's material,
+ * apps/materials/serializers.py, which are the single source;
  * tests/test_catalog_contract.py fails when a field is added or renamed on one
  * side only, or when a permission name, a code source or an error code differs
  * from the Python side. The test compares each interface's field names with the
@@ -20,7 +21,8 @@ export type Permission =
   | "programme.assign_secretariat"
   | "edition.view"
   | "edition.assign_teacher"
-  | "edition.edit_content";
+  | "edition.edit_content"
+  | "edition.manage_materials";
 
 /**
  * Where a course's `code` was read from (apps/catalog/models.py): its Moodle
@@ -273,6 +275,27 @@ export interface ReadingDraft {
   isbn: string;
   url: string;
   importance: Importance;
+}
+
+/** How far a material's ingest has got, its steps in the order they run. */
+export type MaterialStatus = "queued" | "parsing" | "chunking" | "indexing" | "ready" | "failed";
+
+/** Why an ingest failed: the file's (`unreadable`, `incomplete`), the clock's or the server's. */
+export type MaterialFailure = "unreadable" | "incomplete" | "interrupted" | "internal";
+
+/** A PDF on an edition (apps/materials/serializers.py), and the state of its ingest. */
+export interface CourseMaterial {
+  id: number;
+  /** The name the file was uploaded under, which a citation shows. */
+  source_file: string;
+  status: MaterialStatus;
+  /** Empty unless `status` is `failed`. */
+  failure: MaterialFailure | "";
+  /** Null for a material imported from the command line, or whose uploader left. */
+  uploaded_by: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
 }
 
 /** A course as an invitation names it (apps/catalog/invitation_serializers.py): no entries. */

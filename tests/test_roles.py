@@ -228,10 +228,11 @@ def test_deleting_a_scope_or_a_user_deletes_its_role_rows() -> None:
     ]
 
 
-TEACHES = {"edition.view", "edition.assign_teacher", "edition.edit_content"}
-# A past year: its teacher rows are not its course's teachers to change.
-TAUGHT = {"edition.view", "edition.edit_content"}
-RUNS_EDITION = {"edition.view", "edition.assign_teacher", "edition.edit_content"}
+CONTENT = {"edition.view", "edition.edit_content", "edition.manage_materials"}
+TEACHES = {*CONTENT, "edition.assign_teacher"}
+# A past year: its teacher rows are not its course's teachers to change; its content is.
+TAUGHT = CONTENT
+RUNS_EDITION = {*CONTENT, "edition.assign_teacher"}
 RUNS_PROGRAMME = {"programme.view"}
 
 

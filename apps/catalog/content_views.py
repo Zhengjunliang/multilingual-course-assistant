@@ -43,8 +43,11 @@ if TYPE_CHECKING:
 _SECTION_ORDER = {section: index for index, section in enumerate(SyllabusSection.values)}
 
 
-class _EditionContent(EditionView):
-    """A view on one edition's content, which reads the edition's row and none of its staff."""
+class EditionContentView(EditionView):
+    """A view on one edition's content, which reads the edition's row and none of its staff.
+
+    Its material's view is one too (apps/materials/views.py).
+    """
 
     def get_queryset(self) -> QuerySet[CourseEdition]:
         return editions_for(self.request.user, self.visible_with)
@@ -58,7 +61,7 @@ def _syllabus(edition: CourseEdition, locale: str) -> dict[str, object]:
     return SyllabusSerializer({"locale": locale, "sections": rows}).data
 
 
-class EditionSyllabusView(_EditionContent):
+class EditionSyllabusView(EditionContentView):
     """`GET` reads the syllabus; `PATCH` sets its language, the one field it takes."""
 
     scope_map = MappingProxyType(
@@ -77,7 +80,7 @@ class EditionSyllabusView(_EditionContent):
         return Response(_syllabus(self.scope, locale))
 
 
-class EditionSyllabusSectionView(_EditionContent):
+class EditionSyllabusSectionView(EditionContentView):
     """`PUT` writes one section: 200 with the section, or 204 when cleared."""
 
     scope_map = MappingProxyType({"PUT": Permission.EDITION_EDIT_CONTENT})
@@ -96,7 +99,7 @@ class EditionSyllabusSectionView(_EditionContent):
         return Response(SyllabusSectionSerializer(row).data)
 
 
-class _Books(_EditionContent):
+class _Books(EditionContentView):
     def books(self) -> QuerySet[ReadingItem]:
         return ReadingItem.objects.filter(edition=self.scope)
 

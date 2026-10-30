@@ -87,6 +87,7 @@ class ErrorCode(StrEnum):
     ACCOUNT_STILL_ACTIVE = "ACCOUNT_STILL_ACTIVE"
     ROLES_HELD = "ROLES_HELD"
     LAST_SUPERUSER = "LAST_SUPERUSER"
+    MATERIAL_EXISTS = "MATERIAL_EXISTS"
     RESOURCE_EXHAUSTED = "RESOURCE_EXHAUSTED"
     UNAVAILABLE = "UNAVAILABLE"
     ENGINE_DOWN = "ENGINE_DOWN"
@@ -191,6 +192,11 @@ SPEC: dict[ErrorCode, Spec] = {
     ),
     ErrorCode.LAST_SUPERUSER: Spec(
         HTTPStatus.CONFLICT, "fixable", "The account is the last active superuser."
+    ),
+    # The same bytes uploaded twice to one edition (apps/materials/services.py), with the
+    # row they are, as Open WebUI refuses a duplicate file (outside the repository).
+    ErrorCode.MATERIAL_EXISTS: Spec(
+        HTTPStatus.CONFLICT, "fixable", "The edition holds this file as material {material}."
     ),
     ErrorCode.RESOURCE_EXHAUSTED: Spec(
         HTTPStatus.TOO_MANY_REQUESTS,

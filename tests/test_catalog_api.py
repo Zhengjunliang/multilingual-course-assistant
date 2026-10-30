@@ -44,10 +44,16 @@ COURSES_URL = "/api/catalog/courses"
 # PPM's editions: the past one, the current one, and the next.
 PAST, OLD, NEW = "B028451:2023-2024", "B028451:2024-2025", "B028451:2025-2026"
 
-TEACHES = ["edition.assign_teacher", "edition.edit_content", "edition.view"]
+# Sorted, as an edition lists them.
+TEACHES = [
+    "edition.assign_teacher",
+    "edition.edit_content",
+    "edition.manage_materials",
+    "edition.view",
+]
 # A past year: its teacher rows are not its course's teachers to change.
-TAUGHT = ["edition.edit_content", "edition.view"]
-RUNS_EDITION = ["edition.assign_teacher", "edition.edit_content", "edition.view"]
+TAUGHT = ["edition.edit_content", "edition.manage_materials", "edition.view"]
+RUNS_EDITION = TEACHES
 
 
 def as_user(user: User | None) -> APIClient:

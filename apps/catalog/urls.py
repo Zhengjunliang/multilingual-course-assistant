@@ -32,6 +32,7 @@ from apps.catalog.views import (
     ProgrammeDetailView,
     ProgrammeListView,
 )
+from apps.materials.views import EditionMaterialsView
 
 
 class _Key:
@@ -129,4 +130,6 @@ urlpatterns = [
         EditionReadingView.as_view(),
         name="edition-reading",
     ),
+    # The edition's material is apps/materials', nested here as its other content is.
+    path("editions/<int:pk>/materials", EditionMaterialsView.as_view(), name="edition-materials"),
 ]

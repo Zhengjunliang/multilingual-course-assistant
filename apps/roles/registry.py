@@ -35,16 +35,18 @@ class Permission(StrEnum):
     EDITION_VIEW = "edition.view"
     EDITION_ASSIGN_TEACHER = "edition.assign_teacher"
     EDITION_EDIT_CONTENT = "edition.edit_content"
+    EDITION_MANAGE_MATERIALS = "edition.manage_materials"
 
 
 PROGRAMME_PERMISSIONS = frozenset(p for p in Permission if p.startswith("programme."))
 EDITION_PERMISSIONS = frozenset(p for p in Permission if p.startswith("edition."))
 
 # No role holds PROGRAMME_ASSIGN_SECRETARIAT: only the superuser assigns secretariat staff.
-# An edition's content — its syllabus and reading list — is edited by its teacher or the
-# secretariat (docs/decisions.md, 2026-09-25, *The data model is decided on paper before
-# roles are built on it*, point 4). A course's teachers assign their colleagues, on the
-# editions `NOT_ON_PAST_EDITIONS` leaves them.
+# An edition's content — its syllabus and reading list, and the material it is searched
+# for — is edited by its teacher or the secretariat (docs/decisions.md, 2026-09-25, *The
+# data model is decided on paper before roles are built on it*, point 4); the material
+# has a permission of its own because it is uploaded and ingested rather than typed. A
+# course's teachers assign their colleagues, on the editions `NOT_ON_PAST_EDITIONS` leaves them.
 ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = MappingProxyType(
     {
         Role.TEACHER: frozenset(
@@ -52,6 +54,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = MappingProxyType(
                 Permission.EDITION_VIEW,
                 Permission.EDITION_ASSIGN_TEACHER,
                 Permission.EDITION_EDIT_CONTENT,
+                Permission.EDITION_MANAGE_MATERIALS,
             }
         ),
         Role.SECRETARIAT: frozenset(
@@ -60,6 +63,7 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = MappingProxyType(
                 Permission.EDITION_VIEW,
                 Permission.EDITION_ASSIGN_TEACHER,
                 Permission.EDITION_EDIT_CONTENT,
+                Permission.EDITION_MANAGE_MATERIALS,
             }
         ),
     }
