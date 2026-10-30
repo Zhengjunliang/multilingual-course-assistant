@@ -1,6 +1,7 @@
 /**
  * The parts every staff page is built from, so each page says what it holds
- * and not how a heading is spaced: its header, its sections, and a note.
+ * and not how a heading is spaced: its header, its sections, a note, and the
+ * way through a list the server sends in pages.
  *
  * The header is the prototype's: «Gestione» above the title, as the sidebar
  * group the page belongs to, then the page's facts as chips — a code, the
@@ -11,10 +12,11 @@
  * goes when what a dialog was opened from is gone (features/staff/).
  */
 
-import { Database, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, Database, Info } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Count } from "@/components/ui/count";
 import { cn } from "@/lib/utils";
@@ -104,5 +106,55 @@ export function Note({ children, foot }: { children: ReactNode; foot?: boolean }
       <Info aria-hidden className="size-icon shrink-0" />
       <span>{children}</span>
     </p>
+  );
+}
+
+interface PagerProps {
+  /** From 1. */
+  page: number;
+  count: number;
+  /** The rows of a full page, the server's `page_size`. */
+  size: number;
+  /** Whether the server named a page before this one, and after it. */
+  previous: boolean;
+  next: boolean;
+  onPage: (page: number) => void;
+}
+
+/**
+ * Under a list the server sends in pages: which page of how many, and the way
+ * to the one before and after, as DRF's `previous` and `next` allow. Nothing
+ * for a list of one page.
+ */
+export function Pager({ page, count, size, previous, next, onPage }: PagerProps) {
+  const { t } = useTranslation();
+  const pages = Math.max(1, Math.ceil(count / size));
+  if (pages === 1) return null;
+  return (
+    <nav aria-label={t("staff.pager.label")} className="flex items-center justify-end gap-tight">
+      <span className="text-caption text-muted tabular-nums">
+        {t("staff.pager.page", { page, pages })}
+      </span>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={!previous}
+        onClick={() => onPage(page - 1)}
+      >
+        <ChevronLeft aria-hidden className="size-icon" />
+        {t("staff.pager.previous")}
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={!next}
+        onClick={() => onPage(page + 1)}
+      >
+        {t("staff.pager.next")}
+        <ChevronRight aria-hidden className="size-icon" />
+      </Button>
+    </nav>
   );
 }

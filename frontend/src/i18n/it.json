@@ -300,7 +300,8 @@
       "management": "Gestione",
       "programme": "Corso di laurea",
       "mine": "I miei insegnamenti",
-      "users": "Account"
+      "users": "Account",
+      "feedback": "Valutazioni"
     },
     "programmes": {
       "title": "Corsi di laurea",
@@ -532,6 +533,43 @@
       "done": "Ruolo revocato",
       "gone": "{{username}} non aveva più questo ruolo: era già stato revocato altrove."
     },
+    "pager": {
+      "label": "Pagine",
+      "page": "Pagina {{page}} di {{pages}}",
+      "previous": "Precedente",
+      "next": "Successiva"
+    },
+    "feedback": {
+      "title": "Valutazioni",
+      "sub": "Come gli studenti hanno valutato le risposte, dalla più recente. Nessuna dice chi l'ha data.",
+      "count_one": "{{count}} valutazione",
+      "count_other": "{{count}} valutazioni",
+      "question": "Domanda",
+      "rating": "Valutazione",
+      "reason": "Motivo",
+      "target": "Fonte",
+      "locale": "Lingua",
+      "allRatings": "Tutte",
+      "allReasons": "Tutti",
+      "allTargets": "Tutte",
+      "allLocales": "Tutte",
+      "noReason": "Nessun motivo",
+      "none": "Nessuna valutazione.",
+      "noneMatching": "Nessuna valutazione corrisponde ai filtri.",
+      "rated": "Valutata il {{date}}",
+      "comment": "Commento",
+      "answer": "La risposta valutata",
+      "history_one": "{{count}} scambio precedente",
+      "history_other": "{{count}} scambi precedenti",
+      "historyHint": "Come il modello li ha ricevuti insieme alla domanda.",
+      "request": "ID della richiesta",
+      "noRequest": "Non registrato",
+      "where": {
+        "slides": "Materiale del corso",
+        "unifi_web": "Pagine di ateneo",
+        "both": "Entrambe le fonti"
+      }
+    },
     "users": {
       "title": "Account",
       "state": "Stato",
@@ -549,10 +587,6 @@
       "isInactive": "Disattivato",
       "none": "Nessun account corrisponde.",
       "actions": "Azioni per {{username}}",
-      "pages": "Pagine",
-      "page": "Pagina {{page}} di {{pages}}",
-      "previous": "Precedente",
-      "next": "Successiva",
       "gone": "L'account {{username}} non c'è più: è stato eliminato altrove.",
       "failed": "Operazione non riuscita",
       "deactivate": {

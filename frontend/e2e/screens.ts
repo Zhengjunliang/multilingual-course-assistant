@@ -10,7 +10,16 @@ import type { Page } from "@playwright/test";
 
 import it from "../src/i18n/it.json" with { type: "json" };
 import { type Api, expect } from "./api";
-import { ADMIN, CONVERSATION, COURSE, LINK_TOKEN, PROGRAMME, STAFF, STUDENT } from "./fixtures";
+import {
+  ADMIN,
+  CONVERSATION,
+  COURSE,
+  LINK_TOKEN,
+  PROGRAMME,
+  RATING,
+  STAFF,
+  STUDENT,
+} from "./fixtures";
 
 export interface Screen {
   path: string;
@@ -70,6 +79,12 @@ export const SCREENS: Screen[] = [
   },
   { path: "/staff/mine", as: "staff", mark: heading(it.staff.mine.title) },
   { path: "/staff/users", as: "admin", mark: heading(it.staff.users.title) },
+  { path: "/staff/feedback", as: "admin", mark: heading(it.staff.feedback.title) },
+  {
+    path: `/staff/feedback/${RATING.id}`,
+    as: "admin",
+    mark: heading(it.staff.feedback.answer),
+  },
   { path: "/staff/nowhere", as: "staff", mark: heading(it.staff.refusal.notFound) },
   { path: "/nowhere", as: "visitor", mark: heading(it.notFound.title) },
 ];
@@ -99,6 +114,7 @@ export async function visit(page: Page, api: Api, screen: Screen): Promise<void>
     api.signIn(ADMIN);
     api.catalog();
     api.users();
+    api.feedback();
   }
   await page.goto(screen.path + (screen.hash ?? ""));
   const { role, name } = screen.mark;

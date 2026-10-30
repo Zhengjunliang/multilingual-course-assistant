@@ -300,7 +300,8 @@
       "management": "管理",
       "programme": "学位专业",
       "mine": "我的课程",
-      "users": "账号"
+      "users": "账号",
+      "feedback": "评分"
     },
     "programmes": {
       "title": "专业",
@@ -532,6 +533,43 @@
       "done": "已撤销角色",
       "gone": "{{username}} 已不再拥有此角色：它已在别处被撤销。"
     },
+    "pager": {
+      "label": "分页",
+      "page": "第 {{page}} 页，共 {{pages}} 页",
+      "previous": "上一页",
+      "next": "下一页"
+    },
+    "feedback": {
+      "title": "评分",
+      "sub": "学生对回答的评分，最新的在前。不显示是谁评的。",
+      "count_one": "{{count}} 条评分",
+      "count_other": "{{count}} 条评分",
+      "question": "问题",
+      "rating": "评分",
+      "reason": "原因",
+      "target": "来源",
+      "locale": "语言",
+      "allRatings": "全部",
+      "allReasons": "全部",
+      "allTargets": "全部",
+      "allLocales": "全部",
+      "noReason": "没有原因",
+      "none": "没有评分。",
+      "noneMatching": "没有符合筛选条件的评分。",
+      "rated": "评于 {{date}}",
+      "comment": "评论",
+      "answer": "被评的回答",
+      "history_one": "之前的 {{count}} 轮对话",
+      "history_other": "之前的 {{count}} 轮对话",
+      "historyHint": "和问题一起交给模型时的样子。",
+      "request": "请求 ID",
+      "noRequest": "没有记录",
+      "where": {
+        "slides": "课程材料",
+        "unifi_web": "学校网页",
+        "both": "两个来源"
+      }
+    },
     "users": {
       "title": "账号",
       "state": "状态",
@@ -549,10 +587,6 @@
       "isInactive": "已停用",
       "none": "没有匹配的账号。",
       "actions": "{{username}} 的操作",
-      "pages": "分页",
-      "page": "第 {{page}} 页，共 {{pages}} 页",
-      "previous": "上一页",
-      "next": "下一页",
       "gone": "账号 {{username}} 已不在：它已在别处被删除。",
       "failed": "操作未完成",
       "deactivate": {

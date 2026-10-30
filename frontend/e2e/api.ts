@@ -28,6 +28,7 @@ import type {
 } from "@/api/catalog";
 import type { AnswerEvent } from "@/api/contract";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
+import type { FeedbackDetail, FeedbackRow } from "@/api/review";
 import type { ScopeCourse } from "@/api/scope";
 import {
   COURSE,
@@ -38,6 +39,8 @@ import {
   PENDING,
   PROGRAMME,
   PROGRAMMES,
+  RATING,
+  RATINGS,
   READINGS,
   RESET_FOR,
   SCOPE,
@@ -183,6 +186,17 @@ export class Api {
       previous: null,
       results: USERS,
     });
+  }
+
+  /** The superuser's ratings, one page of them, and the first opened. */
+  feedback(): void {
+    this.json<ListPage<FeedbackRow>>("/api/admin/feedback", {
+      count: RATINGS.length,
+      next: null,
+      previous: null,
+      results: RATINGS,
+    });
+    this.json<FeedbackDetail>(`/api/admin/feedback/${RATING.id}`, RATING);
   }
 
   /** Every question gets this stream, whole. */

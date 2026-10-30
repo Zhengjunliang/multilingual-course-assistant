@@ -77,19 +77,31 @@ def question_of(feedback: Feedback) -> str:
 class FeedbackRowSerializer(serializers.ModelSerializer[Feedback]):
     """A rating in the page's list: what it says and what it rates.
 
-    `id` is the answer's, which keys the rating. `target` is where the answer
-    was searched (`RouteDecision.target`), the scenario; `locale` is the
-    language it was asked and answered in.
+    `id` is the answer's, which keys the rating. `comment_locale` is the
+    language the comment is written in, which the list sets it in. `target` is
+    where the answer was searched (`RouteDecision.target`), the scenario;
+    `locale` is the language it was asked and answered in.
     """
 
     id = serializers.UUIDField(source="answer_id", read_only=True)
+    comment_locale = serializers.CharField(source="locale", read_only=True)
     question = serializers.SerializerMethodField()
     target = serializers.SerializerMethodField()
     locale = serializers.CharField(source="answer.locale", read_only=True)
 
     class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         model = Feedback
-        fields = ("id", "rating", "reason", "comment", "updated_at", "question", "target", "locale")
+        fields = (
+            "id",
+            "rating",
+            "reason",
+            "comment",
+            "comment_locale",
+            "updated_at",
+            "question",
+            "target",
+            "locale",
+        )
 
     def get_question(self, feedback: Feedback) -> str:
         return question_of(feedback)

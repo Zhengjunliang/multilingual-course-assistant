@@ -6,6 +6,8 @@ import AccountPage from "@/routes/AccountPage";
 import ChatPage from "@/routes/ChatPage";
 import CoursePage from "@/routes/CoursePage";
 import EditionPage from "@/routes/EditionPage";
+import FeedbackDetailPage from "@/routes/FeedbackDetailPage";
+import FeedbackPage from "@/routes/FeedbackPage";
 import ForgotPage from "@/routes/ForgotPage";
 import InvitePage from "@/routes/InvitePage";
 import LoginPage from "@/routes/LoginPage";
@@ -61,7 +63,7 @@ import VisitorLayout from "@/routes/VisitorLayout";
  * `/chat/:conversationId` stay one route tree. `/staff/*` is open to an account
  * holding a role or the superuser (`RequireStaff`); `/staff` lands on the
  * account's first Gestione item, and the pages are objects — programmes,
- * courses, editions, and the superuser's accounts — not roles.
+ * courses, editions, and the superuser's accounts and ratings — not roles.
  */
 export const routes: RouteObject[] = [
   {
@@ -105,6 +107,8 @@ export const routes: RouteObject[] = [
                   { path: "editions/:id", element: <EditionPage /> },
                   { path: "mine", element: <MinePage /> },
                   { path: "users", element: <UsersPage /> },
+                  { path: "feedback", element: <FeedbackPage /> },
+                  { path: "feedback/:id", element: <FeedbackDetailPage /> },
                   { path: "*", element: <StaffNotFound /> },
                 ],
               },
