@@ -1,7 +1,8 @@
 """Adding a material to an edition: the one way in, for an upload and for the import command.
 
 The file is stored under its digest and the row added `queued`; its ingest is
-queued once the row is committed (apps/materials/tasks.py). The same bytes
+queued once the row is committed (apps/materials/tasks.py), and a row whose
+ingest the broker refuses is deleted again, with its file. The same bytes
 already on the edition are refused with the row they are, decided by the
 unique constraint in a savepoint of its own, so two uploads of one file at
 once cannot both pass a check made first. On another edition they are a row
@@ -11,6 +12,7 @@ of their own, over the file already stored.
 from __future__ import annotations
 
 import hashlib
+from functools import partial
 from pathlib import PurePath
 from typing import TYPE_CHECKING, cast
 
@@ -21,7 +23,7 @@ from apps.materials.models import CourseMaterial, material_name, material_storag
 from apps.materials.tasks import ingest_material
 
 if TYPE_CHECKING:
-    from celery.contrib.django.task import DjangoTask
+    from celery import Task
     from django.core.files import File
 
     from apps.accounts.models import User
@@ -77,6 +79,23 @@ def create_material(
         raise MaterialExistsError(
             CourseMaterial.objects.get(edition=edition, sha256=material.sha256)
         ) from None
-    # Celery leaves `app.task` unannotated, so pyright sees the bare function.
-    cast("DjangoTask", ingest_material).delay_on_commit(material.pk)
+    transaction.on_commit(partial(_queue_ingest, material, name))
     return material
+
+
+def _queue_ingest(material: CourseMaterial, name: str) -> None:
+    """Queue a committed material's ingest, or take the row back if the broker refuses it.
+
+    A row no task will ever take would wait `queued` for good, and hold its
+    bytes against a second upload. Outside a transaction, as the view and
+    the import command call `create_material`, this runs before it returns,
+    so the error reaches the caller.
+    """
+    try:
+        # Celery leaves `app.task` unannotated, so pyright sees the bare function.
+        cast("Task", ingest_material).delay(material.pk)
+    except Exception:
+        material.delete()
+        if not CourseMaterial.objects.filter(file=name).exists():
+            material_storage.delete(name)
+        raise
