@@ -248,6 +248,7 @@ FIELD_MAP: dict[str, FieldReason] = {
     "null": FieldReason.REQUIRED,
     "empty": FieldReason.REQUIRED,
     "invalid": FieldReason.INVALID,
+    "no_name": FieldReason.INVALID,
     "not_a_list": FieldReason.INVALID,
     "invalid_choice": FieldReason.INVALID,
     "max_string_length": FieldReason.INVALID,
