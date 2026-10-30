@@ -5,15 +5,17 @@
 writes each step into the row as it reaches it — `parsing`, `chunking`,
 `indexing` — and ends at `ready` or at `failed` with a code
 (apps/materials/models.py). A failure leaves no point of the material behind:
-the points are written only once every chunk is embedded (`index_chunks`),
+the points are written only once every chunk is embedded (`upsert_chunks`),
 and whatever was written goes again by the material's own key
 (`delete_material`), so an older version under the same name keeps answering.
 
-**A new version** replaces its predecessors once it is ready: the index
-already dropped their points when it wrote the new ones (they share the
-name, `rag.index.replace_slides_sources`), and their rows go here, with any
-file no other row still names. The order between two versions is the
-queue's: ingest takes one material at a time, first in first out.
+**A new version** replaces its predecessors once it is ready, and not
+before: then the points of its name it did not write are deleted
+(`rag.index.replace_slides_sources`), and the older rows go, with any file
+no other row still names. A delete the index refuses, or a worker killed
+before it, leaves both versions answering until the next version replaces them. The order between
+two versions is the queue's: ingest takes one material at a time, first in
+first out.
 
 **Twice is harmless.** A task acknowledged late is delivered again if its
 worker dies (config/settings.py): it starts over, writing the same points
@@ -49,10 +51,12 @@ from apps.materials.models import (
 )
 from config.celery import app
 from rag.chunk import EditionKey, chunk_document, document_locale
-from rag.index import delete_material, index_chunks
+from rag.index import delete_material, replace_slides_sources, upsert_chunks
 from rag.parse import IncompletePdfError, UnreadablePdfError
 
 if TYPE_CHECKING:
+    from qdrant_client import QdrantClient
+
     from apps.materials.ingest import Pipeline
 
 logger = logging.getLogger(__name__)
@@ -110,16 +114,15 @@ def ingest_material(material_id: int) -> None:
             raise UnreadablePdfError(f"{material.source_file}: no text")
         if not _move(material, MaterialStatus.INDEXING):
             return
-        index_chunks(pipeline.client, chunks, pipeline.dense, pipeline.sparse)
-        replaced = _settle(material)
+        written = upsert_chunks(pipeline.client, chunks, pipeline.dense, pipeline.sparse)
+        if not _move(material, MaterialStatus.READY, finished_at=timezone.now()):
+            # Deleted while it was indexed: what was written goes with it.
+            delete_material(pipeline.client, material.sha256, edition)
+            return
     except Exception as exc:
         _fail(material, edition, pipeline, exc)
         return
-    if replaced is None:
-        # Deleted while it was indexed: what was written goes with it.
-        delete_material(pipeline.client, material.sha256, edition)
-        return
-    _delete_unused_files(replaced)
+    _replace_older(material, edition, pipeline.client, written)
 
 
 @app.task
@@ -139,29 +142,35 @@ def _move(material: CourseMaterial, status: MaterialStatus, **fields: Any) -> bo
     return CourseMaterial.objects.filter(pk=material.pk).update(status=status, **fields) == 1
 
 
-def _settle(material: CourseMaterial) -> list[str] | None:
-    """Mark the material ready and delete the older versions under its name.
+def _replace_older(
+    material: CourseMaterial, edition: EditionKey, client: QdrantClient, written: list[str]
+) -> None:
+    """Delete the older versions under a ready material's name: their points, rows and files.
 
-    Returns the files those versions named, or None when the material itself
-    is gone. Older by key, which the database hands out in upload order: a
-    newer version waiting behind this one in the queue is not touched.
+    Older by key, which the database hands out in upload order: a newer
+    version waiting behind this one in the queue is not touched. A file is
+    deleted when no row names it any more, since another edition may hold the
+    same bytes.
     """
+    try:
+        replace_slides_sources(client, [(material.source_file, edition)], written)
+    except Exception:
+        logger.exception("material %d: the older versions' points stay", material.pk)
+        return
     with transaction.atomic():
-        if not _move(material, MaterialStatus.READY, finished_at=timezone.now()):
-            return None
         older = CourseMaterial.objects.filter(
             edition_id=material.edition_id, source_file=material.source_file, pk__lt=material.pk
         )
         names = list(older.values_list("file", flat=True))
         older.delete()
-    return names
-
-
-def _delete_unused_files(names: list[str]) -> None:
-    """Delete each file no row names any more; another edition may hold the same bytes."""
     for name in names:
-        if not CourseMaterial.objects.filter(file=name).exists():
+        if CourseMaterial.objects.filter(file=name).exists():
+            continue
+        try:
             material_storage.delete(name)
+        except OSError:
+            # Windows refuses to delete a file open elsewhere, one being served say.
+            logger.exception("material %d: the file %s stays", material.pk, name)
 
 
 def _fail(

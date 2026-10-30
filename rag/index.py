@@ -517,19 +517,19 @@ def _slides_sources_of(chunks: Sequence[Chunk]) -> set[tuple[str, EditionKey]]:
     }
 
 
-def index_chunks(
+def upsert_chunks(
     client: QdrantClient,
     chunks: Sequence[Chunk],
     dense: DenseEncoder,
     sparse: SparseEncoder,
     collection: str = COLLECTION,
-) -> int:
-    """Encode and upsert one document's chunks; `dense` reads `embed_text`
-    (heading-contextualized), `sparse` reads raw `text` — the two-sided contract
-    set at chunking time. Web chunks replace their own (url, ingest_source)
-    predecessors and slides chunks their own (source_file, course,
-    academic_year) predecessors, after the upsert, so a document is never
-    missing from the index."""
+) -> list[str]:
+    """Encode and upsert one document's chunks, replacing nothing; the ids written.
+
+    `dense` reads `embed_text` (heading-contextualized), `sparse` reads raw
+    `text` — the two-sided contract set at chunking time. Nothing is written
+    until every chunk is encoded.
+    """
     from qdrant_client import models
 
     dense_vectors = dense.encode_documents([chunk.embed_text for chunk in chunks])
@@ -549,7 +549,21 @@ def index_chunks(
         )
     ]
     client.upsert(collection, points)
+    return keep
 
+
+def index_chunks(
+    client: QdrantClient,
+    chunks: Sequence[Chunk],
+    dense: DenseEncoder,
+    sparse: SparseEncoder,
+    collection: str = COLLECTION,
+) -> int:
+    """Upsert one document's chunks, then delete their predecessors: web chunks
+    replace their own (url, ingest_source) predecessors and slides chunks their
+    own (source_file, course, academic_year) ones, after the upsert, so a
+    document is never missing from the index."""
+    keep = upsert_chunks(client, chunks, dense, sparse, collection)
     web_pairs = sorted(
         {
             (chunk.url, chunk.ingest_source)
@@ -562,7 +576,7 @@ def index_chunks(
     slides_sources = sorted(_slides_sources_of(chunks))
     if slides_sources:
         replace_slides_sources(client, slides_sources, keep, collection)
-    return len(points)
+    return len(keep)
 
 
 def main(argv: list[str] | None = None) -> None:
