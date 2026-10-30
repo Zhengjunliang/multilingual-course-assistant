@@ -99,6 +99,8 @@ function failed(error: ApiError): Turn {
     locale: "it",
     complete: false,
     failure: { kind: "failed", error },
+    answerId: null,
+    feedback: null,
   };
 }
 

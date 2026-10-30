@@ -15,7 +15,8 @@ import { ApiError, failureOf, request, writeHeaders } from "./http";
 
 const ASK_URL = "/api/ask";
 
-function answerPath(id: string): string {
+/** An answer's id is a path segment of every endpoint about it: its stream, its stop, its rating. */
+export function answerPath(id: string): string {
   return `/api/answers/${encodeURIComponent(id)}`;
 }
 

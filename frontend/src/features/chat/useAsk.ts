@@ -41,7 +41,7 @@ import {
   stopAnswer,
 } from "@/api/client";
 import type { Citation, RouteDecision } from "@/api/contract";
-import type { ConversationDetail, StoredMessage } from "@/api/conversations";
+import type { ConversationDetail, StoredFeedback, StoredMessage } from "@/api/conversations";
 import { ApiError } from "@/api/http";
 import { follow } from "./follow";
 import { sameEditions } from "./scope";
@@ -80,6 +80,13 @@ export interface Turn {
   /** `end` arrived. Only then may markers be matched against the prose. */
   complete: boolean;
   failure: Failure | null;
+  /**
+   * The answer's id, which its rating is sent to, from `queued` or the stored
+   * row; `null` until then.
+   */
+  answerId: string | null;
+  /** The rating stored with the answer when it was read back; `null` for none, and on a live answer. */
+  feedback: StoredFeedback | null;
 }
 
 export type Waiting =
@@ -124,6 +131,8 @@ function blankTurn(key: string, question: string): Turn {
     locale: null,
     complete: false,
     failure: null,
+    answerId: null,
+    feedback: null,
   };
 }
 
@@ -150,6 +159,8 @@ function replayed(messages: readonly StoredMessage[]): Turn[] {
     open.locale = message.locale;
     open.complete = message.complete;
     if (!message.complete) open.failure = { kind: "interrupted" };
+    open.answerId = message.id;
+    open.feedback = message.feedback;
   }
   return turns;
 }
@@ -411,6 +422,7 @@ async function read(page: Page, key: string, stream: Answering, resumable: boole
             ? current
             : { ...current, turns: [...current.turns, blankTurn(key, event.question)] },
         );
+        patch(page, key, { answerId: event.answer_id });
       },
       start: (event) => {
         patch(page, key, {

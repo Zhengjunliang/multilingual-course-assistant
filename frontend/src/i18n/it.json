@@ -194,7 +194,26 @@
     "copied": "Risposta copiata",
     "searchTime": "Tempo di ricerca",
     "seconds": "{{seconds}} s",
-    "kept": "Quello che vedi è stato salvato così com'è."
+    "kept": "Quello che vedi è stato salvato così com'è.",
+    "rate": {
+      "up": "Buona risposta",
+      "down": "Risposta non buona",
+      "why": "Che cosa non andava?",
+      "comment": "Vuoi aggiungere qualcosa? (facoltativo)",
+      "send": "Invia",
+      "close": "Chiudi",
+      "sent": "Grazie, la valutazione è stata salvata.",
+      "failed": "Non è stato possibile salvare la valutazione.",
+      "retry": "Riprova"
+    }
+  },
+  "feedback": {
+    "reason": {
+      "incorrect": "Non è corretta",
+      "not_answered": "Non risponde alla domanda",
+      "wrong_language": "Lingua sbagliata",
+      "other": "Altro"
+    }
   },
   "code": {
     "copy": "Copia",

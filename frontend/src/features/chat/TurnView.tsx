@@ -9,8 +9,8 @@
  * The answer comes first and its sources after it (#180): no product read on
  * 11 October 2026 puts them above. Above the answer is one line saying how it
  * was searched (`ProcessLine`); in it are pills naming the sources; under it,
- * once it has settled, a copy button and the button to the sources panel
- * (`AnswerActions`).
+ * once it has settled, a copy button, the button to the sources panel and, for
+ * a signed-in reader, the thumbs that rate it (`AnswerActions`).
  *
  * `memo` because a settled turn has nothing to redraw while another one
  * streams, and parsing its Markdown on every token would be most of the work on
@@ -32,6 +32,7 @@ import { AnswerStream } from "./AnswerStream";
 import { HighlightContext } from "./CitationPill";
 import { failureText, type Retry, retryText } from "./notice";
 import { ProcessLine } from "./ProcessLine";
+import { RateAnswer } from "./RateAnswer";
 import { LanguageChip } from "./SourceParts";
 import { MAX_BUSY_RETRIES, type Turn } from "./useAsk";
 
@@ -145,6 +146,15 @@ export const TurnView = memo(function TurnView({
               complete={turn.complete}
               searchMs={turn.searchMs}
               onHighlight={setHighlighted}
+              rating={
+                visitor || turn.answerId === null ? null : (
+                  <RateAnswer
+                    answerId={turn.answerId}
+                    stored={turn.feedback}
+                    question={turn.question}
+                  />
+                )
+              }
             />
           )}
 
