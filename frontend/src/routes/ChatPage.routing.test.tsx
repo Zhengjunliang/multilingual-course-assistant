@@ -1156,10 +1156,14 @@ describe("what a question searches", () => {
     });
     const boxes = [...document.body.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]')];
     const fixed = boxes.filter((box) => box.hasAttribute("data-disabled")).length;
-    const last = boxes.at(-1)?.getAttribute("aria-checked");
+    const last = boxes.at(-1);
+    const left = {
+      checked: last?.getAttribute("aria-checked"),
+      fixed: last?.hasAttribute("data-disabled"),
+    };
     unmount();
 
-    expect({ fixed, last }).toEqual({ fixed: 1, last: "false" });
+    expect({ fixed, left }).toEqual({ fixed: 1, left: { checked: "false", fixed: true } });
   });
 
   it("points an account with no programme and no role to the account page", async () => {
