@@ -119,6 +119,8 @@ function listed(url: URL): Response {
     }),
   );
   const start = (page - 1) * FEEDBACK_PAGE_SIZE;
+  // A page past the last is a 404, as DRF's paginator answers.
+  if (page > 1 && start >= matching.length) return codedRefusal("NOT_FOUND");
   return json({
     count: matching.length,
     next: start + FEEDBACK_PAGE_SIZE < matching.length ? "next" : null,
@@ -328,6 +330,22 @@ describe("the ratings page", () => {
     expect({ chosen, asked }).toEqual({
       chosen: ["", "slides", ""],
       asked: ["GET /api/admin/feedback?target=slides"],
+    });
+  });
+
+  it("reads the first page when the address names one the ratings no longer reach", async () => {
+    const { container, router, unmount } = await open("/staff/feedback?reason=incorrect&page=2");
+    const address = router.state.location.search;
+    const listed = [...container.querySelectorAll("tbody a")].map((link) => link.textContent);
+    unmount();
+
+    expect({ address, listed, asked }).toEqual({
+      address: "?reason=incorrect",
+      listed: ["Che cos'è un ORM?"],
+      asked: [
+        "GET /api/admin/feedback?reason=incorrect&page=2",
+        "GET /api/admin/feedback?reason=incorrect",
+      ],
     });
   });
 
