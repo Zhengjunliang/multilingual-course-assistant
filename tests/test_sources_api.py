@@ -1,52 +1,49 @@
 """`GET /api/sources/<sha256>`: the PDF a slides citation came from.
 
-The corpus and its parse sidecars are built under tmp_path, and the module's
-two directories are pointed at them, so nothing here reads the real corpus.
-Sidecars are written through `ParsedMeta` itself, the model `rag.parse` writes
-them with, so a field the resolver reads cannot drift from what the parser
-records.
+A material is written as the upload writes it, its file stored under its
+digest in the run's own `MATERIALS_ROOT` (tests/conftest.py), with the status
+the test needs, so nothing here reads the developer's material.
 
 Every response is closed: a `FileResponse` holds its file open, and the
 suite's `filterwarnings = error` turns the unclosed handle into a failure.
 """
 
 import hashlib
-import logging
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import pytest
+from django.core.files.base import ContentFile
 from test_qa_api import client_for
 
-from apps.qa import sources
-from rag.parse import ParsedMeta
+from apps.catalog.models import Course, CourseEdition
+from apps.materials.models import CourseMaterial, MaterialFailure, MaterialStatus
 
 pytestmark = pytest.mark.django_db
 
 PDF = b"%PDF-1.4\n% a course deck\n%%EOF\n"
 SHA = hashlib.sha256(PDF).hexdigest()
-WEB_PAGE = b"a crawled page"
-WEB_SHA = hashlib.sha256(WEB_PAGE).hexdigest()
-SECRET = b"%PDF-1.4\n% not course material\n%%EOF\n"
-SECRET_SHA = hashlib.sha256(SECRET).hexdigest()
 
 
-def write_sidecar(
-    parsed: Path, stem: str, source: Path, sha: str, kind: Literal["slides", "web"] = "slides"
-) -> None:
-    meta = ParsedMeta(
-        source_file=source.name,
-        source_path=str(source),
-        source_sha256=sha,
-        parse_variant="classic",
-        docling_version="2.0.0",
-        course="B028451",
-        seconds=1.0,
-        parsed_at="2026-09-29T00:00:00+00:00",
-        academic_year="2025-2026",
-        kind=kind,
+def stored(
+    edition: CourseEdition,
+    data: bytes = PDF,
+    *,
+    name: str = "deck (2).pdf",
+    status: MaterialStatus = MaterialStatus.READY,
+    failure: str = "",
+) -> CourseMaterial:
+    """A material of `edition` holding `data`, its ingest at `status`."""
+    material = CourseMaterial(
+        edition=edition,
+        sha256=hashlib.sha256(data).hexdigest(),
+        source_file=name,
+        status=status,
+        failure=failure,
     )
-    (parsed / f"{stem}.classic.meta.json").write_text(meta.model_dump_json(), encoding="utf-8")
+    material.file.save("upload.pdf", ContentFile(data), save=False)
+    material.save()
+    return material
 
 
 def read(response: Any) -> bytes:
@@ -62,31 +59,14 @@ def read(response: Any) -> bytes:
 
 
 @pytest.fixture
-def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A corpus with one deck, a crawled page, and their sidecars."""
-    corpus = tmp_path / "corpus"
-    parsed = tmp_path / "parsed"
-    (corpus / "PPM").mkdir(parents=True)
-    (corpus / "web").mkdir()
-    parsed.mkdir()
-
-    deck = corpus / "PPM" / "deck (2).pdf"
-    deck.write_bytes(PDF)
-    write_sidecar(parsed, "deck (2)", deck, SHA)
-    # Inside the corpus on purpose: only `kind` keeps it from being served.
-    page = corpus / "web" / "p602.pdf"
-    page.write_bytes(WEB_PAGE)
-    write_sidecar(parsed, "p602", page, WEB_SHA, kind="web")
-    # Matched by the sidecar glob and unreadable as a file: a key that scans
-    # every sidecar reaches it, and must get the 404 of any other miss.
-    (parsed / "zz-a-directory.meta.json").mkdir()
-
-    monkeypatch.setattr(sources, "PARSED_DIR", parsed)
-    monkeypatch.setattr(sources, "CORPUS_DIR", corpus)
-    return tmp_path
+def edition() -> CourseEdition:
+    course = Course.objects.create(code="B028451", name="Progettazione e Produzione Multimediale")
+    return CourseEdition.objects.create(course=course, academic_year="2025-2026")
 
 
-def test_a_slides_source_opens_inline_as_the_indexed_pdf(root: Path) -> None:
+def test_a_ready_material_opens_inline_under_its_uploaded_name(edition: CourseEdition) -> None:
+    stored(edition)
+
     response = client_for().get(f"/api/sources/{SHA}")
     body = read(response)
 
@@ -102,49 +82,31 @@ def test_a_slides_source_opens_inline_as_the_indexed_pdf(root: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "sha",
+    ("sha", "status", "failure"),
     [
-        pytest.param("0" * 64, id="unknown-sha"),
-        pytest.param(SHA.upper(), id="uppercase-hex"),
-        pytest.param(WEB_SHA, id="web-sidecar"),
+        pytest.param("0" * 64, MaterialStatus.READY, "", id="unknown-sha"),
+        pytest.param(SHA.upper(), MaterialStatus.READY, "", id="uppercase-hex"),
+        pytest.param(SHA, MaterialStatus.INDEXING, "", id="still-ingested"),
+        pytest.param(SHA, MaterialStatus.FAILED, MaterialFailure.INCOMPLETE, id="failed"),
     ],
 )
-def test_a_source_is_not_found(root: Path, sha: str) -> None:
+def test_a_source_is_not_found(
+    edition: CourseEdition, sha: str, status: MaterialStatus, failure: str
+) -> None:
+    stored(edition, status=status, failure=failure)
+
     response = client_for().get(f"/api/sources/{sha}")
     response.close()
 
     assert response.status_code == 404
 
 
-@pytest.mark.parametrize(
-    ("planted", "sha", "status"),
-    [
-        pytest.param("corpus/../secret.pdf", SECRET_SHA, 404, id="dotdot-404"),
-        pytest.param("corpus-evil/secret.pdf", SECRET_SHA, 404, id="sibling-prefix-404"),
-        pytest.param("corpus/../secret.pdf", SHA, 200, id="beside-a-good-one-200"),
-    ],
-)
-def test_only_a_sidecar_inside_the_corpus_is_served(
-    root: Path, caplog: pytest.LogCaptureFixture, planted: str, sha: str, status: int
-) -> None:
-    """A sidecar naming a real file outside the corpus is skipped.
+def test_a_material_whose_file_is_gone_is_not_found(edition: CourseEdition) -> None:
+    gone = b"%PDF-1.4\n% deleted by hand\n%%EOF\n"
+    material = stored(edition, gone)
+    Path(material.file.path).unlink()
 
-    `corpus-evil` is the prefix trap: a string comparison would take it for a
-    path inside `corpus`. In the last case the planted sidecar claims the good
-    deck's hash and sorts before it ("a-" < "deck"), so it is read first and
-    must not hide the good one.
-    """
-    outside = root / planted
-    outside.resolve().parent.mkdir(exist_ok=True)
-    outside.resolve().write_bytes(SECRET)
-    write_sidecar(root / "parsed", "a-planted", outside, sha)
+    response = client_for().get(f"/api/sources/{material.sha256}")
+    response.close()
 
-    with caplog.at_level(logging.WARNING, logger="apps.qa.sources"):
-        response = client_for().get(f"/api/sources/{sha}")
-        body = read(response) if response.status_code == 200 else b""
-        response.close()
-
-    assert response.status_code == status
-    assert "skipped" in caplog.text
-    if status == 200:
-        assert body == PDF
+    assert response.status_code == 404

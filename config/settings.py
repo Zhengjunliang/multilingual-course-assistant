@@ -258,7 +258,7 @@ QA_MAX_IN_FLIGHT = env.qa_max_in_flight
 
 # Where an uploaded PDF is kept, named by its digest (apps/materials/models.py).
 # Not MEDIA_ROOT, and no MEDIA_URL: a file leaves only through
-# /api/sources/<sha256> (apps/qa/sources.py), never as a URL of its own. Under
+# /api/sources/<sha256> (apps/qa/source_views.py), never as a URL of its own. Under
 # data/, which git ignores, as everything derived from course material is.
 MATERIALS_ROOT = BASE_DIR / "data" / "materials"
 

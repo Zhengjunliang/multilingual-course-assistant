@@ -40,10 +40,10 @@ from test_catalog_api import as_user, rolled_back
 from test_qa_api import finish
 from test_roles import World, everyone, world
 from test_route_permissions import DELEGATED, routes, served
-from test_sources_api import PDF, SHA, write_sidecar
+from test_sources_api import SHA, stored
 
 from apps.catalog.models import Importance, ReadingItem
-from apps.qa import inflight, sources
+from apps.qa import inflight
 from apps.qa.contract import QueuedEvent
 from apps.qa.models import Conversation, Message
 from apps.roles.invitations import invite
@@ -71,7 +71,7 @@ def targets(
     on, with one section of its syllabus, a book of its reading list and an
     invitation to teach it; B047, with an invitation to its secretariat; the
     student's account, a conversation of theirs and an answer being written
-    for them; the deck of the `deck` fixture.
+    for them; a deck of that edition, ready.
     """
     edition = {"pk": w.ppm_old.pk}
     programme = {"code": w.b047.code}
@@ -181,21 +181,9 @@ def status_of(user: User | None, method: str, url: str, ready: Callable[[], None
     return rolled_back(call)
 
 
-@pytest.fixture
-def deck(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The deck `qa:source` is asked about, built as tests/test_sources_api.py builds it."""
-    corpus, parsed = tmp_path / "corpus", tmp_path / "parsed"
-    (corpus / "PPM").mkdir(parents=True)
-    parsed.mkdir()
-    (corpus / "PPM" / "deck.pdf").write_bytes(PDF)
-    write_sidecar(parsed, "deck", corpus / "PPM" / "deck.pdf", SHA)
-    monkeypatch.setattr(sources, "PARSED_DIR", parsed)
-    monkeypatch.setattr(sources, "CORPUS_DIR", corpus)
-
-
-@pytest.mark.usefixtures("deck")
 def test_who_may_call_each_route() -> None:
     w = world()
+    stored(w.ppm_old)
     conversation = Conversation.objects.create(owner=w.student, locale="it")
     # A conversation with no messages is missing to its owner too
     # (apps/qa/conversation_views.py, `summaries`).

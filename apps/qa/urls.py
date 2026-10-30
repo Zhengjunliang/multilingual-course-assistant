@@ -20,7 +20,7 @@ urlpatterns = [
     # Anything but a UUID in lower-case hex resolves nowhere: a 404, as an
     # unknown id is.
     path("conversations/<uuid:pk>", ConversationDetailView.as_view(), name="conversation"),
-    # Exactly a sha256 as the parse sidecars write it: nothing that could be a
+    # Exactly a sha256 as a material's row records it: nothing that could be a
     # path, and an upper-case key is a 404 rather than a second spelling.
     re_path(r"^sources/(?P<sha256>[0-9a-f]{64})$", SourceView.as_view(), name="source"),
 ]
