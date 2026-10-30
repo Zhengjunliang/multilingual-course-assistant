@@ -1,7 +1,8 @@
 """The journeys' retrieval (`QA_RETRIEVAL` in tests/journeys/settings.py): the
 stub encoders of tests/test_index.py over an in-memory index holding one slides
-excerpt and one web page, so a student, whose scope is every edition, is
-answered from both, and an anonymous visitor, whose scope is none, from the page.
+excerpt and one web page, so a student is answered from the page and from
+whatever of the slides their scope reads (apps/qa/scope.py), and an anonymous
+visitor, whose scope holds no edition, from the page alone.
 
 The index is the run's one, which the journeys' ingest writes into too
 (tests/journeys/ingest.py), so a file uploaded in a journey is among the next

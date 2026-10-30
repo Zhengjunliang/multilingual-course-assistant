@@ -31,7 +31,13 @@ DATABASES = {"default": {**DATABASES["default"], "TEST": {"NAME": "mca_journeys"
 
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,
-    "DEFAULT_THROTTLE_RATES": {"ask": "1000/min", "auth": "1000/min"},
+    # Every bucket of the site's, so a view's scope always has a rate; only
+    # the two the journeys spend in a burst are raised.
+    "DEFAULT_THROTTLE_RATES": {
+        **REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"],
+        "ask": "1000/min",
+        "auth": "1000/min",
+    },
 }
 
 # The developer's site counts in the same Redis database, from the same
