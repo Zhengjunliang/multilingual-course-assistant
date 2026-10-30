@@ -270,8 +270,10 @@ def test_reopening_a_conversation_returns_its_row_as_the_list_shows_it() -> None
 
     detail = client().get(f"{URL}/{conversation.pk}").json()
 
-    # What the detail adds: the thread, and the answer being written into it.
+    # What the detail adds: the thread, the answer being written into it, and
+    # the editions its questions added.
     assert detail.pop("answering") is None
+    assert detail.pop("added_editions") == []
     assert {key: value for key, value in detail.items() if key != "messages"} == only_row()
 
 

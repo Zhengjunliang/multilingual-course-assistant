@@ -62,6 +62,7 @@ const STORED: ConversationDetail = {
     },
   ],
   answering: null,
+  added_editions: [],
 };
 
 /** What `GET /api/conversations` answers; a question on `/` adds to it, as the server does. */

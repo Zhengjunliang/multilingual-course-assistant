@@ -245,6 +245,7 @@ export const CONVERSATION: ConversationDetail = {
     },
   ],
   answering: null,
+  added_editions: [],
 };
 
 // --- the catalogue the staff pages read ------------------------------------------

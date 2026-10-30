@@ -417,6 +417,7 @@ function detail(messages: StoredMessage[], answering: string | null): Conversati
     last_source: null,
     messages,
     answering,
+    added_editions: [],
   };
 }
 

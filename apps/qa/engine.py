@@ -116,7 +116,7 @@ class Engine:
         locale: str | None = None,
         history: Sequence[Turn] = (),
         *,
-        scope: Sequence[EditionKey] | None,
+        scope: Sequence[EditionKey],
         asked_at: float | None = None,
     ) -> Generator[Event, None, None]:
         """Route, retrieve, generate — the read-only three quarters of `rag.agent`.
@@ -129,6 +129,9 @@ class Engine:
         `scope` is the slides editions the caller may be answered from, with
         `rag.search.search`'s meaning, and is required for the same reason it
         is there: it decides what a caller can read, so every call states it.
+        A list, never the None that search reads as every edition: a caller of
+        the site has the scope its account gives it (apps/qa/scope.py), and
+        an empty one searches no slides.
 
         `asked_at` is the `time.time()` reading `StartEvent.search_ms` counts
         from: the task passes the moment the web process admitted the

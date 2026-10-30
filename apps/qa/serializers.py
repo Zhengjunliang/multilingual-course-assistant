@@ -44,6 +44,12 @@ MAX_QUESTION_CHARS = 1000
 # and bounds what the server reads and holds for text no prompt will see.
 MAX_HISTORY_ANSWER_CHARS = 4000
 
+# How many editions one question may add to its default (apps/qa/scope.py).
+# A programme lists some thirty courses, and a student adds a past year of a
+# few of them; the cap bounds what one request makes the server check and the
+# index filter on, as a question's length is bounded.
+MAX_ADDED_EDITIONS = 50
+
 # How much of the first question becomes a sidebar row's label. Long enough to
 # tell two threads about the same lecture apart, short enough not to wrap.
 TITLE_CHARS = 60
@@ -105,6 +111,16 @@ class AskRequest(serializers.Serializer):
     history = serializers.ListSerializer(
         child=TurnSerializer(), required=False, max_length=HISTORY_WINDOW_TURNS
     )
+    # The editions this question and the conversation's later ones search
+    # besides the caller's default, by id: omitted keeps what the conversation
+    # holds, `[]` clears it. An id outside the caller's boundary refuses the
+    # question (apps/qa/views.py); a visitor reads no edition, so sends none.
+    added_editions = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        default=None,
+        max_length=MAX_ADDED_EDITIONS,
+    )
     # Optional: with no locale the engine detects one from the question itself,
     # which is what the CLI does. An empty string is not a locale — `allow_null`
     # without `allow_blank` makes "omitted" and "null" the only ways to say
@@ -130,8 +146,9 @@ class AskRequest(serializers.Serializer):
         Each caller has one source, and a request naming the other is refused
         rather than a field quietly ignored. A logged-in caller's history is
         the stored one, which a client-sent copy could only contradict: a 400.
-        A request without a session that sends no history, or names a stored
-        conversation, is shaped the way a signed-in client shapes its own; it
+        A request without a session that sends no history, names a stored
+        conversation or adds editions is shaped the way a signed-in client
+        shapes its own; it
         is one whose session ended in another tab or ran out. It gets the
         `UNAUTHENTICATED` such a client acts on by asking its reader to sign in
         again (frontend/src/api/http.ts, `isSessionLost`), as it did before
@@ -153,7 +170,10 @@ class AskRequest(serializers.Serializer):
         request: Request = self.context["request"]
         attrs["conversation"] = None
         if not request.user.is_authenticated:
-            if "history" not in attrs or attrs.get("conversation_id") is not None:
+            signed_in = (
+                attrs.get("conversation_id") is not None or attrs["added_editions"] is not None
+            )
+            if "history" not in attrs or signed_in:
                 fail(ErrorCode.UNAUTHENTICATED)
             attrs["history"] = [Turn(**turn) for turn in attrs["history"]]
             return attrs
@@ -307,9 +327,11 @@ class ConversationDetailSerializer(ConversationSerializer):
 
     messages = serializers.SerializerMethodField()
     answering = serializers.SerializerMethodField()
+    # By id, as a question sends them (`AskRequest.added_editions`).
+    added_editions = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
 
     class Meta(ConversationSerializer.Meta):
-        fields = (*ConversationSerializer.Meta.fields, "messages", "answering")
+        fields = (*ConversationSerializer.Meta.fields, "messages", "answering", "added_editions")
 
     def get_messages(self, conversation: Conversation) -> list[ReturnDict[str, Any]]:
         messages = Message.objects.filter(conversation=conversation)

@@ -65,8 +65,10 @@ from test_agent import ScriptedCompleter
 from test_error_contract import refused
 from test_index import StubDense, StubSparse, make_chunk
 from test_inflight import admitted, expire
+from test_scope import declare, offer
 
 from apps.accounts.models import User
+from apps.catalog.models import CourseEdition
 from apps.qa import engine as engine_module
 from apps.qa import inflight, tasks
 from apps.qa import views as views_module
@@ -95,6 +97,9 @@ CONVERSATIONS_URL = "/api/conversations"
 SSE_MEDIA_TYPE = "text/event-stream"
 
 ORM_TEXT = "An ORM maps objects to database tables."
+# Two more decks: last year's of the same course, and another programme's.
+PAST_ORM_TEXT = "Last year's deck maps objects to tables as well."
+SEARCH_TEXT = "Uninformed search expands every node of a level."
 TASSE_TEXT = "Le tasse universitarie scadono il 30 novembre."
 TASSE_URL = "https://www.unifi.it/it/tasse-e-agevolazioni"
 FETCH_DATE = "2026-08-01"
@@ -109,6 +114,23 @@ WEB_ROUTE = '{"target": "unifi_web", "query": "tasse", "fresh": false, "reason":
 BOTH_ROUTE = '{"target": "both", "query": "orm", "fresh": false, "reason": "unsure"}'
 
 ENGINE_DOWN_LINE = "the stream ended in ENGINE_DOWN: A service the answer needs is not running."
+
+
+# The edition of every chunk `make_chunk` builds (tests/test_index.py).
+PPM, PPM_YEAR = "B028451", "2025-2026"
+
+
+def edition_chunk(edition: CourseEdition, text: str) -> Chunk:
+    """A slides chunk of `edition`, from a deck of its own."""
+    course, year = edition.course.code, edition.academic_year
+    return make_chunk(0, text).model_copy(
+        update={
+            "chunk_id": f"{course}:{year}:{'cd' * 8}:classic:0000",
+            "course": course,
+            "academic_year": year,
+            "source_sha256": "cd" * 32,
+        }
+    )
 
 
 def make_web_chunk() -> Chunk:
@@ -259,8 +281,15 @@ def student() -> User:
     `Conversation` carries a foreign key to its owner, and a foreign key does
     not care that a `User` exists in memory. `get_or_create` so that repeated
     calls inside one test are the same student rather than a second one.
+
+    Declared in B047, which lists the course of `index`'s slides chunk, in its
+    one edition, which is therefore current: a question searches it by
+    default (apps/qa/scope.py).
     """
-    user, _ = User.objects.get_or_create(username="student")
+    user, created = User.objects.get_or_create(username="student")
+    if created:
+        offer("B047", PPM, PPM_YEAR)
+        declare(user, "B047")
     return user
 
 
@@ -1826,23 +1855,24 @@ def test_an_anonymous_history_at_its_bounds_is_accepted(index: QdrantClient) -> 
     finish(response)
 
 
-@pytest.mark.parametrize("names_a_conversation", [False, True], ids=["no-history", "an-id"])
+@pytest.mark.parametrize("shape", ["no-history", "an-id", "added-editions"])
 def test_a_request_shaped_for_a_session_that_has_none_is_refused_as_one_that_ended(
-    index: QdrantClient, names_a_conversation: bool
+    index: QdrantClient, shape: str
 ) -> None:
-    """No history, or a conversation's id, is what a signed-in client sends;
-    arriving without a session, it is one whose session ended in another tab
-    or ran out. It gets the 401 that client acts on, before anything runs,
-    rather than an answer as a visitor that it would render as its own and
-    then lose."""
+    """No history, a conversation's id or added editions is what a signed-in
+    client sends; arriving without a session, it is one whose session ended
+    in another tab or ran out. It gets the 401 that client acts on, before
+    anything runs, rather than an answer as a visitor that it would render as
+    its own and then lose."""
     engine = install_engine(index, WEB_ROUTE)
     theirs = Conversation.objects.create(owner=student(), locale="it")
 
-    response = (
-        ask(anonymous=True, conversation_id=theirs.pk, history=[])
-        if names_a_conversation
-        else ask(anonymous=True)
-    )
+    if shape == "no-history":
+        response = ask(anonymous=True)
+    elif shape == "an-id":
+        response = ask(anonymous=True, conversation_id=theirs.pk, history=[])
+    else:
+        response = ask(anonymous=True, added_editions=[], history=[])
 
     assert (response.status_code, refused(response)) == (401, ("UNAUTHENTICATED", {}))
     assert engine.completer.questions == []  # pyright: ignore[reportAttributeAccessIssue]
@@ -1880,3 +1910,101 @@ def test_a_real_worker_answers_a_queued_question(
         stream = events(ask(anonymous=True, history=[]))
 
     assert names(stream) == ["queued", "start", "token", "token", "end"]
+
+
+def slides_editions(stream: list[tuple[str, Any]]) -> set[tuple[str, str]]:
+    """The editions the slides excerpts of an answer came from."""
+    return {
+        (citation["course"], citation["academic_year"])
+        for citation in start_of(stream)["citations"]
+        if citation["kind"] == "slides"
+    }
+
+
+def last_years_deck(index: QdrantClient) -> CourseEdition:
+    """A past edition of the student's course, its deck in the index."""
+    student()
+    (past,) = offer("B047", PPM, "2024-2025")
+    index_chunks(index, [edition_chunk(past, PAST_ORM_TEXT)], StubDense(), StubSparse())
+    return past
+
+
+def test_past_edition_can_be_selected(index: QdrantClient) -> None:
+    """A past year is not searched by default; added, its deck is cited."""
+    past = last_years_deck(index)
+
+    install_engine(index, SLIDES_ROUTE)
+    by_default = slides_editions(events(ask()))
+    install_engine(index, SLIDES_ROUTE)
+    added = slides_editions(events(ask(added_editions=[past.pk])))
+
+    assert by_default == {(PPM, PPM_YEAR)}
+    assert added == {(PPM, PPM_YEAR), (PPM, past.academic_year)}
+
+
+def test_added_editions_stay_with_the_conversation(index: QdrantClient) -> None:
+    """Added once, a past year is searched by every later question of the
+    conversation and listed with it; a new conversation starts without it,
+    and `[]` clears it."""
+    past = last_years_deck(index)
+    last_year = (PPM, past.academic_year)
+
+    install_engine(index, SLIDES_ROUTE)
+    conversation_id = start_of(events(ask(added_editions=[past.pk])))["conversation_id"]
+    install_engine(index, SLIDES_ROUTE)
+    follow_up = slides_editions(events(ask("And Active Record?", conversation_id=conversation_id)))
+    install_engine(index, SLIDES_ROUTE)
+    elsewhere = slides_editions(events(ask("And Active Record?")))
+    detail = client_for().get(f"{CONVERSATIONS_URL}/{conversation_id}").json()
+    install_engine(index, SLIDES_ROUTE)
+    events(ask("And Data Mapper?", conversation_id=conversation_id, added_editions=[]))
+    cleared = client_for().get(f"{CONVERSATIONS_URL}/{conversation_id}").json()
+
+    assert last_year in follow_up
+    assert last_year not in elsewhere
+    assert (detail["added_editions"], cleared["added_editions"]) == ([past.pk], [])
+
+
+@pytest.mark.parametrize("names", ["another-programme", "nothing"])
+def test_edition_outside_the_programme_is_refused(index: QdrantClient, names: str) -> None:
+    """One 403 for another programme's edition and for an id naming none,
+    before the engine runs or a conversation is started."""
+    engine = install_engine(index, SLIDES_ROUTE)
+    student()
+    (theirs,) = offer("L031", "B003725", "2025-2026")
+
+    response = ask(added_editions=[theirs.pk if names == "another-programme" else theirs.pk + 1])
+
+    assert (response.status_code, refused(response)) == (403, ("PERMISSION_DENIED", {}))
+    assert engine.completer.questions == []  # pyright: ignore[reportAttributeAccessIssue]
+    assert not Conversation.objects.exists()
+
+
+def test_student_never_gets_another_programmes_slides(index: QdrantClient) -> None:
+    """Two programmes' decks in one collection: each student is answered from
+    their own alone, and both, a visitor too, from the campus pages. The
+    edition filter is on the slides branch alone (rag/search.py): put on the
+    whole query, it would empty the campus half too, and this test with it."""
+    student()
+    (search,) = offer("L031", "B003725", "2025-2026")
+    index_chunks(index, [edition_chunk(search, SEARCH_TEXT)], StubDense(), StubSparse())
+    other = User.objects.create_user(username="other-student")
+    declare(other, "L031")
+
+    def kinds_and_editions(response: Any) -> tuple[set[str], set[tuple[str, str]]]:
+        stream = events(response)
+        kinds = {citation["kind"] for citation in start_of(stream)["citations"]}
+        return kinds, slides_editions(stream)
+
+    install_engine(index, BOTH_ROUTE)
+    mine = kinds_and_editions(ask())
+    install_engine(index, BOTH_ROUTE)
+    theirs = kinds_and_editions(
+        client_for(user=other).post(ASK_URL, {"question": "What is an ORM?"}, format="json")
+    )
+    install_engine(index, BOTH_ROUTE)
+    visitors = kinds_and_editions(ask(anonymous=True, history=[]))
+
+    assert mine == ({"slides", "web"}, {(PPM, PPM_YEAR)})
+    assert theirs == ({"slides", "web"}, {("B003725", "2025-2026")})
+    assert visitors == ({"web"}, set())

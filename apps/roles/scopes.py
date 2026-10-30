@@ -218,6 +218,16 @@ def must_leave_a_teacher(user: Caller, edition: CourseEdition) -> bool:
     return caller is None or not (caller.is_superuser or as_secretariat)
 
 
+def as_teacher(edition: CourseEdition) -> bool:
+    """Whether the user `with_edition_roles` marked `edition` for teaches its course.
+
+    Read from the marks, as `must_leave_a_teacher` reads them: what a
+    question searches by default (apps/qa/scope.py) asks it of every edition
+    a list holds, in the one query that read the list.
+    """
+    return getattr(edition, _EDITION_FLAGS[Role.TEACHER])
+
+
 def held_on(user: Caller, scope: CourseEdition | DegreeProgramme) -> frozenset[Permission]:
     """What `user` holds on `scope`, reading its row again in one query.
 

@@ -26,12 +26,13 @@ from uuid import UUID
 import pytest
 from test_agent import ScriptedCompleter
 from test_index import StubDense, StubSparse, make_chunk
-from test_qa_api import ORM_TEXT, SLIDES_ROUTE, ScriptedStreamer
+from test_qa_api import ORM_TEXT, PPM, PPM_YEAR, SLIDES_ROUTE, ScriptedStreamer
 
 from apps.qa import engine as engine_module
 from apps.qa.engine import Engine, EngineUnavailableError
 from rag.agent import RouteDecision
 from rag.answer import Turn
+from rag.chunk import EditionKey
 from rag.index import ensure_collection, index_chunks, open_client
 
 if TYPE_CHECKING:
@@ -40,6 +41,8 @@ if TYPE_CHECKING:
     from apps.qa.contract import StartEvent
 
 CONVERSATION_ID = UUID("3f1c9a52-6b0e-4d7a-9c1e-2a5b8d4f0e17")
+# The edition of the one chunk `stub_engine` indexes.
+SCOPE = [EditionKey(PPM, PPM_YEAR)]
 
 
 def stub_engine(tmp_path: Path) -> Engine:
@@ -72,7 +75,7 @@ def test_the_engine_answers_without_touching_the_database(tmp_path: Path) -> Non
             "How does it differ?",
             CONVERSATION_ID,
             history=[Turn(question="What is an ORM?", answer="It maps objects to tables.")],
-            scope=None,
+            scope=SCOPE,
         )
     )
     engine.client.close()
@@ -107,7 +110,7 @@ def test_the_search_time_counts_from_when_the_question_was_asked(
     monkeypatch.setattr(engine_module, "time", SimpleNamespace(time=lambda: next(clock)))
     engine = stub_engine(tmp_path)
 
-    events = engine.stream("What is an ORM?", CONVERSATION_ID, scope=None, asked_at=asked_at)
+    events = engine.stream("What is an ORM?", CONVERSATION_ID, scope=SCOPE, asked_at=asked_at)
     try:
         start = next(events)
     finally:
@@ -162,7 +165,7 @@ def test_retrieval_takes_turns_and_generation_does_not(monkeypatch: pytest.Monke
 
     def answer_one() -> None:
         try:
-            list(engine.stream("What is an ORM?", None, scope=None))
+            list(engine.stream("What is an ORM?", None, scope=SCOPE))
         except BaseException as exc:  # reported below, in the test's own thread
             failures.append(exc)
 

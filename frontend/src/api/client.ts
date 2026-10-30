@@ -50,6 +50,12 @@ export interface AskBody {
   conversation_id?: string | null;
   /** A visitor's last exchanges, oldest first, at most `HISTORY_WINDOW_TURNS`. */
   history?: HistoryTurn[];
+  /**
+   * The editions this question and the conversation's later ones search
+   * besides the default, by id: omitted keeps what the conversation holds,
+   * `[]` clears it. One outside the caller's boundary is a 403. Signed in only.
+   */
+  added_editions?: number[];
   /** Omitted means "decide for me" — the engine detects it from the question. */
   locale?: string;
 }

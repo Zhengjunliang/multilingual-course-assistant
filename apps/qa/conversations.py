@@ -1,8 +1,10 @@
 """Reading and writing a conversation around one answered question.
 
-Every query the answer path makes is in this module, and it makes them for one
-reason each: find or start the thread, slice the history the prompt gets, write
-the two rows, settle the assistant row when the stream ends. `thread` is how a
+Every query the answer path makes of a conversation is in this module, and it
+makes them for one reason each: find or start the thread, slice the history the
+prompt gets, read the editions it added, write the two rows, settle the
+assistant row when the stream ends. Which editions the caller may read is
+apps/qa/scope.py's. `thread` is how a
 conversation is read in order, here and in the detail the sidebar opens. HTTP is not
 mentioned here and neither is the engine. The web view opens the thread and
 slices the history before it queues the question (apps/qa/views.py); the
@@ -28,7 +30,7 @@ from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from rag.answer import Turn
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Collection, Iterable
     from uuid import UUID
 
     from apps.accounts.models import User
@@ -132,7 +134,18 @@ def recent_turns(conversation: Conversation) -> list[Turn]:
     return turns
 
 
-def record_exchange(conversation_id: UUID, start: StartEvent, answer_pk: UUID) -> None:
+def added_to(conversation: Conversation) -> set[int]:
+    """The editions `conversation` searches besides its owner's default, by id."""
+    return set(conversation.added_editions.values_list("pk", flat=True))
+
+
+def record_exchange(
+    conversation_id: UUID,
+    start: StartEvent,
+    answer_pk: UUID,
+    *,
+    added_editions: Collection[int] | None = None,
+) -> None:
     """Write the question and the empty answer, the answer under `answer_pk`.
 
     `answer_pk` is the answer's id everywhere: the web process chose it when
@@ -153,6 +166,10 @@ def record_exchange(conversation_id: UUID, start: StartEvent, answer_pk: UUID) -
     because now is when they exist: they arrive in the `start` event, which is
     not repeated. Reopening this conversation later replays it from these
     columns.
+
+    `added_editions`, when the question set them, replace the conversation's
+    in the same lock, so a question that never began leaves its choice
+    unwritten as it leaves its rows; None keeps what the conversation holds.
 
     The question may have waited for a worker, and the student may have
     deleted the conversation meanwhile — after Stop, or from another tab. The
@@ -187,6 +204,8 @@ def record_exchange(conversation_id: UUID, start: StartEvent, answer_pk: UUID) -
             search_ms=start.search_ms,
         )
         Conversation.objects.filter(pk=conversation_id).update(current_leaf=answer)
+        if added_editions is not None:
+            locked.added_editions.set(added_editions)
 
 
 def settle(answer_pk: UUID, text: str, *, complete: bool) -> None:
