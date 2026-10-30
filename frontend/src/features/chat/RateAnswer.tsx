@@ -87,6 +87,8 @@ export function RateAnswer({ answerId, stored, question }: RateAnswerProps) {
       } catch (error) {
         if (latest.current !== mine) return;
         setShown(held.current);
+        // Why a thumb down was given is not asked of a thumb the server never took.
+        if (held.current?.rating !== "down") setAsking(false);
         if (isSessionLost(error)) {
           forget();
           return;
