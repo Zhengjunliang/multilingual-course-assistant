@@ -1,7 +1,8 @@
 /**
  * What the API answers in the browser tests, typed by the client's mirrors of
  * the server's shapes (`src/api/*.ts`), which `tests/test_qa_contract.py`,
- * `tests/test_catalog_contract.py` and `tests/test_admin_contract.py` hold to
+ * `tests/test_catalog_contract.py`, `tests/test_admin_contract.py` and
+ * `tests/test_scope_contract.py` hold to
  * the Python side: a field renamed on
  * the server breaks `tsc` here before it can make a test pass for nothing.
  * Which endpoint answers which of them is written in `e2e/api.ts`.
@@ -16,6 +17,7 @@ import type {
   Invitation,
   InvitationGrant,
   Programme,
+  ProgrammeName,
   ReadingItem,
   StaffMember,
   StudyPlanCourse,
@@ -23,20 +25,22 @@ import type {
 } from "@/api/catalog";
 import type { AnswerEvent, Citation, RouteDecision } from "@/api/contract";
 import type { ConversationDetail } from "@/api/conversations";
+import type { ScopeCourse } from "@/api/scope";
 import { uuidOf } from "@/test/conversations";
 
 // --- who is calling ------------------------------------------------------------
 
 export const VISITOR: Session = { authenticated: false, user: null };
 
+/** In the second year of B060, so the question box offers B003's editions (`SCOPE`). */
 export const STUDENT: Account = {
   id: 1,
   username: "demo-student",
   locale: "it",
   is_superuser: false,
   roles: [],
-  programme: null,
-  year_of_study: null,
+  programme: "B060",
+  year_of_study: 2,
 };
 
 /** Secretariat of a programme and teacher of an edition: every staff page has something to show. */
@@ -304,6 +308,30 @@ export const EDITION_READ: Edition = {
   teachers: [STAFF_MEMBER],
   permissions: ["edition.view", "edition.edit_content", "edition.manage_materials"],
 };
+
+/** The programmes registration and the account page offer. */
+export const PROGRAMMES: ProgrammeName[] = [
+  { code: PROGRAMME.code, name: PROGRAMME.name, locale: PROGRAMME.locale },
+];
+
+/** The question box's course list: B003's current edition searched, the year before to add. */
+export const SCOPE: ScopeCourse[] = [
+  {
+    code: COURSE.code,
+    name: COURSE.name,
+    locale: COURSE.locale,
+    year_of_study: 2,
+    editions: [
+      { id: EDITION.id, academic_year: EDITION.academic_year, state: "current", default: true },
+      {
+        id: EDITION_READ.id,
+        academic_year: EDITION_READ.academic_year,
+        state: "past",
+        default: false,
+      },
+    ],
+  },
+];
 
 /** The edition's invitations not accepted yet: one still good, one expired. */
 export const PENDING: Invitation[] = [
