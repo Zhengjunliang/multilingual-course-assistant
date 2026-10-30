@@ -4,7 +4,8 @@
  * The account's page (#167), with the network faked at `fetch`: what it
  * shows of what the server answers, the roles by their scopes' names and
  * each device by its browser and system, the current one marked and never
- * offered to end; what it sends for each change; and what it does with each
+ * offered to end; what it sends for each change, the programme and year
+ * through the session as each is chosen; and what it does with each
  * answer: a wrong password said at the password, a device already gone
  * taken as ended, a deletion the account's rules refuse said in the dialog,
  * and one accepted leaving for the front page as a visitor.
@@ -14,9 +15,10 @@ import { act } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Account, AccountSession } from "@/api/account";
-import type { Edition, Programme } from "@/api/catalog";
+import type { Account, AccountSession, Studies } from "@/api/account";
+import type { Edition, Programme, ProgrammeName } from "@/api/catalog";
 import type { ErrorCode, FieldViolation } from "@/api/errors";
+import { ApiError } from "@/api/http";
 import { SessionContext } from "@/auth/SessionProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { readDraft, writeDraft } from "@/features/chat/draft";
@@ -83,10 +85,26 @@ const EDITION: Edition = {
 };
 
 function account(superuser: boolean, roles: Account["roles"]): Account {
-  return { id: 7, username: "demo-reader", locale: "it", is_superuser: superuser, roles };
+  return {
+    id: 7,
+    username: "demo-reader",
+    locale: "it",
+    is_superuser: superuser,
+    roles,
+    programme: null,
+    year_of_study: null,
+  };
 }
 
 const STUDENT = account(false, []);
+
+const PROGRAMMES: ProgrammeName[] = [
+  { code: "B047", name: "INGEGNERIA INFORMATICA", locale: "it" },
+  { code: "B060", name: "INFORMATICA", locale: "it" },
+];
+
+/** A student of B047 in its second year. */
+const SECOND_YEAR: Account = { ...STUDENT, programme: "B047", year_of_study: 2 };
 
 /** The devices the server holds now. */
 let devices: AccountSession[] = [];
@@ -107,6 +125,7 @@ async function fakeApi(input: RequestInfo | URL, init: RequestInit = {}): Promis
   const method = init.method ?? "GET";
   if (method === "GET" && path === "/api/auth/sessions") return json(devices);
   if (method === "GET" && path === "/api/catalog/editions") return json([EDITION]);
+  if (method === "GET" && path === "/api/auth/programmes") return json(PROGRAMMES);
   if (method !== "POST") return codedRefusal("NOT_FOUND");
   const body = JSON.parse(String(init.body)) as { session?: string };
   sent.push({ to: path, body });
@@ -142,7 +161,7 @@ async function settle() {
   }
 }
 
-async function page(reader: Account = STUDENT) {
+async function page(reader: Account = STUDENT, chooseStudies = async (_: Studies) => {}) {
   const forget = vi.fn();
   const router = createMemoryRouter(
     [
@@ -160,6 +179,7 @@ async function page(reader: Account = STUDENT) {
           register: async () => {},
           logOut: async () => {},
           chooseLocale: async () => {},
+          chooseStudies,
           forget,
           recheck: async () => {},
         }}
@@ -183,6 +203,13 @@ function type(input: HTMLInputElement | null, value: string) {
   });
 }
 
+function choose(select: HTMLSelectElement | null, value: string) {
+  act(() => {
+    if (select !== null) select.value = value;
+    select?.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
 function press(scope: ParentNode, name: string) {
   const button = [...scope.querySelectorAll("button")].find(
     (candidate) => candidate.textContent === name || candidate.getAttribute("aria-label") === name,
@@ -200,7 +227,7 @@ async function confirm(password: string) {
 }
 
 /** The text of what describes `input`. */
-function said(input: HTMLInputElement | null): string | undefined {
+function said(input: Element | null): string | undefined {
   const ids = input?.getAttribute("aria-describedby")?.split(" ") ?? [];
   return ids.map((id) => document.getElementById(id)?.textContent ?? "").join(" ");
 }
@@ -344,6 +371,76 @@ describe("a change the page sends", () => {
       fields: ["", ""],
       toast: expect.stringContaining(toast),
     });
+  });
+});
+
+describe("what the account studies", () => {
+  it.each([
+    { who: "a student of B047 in its second year", reader: SECOND_YEAR, shown: ["B047", "2"] },
+    // No year is offered without a programme.
+    { who: "an account that said nothing", reader: STUDENT, shown: [""] },
+  ])("is shown for $who as the account holds it", async ({ reader, shown }) => {
+    const { container, unmount } = await page(reader);
+    const values = [
+      ...container.querySelectorAll<HTMLSelectElement>("#programme, #year_of_study"),
+    ].map((select) => select.value);
+    unmount();
+
+    expect(values).toEqual(shown);
+  });
+
+  it.each([
+    {
+      change: "a programme chosen",
+      reader: STUDENT,
+      field: "#programme",
+      value: "B060",
+      written: { programme: "B060", year_of_study: null },
+    },
+    {
+      change: "another year",
+      reader: SECOND_YEAR,
+      field: "#year_of_study",
+      value: "3",
+      written: { programme: "B047", year_of_study: 3 },
+    },
+    {
+      change: "no programme, which clears the year",
+      reader: SECOND_YEAR,
+      field: "#programme",
+      value: "",
+      written: { programme: null, year_of_study: null },
+    },
+  ])("$change: written as it is chosen", async ({ reader, field, value, written }) => {
+    const chooseStudies = vi.fn(async (_: Studies) => {});
+    const { container, unmount } = await page(reader, chooseStudies);
+    choose(container.querySelector<HTMLSelectElement>(field), value);
+    await settle();
+    unmount();
+
+    expect(chooseStudies.mock.calls).toEqual([[written]]);
+  });
+
+  it("refused, a programme gone since the list was read: said under it, the account's shown again", async () => {
+    const chooseStudies = async () => {
+      throw new ApiError({
+        status: 400,
+        code: "INVALID_ARGUMENT",
+        violations: [{ field: "programme", reason: "INVALID", data: {} }],
+      });
+    };
+    const { container, unmount } = await page(STUDENT, chooseStudies);
+    choose(container.querySelector<HTMLSelectElement>("#programme"), "B060");
+    await settle();
+    const field = container.querySelector<HTMLSelectElement>("#programme");
+    const after = {
+      value: field?.value,
+      said: said(field),
+      focused: document.activeElement === field,
+    };
+    unmount();
+
+    expect(after).toEqual({ value: "", said: i18n.t("errors.field.INVALID"), focused: true });
   });
 });
 

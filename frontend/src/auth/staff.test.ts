@@ -6,7 +6,15 @@ import type { Account, RoleScope } from "@/api/account";
 import { type RoleLabel, roleOf } from "./staff";
 
 function account(roles: RoleScope[], superuser = false): Account {
-  return { id: 1, username: "reader", locale: "it", is_superuser: superuser, roles };
+  return {
+    id: 1,
+    username: "reader",
+    locale: "it",
+    is_superuser: superuser,
+    roles,
+    programme: null,
+    year_of_study: null,
+  };
 }
 
 const TEACHER: RoleScope = { role: "teacher", edition: 3 };

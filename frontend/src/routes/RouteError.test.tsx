@@ -62,6 +62,8 @@ const STUDENT: Account = {
   locale: "it",
   is_superuser: false,
   roles: [],
+  programme: null,
+  year_of_study: null,
 };
 
 const ACTIONS = {
@@ -69,6 +71,7 @@ const ACTIONS = {
   register: async () => {},
   logOut: async () => {},
   chooseLocale: async () => {},
+  chooseStudies: async () => {},
   forget: () => {},
   recheck: async () => {},
 };

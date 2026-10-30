@@ -17,8 +17,15 @@
 
 import { createContext, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
-import type { Account } from "@/api/account";
-import { logIn, logOut, readSession, register, setAccountLocale } from "@/api/account";
+import type { Account, Studies } from "@/api/account";
+import {
+  logIn,
+  logOut,
+  readSession,
+  register,
+  setAccountLocale,
+  setAccountStudies,
+} from "@/api/account";
 import { isSessionLost } from "@/api/http";
 import { clearDraft } from "@/features/chat/draft";
 import { chooseUiLocale, type UiLocale } from "@/i18n";
@@ -27,9 +34,16 @@ interface SessionValue {
   /** `null` means nobody is signed in — an ordinary state, not a failure. */
   account: Account | null;
   logIn: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string, locale: UiLocale) => Promise<void>;
+  register: (
+    username: string,
+    password: string,
+    locale: UiLocale,
+    studies: Studies,
+  ) => Promise<void>;
   logOut: () => Promise<void>;
   chooseLocale: (locale: UiLocale) => Promise<void>;
+  /** Writes what the account says it studies, and follows the account the server answers with. */
+  chooseStudies: (studies: Studies) => Promise<void>;
   /** Called when a request comes back refused, to drop a session that ended elsewhere. */
   forget: () => void;
   /**
@@ -94,8 +108,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const session = await logIn(username, password);
         adopt(session.user);
       },
-      register: async (username, password, locale) => {
-        const session = await register(username, password, locale);
+      register: async (username, password, locale, studies) => {
+        const session = await register(username, password, locale, studies);
         adopt(session.user);
       },
       logOut: async () => {
@@ -118,6 +132,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // account is still the source — this only stops it looking slow.
         void chooseUiLocale(locale);
         adopt((await setAccountLocale(locale)).user);
+      },
+      chooseStudies: async (studies) => {
+        adopt((await setAccountStudies(studies)).user);
       },
       forget,
       recheck: async () => {

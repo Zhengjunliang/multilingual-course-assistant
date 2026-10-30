@@ -108,6 +108,14 @@
       "confirm": "Delete"
     }
   },
+  "studies": {
+    "title": "Studies",
+    "programme": "Degree programme",
+    "year": "Year of study",
+    "none": "Not stated",
+    "yearN": "Year {{year}}",
+    "hint": "Optional. Your questions search the material of your programme's courses."
+  },
   "theme": {
     "system": "System",
     "light": "Light",

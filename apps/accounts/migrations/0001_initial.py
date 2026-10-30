@@ -2,6 +2,7 @@
 
 import django.contrib.auth.models
 import django.contrib.auth.validators
+import django.core.validators
 import django.db.models.deletion
 import django.utils.timezone
 from django.conf import settings
@@ -13,6 +14,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("auth", "0012_alter_user_first_name_max_length"),
+        ("catalog", "0001_initial"),
     ]
 
     operations = [
@@ -176,5 +178,60 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
+        ),
+        migrations.CreateModel(
+            name="StudentProgramme",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "year_of_study",
+                    models.PositiveSmallIntegerField(
+                        blank=True,
+                        null=True,
+                        validators=[
+                            django.core.validators.MinValueValidator(1),
+                            django.core.validators.MaxValueValidator(6),
+                        ],
+                        verbose_name="year of study",
+                    ),
+                ),
+                (
+                    "programme",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="+",
+                        to="catalog.degreeprogramme",
+                        verbose_name="degree programme",
+                    ),
+                ),
+                (
+                    "user",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="student_programme",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+            ],
+            options={
+                "verbose_name": "student programme",
+                "verbose_name_plural": "student programmes",
+                "constraints": [
+                    models.CheckConstraint(
+                        condition=models.Q(
+                            ("year_of_study__isnull", True),
+                            models.Q(("year_of_study__gte", 1), ("year_of_study__lte", 6)),
+                            _connector="OR",
+                        ),
+                        name="accounts_programme_year_of_study_range",
+                        violation_error_message="A year of study is between 1 and 6.",
+                    )
+                ],
+            },
         ),
     ]

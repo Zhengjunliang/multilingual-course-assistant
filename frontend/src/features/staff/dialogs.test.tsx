@@ -26,6 +26,8 @@ const READER: Account = {
   locale: "it",
   is_superuser: false,
   roles: [],
+  programme: null,
+  year_of_study: null,
 };
 const EDITION: MemberScope = { kind: "edition", id: 5 };
 const B047: MemberScope = { kind: "programme", code: "B047" };
@@ -75,6 +77,7 @@ function open(dialog: ReactElement) {
         register: async () => {},
         logOut: async () => {},
         chooseLocale: async () => {},
+        chooseStudies: async () => {},
         forget: () => {},
         recheck: async () => {},
       }}

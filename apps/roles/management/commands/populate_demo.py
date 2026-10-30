@@ -26,9 +26,10 @@ on one holding rows of its own:
   shipped content names the shipped catalogue's editions, so a catalogue file
   given without a content file gets none.
 - Accounts: `demo-` ones only, and the file may name no other. A declared
-  account's name, superuser flag and role rows are made the file's, rows it does not
-  declare removed; a `demo-` account the file does not name keeps the account
-  and loses its role rows, so the demo holds exactly the roles the file shows.
+  account's name, superuser flag, role rows and programme (`StudentProgramme`)
+  are made the file's, rows it does not declare removed; a `demo-` account
+  the file does not name keeps the account and loses its role rows, so the
+  demo holds exactly the roles the file shows.
   An account switched off in the admin stays off: every demo account shares
   `DEMO_PASSWORD`, so switching `demo-admin` off is how a site others can reach
   keeps the superuser's door shut. An account outside `demo-` is never touched.
@@ -56,7 +57,7 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from apps.accounts.models import User
+from apps.accounts.models import StudentProgramme, User
 from apps.accounts.passwords import set_password_checked
 from apps.catalog.models import (
     CodeSource,
@@ -261,6 +262,13 @@ class Command(BaseCommand):
                 want.full_clean()
                 want.save()
                 self.stdout.write(f"added role {want}")
+        code = account.get("programme")
+        programme = None if code is None else DegreeProgramme.objects.filter(code=code).first()
+        if code is not None and programme is None:
+            raise CommandError(f"{username}: no programme {code!r}")
+        StudentProgramme.declare(
+            user, programme=programme, year_of_study=account.get("year_of_study")
+        )
 
     def _role_row(self, user: User, role: dict[str, str]) -> RoleAssignment:
         """The role row the data file declares, not saved: `{"role": ..., "edition": "CODE:YEAR"}`

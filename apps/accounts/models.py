@@ -1,4 +1,5 @@
-"""The project's user model, the sessions signed in to it, and the link that resets its password.
+"""The project's user model, the sessions signed in to it, the link that resets its
+password, and the programme it says it studies in.
 
 Swapped in before the first `migrate` on purpose: `contrib.auth` and `admin`
 declare their dependency on the user model through `swappable_dependency`, so a
@@ -8,10 +9,17 @@ custom model has to exist and be migrated for those dependencies to resolve.
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.sessions.base_session import AbstractBaseSession
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from apps.accounts.sessions import USER_AGENT_MAX_LENGTH, SessionStore
+from apps.catalog.models import (
+    FIRST_YEAR_OF_STUDY,
+    LAST_YEAR_OF_STUDY,
+    YEAR_OF_STUDY_MESSAGE,
+    DegreeProgramme,
+)
 
 
 class User(AbstractUser):
@@ -74,3 +82,70 @@ class ResetLink(models.Model):
     def __str__(self) -> str:
         # Never the digest: whatever prints a row has no use for it.
         return f"reset link #{self.pk}"
+
+
+class StudentProgramme(models.Model):
+    """The degree programme an account says it studies in, and its year (#36).
+
+    What a search reads by default follows from it (apps/qa/scope.py). The
+    person declares it, at registration or on the account page, so it keeps a
+    search consistent and protects nothing (docs/data-model.md, scope
+    invariant 3); a university identity (#44) would write this table and no
+    other. Apart from `User`, as Open edX keeps a `ProgramEnrollment` and
+    Django's documentation advises for an app's own data about a user
+    (outside the repository). No row is no programme. `year_of_study` orders
+    the course list, and decides nothing.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="student_programme"
+    )
+    # CASCADE: a programme gone from the catalogue is one nobody studies in any more.
+    programme = models.ForeignKey(
+        DegreeProgramme,
+        on_delete=models.CASCADE,
+        related_name="+",
+        verbose_name=_("degree programme"),
+    )
+    year_of_study = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=(
+            MinValueValidator(FIRST_YEAR_OF_STUDY),
+            MaxValueValidator(LAST_YEAR_OF_STUDY),
+        ),
+        verbose_name=_("year of study"),
+    )
+
+    # The columns Django adds for the keys, declared for the type checker, which does not see them.
+    user_id: int
+    programme_id: int
+
+    class Meta:
+        verbose_name = _("student programme")
+        verbose_name_plural = _("student programmes")
+        constraints = (
+            models.CheckConstraint(
+                condition=models.Q(year_of_study__isnull=True)
+                | models.Q(
+                    year_of_study__gte=FIRST_YEAR_OF_STUDY, year_of_study__lte=LAST_YEAR_OF_STUDY
+                ),
+                name="accounts_programme_year_of_study_range",
+                violation_error_message=YEAR_OF_STUDY_MESSAGE,
+            ),
+        )
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.programme_id}"
+
+    @classmethod
+    def declare(
+        cls, user: User, *, programme: DegreeProgramme | None, year_of_study: int | None
+    ) -> None:
+        """Store what `user` declares: a programme and its year, or no programme at all."""
+        if programme is None:
+            cls.objects.filter(user=user).delete()
+            return
+        cls.objects.update_or_create(
+            user=user, defaults={"programme": programme, "year_of_study": year_of_study}
+        )

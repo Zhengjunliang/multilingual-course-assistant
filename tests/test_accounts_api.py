@@ -24,7 +24,7 @@ from test_error_contract import refused
 import config.env
 import config.settings
 from apps.accounts.links import make_reset_link
-from apps.accounts.models import User
+from apps.accounts.models import StudentProgramme, User
 from apps.catalog.models import Course, CourseEdition, DegreeProgramme
 from apps.qa import inflight
 from apps.roles.invitations import invite
@@ -45,6 +45,7 @@ ME_URL = "/api/auth/me"
 LOGIN_URL = "/api/auth/login"
 LOGOUT_URL = "/api/auth/logout"
 REGISTER_URL = "/api/auth/register"
+PROGRAMMES_URL = "/api/auth/programmes"
 PASSWORD_URL = "/api/auth/password"
 SESSIONS_END_URL = "/api/auth/sessions/end"
 DELETE_URL = "/api/auth/me/delete"
@@ -215,6 +216,119 @@ def test_registering_keeps_the_chosen_locale(chosen: dict[str, str], kept: str) 
     )
 
     assert User.objects.get(username="ada").locale == kept
+
+
+@pytest.fixture
+def programmes() -> list[DegreeProgramme]:
+    return [
+        DegreeProgramme.objects.create(code="B047", name="Ingegneria Informatica"),
+        DegreeProgramme.objects.create(code="B046", name="Ingegneria Elettronica"),
+    ]
+
+
+def declared(username: str) -> tuple[str, int | None] | None:
+    row = StudentProgramme.objects.filter(user__username=username).select_related("programme")
+    found = row.first()
+    return None if found is None else (found.programme.code, found.year_of_study)
+
+
+@pytest.mark.parametrize(
+    ("chosen", "kept"),
+    [
+        pytest.param({}, None, id="neither"),
+        pytest.param({"programme": "B047"}, ("B047", None), id="a-programme"),
+        pytest.param({"programme": "B047", "year_of_study": 2}, ("B047", 2), id="and-its-year"),
+    ],
+)
+def test_registering_declares_a_programme_and_its_year_or_neither(
+    programmes: list[DegreeProgramme], chosen: dict[str, object], kept: object
+) -> None:
+    """Both optional: an account without a programme is a visitor's search with a history."""
+    client = APIClient()
+    response = client.post(
+        REGISTER_URL, {"username": "ada", "password": PASSWORD, **chosen}, format="json"
+    )
+
+    user = client.get(ME_URL).json()["user"]
+    assert response.status_code == 201
+    assert declared("ada") == kept
+    assert (user["programme"], user["year_of_study"]) == (kept or (None, None))
+
+
+def test_the_programme_is_set_changed_and_cleared_through_me(
+    student: User, programmes: list[DegreeProgramme]
+) -> None:
+    """A field left out keeps its value; clearing the programme clears its year."""
+    client = logged_in()
+    seen = []
+    for body in (
+        {"programme": "B047", "year_of_study": 1},
+        {"year_of_study": 2},
+        {"programme": "B046"},
+        {"locale": "en"},
+        {"programme": None},
+    ):
+        user = client.patch(ME_URL, body, format="json").json()["user"]
+        seen.append(((user["programme"], user["year_of_study"]), declared(USERNAME)))
+
+    assert seen == [
+        (("B047", 1), ("B047", 1)),
+        (("B047", 2), ("B047", 2)),
+        (("B046", 2), ("B046", 2)),
+        (("B046", 2), ("B046", 2)),
+        ((None, None), None),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("url", "body", "codes"),
+    [
+        pytest.param(REGISTER_URL, {"programme": "B999"}, {"programme": ["INVALID"]}, id="unknown"),
+        pytest.param(REGISTER_URL, {"year_of_study": 2}, {"programme": ["REQUIRED"]}, id="year"),
+        pytest.param(
+            REGISTER_URL,
+            {"programme": "B047", "year_of_study": 7},
+            {"year_of_study": ["TOO_LARGE"]},
+            id="year-seven",
+        ),
+        pytest.param(ME_URL, {"programme": "B999"}, {"programme": ["INVALID"]}, id="me-unknown"),
+        pytest.param(ME_URL, {"year_of_study": 2}, {"programme": ["REQUIRED"]}, id="me-year"),
+        pytest.param(
+            ME_URL,
+            {"programme": None, "year_of_study": 2},
+            {"programme": ["REQUIRED"]},
+            id="me-year-without-programme",
+        ),
+    ],
+)
+def test_an_unknown_programme_or_a_year_without_one_is_refused(
+    student: User,
+    programmes: list[DegreeProgramme],
+    url: str,
+    body: dict[str, object],
+    codes: object,
+) -> None:
+    if url == REGISTER_URL:
+        response = APIClient().post(
+            url, {"username": "ada", "password": PASSWORD, **body}, format="json"
+        )
+    else:
+        response = logged_in().patch(url, body, format="json")
+
+    assert (response.status_code, refused(response)) == (400, ("INVALID_ARGUMENT", codes))
+    assert not StudentProgramme.objects.exists()
+    assert not User.objects.filter(username="ada").exists()
+
+
+def test_the_programmes_are_listed_to_anyone(programmes: list[DegreeProgramme]) -> None:
+    """The registration form's choices, before there is an account to ask with."""
+    response = APIClient().get(PROGRAMMES_URL)
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"code": "B046", "name": "Ingegneria Elettronica", "locale": "it"},
+        {"code": "B047", "name": "Ingegneria Informatica", "locale": "it"},
+    ]
 
 
 # Long enough for every rule but the one a row breaks, and close to no username.
@@ -467,11 +581,11 @@ def test_a_language_the_project_does_not_serve_is_refused(student: User) -> None
     ],
     ids=["username", "is_superuser", "is_staff", "roles"],
 )
-def test_only_the_language_can_be_changed_through_me(
+def test_only_the_language_and_the_programme_can_be_changed_through_me(
     student: User, field: str, value: object
 ) -> None:
-    """The endpoint exists to switch languages. Any other writable field here
-    would be an account takeover or a privilege opened by accident."""
+    """The endpoint exists to switch languages and programmes. Any other writable
+    field here would be an account takeover or a privilege opened by accident."""
     response = logged_in().patch(ME_URL, {field: value}, format="json")
     student.refresh_from_db()
 
@@ -482,6 +596,8 @@ def test_only_the_language_can_be_changed_through_me(
         "locale": student.locale,
         "is_superuser": False,
         "roles": [],
+        "programme": None,
+        "year_of_study": None,
     }
     assert (student.username, student.is_superuser, student.is_staff) == (USERNAME, False, False)
     assert not RoleAssignment.objects.exists()

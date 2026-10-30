@@ -9,7 +9,7 @@
  */
 
 import type { UiLocale } from "@/i18n";
-import type { InvitationGrant } from "./catalog";
+import type { InvitationGrant, ProgrammeName } from "./catalog";
 import { request } from "./http";
 
 /**
@@ -28,6 +28,18 @@ export interface Account {
   locale: UiLocale;
   is_superuser: boolean;
   roles: RoleScope[];
+  /**
+   * The degree programme the account says it studies in, by its code, and its
+   * year (apps/accounts/models.py, `StudentProgramme`); null for none said.
+   */
+  programme: string | null;
+  year_of_study: number | null;
+}
+
+/** What a person says they study: both optional, and a year only with a programme. */
+export interface Studies {
+  programme: string | null;
+  year_of_study: number | null;
 }
 
 /** `authenticated: false` is an ordinary 200, not an error. */
@@ -47,11 +59,21 @@ export function logIn(username: string, password: string): Promise<Session> {
   });
 }
 
-export function register(username: string, password: string, locale: UiLocale): Promise<Session> {
+export function register(
+  username: string,
+  password: string,
+  locale: UiLocale,
+  studies: Studies,
+): Promise<Session> {
   return request<Session>("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ username, password, locale }),
+    body: JSON.stringify({ username, password, locale, ...studies }),
   });
+}
+
+/** Every degree programme, by code: open to anyone, for the registration form. */
+export function listProgrammes(): Promise<ProgrammeName[]> {
+  return request<ProgrammeName[]>("/api/auth/programmes");
 }
 
 export function logOut(): Promise<void> {
@@ -62,6 +84,14 @@ export function setAccountLocale(locale: UiLocale): Promise<Session> {
   return request<Session>("/api/auth/me", {
     method: "PATCH",
     body: JSON.stringify({ locale }),
+  });
+}
+
+/** Sets what the account says it studies; no programme clears the year with it. */
+export function setAccountStudies(studies: Studies): Promise<Session> {
+  return request<Session>("/api/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify(studies),
   });
 }
 

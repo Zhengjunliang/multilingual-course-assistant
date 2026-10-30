@@ -6,13 +6,14 @@
  * (what the field does is components/PasswordField.test.tsx's subject); a
  * refused sign-in empties the password and an accepted one shows its check
  * before it leaves (routes/landing.ts); a registration carries the language
- * the page is read in.
+ * the page is read in, and what the person says they study.
  */
 
 import { act } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { ProgrammeName } from "@/api/catalog";
 import { ApiError } from "@/api/http";
 import { SessionContext } from "@/auth/SessionProvider";
 import i18n from "@/i18n";
@@ -23,12 +24,15 @@ import LoginPage from "./LoginPage";
 import { ACCEPTED_FOR, CROUCH, leapt } from "./landing";
 import RegisterPage from "./RegisterPage";
 
+type VisitorSession = typeof VISITOR;
+
 const VISITOR = {
   account: null,
   logIn: async () => {},
   register: async () => {},
   logOut: async () => {},
   chooseLocale: async () => {},
+  chooseStudies: async () => {},
   forget: () => {},
   recheck: async () => {},
 };
@@ -156,17 +160,41 @@ describe("a sign-in", () => {
   });
 });
 
+const PROGRAMMES: ProgrammeName[] = [
+  { code: "B047", name: "INGEGNERIA INFORMATICA", locale: "it" },
+  { code: "B060", name: "INFORMATICA", locale: "it" },
+];
+
+function choose(select: HTMLSelectElement | null, value: string) {
+  act(() => {
+    if (select !== null) select.value = value;
+    select?.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
+function registration(register: VisitorSession["register"]) {
+  return mount(
+    <SessionContext value={{ ...VISITOR, register }}>
+      <MemoryRouter>
+        <RegisterPage />
+      </MemoryRouter>
+    </SessionContext>,
+  );
+}
+
 describe("a registration", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", async () => Response.json(PROGRAMMES));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("makes the language the page is read in the account's", async () => {
     await act(() => i18n.changeLanguage("zh-hans"));
     const register = vi.fn(async () => {});
-    const { container, unmount } = mount(
-      <SessionContext value={{ ...VISITOR, register }}>
-        <MemoryRouter>
-          <RegisterPage />
-        </MemoryRouter>
-      </SessionContext>,
-    );
+    const { container, unmount } = registration(register);
     type(container.querySelector<HTMLInputElement>("#username"), "ada");
     type(container.querySelector<HTMLInputElement>("#password"), "segreta-lunga");
     await act(async () => {
@@ -175,7 +203,41 @@ describe("a registration", () => {
     unmount();
     await act(() => i18n.changeLanguage("it"));
 
-    expect(register).toHaveBeenCalledWith("ada", "segreta-lunga", "zh-hans");
+    expect(register).toHaveBeenCalledWith("ada", "segreta-lunga", "zh-hans", {
+      programme: null,
+      year_of_study: null,
+    });
+  });
+
+  it("declares a programme and its year, the year offered once a programme is chosen", async () => {
+    const register = vi.fn(async () => {});
+    const { container, unmount } = registration(register);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const before = {
+      programmes: [...container.querySelectorAll("#programme option")].map(
+        (option) => option.textContent,
+      ),
+      year: container.querySelector("#year_of_study"),
+    };
+    choose(container.querySelector<HTMLSelectElement>("#programme"), "B047");
+    choose(container.querySelector<HTMLSelectElement>("#year_of_study"), "2");
+    type(container.querySelector<HTMLInputElement>("#username"), "ada");
+    type(container.querySelector<HTMLInputElement>("#password"), "segreta-lunga");
+    await act(async () => {
+      container.querySelector("form")?.requestSubmit();
+    });
+    unmount();
+
+    expect(before).toEqual({
+      programmes: [i18n.t("studies.none"), "INGEGNERIA INFORMATICA", "INFORMATICA"],
+      year: null,
+    });
+    expect(register).toHaveBeenCalledWith("ada", "segreta-lunga", "it", {
+      programme: "B047",
+      year_of_study: 2,
+    });
   });
 
   it.each([
@@ -187,6 +249,15 @@ describe("a registration", () => {
         violations: [{ field: "password", reason: "TOO_COMMON", data: {} }],
       }),
       after: { focused: "password", invalid: "true", alert: null },
+    },
+    {
+      refusal: "a programme gone since the list was read: the focus goes to it, described",
+      error: new ApiError({
+        status: 400,
+        code: "INVALID_ARGUMENT",
+        violations: [{ field: "programme", reason: "INVALID", data: {} }],
+      }),
+      after: { focused: "programme", invalid: "true", alert: null },
     },
     {
       refusal: "a failure no field carries: it is an alert",
@@ -205,13 +276,7 @@ describe("a registration", () => {
     const register = async () => {
       throw error;
     };
-    const { container, unmount } = mount(
-      <SessionContext value={{ ...VISITOR, register }}>
-        <MemoryRouter>
-          <RegisterPage />
-        </MemoryRouter>
-      </SessionContext>,
-    );
+    const { container, unmount } = registration(register);
     type(container.querySelector<HTMLInputElement>("#username"), "ada");
     type(container.querySelector<HTMLInputElement>("#password"), "password");
     await act(async () => {
@@ -219,7 +284,7 @@ describe("a registration", () => {
     });
     const state = {
       focused: document.activeElement?.id,
-      invalid: container.querySelector("#password")?.getAttribute("aria-invalid") ?? null,
+      invalid: document.activeElement?.getAttribute("aria-invalid") ?? null,
       alert: container.querySelector("[role=alert]")?.textContent ?? null,
     };
     unmount();

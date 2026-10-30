@@ -1,4 +1,4 @@
-"""Account endpoints: who am I, log in, log out, register.
+"""Account endpoints: who am I, log in, log out, register, and the programmes to choose from.
 
 What the holder of a link calls, a reset link or an invitation, is
 apps/accounts/link_views.py.
@@ -32,6 +32,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
+from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -40,6 +41,8 @@ from rest_framework.views import APIView
 from apps.accounts.events import AuthEvent, auth_event
 from apps.accounts.permissions import AllowAnyWithCsrf
 from apps.accounts.serializers import LoginSerializer, RegisterSerializer, UserSerializer
+from apps.catalog.models import DegreeProgramme
+from apps.catalog.serializers import ProgrammeNameSerializer
 
 if TYPE_CHECKING:
     from django.contrib.auth.base_user import AbstractBaseUser
@@ -76,7 +79,7 @@ class AddressRateThrottle(ScopedRateThrottle):
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class SessionView(APIView):
-    """`GET` says who is calling; `PATCH` changes their interface language."""
+    """`GET` says who is calling; `PATCH` changes their interface language or their programme."""
 
     def get_permissions(self) -> list[BasePermission]:
         # Per method rather than per class: `GET` is how the SPA discovers it is
@@ -98,9 +101,9 @@ class SessionView(APIView):
         return Response(session_body(user))
 
     def patch(self, request: Request) -> Response:
-        # `partial` because the only writable field is `locale` and a language
-        # switch should not have to echo back the rest of the account. The cast
-        # is the same one `session_body` explains.
+        # `partial` because a language switch, or a programme's, should not
+        # have to echo back the rest of the account. The cast is the same one
+        # `session_body` explains.
         serializer = UserSerializer(cast("User", request.user), data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -151,3 +154,16 @@ class RegisterView(APIView):
         # that checks passwords.
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         return Response(session_body(user), status=status.HTTP_201_CREATED)
+
+
+class ProgrammeNamesView(ListAPIView[DegreeProgramme]):
+    """`GET`: every degree programme, by code, for the registration form and the account page.
+
+    Open to anyone, since registering is: which programmes there are is the
+    public Cineca catalogue (docs/decisions.md, 2026-10-05, *The staff pages
+    live in the chat shell*, point 2). Names only, no staff.
+    """
+
+    permission_classes = (AllowAny,)
+    serializer_class = ProgrammeNameSerializer
+    queryset = DegreeProgramme.objects.order_by("code")

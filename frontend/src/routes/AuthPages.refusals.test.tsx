@@ -31,6 +31,7 @@ const VISITOR = {
   register: async () => {},
   logOut: async () => {},
   chooseLocale: async () => {},
+  chooseStudies: async () => {},
   forget: () => {},
   recheck: async () => {},
 };

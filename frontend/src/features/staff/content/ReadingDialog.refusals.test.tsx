@@ -28,6 +28,8 @@ const READER: Account = {
   locale: "it",
   is_superuser: false,
   roles: [{ role: "teacher", edition: 5 }],
+  programme: null,
+  year_of_study: null,
 };
 
 const TEACHER = {
@@ -36,6 +38,7 @@ const TEACHER = {
   register: async () => {},
   logOut: async () => {},
   chooseLocale: async () => {},
+  chooseStudies: async () => {},
   forget: () => {},
   recheck: async () => {},
 };

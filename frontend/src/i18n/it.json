@@ -108,6 +108,14 @@
       "confirm": "Elimina"
     }
   },
+  "studies": {
+    "title": "Studi",
+    "programme": "Corso di laurea",
+    "year": "Anno di corso",
+    "none": "Non indicato",
+    "yearN": "{{year}}º anno",
+    "hint": "Facoltativo. Le tue domande cercano nei materiali dei corsi del tuo corso di laurea."
+  },
   "theme": {
     "system": "Di sistema",
     "light": "Chiaro",
