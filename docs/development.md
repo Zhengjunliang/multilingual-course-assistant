@@ -91,7 +91,7 @@ On 5173 the Vite dev server proxies `/api`, `/admin` and `/static` to port 8000 
 
 ## The pipeline CLI
 
-Course PDFs go in `data/corpus/<course>/` (gitignored). These commands are the experiments' tools: the site's material is uploaded, or imported from such a directory with `import_materials` (section *Daily loop*), and a deck indexed from here has no material row, so its citations open no PDF. Every command below is `uv run python -m rag.<module> …`:
+Course PDFs go in `data/corpus/<course>/` (gitignored). These commands are the experiments' tools: the site's material is uploaded, or imported from such a directory with `import_materials` (section *Daily loop*), and a deck indexed from here has no material row, so its citations open no PDF; its points are keyed as a material of the same bytes on its edition would be, so a failed upload of that file deletes them. Every command below is `uv run python -m rag.<module> …`:
 
 | Module | Does | Example arguments |
 | ------ | ---- | ----------------- |
