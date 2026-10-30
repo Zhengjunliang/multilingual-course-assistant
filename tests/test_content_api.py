@@ -20,7 +20,7 @@ from test_roles import world
 
 from apps.catalog.content_views import EditionReadingView
 from apps.catalog.models import ReadingItem, Syllabus
-from apps.materials.models import CourseMaterial, MaterialFailure, MaterialStatus
+from apps.materials.models import CourseMaterial, MaterialFailure, MaterialStatus, material_storage
 from apps.materials.tasks import ingest_material
 
 if TYPE_CHECKING:
@@ -382,6 +382,27 @@ def test_an_upload_answers_before_its_ingest_is_queued(
     assert waiting == []
     assert CourseMaterial.objects.get().status == MaterialStatus.QUEUED
     assert queued == [response.json()["id"]]  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def test_an_upload_whose_ingest_cannot_be_queued_leaves_nothing_behind(
+    django_capture_on_commit_callbacks: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A row no worker would ever take is taken back, so the same file can be sent again."""
+    w = world()
+
+    def broker_down(material_id: int) -> None:
+        raise ConnectionError("the broker is down")
+
+    monkeypatch.setattr(ingest_material, "delay", broker_down)
+
+    with django_capture_on_commit_callbacks(execute=False) as callbacks:
+        upload(as_user(w.newcomer), w.ppm_new)
+    (queue,) = callbacks
+    with pytest.raises(ConnectionError):
+        queue()
+
+    assert not CourseMaterial.objects.exists()
+    assert not material_storage.exists(f"{hashlib.sha256(DECK).hexdigest()}.pdf")
 
 
 def test_the_same_file_twice_on_an_edition_is_refused_with_the_material_it_is() -> None:
