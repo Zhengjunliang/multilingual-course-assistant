@@ -19,6 +19,7 @@ skipping it.
 
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -53,8 +54,14 @@ class Command(BaseCommand):
         ).first()
         if edition is None:
             raise CommandError(f"no edition of {course} in {academic_year}")
+        pdfs = list(collect_pdfs(target))
+        # Two files of one name would be two versions of one material, and the
+        # first would be replaced by the second.
+        names = Counter(pdf.name for pdf in pdfs)
+        if twice := sorted(name for name, count in names.items() if count > 1):
+            raise CommandError(f"more than one file named {', '.join(twice)}")
         queued = skipped = 0
-        for pdf in collect_pdfs(target):
+        for pdf in pdfs:
             with pdf.open("rb") as handle:
                 try:
                     material = create_material(
