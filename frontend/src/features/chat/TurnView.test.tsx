@@ -963,19 +963,23 @@ describe("rating an answer", () => {
     expect(thumbs).toBeNull();
   });
 
-  it("puts the thumb back when the server refuses, and says so with a way to try again", async () => {
+  it("puts the thumbs back as stored when the server refuses, asks no more why, and says so with a way to try again", async () => {
     serve(codedRefusal("INTERNAL"));
-    const { container, unmount } = rated({});
+    const { container, unmount } = rated({
+      feedback: { rating: "up", reason: "", comment: "" },
+    });
 
-    act(() => thumb(container, "up")?.click());
+    act(() => thumb(container, "down")?.click());
     await settle();
     const seen = {
       pressed: pressed(container),
+      form: container.querySelector("form"),
       toast: document.body.querySelector("[data-sonner-toast]")?.textContent ?? "",
     };
     unmount();
 
-    expect(seen.pressed).toEqual({ up: "false", down: "false" });
+    expect(seen.pressed).toEqual({ up: "true", down: "false" });
+    expect(seen.form).toBeNull();
     expect(seen.toast).toContain(i18n.t("answer.rate.failed"));
     expect(seen.toast).toContain(i18n.t("answer.rate.retry"));
   });
