@@ -2,7 +2,7 @@
 
 The ingest of a material (apps/materials/tasks.py) runs the steps of `rag/`
 itself — probe and parse (`rag.parse.parse_pdf`), chunk
-(`rag.chunk.chunk_document`), index (`rag.index.index_chunks`) — on what
+(`rag.chunk.chunk_document`), index (`rag.index.upsert_chunks`) — on what
 this module builds once, as apps/qa/engine.py builds the question engine's:
 the converters, one per parse variant, the tokenizer behind the chunker, the
 two encoders and the Qdrant client. The dense encoder is
