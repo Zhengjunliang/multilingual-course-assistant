@@ -2,6 +2,34 @@
 
 What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; each entry's *Reproducibility* section says how its numbers were produced, and what of that was not kept. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
+## 2026-10-30 — The 31 PPM decks, imported as uploads, are ingested by the laptop's worker in 5 min 29 s, all with formula decoding, and the smoke gate holds at 38/40
+
+`#35`. The course's PDFs in `data/corpus/PPM` added to the edition B028451 2025-2026 by `import_materials`, ingested by the development worker in place of the points the CLI wrote, then the smoke gate on the result.
+
+### 1. The ingest
+
+| Item | Value |
+| --- | --- |
+| Machine | the laptop, RTX 4070 Laptop 8 GB, the worker on the `solo` pool consuming `default,qa,ingest` |
+| Materials | 31 queued, 31 `ready`, 0 `failed` |
+| Wall clock | 5 min 29 s, from the first row's creation to the last row's end |
+| Per file | median 5.1 s; shortest 0.9 s (`elaborato-istruzioni.pdf`); longest 99.5 s (`3.5-HTML5-Part-2--CSS-Positioning-Classic-Part-1.pdf`, the one parsed with OCR), then 29.4 s and 24.5 s (`3.2b VIDEO H261-H262   2024.pdf`, `3.1b VIDEO GENERAL CONCEPTS 2024.pdf`) |
+| Memory | at least 7820 of 8188 MiB at its peak; no allocation failed |
+
+The per-file times add up to 327.8 s, about the wall clock: the worker took the files one after another without waiting. RapidOCR found only onnxruntime's CPU provider, so the OCR deck's pages were recognised on the processor, which is most of its 99.5 s.
+
+### 2. The index
+
+`slides` holds 1248 points, against the 1234 the CLI wrote (entry of 2026-10-26, section 5). Each of the 31 `source_file` values carries one digest and one parse variant, and no point the CLI wrote is left: a material's points replace those of its name in its edition. The worker decodes formulas in every file (`apps/materials/ingest.py`), where the CLI had chosen it for 4 files: the variants went from 26 `classic`, 4 `classic-formula` and 1 `classic-ocr` to 30 `classic-formula` and 1 `classic-ocr-formula`. 15 files' chunk counts changed, most of all the OCR deck's, from 34 to 52, and `3.2b VIDEO H261-H262   2024.pdf`'s, from 70 to 58.
+
+### 3. The smoke gate
+
+`rag.gold gold/smoke.jsonl`, run twice: hit@5 **38/40** both times, the misses `q018` and `q028` with the same pages on top as the laptop's baseline (entry of 2026-08-24, section 4). Memory peaked at 7885 of 8188 MiB, and no allocation failed.
+
+### Reproducibility
+
+The worker and the import are the commands of [development.md](development.md), section "Daily loop"; the gate is `uv run python -m rag.gold gold/smoke.jsonl`. The times are the rows' `created_at`, `started_at` and `finished_at`, kept in the local database until a material is replaced; the variants and counts were read from the `slides` collection's payloads, and the CLI's counts from its `data/chunks/*.jsonl`, which stay as they were. The memory peaks were sampled during the runs, and the samples were not kept.
+
 ## 2026-10-26 — vLLM serves Qwen3-4B in fp16 on ultron's Turing card, a restart costs about 80 s, switching the laptop to it changes only `.env`, and the index restored on ultron repeats the smoke gate's 38/40
 
 `#18` on MICC. Sections 1–4: the generation endpoint for the M3 experiments, with retrieval on the laptop (its Qdrant service, embedding and reranker). Sections 5–7: the index restored on the server from the laptop's snapshots (`#122`), the project's environment with the CUDA build of torch, and the smoke gate run there.
