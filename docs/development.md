@@ -18,6 +18,7 @@ git config pull.rebase true      # history is linear: a pull rebases onto main i
 | To | Run |
 | -- | --- |
 | start / stop PostgreSQL, Qdrant and Redis | `docker compose up -d` / `docker compose down` (data stays in the named volumes; `down -v` deletes them all, the index and the pages fetched live that exist nowhere else included, irreversibly: `rag.snapshot` in section *The pipeline CLI* copies the index out first) |
+| start / stop Langfuse, where the LLM calls are traced | `docker compose --profile tracing up -d` / `docker compose --profile tracing down`, after filling the `LANGFUSE_` secrets of `.env.example` into `.env`; the interface is at <http://localhost:3000/>, where the first start has made one account, `LANGFUSE_INIT_USER_EMAIL` with `LANGFUSE_INIT_USER_PASSWORD`, and nobody can sign up. Six containers of its own, apart from the three above (`docker-compose.yml`) |
 | serve the site | `uv run python manage.py runserver` → <http://127.0.0.1:8000/> (admin at `/admin/`, superusers only) |
 | work on the frontend | the above, plus `npm run dev --prefix frontend` → <http://localhost:5173/> |
 | run the background tasks, questions and uploads included | `uv run celery -A config worker -P solo -Q default,qa,ingest -l info` for the worker, without which the site answers no question and ingests no upload, and, in another terminal, `uv run celery -A config beat -l info` for the scheduled ones; one beat at a time, since two would queue every task twice ([background-tasks.md](background-tasks.md)) |
