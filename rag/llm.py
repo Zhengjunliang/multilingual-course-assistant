@@ -29,9 +29,10 @@ Calls can also be recorded, in the Langfuse of docker-compose.yml's tracing
 profile, and this is the one module of `rag/` that knows it. A caller opens
 `trace()` around a unit of work, such as one question of a CLI run, and every
 call made inside it becomes a generation of that trace: the prompt, the reply,
-the model and its decoding, the tokens. A call made outside any trace is sent as
-ever and recorded nowhere. With LANGFUSE_TRACING_ENABLED off, the default,
-`trace()` records nothing and `langfuse` is never imported.
+the model and its decoding, the tokens; `observe()` adds a step that is no LLM
+call, such as a search. A call made outside any trace is sent as ever and
+recorded nowhere. With LANGFUSE_TRACING_ENABLED off, the default, `trace()`
+records nothing and `langfuse` is never imported.
 
 Text this project did not write — an excerpt, a web page, a link's anchor, an
 earlier turn the browser sent back — enters a prompt through `quote()`, and
@@ -50,7 +51,7 @@ import unicodedata
 import urllib.parse
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
 from pydantic import BaseModel, SecretStr, ValidationError
 
@@ -102,7 +103,7 @@ _UNRECORDED = _Unrecorded()
 
 
 @functools.cache
-def _tracer() -> Langfuse | None:
+def tracer() -> Langfuse | None:
     """The process's Langfuse client; None with tracing off.
 
     Built on first use, so a process that never opens a trace never starts
@@ -132,7 +133,7 @@ def _recording() -> Langfuse | None:
     own `get_current_trace_id()` logs a warning on every call made outside one,
     and outside one is where every untraced call is.
     """
-    client = _tracer()
+    client = tracer()
     if client is None:
         return None
     from opentelemetry import trace as otel
@@ -155,7 +156,7 @@ def trace(
     caller already holds; `session_id` groups the traces of one conversation;
     `metadata` holds short strings to filter the traces by, such as a run id.
     """
-    client = _tracer()
+    client = tracer()
     if client is None:
         yield _UNRECORDED
         return
@@ -173,15 +174,20 @@ def trace(
 
 
 @contextmanager
-def _generation(name: str, messages: Sequence[Message]) -> Generator[Observation]:
+def observe(
+    name: str,
+    *,
+    as_type: Literal["span", "retriever", "generation"] = "span",
+    input: Any = None,
+) -> Generator[Observation]:
+    """Record the block as one step of the trace open around it, such as a
+    search (`retriever`); outside one it records nothing."""
     client = _recording()
     if client is None:
         yield _UNRECORDED
         return
-    with client.start_as_current_observation(
-        name=name, as_type="generation", input=list(messages)
-    ) as generation:
-        yield generation
+    with client.start_as_current_observation(name=name, as_type=as_type, input=input) as step:
+        yield step
 
 
 def _usage(usage: CompletionUsage | None) -> dict[str, int] | None:
@@ -352,7 +358,7 @@ def complete_json[ModelT: BaseModel](
     from openai import APIConnectionError
 
     try:
-        with _generation(schema.__name__, messages) as generation:
+        with observe(schema.__name__, as_type="generation", input=list(messages)) as generation:
             reply = completer.complete(messages)
             generation.update(output=reply)
     except APIConnectionError as error:

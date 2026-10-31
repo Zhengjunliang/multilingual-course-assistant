@@ -19,7 +19,9 @@ time, under a lock held for retrieval alone. Generation runs outside it,
 because generating several answers at once is the model server's job (vLLM
 batches them, Ollama queues them), and a lock here would only serialise what
 that server can overlap. The index is the Qdrant service, which the terminal
-and the worker query at the same time (docker-compose.yml).
+and the worker query at the same time (docker-compose.yml). In a trace
+(apps/qa/tasks.py) the wait for the lock is a step of its own, `gpu-wait`,
+beside the search, `retrieve`.
 
 Retrieval and generation logic is not reimplemented here. This module routes
 through `rag.agent.route`, retrieves through `rag.search.search` and generates
@@ -40,6 +42,7 @@ from __future__ import annotations
 
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -47,6 +50,7 @@ from apps.qa.contract import Citation, EndEvent, Event, StartEvent, TokenEvent
 from rag.agent import collections_for, route
 from rag.answer import answer
 from rag.chunk import detect_locale
+from rag.llm import observe
 from rag.search import RELEVANCE_CUTOFF, search
 
 if TYPE_CHECKING:
@@ -76,6 +80,18 @@ LLM_DOWN = (
 
 # The index is the compose service every process shares (docker-compose.yml).
 INDEX_DOWN = "The search index did not respond. Check that the Qdrant service is running."
+
+
+@contextmanager
+def _taken(gpu: threading.Lock) -> Generator[None]:
+    """Hold `gpu`. Waiting for it is a step of the answer's trace of its own,
+    `gpu-wait`: the time a question spent behind another one's retrieval."""
+    with observe("gpu-wait"):
+        gpu.acquire()
+    try:
+        yield
+    finally:
+        gpu.release()
 
 
 class EngineUnavailableError(Exception):
@@ -188,7 +204,10 @@ class Engine:
             # above, the remaining ones are payload drift and mismatched reranker
             # output — real defects, which deserve a traceback in the log rather
             # than an outage telling the caller to rebuild an index that is fine.
-            with self.gpu:
+            with (
+                _taken(self.gpu),
+                observe("retrieve", as_type="retriever", input=decision.query) as retrieval,
+            ):
                 hits = search(
                     self.client,
                     # Retrieval runs on the rewritten query; generation below
@@ -203,6 +222,8 @@ class Engine:
                     min_score=RELEVANCE_CUTOFF,
                     collections=available,
                 )
+                citations = [Citation.of(hit) for hit in hits]
+                retrieval.update(output=[{"marker": c.marker, "score": c.score} for c in citations])
         except ResponseHandlingException as exc:
             # qdrant-client wraps two failures in this one class: the transport
             # (the server is down or unreachable) and a 200 reply it could not
@@ -219,7 +240,7 @@ class Engine:
             conversation_id=conversation_id,
             locale=answer_locale,
             route=decision,
-            citations=[Citation.of(hit) for hit in hits],
+            citations=citations,
             # Never below zero: `asked_at` is the web host's clock, and a
             # worker's may be behind it.
             search_ms=max(0, round((time.time() - started) * 1000)),

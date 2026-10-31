@@ -10,3 +10,8 @@ from django.apps import AppConfig
 
 class QaConfig(AppConfig):
     name = "apps.qa"
+
+    def ready(self) -> None:
+        # Connects the conversation's `pre_delete`, in every process that can
+        # delete one, the web's included.
+        from apps.qa import traces  # noqa: F401
