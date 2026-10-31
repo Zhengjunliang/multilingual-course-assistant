@@ -75,6 +75,9 @@ export default defineConfig({
         // Whatever the developer's .env says: the configuration CI checks.
         DJANGO_DEBUG: "false",
         DJANGO_BEHIND_TLS: "false",
+        // The fake model's replies stay out of the developer's Langfuse, as
+        // pytest's stubs do (tests/conftest.py).
+        LANGFUSE_TRACING_ENABLED: "false",
       },
     },
   ],
