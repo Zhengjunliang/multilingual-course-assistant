@@ -33,6 +33,7 @@ from apps.qa.feedback_serializers import (
 )
 from apps.qa.models import Conversation, Feedback, Message
 from apps.qa.serializers import StoredFeedbackSerializer
+from apps.qa.traces import rating_changed
 from config.errors import ErrorCode, fail
 from rag.chunk import normalize_locale
 
@@ -82,12 +83,15 @@ class AnswerFeedbackView(APIView):
             feedback, _ = Feedback.objects.update_or_create(
                 answer=answer, defaults=body.validated_data
             )
+            rating_changed(answer.pk)
         return Response(StoredFeedbackSerializer(feedback).data)
 
     def delete(self, request: Request, pk: UUID) -> Response:
         if not rateable(request.user).filter(pk=pk).exists():
             fail(ErrorCode.NOT_FOUND)
-        Feedback.objects.filter(answer_id=pk).delete()
+        deleted, _ = Feedback.objects.filter(answer_id=pk).delete()
+        if deleted:
+            rating_changed(pk)
         return Response(status=204)
 
 

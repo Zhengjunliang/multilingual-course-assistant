@@ -2,14 +2,16 @@
 
 The web process admits a question under the global cap, queues this task on
 `qa` and relays to the browser what it writes (apps/qa/views.py). This is
-the other half, and it owns three things:
+the other half, and it owns four things:
 
 - the conversation's rows, written once `start` exists and settled once the
   answer ends (apps/qa/conversations.py), so a signed-in student who leaves
   the page still finds the answer when they come back;
 - the answer's events, written into its stream (apps/qa/inflight.py);
 - its lease, renewed every second by a heartbeat thread, which is also how a
-  stop reaches it.
+  stop reaches it;
+- with tracing on, a signed-in student's answer's trace in Langfuse, which
+  apps/qa/traces.py keeps in step with the rows.
 
 **Answered once.** The task is acknowledged as it starts, against the late
 acknowledgement every other task here has (config/settings.py): a question
@@ -29,7 +31,7 @@ import contextvars
 import logging
 import threading
 import time
-from contextlib import closing
+from contextlib import closing, nullcontext
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
@@ -41,18 +43,22 @@ from apps.qa import inflight
 from apps.qa.contract import EndEvent, ErrorEvent, StartEvent, StoppedEvent, TokenEvent
 from apps.qa.conversations import ConversationGoneError, record_exchange, settle
 from apps.qa.engine import EngineUnavailableError, loaded_engine
+from apps.qa.traces import SITE_TRACE
 from config.celery import app
 from config.errors import ErrorCode, error_body
 from config.request_id import serving
 from rag.answer import Turn
 from rag.chunk import EditionKey
+from rag.llm import trace
 
 if TYPE_CHECKING:
+    from contextlib import AbstractContextManager
     from types import TracebackType
 
     from celery import Task
 
     from apps.qa.contract import Event
+    from rag.llm import Observation
 
 logger = logging.getLogger(__name__)
 
@@ -117,9 +123,24 @@ def answer_question(payload: dict[str, object]) -> None:
         if verdict == "stopped":
             inflight.finish(job.answer_id, StoppedEvent(), conversation_id=job.conversation_id)
             return
-        with _Heartbeat(job.answer_id) as heartbeat:
-            last = _generate(job, heartbeat)
+        with _Heartbeat(job.answer_id) as heartbeat, _traced(job) as root:
+            last = _generate(job, heartbeat, root)
         inflight.finish(job.answer_id, last, conversation_id=job.conversation_id)
+
+
+def _traced(job: AnswerJob) -> AbstractContextManager[Observation | None]:
+    """A signed-in student's answer as one trace, under the asking request's
+    id and in its conversation's session, naming nobody (docs/decisions.md).
+    A visitor's is recorded nowhere, its LLM calls included: a call is
+    recorded only inside a trace (rag/llm.py)."""
+    if job.conversation_id is None:
+        return nullcontext()
+    return trace(
+        SITE_TRACE,
+        trace_id=job.request_id,
+        session_id=str(job.conversation_id),
+        input=job.question,
+    )
 
 
 class _Heartbeat:
@@ -183,9 +204,10 @@ class _Heartbeat:
                 return
 
 
-def _generate(job: AnswerJob, heartbeat: _Heartbeat) -> Event:
+def _generate(job: AnswerJob, heartbeat: _Heartbeat, root: Observation | None) -> Event:
     """Run the engine and write what it yields; return the event that ends the
-    answer, which the caller writes once the rows are settled.
+    answer, which the caller writes once the rows are settled. What was
+    written of the answer is also the output of its trace, `root`.
 
     That order is the reason this returns the last event rather than writing
     it: a reader who receives `end` and reopens the conversation at once finds
@@ -257,6 +279,8 @@ def _generate(job: AnswerJob, heartbeat: _Heartbeat) -> Event:
         logger.exception("the stream ended in %s: %s", failure.error.code, failure.error.message)
         return failure
     finally:
+        if root is not None:
+            root.update(output="".join(parts))
         if stored:
             try:
                 settle(job.answer_id, "".join(parts), complete=complete)

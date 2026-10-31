@@ -386,6 +386,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.materials.tasks.fail_stalled",
         "schedule": crontab(minute="*/10"),
     },
+    # Langfuse corrected to the database, with tracing on (apps/qa/traces.py).
+    "reconcile-traces": {
+        "task": "apps.qa.traces.reconcile_traces",
+        "schedule": crontab(minute="*/10"),
+    },
 }
 # No result backend is configured, so a task's return value is never stored.
 # Left at its one-day default, this would make beat add Celery's own nightly

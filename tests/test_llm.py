@@ -176,7 +176,7 @@ def test_tracing_off_records_nothing_and_imports_nothing(monkeypatch: pytest.Mon
 
     monkeypatch.setitem(sys.modules, "langfuse", None)
     monkeypatch.setitem(sys.modules, "opentelemetry", None)
-    rag.llm._tracer.cache_clear()
+    rag.llm.tracer.cache_clear()
     serve(monkeypatch, RecordingCompletions())
     messages: list[Message] = [{"role": "user", "content": "relevant?"}]
 
@@ -186,7 +186,7 @@ def test_tracing_off_records_nothing_and_imports_nothing(monkeypatch: pytest.Mon
         streamer = build_streamer("http://x/v1", SecretStr("k"), "m")
         assert "".join(streamer.stream(messages)) == "ok"
         routing.update(output="done")
-    assert rag.llm._tracer() is None
+    assert rag.llm.tracer() is None
 
 
 def attributes(span: ReadableSpan) -> dict[str, Any]:

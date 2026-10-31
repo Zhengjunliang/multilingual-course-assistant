@@ -103,7 +103,7 @@ def traced(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[], tuple["Read
         span_exporter=exporter,
         tracer_provider=TracerProvider(),
     )
-    monkeypatch.setattr("rag.llm._tracer", lambda: client)
+    monkeypatch.setattr("rag.llm.tracer", lambda: client)
 
     def spans() -> tuple["ReadableSpan", ...]:
         client.flush()
