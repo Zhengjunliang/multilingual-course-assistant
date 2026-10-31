@@ -12,6 +12,7 @@ all — no encoders, no reranker, no index.
     uv run python -m rag.gold gold/smoke.jsonl
     uv run python -m rag.gold gold/smoke.jsonl --no-rerank --top-k 10
     uv run python -m rag.gold gold/campus.jsonl --routing
+    uv run python -m rag.gold gold/campus.jsonl --routing --run-id gold-baseline
     uv run python -m rag.gold gold/campus-autogrow.jsonl --live on
 """
 
@@ -20,6 +21,7 @@ from __future__ import annotations
 import argparse
 import logging
 from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -27,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from rag.agent import FALLBACK_REASON, collections_for, route
 from rag.chunk import EditionKey
+from rag.llm import trace
 from rag.probe import configure_cli_logging
 from rag.search import DEFAULT_RERANK_MODEL, build_reranker, payload_filter, search
 
@@ -122,12 +125,21 @@ class RoutingReport(BaseModel):
     fallback: int
 
 
-def routing_report(questions: Sequence[GoldQuestion], completer: Completer) -> RoutingReport:
+def routing_report(
+    questions: Sequence[GoldQuestion], completer: Completer, *, run_id: str
+) -> RoutingReport:
     """Route every question and score the choice. Pure report: the collections
-    are scored as names, never opened."""
+    are scored as names, never opened. Each question is a trace of its own,
+    under `run_id`, so one run's traces are found together."""
     rows: list[RoutingRow] = []
     for question in questions:
-        decision = route(question.question, completer)
+        with trace(
+            "routing",
+            metadata={"run_id": run_id, "question_id": question.id},
+            input=question.question,
+        ) as routing:
+            decision = route(question.question, completer)
+            routing.update(output=decision.model_dump())
         rows.append(
             RoutingRow(
                 id=question.id,
@@ -197,6 +209,12 @@ def main(argv: list[str] | None = None) -> None:
         help="report-only: score the router's collection choice per question, "
         "without retrieving anything",
     )
+    parser.add_argument(
+        "--run-id",
+        default=None,
+        help="the id the routing report's traces are filtered by in Langfuse; "
+        "default: gold-<UTC timestamp>",
+    )
     args = parser.parse_args(argv)
 
     configure_cli_logging()
@@ -228,6 +246,8 @@ def main(argv: list[str] | None = None) -> None:
             logger.warning(
                 "routing report is LLM-only; retrieval flags ignored: %s", ", ".join(overridden)
             )
+        run_id = args.run_id or "gold-" + datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        print(f"run_id: {run_id}")
         # Fixed seed: the run-twice-identical gate must not rest on greedy
         # decoding alone; recorded in docs/experiment-log.md, entry of 2026-08-24.
         report = routing_report(
@@ -235,6 +255,7 @@ def main(argv: list[str] | None = None) -> None:
             build_completer(
                 env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0, seed=0
             ),
+            run_id=run_id,
         )
         for row in report.rows:
             print(
@@ -250,6 +271,9 @@ def main(argv: list[str] | None = None) -> None:
         ):
             print(f"{label}: {count}/{total} ({count / total if total else 0.0:.0%})")
         return
+
+    if args.run_id is not None:
+        logger.warning("--run-id names the routing report's traces; ignored without --routing")
 
     # The eval-isolation rule's explicit release (docs/architecture.md): the autogrow
     # acceptance has to see the pages the run just wrote, and the answer may sit in

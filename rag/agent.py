@@ -62,6 +62,7 @@ from rag.llm import (
     complete_json,
     inert_url,
     quote,
+    trace,
 )
 from rag.passages import collapse
 from rag.probe import configure_cli_logging
@@ -798,85 +799,95 @@ def main(argv: list[str] | None = None) -> None:
     locale = args.locale or detect_locale(args.question)
     run_id = args.run_id or "live-" + datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
 
-    # Fixed seed: the run-twice-identical gate must not rest on greedy decoding
-    # alone; recorded in docs/experiment-log.md, entry of 2026-08-24.
-    completer = build_completer(
-        env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0, seed=0
-    )
-    decision = route(args.question, completer)
-    print(f"route: {decision.target} ({decision.reason})")
-
-    dense = build_dense_encoder(args.dense_model)
-    sparse = build_sparse_encoder()
-    reranker = None if args.no_rerank else build_reranker(args.rerank_model)
-    client = open_client(args.qdrant)
-    fetcher = HttpxFetcher()
-
-    def retrieve(query: str) -> list[Hit]:
-        return search(
-            client,
-            # Retrieval runs on the rewritten query; generation below keeps the
-            # student's original wording, which is what the answer must address.
-            query,
-            dense,
-            sparse,
-            reranker,
-            scope=None,
-            limit=args.top_k,
-            min_score=RELEVANCE_CUTOFF,
-            collections=collections_for(decision),
+    # One trace per turn, under the run and question ids the decision rows
+    # carry, so a run's traces are found as its rows are.
+    with trace(
+        "agent",
+        metadata={"run_id": run_id, "question_id": args.question_id},
+        input=args.question,
+    ) as turn:
+        # Fixed seed: the run-twice-identical gate must not rest on greedy decoding
+        # alone; recorded in docs/experiment-log.md, entry of 2026-08-24.
+        completer = build_completer(
+            env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0, seed=0
         )
+        decision = route(args.question, completer)
+        print(f"route: {decision.target} ({decision.reason})")
 
-    def fetch(url: str, referrer: str | None, unload: Callable[[], None]) -> LiveResult:
-        return fetch_and_ingest(
-            url,
-            fetcher=fetcher,
-            completer=completer,
-            client=client,
-            # CPU encoder from the shared cache: the GPU already hosts the
-            # retrieval embedder and the reranker.
-            dense=cached_dense_encoder(args.dense_model, device="cpu"),
-            sparse=sparse,
+        dense = build_dense_encoder(args.dense_model)
+        sparse = build_sparse_encoder()
+        reranker = None if args.no_rerank else build_reranker(args.rerank_model)
+        client = open_client(args.qdrant)
+        fetcher = HttpxFetcher()
+
+        def retrieve(query: str) -> list[Hit]:
+            return search(
+                client,
+                # Retrieval runs on the rewritten query; generation below keeps the
+                # student's original wording, which is what the answer must address.
+                query,
+                dense,
+                sparse,
+                reranker,
+                scope=None,
+                limit=args.top_k,
+                min_score=RELEVANCE_CUTOFF,
+                collections=collections_for(decision),
+            )
+
+        def fetch(url: str, referrer: str | None, unload: Callable[[], None]) -> LiveResult:
+            return fetch_and_ingest(
+                url,
+                fetcher=fetcher,
+                completer=completer,
+                client=client,
+                # CPU encoder from the shared cache: the GPU already hosts the
+                # retrieval embedder and the reranker.
+                dense=cached_dense_encoder(args.dense_model, device="cpu"),
+                sparse=sparse,
+                run_id=run_id,
+                trigger=args.question_id,
+                referrer_url=referrer,
+                registry_path=args.registry,
+                # The throttle and the robots cache are the live module's shared
+                # pair: a fresh throttle never waits, so 1 req/s would hold only
+                # inside a single fetch.
+                robots=shared_robots(fetcher),
+                throttle=shared_throttle(),
+                unload_llm=unload,
+            )
+
+        result = deepen(
+            args.question,
+            decision,
+            completer,
+            retrieve=retrieve,
+            fetch=fetch,
+            registry=latest_by_url(read_registry(args.registry)),
+            dense_encoder=partial(cached_dense_encoder, args.dense_model, device="cpu"),
             run_id=run_id,
-            trigger=args.question_id,
-            referrer_url=referrer,
-            registry_path=args.registry,
-            # The throttle and the robots cache are the live module's shared
-            # pair: a fresh throttle never waits, so 1 req/s would hold only
-            # inside a single fetch.
-            robots=shared_robots(fetcher),
-            throttle=shared_throttle(),
-            unload_llm=unload,
+            question_id=args.question_id,
+            unload_llm=lambda: maybe_unload_llm(env.llm_base_url, env.llm_model),
+            link_hopping=not args.no_deepen,
         )
+        client.close()
 
-    result = deepen(
-        args.question,
-        decision,
-        completer,
-        retrieve=retrieve,
-        fetch=fetch,
-        registry=latest_by_url(read_registry(args.registry)),
-        dense_encoder=partial(cached_dense_encoder, args.dense_model, device="cpu"),
-        run_id=run_id,
-        question_id=args.question_id,
-        unload_llm=lambda: maybe_unload_llm(env.llm_base_url, env.llm_model),
-        link_hopping=not args.no_deepen,
-    )
-    client.close()
+        for entry in result.decisions:
+            print(f"step {entry.step}: {entry.outcome} {entry.choice or ''} ({entry.reason})")
+        append_decisions(args.decision_log, result.decisions)
 
-    for entry in result.decisions:
-        print(f"step {entry.step}: {entry.outcome} {entry.choice or ''} ({entry.reason})")
-    append_decisions(args.decision_log, result.decisions)
+        streamer = build_streamer(env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0)
+        pieces: list[str] = []
+        for token in answer(args.question, result.hits, streamer, locale):
+            pieces.append(token)
+            print(token, end="", flush=True)
+        print()
+        turn.update(output="".join(pieces))
 
-    streamer = build_streamer(env.llm_base_url, env.llm_api_key, env.llm_model, temperature=0.0)
-    for token in answer(args.question, result.hits, streamer, locale):
-        print(token, end="", flush=True)
-    print()
-
-    if result.hits:
-        print_sources(result.hits)
-    else:
-        print(pointer_line(locale))
+        if result.hits:
+            print_sources(result.hits)
+        else:
+            print(pointer_line(locale))
 
 
 if __name__ == "__main__":

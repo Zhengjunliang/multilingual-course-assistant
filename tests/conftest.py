@@ -19,7 +19,10 @@ their own worker would take a queued question and answer it with the real
 models. It is Kombu's in-memory transport instead, named in the environment
 because Celery reads `CELERY_BROKER_URL` from there before its settings.
 The developer's uploaded material is out of reach the same way: `MATERIALS_ROOT`
-is a temporary directory for the whole run, one per xdist worker.
+is a temporary directory for the whole run, one per xdist worker. So is their
+Langfuse: with tracing on in `.env`, every stub reply a test makes up would be
+recorded there, so the run has it off, and a test of what a trace records
+records it in memory instead (`traced`).
 
 This lives in a conftest rather than in the file that first needed it because an
 autouse fixture only applies to the module that defines it. A second test file
@@ -32,7 +35,9 @@ password set anywhere would send to api.pwnedpasswords.com.
 """
 
 import hashlib
-from collections.abc import Iterator
+import uuid
+from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 import httpx
@@ -45,6 +50,10 @@ from pwned_passwords_django import api
 
 from apps.qa import engine as engine_module
 from apps.qa import inflight
+from config.env import env
+
+if TYPE_CHECKING:
+    from opentelemetry.sdk.trace import ReadableSpan
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -63,6 +72,45 @@ def _broker_in_memory() -> Iterator[None]:
     with pytest.MonkeyPatch.context() as patch:
         patch.setenv("CELERY_BROKER_URL", "memory://")
         yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _tracing_off() -> Iterator[None]:
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(env, "langfuse_tracing_enabled", False)
+        yield
+
+
+@pytest.fixture
+def traced(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[], tuple["ReadableSpan", ...]]]:
+    """Tracing on, into memory: yields a function returning the spans exported so far.
+
+    The real client, so what the SDK writes on a span is what is checked; only
+    the exporter is replaced. A key of its own per test, since the SDK keeps
+    one client per public key, and a tracer provider of its own instead of the
+    process-wide one the SDK would install. Nothing listens at the base URL.
+    """
+    from langfuse import Langfuse
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    exporter = InMemorySpanExporter()
+    key = uuid.uuid4().hex
+    client = Langfuse(
+        public_key=f"pk-lf-{key}",
+        secret_key=f"sk-lf-{key}",
+        base_url="http://127.0.0.1:9",
+        span_exporter=exporter,
+        tracer_provider=TracerProvider(),
+    )
+    monkeypatch.setattr("rag.llm._tracer", lambda: client)
+
+    def spans() -> tuple["ReadableSpan", ...]:
+        client.flush()
+        return exporter.get_finished_spans()
+
+    yield spans
+    client.shutdown()
 
 
 @pytest.fixture(scope="session", autouse=True)
