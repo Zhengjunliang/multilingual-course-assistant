@@ -3,11 +3,14 @@ file AND the right page inside the chunk's span, and the CLI must report a
 rate that survives an empty index without dividing by zero."""
 
 import json
+import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 
 import pytest
+from opentelemetry.sdk.trace import ReadableSpan
 from pydantic import SecretStr
 from test_agent import ScriptedCompleter
 from test_index import StubDense, StubSparse, make_chunk
@@ -426,7 +429,7 @@ def test_routing_report_scores_exact_wide_both_and_fallback() -> None:
         [routed("slides"), routed("both"), routed("slides"), "sorry, no JSON"]
     )
 
-    report = routing_report(questions, completer)
+    report = routing_report(questions, completer, run_id="gold-test")
     assert [row.routed_target for row in report.rows] == ["slides", "both", "slides", "both"]
     assert report.exact == 1
     assert report.wide == 3
@@ -474,6 +477,7 @@ def test_routing_report_short_circuits_before_the_retrieval_stack(
     main([str(gold_file), "--routing", "--no-rerank"])
     assert "retrieval flags ignored: no_rerank" in caplog.text
     out = capsys.readouterr().out
+    assert re.search(r"^run_id: gold-\d{8}-\d{6}$", out, re.MULTILINE)
     assert "q001 slides -> slides" in out
     assert "c001 unifi_web -> both" in out
     assert "exact-hit: 1/2 (50%)" in out
@@ -484,3 +488,40 @@ def test_routing_report_short_circuits_before_the_retrieval_stack(
     # `--live` rides the same ignored-flags report as every retrieval flag.
     main([str(gold_file), "--routing", "--live", "on"])
     assert "retrieval flags ignored: live" in caplog.text
+
+
+def test_a_routing_run_traces_each_question_under_its_run_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    traced: Callable[[], tuple[ReadableSpan, ...]],
+) -> None:
+    """A run is found in Langfuse by the id it printed: one trace per
+    question, each holding the router's generation, all under that id."""
+    monkeypatch.setattr(
+        "rag.llm.build_completer",
+        lambda *args, **kwargs: ScriptedCompleter([routed("slides"), routed("both")]),
+    )
+    gold_file = tmp_path / "routing.jsonl"
+    gold_file.write_text(
+        make_question().model_dump_json() + "\n" + make_campus_question().model_dump_json() + "\n",
+        encoding="utf-8",
+    )
+
+    main([str(gold_file), "--routing", "--run-id", "gold-baseline"])
+    assert "run_id: gold-baseline" in capsys.readouterr().out
+
+    spans = traced()
+    roots = [span for span in spans if span.name == "routing"]
+    tagged = [
+        tuple(
+            json.loads(str(dict(root.attributes or {})[f"langfuse.trace.metadata.{key}"]))
+            for key in ("run_id", "question_id")
+        )
+        for root in roots
+    ]
+    assert sorted(tagged) == [("gold-baseline", "c001"), ("gold-baseline", "q001")]
+    decisions = [span for span in spans if span.name == "RouteDecision"]
+    assert sorted(span.parent.span_id for span in decisions if span.parent) == sorted(
+        root.context.span_id for root in roots if root.context
+    )

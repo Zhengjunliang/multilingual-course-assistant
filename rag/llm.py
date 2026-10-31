@@ -25,6 +25,14 @@ endpoint stops answering — and the deepening loop has one (the step clock in
 docs/unifi-web-source.md). This module knows nothing about who is calling it,
 so the bound is a plain default here rather than an imported constant.
 
+Calls can also be recorded, in the Langfuse of docker-compose.yml's tracing
+profile, and this is the one module of `rag/` that knows it. A caller opens
+`trace()` around a unit of work, such as one question of a CLI run, and every
+call made inside it becomes a generation of that trace: the prompt, the reply,
+the model and its decoding, the tokens. A call made outside any trace is sent as
+ever and recorded nowhere. With LANGFUSE_TRACING_ENABLED off, the default,
+`trace()` records nothing and `langfuse` is never imported.
+
 Text this project did not write — an excerpt, a web page, a link's anchor, an
 earlier turn the browser sent back — enters a prompt through `quote()`, and
 every system prompt that reads such text carries `QUOTED_CLAUSE`
@@ -35,18 +43,23 @@ its own block, and `inert_url()` is how a URL stands outside one.
 
 from __future__ import annotations
 
+import functools
 import logging
 import re
 import unicodedata
 import urllib.parse
+from contextlib import contextmanager
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from pydantic import BaseModel, SecretStr, ValidationError
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Generator, Iterator, Sequence
 
+    from langfuse import Langfuse
     from openai import Omit
+    from openai.types import CompletionUsage
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +86,115 @@ class Completer(Protocol):
     def complete(self, messages: Sequence[Message]) -> str: ...
 
 
+class Observation(Protocol):
+    """What a caller may do with the trace it opened: say what came out of it.
+    With tracing off the same call records nothing."""
+
+    def update(self, *, output: Any) -> object: ...
+
+
+class _Unrecorded:
+    def update(self, *, output: Any) -> object:
+        return self
+
+
+_UNRECORDED = _Unrecorded()
+
+
+@functools.cache
+def _tracer() -> Langfuse | None:
+    """The process's Langfuse client; None with tracing off.
+
+    Built on first use, so a process that never opens a trace never starts
+    the SDK's export thread, and with tracing off never imports `langfuse`. The
+    SDK sends what is left on exit by itself.
+    """
+    from config.env import env
+
+    if not env.langfuse_tracing_enabled:
+        return None
+    from langfuse import Langfuse
+
+    # Never None here: config/env.py refuses tracing without the pair.
+    public_key = cast("SecretStr", env.langfuse_public_key)
+    secret_key = cast("SecretStr", env.langfuse_secret_key)
+    return Langfuse(
+        public_key=public_key.get_secret_value(),
+        secret_key=secret_key.get_secret_value(),
+        base_url=env.langfuse_base_url,
+    )
+
+
+def _recording() -> Langfuse | None:
+    """The client while a `trace()` is open in this context; None otherwise.
+
+    Read from OpenTelemetry's context, where the SDK keeps its spans: the SDK's
+    own `get_current_trace_id()` logs a warning on every call made outside one,
+    and outside one is where every untraced call is.
+    """
+    client = _tracer()
+    if client is None:
+        return None
+    from opentelemetry import trace as otel
+
+    return client if otel.get_current_span().is_recording() else None
+
+
+@contextmanager
+def trace(
+    name: str,
+    *,
+    trace_id: str | None = None,
+    session_id: str | None = None,
+    metadata: dict[str, str] | None = None,
+    input: Any = None,
+) -> Generator[Observation]:
+    """Record every LLM call made inside the block under one trace.
+
+    `trace_id`, 32 lowercase hex characters, names the trace after an id the
+    caller already holds; `session_id` groups the traces of one conversation;
+    `metadata` holds short strings to filter the traces by, such as a run id.
+    """
+    client = _tracer()
+    if client is None:
+        yield _UNRECORDED
+        return
+    from langfuse import propagate_attributes
+
+    with (
+        client.start_as_current_observation(
+            name=name,
+            input=input,
+            trace_context={"trace_id": trace_id} if trace_id else None,
+        ) as root,
+        propagate_attributes(session_id=session_id, metadata=metadata),
+    ):
+        yield root
+
+
+@contextmanager
+def _generation(name: str, messages: Sequence[Message]) -> Generator[Observation]:
+    client = _recording()
+    if client is None:
+        yield _UNRECORDED
+        return
+    with client.start_as_current_observation(
+        name=name, as_type="generation", input=list(messages)
+    ) as generation:
+        yield generation
+
+
+def _usage(usage: CompletionUsage | None) -> dict[str, int] | None:
+    """The token counts under Langfuse's own keys; None when the server sent none."""
+    if usage is None:
+        return None
+    return {
+        "input": usage.prompt_tokens,
+        "output": usage.completion_tokens,
+        "total": usage.total_tokens,
+    }
+
+
 class _OpenAIClient:
     def __init__(
         self,
@@ -97,18 +219,62 @@ class _OpenAIClient:
         # where an absent field costs nothing.
         self._seed: int | Omit = omit if seed is None else seed
 
+    def _parameters(self) -> dict[str, Any]:
+        """The decoding a generation records: what this client puts on the wire."""
+        parameters: dict[str, Any] = {"temperature": self._temperature}
+        if isinstance(self._seed, int):
+            parameters["seed"] = self._seed
+        return parameters
+
     def stream(self, messages: Sequence[Message]) -> Iterator[str]:
-        events = self._client.chat.completions.create(
-            model=self._model,
-            messages=cast("Any", list(messages)),  # our Message shape matches the typed dicts
-            stream=True,
-            temperature=self._temperature,
-            seed=self._seed,
+        from openai import omit
+
+        client = _recording()
+        # Started, not made current: the caller runs between two tokens, so the
+        # generation is ended by hand, in `finally`, which a caller that stops
+        # reading early reaches too.
+        generation = (
+            None
+            if client is None
+            else client.start_observation(
+                name="answer",
+                as_type="generation",
+                input=list(messages),
+                model=self._model,
+                model_parameters=self._parameters(),
+            )
         )
-        for event in events:
-            delta = event.choices[0].delta.content
-            if delta:
-                yield delta
+        pieces: list[str] = []
+        usage: CompletionUsage | None = None
+        try:
+            events = self._client.chat.completions.create(
+                model=self._model,
+                messages=cast("Any", list(messages)),  # our Message shape matches the typed dicts
+                stream=True,
+                temperature=self._temperature,
+                seed=self._seed,
+                # The token counts come in a last chunk of their own, with no
+                # choices, and only when asked for.
+                stream_options={"include_usage": True} if generation else omit,
+            )
+            for event in events:
+                usage = event.usage or usage
+                if not event.choices:
+                    continue
+                delta = event.choices[0].delta.content
+                if delta:
+                    if generation is not None and not pieces:
+                        generation.update(completion_start_time=datetime.now(UTC))
+                    pieces.append(delta)
+                    yield delta
+        except Exception as error:
+            if generation is not None:
+                generation.update(level="ERROR", status_message=type(error).__name__)
+            raise
+        finally:
+            if generation is not None:
+                generation.update(output="".join(pieces), usage_details=_usage(usage))
+                generation.end()
 
     def complete(self, messages: Sequence[Message]) -> str:
         response = self._client.chat.completions.create(
@@ -117,6 +283,14 @@ class _OpenAIClient:
             temperature=self._temperature,
             seed=self._seed,
         )
+        client = _recording()
+        if client is not None:
+            # Fills the generation `complete_json`, the one caller, opened.
+            client.update_current_generation(
+                model=self._model,
+                model_parameters=self._parameters(),
+                usage_details=_usage(response.usage),
+            )
         return response.choices[0].message.content or ""
 
 
@@ -171,11 +345,16 @@ def complete_json[ModelT: BaseModel](
     missed, not the turn", and a timeout that escaped as an exception would
     cost the whole loop. `APITimeoutError` subclasses `APIConnectionError`, so
     one except covers both.
+
+    Inside a `trace()` the call is a generation named after the schema, so a
+    trace reads as the decisions taken: `RouteDecision`, `AnswerVerdict`.
     """
     from openai import APIConnectionError
 
     try:
-        reply = completer.complete(messages)
+        with _generation(schema.__name__, messages) as generation:
+            reply = completer.complete(messages)
+            generation.update(output=reply)
     except APIConnectionError as error:
         logger.warning("completion request failed (%s): no usable reply", type(error).__name__)
         return None

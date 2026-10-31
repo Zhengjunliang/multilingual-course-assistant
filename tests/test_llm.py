@@ -4,17 +4,21 @@ must degrade to None — the caller's deterministic fallback path — never rais
 mid-pipeline. Decoding stays reproducible: both call shapes must put the
 configured temperature and seed on the wire. Text the project did not write
 reaches a model only inside a quoted block, under a system prompt that says what
-the block is."""
+the block is. A call is recorded only inside an open trace, and with tracing off
+nothing is recorded or imported."""
 
 import ast
 import importlib
+import json
 import re
-from collections.abc import Callable, Sequence
+import sys
+from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from opentelemetry.sdk.trace import ReadableSpan
 from pydantic import BaseModel, SecretStr
 from test_answer import tags_read_leniently
 from test_index import make_web_chunk
@@ -34,6 +38,7 @@ from rag.llm import (
     inert_url,
     neutralize,
     parse_json_reply,
+    trace,
 )
 from rag.search import Hit
 
@@ -90,18 +95,38 @@ def test_complete_json_degrades_a_dead_endpoint_to_none() -> None:
 
 class RecordingCompletions:
     """Stands in for `client.chat.completions`: records the request kwargs and
-    answers in both shapes (streamed deltas / one full message)."""
+    answers in both shapes (streamed deltas / one full message), with the token
+    counts where the API puts them: on the message, and on a last chunk with
+    no choices when the stream asks for it."""
 
-    def __init__(self) -> None:
+    usage = SimpleNamespace(prompt_tokens=7, completion_tokens=3, total_tokens=10)
+
+    def __init__(self, deltas: Sequence[str] = ("ok",)) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.deltas = deltas
 
     def create(self, **kwargs: Any) -> Any:
         self.calls.append(kwargs)
         if kwargs.get("stream"):
-            return iter(
-                [SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="ok"))])]
-            )
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))])
+            chunks = [
+                SimpleNamespace(
+                    choices=[SimpleNamespace(delta=SimpleNamespace(content=delta))], usage=None
+                )
+                for delta in self.deltas
+            ]
+            if kwargs.get("stream_options") == {"include_usage": True}:
+                chunks.append(SimpleNamespace(choices=[], usage=self.usage))
+            return iter(chunks)
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))], usage=self.usage
+        )
+
+
+def serve(monkeypatch: pytest.MonkeyPatch, completions: RecordingCompletions) -> None:
+    def fake_openai(base_url: str, api_key: str, timeout: float) -> Any:
+        return SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
 
 
 def test_decoding_parameters_reach_both_call_shapes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -133,6 +158,7 @@ def test_decoding_parameters_reach_both_call_shapes(monkeypatch: pytest.MonkeyPa
     streamed, completed = completions.calls
     assert streamed["temperature"] == 0.0
     assert streamed["seed"] is omit  # unset seed is left out of the request
+    assert streamed["stream_options"] is omit  # the token counts are asked for when traced
     assert completed["temperature"] == 0.0
     assert completed["seed"] == 42
     # Every request is bounded: the SDK's own default is ten minutes, which
@@ -140,6 +166,124 @@ def test_decoding_parameters_reach_both_call_shapes(monkeypatch: pytest.MonkeyPa
     # endpoint stops answering.
     assert clients == [DEFAULT_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS]
     assert DEFAULT_TIMEOUT_SECONDS < STEP_TIMEOUT_SECONDS
+
+
+def test_tracing_off_records_nothing_and_imports_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Off is the default of every checkout, the tests and CI: a run must not
+    pay for a client it never uses, nor reach for a server nobody started.
+    With the packages made unimportable, any import of them would raise here."""
+    import rag.llm
+
+    monkeypatch.setitem(sys.modules, "langfuse", None)
+    monkeypatch.setitem(sys.modules, "opentelemetry", None)
+    rag.llm._tracer.cache_clear()
+    serve(monkeypatch, RecordingCompletions())
+    messages: list[Message] = [{"role": "user", "content": "relevant?"}]
+
+    with trace("routing", metadata={"run_id": "gold-x"}) as routing:
+        reply = '{"relevant": true, "reason": "r"}'
+        assert complete_json(StubCompleter(reply), messages, Verdict) is not None
+        streamer = build_streamer("http://x/v1", SecretStr("k"), "m")
+        assert "".join(streamer.stream(messages)) == "ok"
+        routing.update(output="done")
+    assert rag.llm._tracer() is None
+
+
+def attributes(span: ReadableSpan) -> dict[str, Any]:
+    return dict(span.attributes or {})
+
+
+def test_a_call_outside_any_trace_is_sent_and_not_recorded(
+    traced: Callable[[], tuple[ReadableSpan, ...]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Recording is decided by whoever opens a trace: a call made outside one,
+    tracing on or not, is sent as ever and leaves no span, not even a trace of
+    its own."""
+    completions = RecordingCompletions()
+    serve(monkeypatch, completions)
+    messages: list[Message] = [{"role": "user", "content": "hi"}]
+
+    assert complete_json(StubCompleter('{"relevant": true, "reason": "r"}'), messages, Verdict)
+    assert "".join(build_streamer("http://x/v1", SecretStr("k"), "m").stream(messages)) == "ok"
+    assert len(completions.calls) == 1
+    assert traced() == ()
+
+
+def test_a_traced_call_is_a_generation_named_after_its_schema(
+    traced: Callable[[], tuple[ReadableSpan, ...]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A trace reads as the decisions taken, each with what it cost: the
+    schema names the generation, the client adds the model, its decoding and
+    the tokens the server counted. The trace takes the caller's id, session
+    and metadata, so it can be found from what the caller already holds, and
+    names nobody."""
+    serve(monkeypatch, RecordingCompletions())
+    messages: list[Message] = [{"role": "user", "content": "relevant?"}]
+    completer = build_completer("http://x/v1", SecretStr("k"), "qwen3:4b", seed=42)
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+
+    with trace(
+        "answer",
+        trace_id=trace_id,
+        session_id="conversation-1",
+        metadata={"run_id": "gold-x"},
+        input="relevant?",
+    ) as root:
+        assert complete_json(completer, messages, Verdict) is None  # "ok" is no JSON
+        root.update(output="done")
+
+    spans = {span.name: span for span in traced()}
+    assert set(spans) == {"answer", "Verdict"}
+    root_span, generation = spans["answer"], spans["Verdict"]
+    assert root_span.context is not None
+    assert format(root_span.context.trace_id, "032x") == trace_id
+    assert generation.parent is not None
+    assert generation.parent.span_id == root_span.context.span_id
+    assert attributes(root_span)["session.id"] == "conversation-1"
+    assert "user.id" not in attributes(root_span)
+    assert json.loads(attributes(root_span)["langfuse.trace.metadata.run_id"]) == "gold-x"
+    recorded = attributes(generation)
+    assert recorded["langfuse.observation.type"] == "generation"
+    assert recorded["langfuse.observation.model.name"] == "qwen3:4b"
+    assert json.loads(recorded["langfuse.observation.model.parameters"]) == {
+        "temperature": 0.0,
+        "seed": 42,
+    }
+    assert json.loads(recorded["langfuse.observation.usage_details"]) == {
+        "input": 7,
+        "output": 3,
+        "total": 10,
+    }
+    assert json.loads(recorded["langfuse.observation.input"]) == messages
+    assert recorded["langfuse.observation.output"] == "ok"
+    assert recorded["session.id"] == "conversation-1"
+
+
+def test_a_stream_left_early_still_ends_its_generation(
+    traced: Callable[[], tuple[ReadableSpan, ...]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A generation left open is never exported, so an answer the reader stopped
+    reading would vanish from the trace; closing the stream must end it, with
+    what was streamed so far. Read to the end, it carries the token counts the
+    stream asked for."""
+    completions = RecordingCompletions(deltas=("Le ", "tasse ", "scadono."))
+    serve(monkeypatch, completions)
+    messages: list[Message] = [{"role": "user", "content": "Quando scadono le tasse?"}]
+    streamer = build_streamer("http://x/v1", SecretStr("k"), "qwen3:4b")
+
+    with trace("turn"):
+        tokens = streamer.stream(messages)
+        assert isinstance(tokens, Generator)
+        assert next(tokens) == "Le "
+        tokens.close()
+        assert "".join(streamer.stream(messages)) == "Le tasse scadono."
+
+    assert [call["stream_options"] for call in completions.calls] == [{"include_usage": True}] * 2
+    left, read = [span for span in traced() if span.name == "answer"]
+    assert attributes(left)["langfuse.observation.output"] == "Le "
+    assert attributes(read)["langfuse.observation.output"] == "Le tasse scadono."
+    assert json.loads(attributes(read)["langfuse.observation.usage_details"])["output"] == 3
+    assert "langfuse.observation.completion_start_time" in attributes(read)
 
 
 @pytest.mark.parametrize(

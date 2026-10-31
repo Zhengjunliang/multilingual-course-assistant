@@ -4,7 +4,9 @@ Deliberately free of Django imports: `rag/` must stay runnable without Django,
 so both sides can read their configuration from this one source.
 """
 
-from pydantic import PositiveInt, SecretStr, field_validator
+from typing import Self
+
+from pydantic import PositiveInt, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -88,6 +90,17 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("unused")
     llm_model: str = "qwen3:4b-instruct-2507-q4_K_M"
 
+    # Langfuse, served by docker-compose.yml's tracing profile: where the CLIs
+    # and the worker send the record of their LLM calls (rag/llm.py). Off by
+    # default, so a fresh checkout, the tests and CI never reach for a server
+    # nobody started. The names are the ones the SDK reads by itself, so one
+    # name means one value; the key pair is the one the compose file makes the
+    # project with. 127.0.0.1 for the reason QDRANT_URL gives.
+    langfuse_tracing_enabled: bool = False
+    langfuse_public_key: SecretStr | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_base_url: str = "http://127.0.0.1:3000"
+
     # The password every demo- account gets from `manage.py populate_demo`
     # (apps/roles/management/commands/populate_demo.py), the way Django's
     # `createsuperuser --noinput` reads DJANGO_SUPERUSER_PASSWORD. None, the
@@ -105,6 +118,18 @@ class Settings(BaseSettings):
                 "pass a directory to a CLI's --qdrant to open an embedded index"
             )
         return value
+
+    @model_validator(mode="after")
+    def _tracing_has_its_keys(self) -> Self:
+        # Without the pair the SDK would only log a warning and record nothing,
+        # so a switch that reads on would leave a run untraced in silence.
+        if self.langfuse_tracing_enabled and not (
+            self.langfuse_public_key and self.langfuse_secret_key
+        ):
+            raise ValueError(
+                "LANGFUSE_TRACING_ENABLED needs LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY"
+            )
+        return self
 
     @property
     def allowed_hosts(self) -> list[str]:
