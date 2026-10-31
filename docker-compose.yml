@@ -5,6 +5,12 @@
 # Django and the Celery worker and beat run on the host under `uv run` so they
 # can reach the GPU that rag/ requires (rag/search.py picks cuda when it is there).
 #
+# The tracing profile adds Langfuse, which records the LLM calls (#26):
+# `docker compose --profile tracing up -d`. A profile of its own, as Dify's
+# compose file keeps each optional service (outside the repository), because
+# its six containers cost a few GB of memory that a session with tracing off
+# has no use for.
+#
 # The app profile, which would containerise the whole stack on a Linux host for
 # MICC and the defence demo, joins this file with that deployment (#41). Values
 # come from .env, the same file config/env.py reads, so there is one place to
@@ -13,6 +19,37 @@
 # Fixed, so the volume names below do not depend on the checkout's directory
 # name (the commands of docs/development.md name them).
 name: multilingual-course-assistant
+
+# What Langfuse's web and worker containers share, from the official compose
+# file (langfuse/langfuse, docker-compose.yml, outside the repository). The
+# passwords written here open services that publish no port, so only the other
+# containers of this file reach them; the secrets a process on this host could
+# use come from .env. Every value from .env defaults to empty rather than
+# using `:?`, which compose checks even with the profile off: an empty
+# LANGFUSE_NEXTAUTH_SECRET stops langfuse-web from starting, so the profile
+# fails closed.
+x-langfuse-env: &langfuse-env
+  NEXTAUTH_URL: http://localhost:3000
+  DATABASE_URL: postgresql://postgres:postgres@langfuse-postgres:5432/postgres
+  SALT: ${LANGFUSE_SALT:-}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-}
+  # The loop is offline (docs/architecture.md), as Qdrant's telemetry below.
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+  CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+  CLICKHOUSE_USER: clickhouse
+  CLICKHOUSE_PASSWORD: clickhouse
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  REDIS_HOST: langfuse-redis
+  REDIS_PORT: "6379"
+  REDIS_AUTH: myredissecret
 
 services:
   postgres:
@@ -103,7 +140,134 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Langfuse, as its official compose file runs it (see x-langfuse-env above),
+  # each backing service its own rather than ours: its migrations, its queues
+  # and its data stay out of the site's database and broker, and upgrade with
+  # it. The images and pins are the official file's. Only langfuse-web
+  # publishes a port, on loopback as every service here: the others publish
+  # none, where the official file puts them on this host's 5432 and 6379,
+  # which are ours.
+  langfuse-worker:
+    image: docker.langfuse.com/langfuse/langfuse-worker:4
+    profiles: [tracing]
+    depends_on: &langfuse-depends-on
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+    environment: *langfuse-env
+    restart: unless-stopped
+
+  langfuse-web:
+    image: docker.langfuse.com/langfuse/langfuse:4
+    profiles: [tracing]
+    depends_on: *langfuse-depends-on
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-}
+      # One account, the developer's, made below: nobody else signs up.
+      AUTH_DISABLE_SIGNUP: "true"
+      # Headless initialisation: the first start makes the organisation, the
+      # project with the key pair the site and the rag CLIs send, and the
+      # developer's account, each only if it does not exist yet.
+      LANGFUSE_INIT_ORG_ID: mca
+      LANGFUSE_INIT_ORG_NAME: multilingual-course-assistant
+      LANGFUSE_INIT_PROJECT_ID: mca
+      LANGFUSE_INIT_PROJECT_NAME: multilingual-course-assistant
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
+      LANGFUSE_INIT_USER_NAME: developer
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+
+  langfuse-clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:26.3.62.3
+    profiles: [tracing]
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+    volumes:
+      - langfuse-clickhouse-data:/var/lib/clickhouse
+      - langfuse-clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+    restart: unless-stopped
+
+  langfuse-minio:
+    image: cgr.dev/chainguard/minio
+    profiles: [tracing]
+    entrypoint: sh
+    # Creates the bucket the events are uploaded to, then starts the server.
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    volumes:
+      - langfuse-minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+      start_period: 1s
+    restart: unless-stopped
+
+  langfuse-redis:
+    image: docker.io/redis:7
+    profiles: [tracing]
+    # noeviction: Langfuse's queues live here, and a job evicted under memory
+    # pressure would be lost. Written out, as the official file writes it,
+    # although it is Redis's own default.
+    command: >
+      --requirepass myredissecret
+      --maxmemory-policy noeviction
+    volumes:
+      - langfuse-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  langfuse-postgres:
+    # 17, the official file's default: the pre-18 data directory below.
+    image: docker.io/postgres:17
+    profiles: [tracing]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - langfuse-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   qdrant-data:
   redis-data:
+  langfuse-postgres-data:
+  langfuse-clickhouse-data:
+  langfuse-clickhouse-logs:
+  langfuse-minio-data:
+  langfuse-redis-data:
