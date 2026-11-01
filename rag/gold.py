@@ -1,9 +1,9 @@
 """Retrieval smoke check against the gold set: hit@k per question.
 
 A hit means some top-k chunk comes from the question's `source_file` and spans
-its `page`. This is the M2 tuning signal (chunk size / top-k / prompt) — the
-real evaluation harness (RAGAS, retrieval metrics, error taxonomy) belongs to
-M3 and does not live here.
+its `page`. This is the M2 tuning signal (chunk size / top-k / prompt); the M3
+evaluation, RAGAS and the retrieval metrics, is `rag/eval.py`, which scores a
+hit through the same `first_hit_rank`.
 
 `--routing` is a second, independent report over the same file: it scores the
 router's collection choice against the gold `target` and runs no retrieval at
