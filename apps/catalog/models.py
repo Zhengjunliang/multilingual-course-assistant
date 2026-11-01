@@ -8,8 +8,8 @@ academic year of a course, and it is the row the rest of the site will hang on:
 material, syllabus, reading list, teachers.
 
 `(course.code, academic_year)` is the pair every slides chunk of `rag/` carries
-(`rag/chunk.py`), in place of the corpus directory name (docs/data-model.md,
-chunk payload mapping). It crosses that boundary as two plain strings — `rag/`
+(`rag/chunk.py`), in place of the corpus directory name (docs/rag-pipeline.md,
+section 3.6). It crosses that boundary as two plain strings — `rag/`
 never imports Django — so the strings themselves are the contract, which is
 why neither may change once the edition exists.
 

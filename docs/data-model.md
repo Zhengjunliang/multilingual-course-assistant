@@ -61,10 +61,6 @@ erDiagram
 
 ✅ `data/webcorpus/registry.jsonl`, written by `rag/crawl.py` and `rag/live.py`, is the append-only record of what was fetched; its layout is in [unifi-web-source.md](unifi-web-source.md), in the snapshot and registry layout section. 🔜 M5: `WebSource` is what should be fetched, edited by people — no edition for a campus page (the secretariat's), an edition for a course reference page (the teacher's). A task in `apps/` reads it and hands `rag.crawl` plain data derived from it; `rag/` never reads the table.
 
-## Chunk payload mapping
-
-✅ The field table and the web-side values are owned by [rag-pipeline.md](rag-pipeline.md), section 3.6, with the model in `rag/chunk.py`. In the slides collection, `course` holds a UniFi course code (`B028451` for PPM) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default; a slides `chunk_id` carries both, so one PDF in two editions yields two identities. The stored points moved to these fields without re-embedding (step ④ below).
-
 ## Migration order
 
 ✅ ① is in `apps/catalog/migrations/0001_initial.py`, ② in `apps/roles/migrations/0001_initial.py`, and ④ is done, all 1234 slides points moved with their vectors unchanged; 🔶 ③: `Syllabus` and `ReadingItem` are in `apps/catalog/migrations/0001_initial.py`, `CourseMaterial` in `apps/materials/migrations/0001_initial.py`, `StudentProgramme` in `apps/accounts/migrations/0001_initial.py` and `Conversation.added_editions` in `apps/qa/migrations/0001_initial.py`, and `WebSource` is 🔜 M5. Each step lands with the issue that first uses it. Until a database has to keep its data, a step rewrites its app's single `0001_initial.py` and the local database is rebuilt; from that database on, every step is a new migration that adds and drops nothing — [decisions.md](decisions.md), 2026-09-25, *The data model is decided on paper*, point 5. Roles' and materials' `0001` depend on the catalogue's, so rewriting the catalogue's rewrites all three; the steps are in [development.md](development.md), under *Changing a model*.
