@@ -51,7 +51,7 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 | Markdown prose | English | `language` |
 | Every tracked file | no known misspelling | `typos` |
 | Frontend sources (TypeScript, CSS, JSON) | Biome's rules and format, and no JSX `title` attribute (`DESIGN.md`) | `biome` |
-| What VS Code flags (TypeScript, Pylance, Tailwind CSS IntelliSense) | the chain flags too (`docs/development.md`, section "The check chain") | `frontend` step (`tsc`, `check:tailwind`), `types` step (`pyright`) |
+| What VS Code flags (TypeScript, Pylance, Tailwind CSS IntelliSense) | the chain flags too (`docs/development.md`, section "The check chain") | the `frontend` step (`npm run typecheck`, `npm run check:tailwind`) and the `types` step (`python -m pyright`) |
 | `/api/` refusals (Python) | `fail()` or `field_error()` of `config/errors.py`, never DRF's or Django's exceptions (`docs/api.md`, section "Errors") | `ruff-check` (TID251) |
 | Status markers, temporal wording, links between files | the conventions below | `doc-conventions` |
 | Links, document paths, decision references, paths a status marker cites | they resolve | `doc-references` |
