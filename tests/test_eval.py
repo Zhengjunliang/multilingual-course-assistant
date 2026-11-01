@@ -3,6 +3,8 @@ encoders, a stub generator and a stub judge: no model, no GPU, no network."""
 
 import hashlib
 import json
+import shutil
+import subprocess
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -13,7 +15,7 @@ from test_answer import StubStreamer
 from test_index import StubDense, StubSparse, make_chunk
 from test_search import ORM_TEXT, TASSE_TEXT, TASSE_URL, KeywordReranker, make_web_chunk
 
-from rag.eval import METRICS, main, summarise
+from rag.eval import METRICS, code_identity, main, summarise
 from rag.gold import GoldQuestion
 from rag.index import WEB_COLLECTION, DenseEncoder, ensure_collection, index_chunks, open_client
 
@@ -132,6 +134,34 @@ def test_run_artifact_records_snapshot_identity(run_dir: Path) -> None:
     write_manifest(run_dir / "other", slides=1, web=3)
     with pytest.raises(SystemExit, match="restore the snapshot"):
         generate("--index-snapshot", "other")
+
+
+def test_artefacts_of_earlier_runs_leave_the_code_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An earlier run's artefact sits uncommitted in `eval/` while the next
+    run starts: the code is not dirty for it, and is for a changed source."""
+    git = shutil.which("git")
+    assert git is not None
+    monkeypatch.chdir(tmp_path)
+
+    def run(*args: str) -> None:
+        subprocess.run(
+            [git, "-c", "core.hooksPath=none", "-c", "commit.gpgsign=false", *args],
+            capture_output=True,
+            check=True,
+        )
+
+    run("init")
+    Path("module.py").write_text("x = 1\n", encoding="utf-8")
+    run("add", "module.py")
+    run("-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-m", "init")
+    Path("eval").mkdir()
+    Path("eval/eval-earlier.json").write_text("{}\n", encoding="utf-8")
+    assert code_identity()["dirty"] is False
+
+    Path("module.py").write_text("x = 2\n", encoding="utf-8")
+    assert code_identity()["dirty"] is True
 
 
 def test_generate_freezes_the_text_outside_the_artefact(run_dir: Path) -> None:

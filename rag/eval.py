@@ -109,7 +109,10 @@ def code_identity() -> dict[str, Any]:
     commit = run("rev-parse", "HEAD")
     if commit is None:
         return {"commit": None, "dirty": None}
-    return {"commit": commit, "dirty": bool(run("status", "--porcelain"))}
+    # The artefacts of earlier runs wait uncommitted in their directory while
+    # the next runs start; they are output, not code.
+    status = run("status", "--porcelain", "--", ".", f":(exclude){ARTEFACT_DIR.as_posix()}")
+    return {"commit": commit, "dirty": bool(status)}
 
 
 def server_identity(base_url: str, api_key: SecretStr) -> dict[str, Any]:
