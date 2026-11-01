@@ -40,7 +40,7 @@ import {
   resumeAnswer,
   stopAnswer,
 } from "@/api/client";
-import type { Citation, RouteDecision } from "@/api/contract";
+import type { Citation, RouteDecision, StepEvent } from "@/api/contract";
 import type { ConversationDetail, StoredFeedback, StoredMessage } from "@/api/conversations";
 import { ApiError } from "@/api/http";
 import { follow } from "./follow";
@@ -71,6 +71,12 @@ export interface Turn {
    * then, and for good on an answer stored before the server kept it.
    */
   searchMs: number | null;
+  /**
+   * The steps the answer took, from its `step` events or the stored row: one
+   * begun and not yet ended has a `null` `ms`. Empty on an answer stored before
+   * the server kept them.
+   */
+  steps: StepEvent[];
   /**
    * The language the answer was written in, from `start` or the stored row;
    * `null` until then. Not the interface's language: a Chinese answer in the
@@ -128,6 +134,7 @@ function blankTurn(key: string, question: string): Turn {
     citations: [],
     route: null,
     searchMs: null,
+    steps: [],
     locale: null,
     complete: false,
     failure: null,
@@ -156,6 +163,7 @@ function replayed(messages: readonly StoredMessage[]): Turn[] {
     open.citations = message.citations;
     open.route = message.route;
     open.searchMs = message.search_ms;
+    open.steps = message.steps;
     open.locale = message.locale;
     open.complete = message.complete;
     if (!message.complete) open.failure = { kind: "interrupted" };
@@ -424,6 +432,7 @@ async function read(page: Page, key: string, stream: Answering, resumable: boole
         );
         patch(page, key, { answerId: event.answer_id });
       },
+      steps: (steps) => patch(page, key, { steps }),
       start: (event) => {
         patch(page, key, {
           citations: event.citations,

@@ -39,6 +39,7 @@ function turn(question: string, change: Partial<Turn> = {}): Turn {
     citations: [],
     route: ROUTE,
     searchMs: 1200,
+    steps: [],
     locale: "it",
     complete: true,
     failure: null,
@@ -335,8 +336,12 @@ const STARTED = frame(
   },
   "2-0",
 );
+const WAITED = frame("step", { name: "queue", ms: 900 }, "1-1");
+const ROUTING = frame("step", { name: "route", ms: null }, "1-2");
+const ROUTED = frame("step", { name: "route", ms: 300 }, "1-3");
 const FIRST = frame("token", { text: "Un ORM " }, "3-0");
 const REST = frame("token", { text: "mappa le tabelle." }, "4-0");
+const WRITTEN = frame("step", { name: "generate", ms: 2000 }, "4-1");
 const ENDED = frame("end", {}, "5-0");
 
 /** A body that stays open for the test to write into, end, or break off. */
@@ -403,6 +408,7 @@ function row(
     citations: [],
     route: answer ? ROUTE : null,
     search_ms: answer ? 40 : null,
+    steps: [],
     created_at: "2026-10-29T10:00:00Z",
     feedback: null,
   };
@@ -448,16 +454,21 @@ describe("a question answered on a worker", () => {
     serve({ "POST /api/ask": [answer] });
     const { unmount } = await ask(false);
 
-    answer.write(QUEUED);
+    answer.write(QUEUED + WAITED + ROUTING);
     await settle();
     const queued = {
       waiting: hook.waiting,
       conversation: hook.conversationId,
       answer: hook.turns[0]?.answerId,
+      steps: hook.turns[0]?.steps,
     };
-    answer.write(STARTED + FIRST);
+    answer.write(ROUTED + STARTED + FIRST);
     await settle();
-    const started = { waiting: hook.waiting, conversation: hook.conversationId };
+    const started = {
+      waiting: hook.waiting,
+      conversation: hook.conversationId,
+      steps: hook.turns[0]?.steps,
+    };
     answer.write(ENDED);
     answer.end();
     await settle();
@@ -465,8 +476,24 @@ describe("a question answered on a worker", () => {
     unmount();
 
     expect({ queued, started, ended }).toEqual({
-      queued: { waiting: { phase: "queued" }, conversation: null, answer: ANSWER },
-      started: { waiting: { phase: "streaming" }, conversation: CONVERSATION },
+      queued: {
+        waiting: { phase: "queued" },
+        conversation: null,
+        answer: ANSWER,
+        steps: [
+          { name: "queue", ms: 900 },
+          { name: "route", ms: null },
+        ],
+      },
+      started: {
+        waiting: { phase: "streaming" },
+        conversation: CONVERSATION,
+        // The end of a step takes its beginning's place.
+        steps: [
+          { name: "queue", ms: 900 },
+          { name: "route", ms: 300 },
+        ],
+      },
       ended: { phase: "idle" },
     });
   });
@@ -510,9 +537,9 @@ describe("a question answered on a worker", () => {
 
   it("opens a student's dropped stream again, after the last event read", async () => {
     const answer = pipe();
-    serve({ "POST /api/ask": [answer], [EVENTS]: [REST + ENDED] });
+    serve({ "POST /api/ask": [answer], [EVENTS]: [REST + WRITTEN + ENDED] });
     const { unmount } = await ask(false);
-    answer.write(QUEUED + STARTED + FIRST);
+    answer.write(QUEUED + WAITED + STARTED + FIRST);
     await settle();
 
     answer.fail(new TypeError("network error"));
@@ -523,6 +550,10 @@ describe("a question answered on a worker", () => {
     expect(calls.at(-1)).toEqual({ method: "GET", url: EVENTS_URL, lastEventId: "3-0" });
     expect(turns[0]).toMatchObject({
       answer: "Un ORM mappa le tabelle.",
+      steps: [
+        { name: "queue", ms: 900 },
+        { name: "generate", ms: 2000 },
+      ],
       complete: true,
       failure: null,
     });
@@ -574,12 +605,16 @@ describe("a question answered on a worker", () => {
     expect(waiting).toEqual({ phase: "idle" });
   });
 
-  it("reads a conversation nobody is answering from its rows alone, its ratings with them", async () => {
+  it("reads a conversation nobody is answering from its rows alone, its ratings and steps with them", async () => {
     serve({});
     const { unmount } = mount(<Probe visitor={false} />);
     const feedback = { rating: "down", reason: "incorrect", comment: "" } as const;
+    const steps = [
+      { name: "queue", ms: 900 },
+      { name: "generate", ms: 2000 },
+    ] as const;
     const rows = EARLIER.map((message) =>
-      message.role === "assistant" ? { ...message, feedback } : message,
+      message.role === "assistant" ? { ...message, feedback, steps: [...steps] } : message,
     );
 
     await act(() => hook.adopt(detail(rows, null)));
@@ -591,7 +626,7 @@ describe("a question answered on a worker", () => {
       turns: 1,
       waiting: { phase: "idle" },
     });
-    expect(turns[0]).toMatchObject({ answerId: "a-1", feedback });
+    expect(turns[0]).toMatchObject({ answerId: "a-1", feedback, steps });
   });
 });
 

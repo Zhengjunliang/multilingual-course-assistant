@@ -65,6 +65,7 @@ function turn(overrides: Partial<Turn> = {}): Turn {
     citations: [citation("[Excerpt 1]", 3), citation("[Excerpt 2]", 4), citation("[Excerpt 3]", 5)],
     route: ROUTE,
     searchMs: 2400,
+    steps: [],
     locale: "it",
     complete: true,
     failure: null,

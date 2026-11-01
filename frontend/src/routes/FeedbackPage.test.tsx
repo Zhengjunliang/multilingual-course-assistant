@@ -91,6 +91,7 @@ const DETAIL: FeedbackDetail = {
     citations: [SLIDE],
     route: { target: "slides", query: "secondo ORM", fresh: false, reason: "corso" },
     search_ms: 2400,
+    steps: [],
     request_id: "4bf92f3577b34da6a3ce929d0e0e4736",
     created_at: "2026-10-30T09:28:00Z",
   },

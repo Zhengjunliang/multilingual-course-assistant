@@ -12,8 +12,8 @@ worker writes the rows and settles them (apps/qa/tasks.py). What crosses into
 `rag/` is `Turn`, two strings on a frozen model.
 
 **Where the writes happen matters more than what they write.** Both rows are
-created after the engine's first event has been pulled, never before. Until that
-`next()` returns, the question can still fail — a stopped model server, a
+created after the engine's `start` event has been pulled, never before. Until it
+arrives, the question can still fail — a stopped model server, a
 stopped Qdrant service, a stop asked while it waited — and a question that was
 never answered should leave nothing behind. Created earlier, every such failure
 would deposit a question with no answer under it, and the next turn's history
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from apps.accounts.models import User
-    from apps.qa.contract import StartEvent
+    from apps.qa.contract import StartEvent, StepEvent
 
 
 class ConversationGoneError(Exception):
@@ -146,11 +146,13 @@ def record_exchange(
     *,
     request_id: str,
     history: Sequence[Turn],
+    steps: Sequence[StepEvent] = (),
     added_editions: Collection[int] | None = None,
 ) -> None:
     """Write the question and the empty answer, the answer under `answer_pk`,
-    with the id of the request that asked (`Message.request_id`) and the
-    history its prompt was given (`Message.history`).
+    with the id of the request that asked (`Message.request_id`), the
+    history its prompt was given (`Message.history`) and the steps it finished
+    before `start` (`Message.steps`).
 
     `answer_pk` is the answer's id everywhere: the web process chose it when
     it admitted the question, and it already names the answer's stream and
@@ -169,7 +171,8 @@ def record_exchange(
     `citations`, `route` and `search_ms` are stored now rather than at the end
     because now is when they exist: they arrive in the `start` event, which is
     not repeated. Reopening this conversation later replays it from these
-    columns.
+    columns. The steps so far are stored now too, so an answer whose worker
+    died before it settled still says where its time went.
 
     `added_editions`, when the question set them, replace the conversation's
     in the same lock, so a question that never began leaves its choice
@@ -206,6 +209,7 @@ def record_exchange(
             citations=[citation.model_dump(mode="json") for citation in start.citations],
             route=start.route.model_dump(mode="json"),
             search_ms=start.search_ms,
+            steps=[step.model_dump(mode="json") for step in steps],
             request_id=request_id,
             history=[turn.model_dump(mode="json") for turn in history],
         )
@@ -214,6 +218,10 @@ def record_exchange(
             locked.added_editions.set(added_editions)
 
 
-def settle(answer_pk: UUID, text: str, *, complete: bool) -> None:
-    """Fill in the answer row once the stream has stopped, however it stopped."""
-    Message.objects.filter(pk=answer_pk).update(text=text, complete=complete)
+def settle(answer_pk: UUID, text: str, *, complete: bool, steps: Sequence[StepEvent]) -> None:
+    """Fill in the answer row once the stream has stopped, however it stopped,
+    with every step it finished: `record_exchange`'s and `generate`, if the
+    answer got that far."""
+    Message.objects.filter(pk=answer_pk).update(
+        text=text, complete=complete, steps=[step.model_dump(mode="json") for step in steps]
+    )

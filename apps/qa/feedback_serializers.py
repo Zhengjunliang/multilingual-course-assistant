@@ -120,6 +120,7 @@ class RatedAnswerSerializer(serializers.ModelSerializer[Message]):
             "citations",
             "route",
             "search_ms",
+            "steps",
             "request_id",
             "created_at",
         )

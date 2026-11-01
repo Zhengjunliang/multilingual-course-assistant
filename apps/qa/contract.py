@@ -14,12 +14,16 @@ yields these models and never sees the framing; `apps/qa/views.py` frames them
 and never builds one.
 
 A stream is one `queued`, one `start`, any number of `token`s, and one
-terminator, each event under the id it has in the answer's Redis stream
-(apps/qa/inflight.py)::
+terminator, with `step`s between them, each event under the id it has in the
+answer's Redis stream (apps/qa/inflight.py)::
 
     id: 1730200000000-0
     event: queued
     data: {"answer_id": "9b2e…", "conversation_id": "3f1c9a52-…", "question": "..."}
+
+    id: 1730200002950-0
+    event: step
+    data: {"name": "queue", "ms": 2950}
 
     id: 1730200004211-0
     event: start
@@ -162,6 +166,34 @@ class QueuedEvent(Event):
     question: str
 
 
+# The steps of an answer, in the order it takes them: waiting for a worker,
+# understanding the question (`rag.agent.route`), looking for the excerpts and
+# writing the answer. Named for what a student sees rather than for the parts
+# that do them: the wait for the GPU is in `retrieve`, as the trace's
+# `gpu-wait` is beside its `retrieve` (apps/qa/engine.py).
+StepName = Literal["queue", "route", "retrieve", "generate"]
+
+
+class StepEvent(Event):
+    """A step of the answer began, or ended after `ms` milliseconds.
+
+    The steps come in order: `queue` ended → `route` began and ended →
+    `retrieve` began and ended → `start` → the tokens → `generate` ended →
+    `end`. `queued` is where the wait for a worker begins and `start` where
+    the writing does, so those two steps send no event of their own when they
+    begin. A step the answer never finished, stopped or failed meanwhile,
+    sends none when it ends either.
+
+    An answer stores the steps it finished (`Message.steps`), so a reopened
+    conversation shows the same ones as the live answer did.
+    """
+
+    NAME = "step"
+
+    name: StepName
+    ms: int | None
+
+
 class StartEvent(Event):
     """Everything known before a single token exists.
 
@@ -194,7 +226,7 @@ class StartEvent(Event):
     counts the seconds from the moment the question is asked, and a total that
     left the queue out would fold a count of 50 into "15". It is stored with
     the answer so a reopened conversation shows the same number rather than
-    none.
+    none. The `step` events before this one say where that time went.
     """
 
     NAME = "start"

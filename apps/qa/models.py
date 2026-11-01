@@ -194,6 +194,10 @@ class Message(models.Model):
     search_ms = models.PositiveIntegerField(
         null=True, blank=True, verbose_name=_("search time (ms)")
     )
+    # The steps the answer finished, each a `StepEvent` as JSON, `{"name", "ms"}`,
+    # in the order it took them: kept for the reason `search_ms` is. Empty on a
+    # student's turn and on an answer stored before the column existed.
+    steps = models.JSONField(default=list, blank=True, verbose_name=_("steps"))
     # The id of the request that asked for this answer (config/request_id.py),
     # which files its log lines and, with #26, names its trace: a rating is
     # read beside what the server did to produce the answer it rates. Empty on

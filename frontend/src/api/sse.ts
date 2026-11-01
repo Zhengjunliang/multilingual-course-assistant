@@ -102,6 +102,7 @@ export async function* readAnswerEvents(
     const data: unknown = JSON.parse(frame.data);
     switch (frame.name) {
       case "queued":
+      case "step":
       case "start":
       case "token":
       case "end":

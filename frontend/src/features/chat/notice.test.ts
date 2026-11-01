@@ -21,6 +21,7 @@ function turn(overrides: Partial<Turn> = {}): Turn {
     citations: [],
     route: null,
     searchMs: null,
+    steps: [],
     locale: "it",
     complete: false,
     failure: null,

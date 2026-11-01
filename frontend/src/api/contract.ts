@@ -65,7 +65,24 @@ export interface QueuedEvent {
   question: string;
 }
 
-/** Everything known before a single token exists. Follows `queued`. */
+/**
+ * The steps of an answer, in the order it takes them: waiting for a worker,
+ * understanding the question, looking for the excerpts, writing the answer.
+ * The wait for the GPU is part of `retrieve`.
+ */
+export type StepName = "queue" | "route" | "retrieve" | "generate";
+
+/**
+ * A step began (`ms` is `null`) or ended after `ms` milliseconds. `queue` and
+ * `generate` send only their end: `queued` and `start` are their beginnings. A
+ * step the answer never finished sends no end.
+ */
+export interface StepEvent {
+  name: StepName;
+  ms: number | null;
+}
+
+/** Everything known before a single token exists. Follows `queued` and the steps before it. */
 export interface StartEvent {
   question: string;
   /**
@@ -108,11 +125,13 @@ export interface ErrorEvent {
 
 /**
  * A stream is one `queued`, one `start`, any number of `token`s, and one
- * terminator: `end`, `stopped` or `error`. A stream that stops with none of
- * them lost its connection, and a signed-in reader can resume it.
+ * terminator: `end`, `stopped` or `error`, with `step`s between them. A stream
+ * that stops with no terminator lost its connection, and a signed-in reader
+ * can resume it.
  */
 export type AnswerEvent =
   | { name: "queued"; data: QueuedEvent }
+  | { name: "step"; data: StepEvent }
   | { name: "start"; data: StartEvent }
   | { name: "token"; data: TokenEvent }
   | { name: "end"; data: EndEvent }
