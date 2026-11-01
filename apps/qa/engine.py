@@ -51,7 +51,7 @@ from rag.agent import collections_for, route
 from rag.answer import answer
 from rag.chunk import detect_locale
 from rag.llm import observe
-from rag.search import RELEVANCE_CUTOFF, search
+from rag.search import RELEVANCE_CUTOFF, TOP_K, search
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Sequence
@@ -64,12 +64,6 @@ if TYPE_CHECKING:
     from rag.index import DenseEncoder, SparseEncoder
     from rag.llm import ChatStreamer, Completer
     from rag.search import Reranker
-
-# The most sources an answer is given: `search()` keeps fewer when the reranker
-# calls the rest irrelevant (`RELEVANCE_CUTOFF`). The CLI default (`rag.answer`,
-# `rag.agent`), restated rather than imported because those are argparse
-# defaults rather than a shared constant.
-TOP_K = 5
 
 # One message for both LLM roles: the router and the generator talk to the same
 # endpoint, so whichever notices first is reporting the same outage.
