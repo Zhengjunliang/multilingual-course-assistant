@@ -127,6 +127,7 @@ Beat is one process that queues each scheduled task when it falls due; it runs n
 | Task | When | Why |
 | ---- | ---- | --- |
 | `apps.accounts.tasks.clear_expired_sessions` | 04:00 every night | Django keeps an expired session's row until something deletes it, and asks for `clearsessions` to be run regularly |
+| `apps.qa.traces.reconcile_traces` | every 10 minutes | Langfuse is a copy of the database: the traces of conversations deleted while tracing was off or Langfuse was down, or exported after their conversation was deleted, are deleted, and the `user-feedback` scores are made to match the ratings ([decisions.md](decisions.md), 2026-10-31, *A signed-in student's answer is a trace in Langfuse that names nobody and goes with its conversation*, point 3); with tracing off it returns at once |
 | `apps.materials.tasks.fail_stalled` | every 10 minutes | A worker that dies under a material leaves its row in a running state; past the ingest's hard limit and 5 minutes more, the row is marked failed, `interrupted` |
 
 ## What goes to a worker
@@ -141,6 +142,9 @@ Beat is one process that queues each scheduled task when it falls due; it runs n
 | A global cap on the questions in flight | a sorted set of leases in Redis | ✅ `apps/qa/inflight.py` |
 | Ingesting uploaded course material | a worker on `ingest` | ✅ `apps/materials/tasks.py` |
 | Failing an ingest whose worker died | beat, then a worker on `default` | ✅ `apps/materials/tasks.py` |
+| Tracing an answer in Langfuse | the worker on `qa` that answers it, the SDK exporting from a thread of its own | ✅ `apps/qa/tasks.py` |
+| Deleting a deleted conversation's traces, sending a rating's score | a worker on `default`, queued once the transaction commits | ✅ `apps/qa/traces.py` |
+| Bringing Langfuse back to the database | beat, then a worker on `default` | ✅ `apps/qa/traces.py` |
 | Bounding a document's parse time and pages | the upload for its pages, the ingest task for its parse time | ✅ `apps/materials/services.py`, `apps/materials/ingest.py` |
 | Snapshotting the Qdrant index | beat, then a worker on `default` | 🔜 M5 #122 |
 | The deepening agent on the web (`rag/agent.py`) | a worker, over the answer streams | 🔜 M7, no issue |

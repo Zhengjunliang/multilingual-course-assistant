@@ -2,6 +2,40 @@
 
 What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; each entry's *Reproducibility* section says how its numbers were produced, and what of that was not kept. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
+## 2026-11-01 — Tracing a routing run in Langfuse costs less than the run-to-run spread, and a deleted conversation leaves Langfuse in under two minutes
+
+`#26`. The campus set's routing report run with tracing on and off, then the site's traces followed through a rating, its withdrawal and two deletions, one made while tracing was off. The laptop, RTX 4070 Laptop 8 GB, Ollama serving `qwen3:4b-instruct-2507-q4_K_M`; Langfuse v4.72.0 under the compose profile `tracing`, the SDK `langfuse` 5.1.0.
+
+### 1. The routing run
+
+`rag.gold gold/campus.jsonl --routing`, four pairs, the off arm first in pairs 1, 3 and 4:
+
+| Pair | Tracing off | Tracing on |
+| --- | --- | --- |
+| 1 | 95.6 s | 63.6 s |
+| 2 | 123.6 s, one call timed out at 30 s and was retried | 57.9 s |
+| 3 | 50.0 s | 47.4 s |
+| 4 | 46.6 s | 47.0 s |
+
+Every run routed the 32 questions alike, exact hit 21/32. Each run with tracing on is exactly 32 `routing` traces under its run id, each holding one `RouteDecision` generation with its model and tokens, and each run with it off none. Pairs 3 and 4 differ by under 3 s, either way. The off arms of pairs 1 and 2 are slower by 32 s and 66 s, which tracing cannot explain: with it off the code does strictly less, so that is the endpoint's spread on the laptop.
+
+### 2. The site and the agent
+
+| Check | Measured |
+| --- | --- |
+| A signed-in student's answer | 15.35 s; one trace under the request's id, its session the conversation's id, no user; `RouteDecision` 4.55 s and 278 tokens, `gpu-wait` 0 ms, `retrieve` 5.10 s, `answer` 5.63 s and 1895 tokens; the trace's input and output the question and the answer |
+| A visitor's answer | 23.6 s on the worker; no observation in Langfuse |
+| Rated down, then up, then withdrawn | one score `user-feedback`, 0 then 1 under the same id and the answer's time, gone within 3 s of the withdrawal |
+| A conversation deleted, tracing on | its trace and score gone from Langfuse 1 min 42 s after the deletion, read every 15 s |
+| A conversation deleted and an answer rated down with a comment, tracing off | nothing queued; with tracing on again, the reconciliation took 0.3 s, the trace was gone at the first read, 12 s later, and the score, its comment included, was there 16 s after it |
+| `rag.agent`, a question the stored pages answer | 61 s; one `agent` trace of three calls: `RouteDecision`, `AnswerVerdict`, `answer` |
+| `rag.agent`, a question that fetches live | 25 min 28 s; one trace of ten calls: `RouteDecision`, `AnswerVerdict` three times, `CandidateChoice` three times, `RelevanceVerdict` twice, `answer`. Most of the time went to the dense encoder, at 124 to 133 s a batch beside the model on the 8 GB card, which tracing does not touch |
+| `npm run e2e:journeys` with tracing on in `.env` | 10 passed in 50 s, no observation in Langfuse |
+
+### Reproducibility
+
+The runs are the commands above and those of [development.md](development.md), section "Daily loop", the site asked in the browser as `demo-student` and as a visitor. The times are the shell's around each command, the worker's own for a task, and Langfuse's for a step; Langfuse was read through its public API (observations v2, scores v3) by a script that was not kept. The routing runs' traces stay in the local Langfuse under the run ids `cp2-on`, `cp2-on-timed`, `cp2-on-timed2`, `cp2-on-timed3` and `cp2-on-timed4` until its volumes are deleted; the site's were deleted with their conversations, which is what the run measured.
+
 ## 2026-10-30 — The 31 PPM decks, imported as uploads, are ingested by the laptop's worker in 5 min 29 s, all with formula decoding, and the smoke gate holds at 38/40
 
 `#35`. The course's PDFs in `data/corpus/PPM` added to the edition B028451 2025-2026 by `import_materials`, ingested by the development worker in place of the points the CLI wrote, then the smoke gate on the result.
