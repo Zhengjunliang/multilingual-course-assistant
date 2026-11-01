@@ -34,6 +34,18 @@ if __name__ == "__main__":
     connection.creation.create_test_db(verbosity=0, autoclobber=True, serialize=False)
     call_command("populate_demo", verbosity=0)
 
+    from django.conf import settings
+
+    from apps.qa import inflight
+
+    # The run's keys in Redis go with its database: an upload's task on the
+    # activity stream is its material's id, which a database made afresh hands
+    # out again, and the entries an earlier run left under it would join this
+    # run's. Only the run's prefix: the developer's site shares the database.
+    redis = inflight.connection().client
+    if stale := list(redis.scan_iter(f"{settings.QA_KEY_PREFIX}:*")):
+        redis.delete(*stale)
+
     from config.celery import app
 
     # Solo, as on a Windows worker; no ping, which needs a task the app lacks.
