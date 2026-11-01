@@ -1,6 +1,6 @@
 # UniFi web source — crawl, snapshots and automatic growth
 
-This file owns the design of the campus source (the UniFi website, Qdrant collection `unifi_web`): the scope table, multi-collection retrieval, the snapshot and registry layout, the deepening loop's state machine and rules, the decision-log schema and the fallback. The reasons behind each rule of the loop are written in the docstrings of `rag/agent.py` and `rag/live.py`, next to the code they explain; the chunk fields are [rag-pipeline.md](rag-pipeline.md), section 3.6; the eval-isolation rule is [architecture.md](architecture.md); every measurement is [experiment-log.md](experiment-log.md), entries of 2026-08-22 to 2026-08-24; how a page's text enters a prompt, and why that defence against prompt injection is a mitigation and not a guarantee, is [security.md](security.md), row LLM01:2026.
+This file owns the design of the campus source (the UniFi website, Qdrant collection `unifi_web`): the scope table, multi-collection retrieval, the snapshot and registry layout, the deepening loop's state machine and rules, the schema of the agent's decision log (an audit file, not a record of design decisions) and the fallback. The reasons behind each rule of the loop are written in the docstrings of `rag/agent.py` and `rag/live.py`, next to the code they explain; the chunk fields are [rag-pipeline.md](rag-pipeline.md), section 3.6; the eval-isolation rule is [architecture.md](architecture.md); every measurement is [experiment-log.md](experiment-log.md), entries of 2026-08-22 to 2026-08-24; how a page's text enters a prompt, and why that defence against prompt injection is a mitigation and not a guarantee, is [security.md](security.md), row LLM01:2026.
 
 ## Scope table
 
@@ -89,7 +89,7 @@ The loop's hard caps and budgets are all code constants:
 | unloading the LLM | `ollama stop` between the gate and the parse, local Ollama only | `maybe_unload_llm()` (`rag/live.py`) | frees GPU memory; a no-op on any other endpoint |
 | `--no-deepen` | follows no page link: the shortlist holds linked PDFs only, in the same cosine order, without the top-5 cut | `narrow_candidates(link_hopping=False)` | the two arms then differ in link hopping alone |
 
-## Decision log
+## The agent's decision log
 
 ✅ `Decision` in `rag/agent.py`, appended to `data/webcorpus/decisions.jsonl` (`--decision-log` changes the path); the raw material of the error taxonomy (`#23`). A row is `run_id · question_id · step · candidates[] · choice · reason · outcome`. `candidates[]` keeps the anchor text, without which "the shortlist was wrong" cannot be told from "the model chose wrong". `outcome` is one of:
 
