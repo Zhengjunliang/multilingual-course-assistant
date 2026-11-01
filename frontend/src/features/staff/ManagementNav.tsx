@@ -3,7 +3,7 @@
  * between the search field and the conversations (ConversationSidebar).
  *
  * Its items are landing.ts's, each with the count of what its page lists, but
- * the accounts and the ratings, which only their own pages count.
+ * the accounts, the ratings and the system, which only their own pages count.
  * Each link closes the narrow-screen drawer as a conversation link does,
  * through the same `onNavigate`, so both mounts of the sidebar behave alike.
  * The item the reader is inside — on its page or any page below it — is drawn
@@ -14,7 +14,14 @@
  * same items as icons.
  */
 
-import { BookOpen, GraduationCap, type LucideIcon, ThumbsUp, UsersRound } from "lucide-react";
+import {
+  Activity,
+  BookOpen,
+  GraduationCap,
+  type LucideIcon,
+  ThumbsUp,
+  UsersRound,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 
@@ -29,6 +36,7 @@ export const ICON: Record<ManagementKey, LucideIcon> = {
   mine: BookOpen,
   users: UsersRound,
   feedback: ThumbsUp,
+  system: Activity,
 };
 
 /** Where the reader stands relative to an item, as `aria-current` says it. */

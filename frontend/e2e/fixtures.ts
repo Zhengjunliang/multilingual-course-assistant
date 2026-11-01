@@ -27,6 +27,7 @@ import type { AnswerEvent, Citation, RouteDecision } from "@/api/contract";
 import type { ConversationDetail } from "@/api/conversations";
 import type { FeedbackDetail, FeedbackRow } from "@/api/review";
 import type { ScopeCourse } from "@/api/scope";
+import type { ActivityEntry, Snapshot } from "@/api/system";
 import { uuidOf } from "@/test/conversations";
 
 // --- who is calling ------------------------------------------------------------
@@ -479,3 +480,114 @@ export const STUDY_PLAN: StudyPlanCourse[] = [
     },
   },
 ];
+
+// --- the background work the superuser watches ------------------------------------
+
+const WORKER = "celery@laptop";
+
+/** An entry of the activity feed, empty but for what `fields` says. */
+function activity(
+  fields: Partial<ActivityEntry> & Pick<ActivityEntry, "id" | "task" | "event">,
+): ActivityEntry {
+  return {
+    kind: "question",
+    worker: null,
+    question: null,
+    request_id: null,
+    step: null,
+    ms: null,
+    found: null,
+    code: null,
+    file: null,
+    chunks: null,
+    ...fields,
+  };
+}
+
+/**
+ * The system page's snapshot: the campus question answered, a visitor's
+ * refused, an upload ready, and a question being searched for on the one
+ * solo worker, its place taken.
+ */
+export const ACTIVITY: Snapshot = {
+  cap: 4,
+  retry_after_seconds: 60,
+  trace_url: null,
+  seats: [{ answer_id: uuidOf(41), taken: true }],
+  workers: [
+    { hostname: WORKER, queues: ["default", "ingest", "qa"], pool: "solo", concurrency: 1 },
+  ],
+  recent: [
+    activity({
+      id: "1793520000000-0",
+      task: CAMPUS_ANSWER_ID,
+      event: "queued",
+      question: CAMPUS_QUESTION,
+      request_id: RATING.answer.request_id,
+    }),
+    activity({ id: "1793520000100-0", task: CAMPUS_ANSWER_ID, event: "taken", worker: WORKER }),
+    activity({
+      id: "1793520000101-0",
+      task: CAMPUS_ANSWER_ID,
+      event: "step",
+      step: "route",
+      ms: 1200,
+      worker: WORKER,
+    }),
+    activity({
+      id: "1793520000102-0",
+      task: CAMPUS_ANSWER_ID,
+      event: "step",
+      step: "retrieve",
+      ms: 800,
+      worker: WORKER,
+    }),
+    activity({ id: "1793520007900-0", task: CAMPUS_ANSWER_ID, event: "end", worker: WORKER }),
+    activity({ id: "1793520060000-0", task: uuidOf(40), event: "refused" }),
+    activity({
+      id: "1793520100000-0",
+      kind: "upload",
+      task: "7",
+      event: "queued",
+      file: "Lezione 08 - Transazioni.pdf",
+    }),
+    activity({
+      id: "1793520100200-0",
+      kind: "upload",
+      task: "7",
+      event: "parsing",
+      worker: WORKER,
+    }),
+    activity({
+      id: "1793520171000-0",
+      kind: "upload",
+      task: "7",
+      event: "chunking",
+      worker: WORKER,
+    }),
+    activity({
+      id: "1793520180000-0",
+      kind: "upload",
+      task: "7",
+      event: "indexing",
+      chunks: 214,
+      worker: WORKER,
+    }),
+    activity({ id: "1793520202000-0", kind: "upload", task: "7", event: "ready", worker: WORKER }),
+    activity({
+      id: "1793520300000-0",
+      task: uuidOf(41),
+      event: "queued",
+      question: "Quando c'è l'appello di Analisi 2?",
+      request_id: "0af7651916cd43dd8448eb211c80319c",
+    }),
+    activity({ id: "1793520300100-0", task: uuidOf(41), event: "taken", worker: WORKER }),
+    activity({
+      id: "1793520300101-0",
+      task: uuidOf(41),
+      event: "step",
+      step: "retrieve",
+      worker: WORKER,
+    }),
+  ],
+};

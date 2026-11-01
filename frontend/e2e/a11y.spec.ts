@@ -51,8 +51,13 @@ const WCAG_22_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
  * is left unmeasured too, as `elmPartiallyObscuring`: axe compares what lies
  * under each line of the text, and under a floating layer that is different
  * page content line by line, whatever the layer's own colours. That text is
- * measured here instead (`floatingContrast`), and only a ratio under 4.5:1
- * is reported.
+ * measured here instead (`ownContrast`), and only a ratio under 4.5:1 is
+ * reported.
+ *
+ * Text drawn in an SVG, the system page's diagram, is left unmeasured as
+ * `bgOverlap`: axe reads no background off an SVG shape. Its fill is measured
+ * here against the fill of the shape under it (`ownContrast`), on the same
+ * terms.
  *
  * A staff page's `main` scrolls by itself (routes/PageLayout.tsx), so text
  * across its lower edge is cut by it, and axe leaves that text unmeasured
@@ -82,8 +87,8 @@ async function violations(page: Page): Promise<string[]> {
     const reason = (any[0]?.data as { messageKey?: string } | null)?.messageKey ?? "no reason";
     const selector = target.join(" ");
     if (reason === "elmPartiallyObscured" && (await measuredInView(page, selector))) continue;
-    if (reason === "elmPartiallyObscuring") {
-      const ratios = await floatingContrast(page, selector);
+    if (reason === "elmPartiallyObscuring" || reason === "bgOverlap") {
+      const ratios = await ownContrast(page, selector);
       if (ratios.length > 0 && ratios.every((ratio) => ratio >= 4.5)) continue;
       if (ratios.length > 0) {
         unmeasured.push(`color-contrast ${Math.min(...ratios).toFixed(2)}:1: ${selector}`);
@@ -109,13 +114,14 @@ async function measuredInView(page: Page, selector: string): Promise<boolean> {
 }
 
 /**
- * The contrast of the text `selector` names on a floating layer, as WCAG
- * defines it: its colour against the nearest opaque background under it in
- * the layer. The browser draws both colours to a canvas, which reads any CSS
- * colour, `oklch()` included, back as sRGB. Text outside a floating layer is
- * not measured here; axe's word stands for it.
+ * The contrast of the text `selector` names, as WCAG defines it: on a
+ * floating layer, its colour against the nearest opaque background under it
+ * in the layer; in an SVG, its fill against the fill of the opaque shape under
+ * its middle. The browser draws both colours to a canvas, which reads any CSS
+ * colour, `oklch()` included, back as sRGB. Other text is not measured here;
+ * axe's word stands for it.
  */
-function floatingContrast(page: Page, selector: string): Promise<number[]> {
+function ownContrast(page: Page, selector: string): Promise<number[]> {
   return page.evaluate((wanted) => {
     const canvas = document.createElement("canvas");
     canvas.width = 1;
@@ -135,18 +141,37 @@ function floatingContrast(page: Page, selector: string): Promise<number[]> {
       });
       return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
     };
-    return [...document.querySelectorAll(wanted)]
-      .filter((element) => element.closest('[data-radix-popper-content-wrapper], [role="dialog"]'))
-      .map((element) => {
-        let layer: Element | null = element;
-        while (layer !== null && rgba(getComputedStyle(layer).backgroundColor)[3] !== 255) {
-          layer = layer.parentElement;
-        }
-        if (layer === null) return 0;
-        const text = luminance(rgba(getComputedStyle(element).color));
-        const ground = luminance(rgba(getComputedStyle(layer).backgroundColor));
-        return (Math.max(text, ground) + 0.05) / (Math.min(text, ground) + 0.05);
-      });
+    const ratio = (ink: string, paper: string) => {
+      const text = luminance(rgba(ink));
+      const ground = luminance(rgba(paper));
+      return (Math.max(text, ground) + 0.05) / (Math.min(text, ground) + 0.05);
+    };
+    /** The background of the nearest opaque element from `start` out, or `null`. */
+    const backdrop = (start: Element | null) => {
+      let layer = start;
+      while (layer !== null && rgba(getComputedStyle(layer).backgroundColor)[3] !== 255) {
+        layer = layer.parentElement;
+      }
+      return layer === null ? null : getComputedStyle(layer).backgroundColor;
+    };
+    return [...document.querySelectorAll(wanted)].flatMap((element) => {
+      if (element instanceof SVGTextElement) {
+        element.scrollIntoView({ block: "center", inline: "center" });
+        const box = element.getBoundingClientRect();
+        const under = document
+          .elementsFromPoint(box.x + box.width / 2, box.y + box.height / 2)
+          .find(
+            (each) =>
+              each instanceof SVGGeometryElement && rgba(getComputedStyle(each).fill)[3] === 255,
+          );
+        const paper =
+          under === undefined ? backdrop(element.ownerSVGElement) : getComputedStyle(under).fill;
+        return paper === null ? [0] : [ratio(getComputedStyle(element).fill, paper)];
+      }
+      if (!element.closest('[data-radix-popper-content-wrapper], [role="dialog"]')) return [];
+      const paper = backdrop(element);
+      return paper === null ? [0] : [ratio(getComputedStyle(element).color, paper)];
+    });
   }, selector);
 }
 

@@ -30,7 +30,9 @@ import type { AnswerEvent } from "@/api/contract";
 import type { ConversationDetail, ConversationSummary } from "@/api/conversations";
 import type { FeedbackDetail, FeedbackRow } from "@/api/review";
 import type { ScopeCourse } from "@/api/scope";
+import type { ActivityFrame } from "@/api/system";
 import {
+  ACTIVITY,
   COURSE,
   EDITION,
   EDITION_READ,
@@ -51,12 +53,15 @@ import {
   VISITOR,
 } from "./fixtures";
 
+/** An event as a stream carries it: an answer's, or the activity feed's. */
+type Frame = { name: string; data: unknown };
+
 /** `sse` is a whole stream; `open` is sent and then held open, mid-answer. */
-type Reply = { status?: number; json?: unknown; sse?: AnswerEvent[]; open?: AnswerEvent[] };
+type Reply = { status?: number; json?: unknown; sse?: readonly Frame[]; open?: AnswerEvent[] };
 type Handler = (request: Request) => Reply;
 
 /** The SSE framing `apps/qa/contract.py` writes and `src/api/sse.ts` reads. */
-function frames(events: AnswerEvent[]): string {
+function frames(events: readonly Frame[]): string {
   return events
     .map(({ name, data }) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`)
     .join("");
@@ -197,6 +202,16 @@ export class Api {
       results: RATINGS,
     });
     this.json<FeedbackDetail>(`/api/admin/feedback/${RATING.id}`, RATING);
+  }
+
+  /**
+   * The superuser's feed of background work: its snapshot, and then its end,
+   * which the page opens again after a while. A feed held open would keep the
+   * network busy, and a screen is judged once the network is quiet.
+   */
+  activity(): void {
+    const snapshot: ActivityFrame = { name: "snapshot", data: ACTIVITY };
+    this.on("GET", "/api/admin/activity", () => ({ sse: [snapshot] }));
   }
 
   /** Every question gets this stream, whole. */

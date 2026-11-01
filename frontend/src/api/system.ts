@@ -6,9 +6,17 @@
  * The shapes mirror apps/system/contract.py, which is the single source;
  * tests/test_system_contract.py fails when the two drift. None of them names
  * who asked.
+ *
+ * Read with `fetch`, as an answer's stream is (sse.ts), so that leaving the
+ * page aborts it; the feed never ends of its own, and one that ends or breaks
+ * is opened again by its reader (features/system/useActivity.ts).
  */
 
 import type { StepName } from "./contract";
+import { ApiError, failureOf } from "./http";
+import { readFrames } from "./sse";
+
+const ACTIVITY_URL = "/api/admin/activity";
 
 export type ActivityKind = "question" | "upload";
 
@@ -88,4 +96,42 @@ export interface Snapshot {
 export interface Refresh {
   seats: Seat[];
   workers: Worker[];
+}
+
+/** An event of the feed, typed. */
+export type ActivityFrame =
+  | { name: "snapshot"; data: Snapshot }
+  | { name: "activity"; data: ActivityEntry }
+  | { name: "refresh"; data: Refresh };
+
+/** The feed's body to read, or the refusal: a 403 to anyone but the superuser. A GET, as an answer read again is. */
+export async function openActivity(signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+  const response = await fetch(ACTIVITY_URL, {
+    headers: { Accept: "text/event-stream" },
+    credentials: "same-origin",
+    signal,
+  });
+  if (!response.ok) throw await failureOf(response);
+  if (response.body === null) {
+    const requestId = response.headers.get("X-Request-ID");
+    throw new ApiError({ status: response.status, code: "BAD_RESPONSE", requestId });
+  }
+  return response.body;
+}
+
+/** The feed's events as they arrive; an unknown one is dropped, as an answer's is (sse.ts). */
+export async function* readActivity(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<ActivityFrame> {
+  for await (const frame of readFrames(body)) {
+    switch (frame.name) {
+      case "snapshot":
+      case "activity":
+      case "refresh":
+        yield { name: frame.name, data: JSON.parse(frame.data) } as ActivityFrame;
+        break;
+      default:
+        break;
+    }
+  }
 }

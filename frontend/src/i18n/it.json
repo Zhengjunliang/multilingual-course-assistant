@@ -174,14 +174,21 @@
       "queue": "In coda",
       "route": "Capisce la domanda",
       "retrieve": "Cerca nel materiale",
-      "generate": "Scrive la risposta"
+      "generate": "Scrive la risposta",
+      "parsing": "Legge il PDF",
+      "chunking": "Lo divide in passaggi",
+      "indexing": "Lo rende cercabile"
     },
     "done": {
       "queue": "Atteso il turno",
       "route": "Domanda capita",
       "retrieve_one": "Trovato {{count}} estratto",
       "retrieve_other": "Trovati {{count}} estratti",
-      "generate": "Risposta scritta"
+      "generate": "Risposta scritta",
+      "parsing": "PDF letto",
+      "chunking_one": "Diviso in {{count}} passaggio",
+      "chunking_other": "Diviso in {{count}} passaggi",
+      "indexing": "Reso cercabile"
     },
     "seconds": "{{seconds}} s"
   },
@@ -316,7 +323,8 @@
       "programme": "Corso di laurea",
       "mine": "I miei insegnamenti",
       "users": "Account",
-      "feedback": "Valutazioni"
+      "feedback": "Valutazioni",
+      "system": "Sistema"
     },
     "programmes": {
       "title": "Corsi di laurea",
@@ -663,6 +671,73 @@
     "failure": {
       "title": "Impossibile aprire questa pagina",
       "part": "Questa parte della pagina non si è caricata."
+    },
+    "system": {
+      "title": "Sistema",
+      "sub": "Le domande e i caricamenti mentre attraversano il sito, Redis e i worker.",
+      "live": "In diretta",
+      "opening": "Connessione…",
+      "reopening": "Riconnessione…",
+      "diagram": "Schema del sistema: browser, sito, Redis, worker Celery, modelli e dati. Posti occupati: {{taken}} su {{cap}}.",
+      "node": {
+        "browserSub": "chi chiede",
+        "site": "Sito · Django",
+        "siteSub": "accoda e inoltra",
+        "queues": "Code · qa {{qa}} · ingest {{ingest}}",
+        "seats": "Posti {{taken}}/{{cap}}",
+        "seatsFull": "Posti {{taken}}/{{cap}} · pieni",
+        "streams": "Flussi delle risposte",
+        "workers": "Worker Celery",
+        "noWorker": "Nessun worker in linea",
+        "models": "Modelli e dati"
+      },
+      "load": {
+        "busy": "occupato",
+        "idle": "libero",
+        "some": "{{busy}}/{{concurrency}} in lavoro",
+        "unknown": "al lavoro"
+      },
+      "legend": {
+        "question": "Domanda",
+        "upload": "Materiale caricato",
+        "refused": "Rifiutata: posti pieni",
+        "waiting": "Posto: in coda",
+        "answering": "Posto: in risposta"
+      },
+      "retry": "503 · {{seconds}} s",
+      "recent": "Ultime attività",
+      "recentSub": "Quelle in corso e le ultime {{count}} concluse; una riga ne mostra i passaggi.",
+      "none": "Ancora nessuna attività.",
+      "column": {
+        "what": "Cosa",
+        "outcome": "Esito",
+        "duration": "Durata",
+        "worker": "Worker"
+      },
+      "visitor": "Domanda di un visitatore",
+      "upload": "PDF · {{file}}",
+      "outcome": {
+        "going": "In corso",
+        "answered": "Risposta",
+        "stopped": "Fermata",
+        "error": "Errore",
+        "refused": "Rifiutata: posti pieni",
+        "lost": "Interrotta",
+        "ready": "Pronto",
+        "failed": "Non riuscito"
+      },
+      "steps": "Passaggi",
+      "pick": "Scegli un'attività dallo schema o dall'elenco.",
+      "worker": "Worker: {{name}}",
+      "request": "ID richiesta",
+      "copy": "Copia l'ID richiesta",
+      "copied": "Copiato",
+      "langfuse": "Apri in Langfuse",
+      "code": "Codice: {{code}}",
+      "duration": {
+        "seconds": "{{seconds}} s",
+        "minutes": "{{minutes}} min {{seconds}} s"
+      }
     }
   },
   "shortcuts": {

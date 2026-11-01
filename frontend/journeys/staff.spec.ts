@@ -5,13 +5,15 @@
  * stored, its ingest run on the worker over the journeys' stub pipeline
  * (tests/journeys/ingest.py), the row read again until it is ready, and the
  * file served to a student who adds its year to a conversation and whose
- * answer lists it among its sources.
+ * answer lists it among its sources; meanwhile the superuser's system page
+ * lists the upload and the question as their entries arrive, each with its
+ * steps.
  */
 
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import it from "../src/i18n/it.json" with { type: "json" };
-import { ask, logIn, newAccount, SECRETARIAT, STUDENT } from "./stack";
+import { ADMIN, ask, logIn, newAccount, SECRETARIAT, STUDENT } from "./stack";
 
 test.use({ storageState: SECRETARIAT });
 
@@ -63,6 +65,12 @@ test("the secretariat uploads a PDF to a past edition, and a student who adds th
       "",
     ].join("\n"),
   );
+  // The superuser watches from before the upload, so what follows arrives live.
+  const watching = await browser.newContext({ storageState: ADMIN });
+  const system = await watching.newPage();
+  await system.goto("/staff/system");
+  await expect(system.getByRole("heading", { name: it.staff.system.recent })).toBeVisible();
+
   // Ricerca operativa, in B047, which demo-secretariat runs and demo-student
   // declares: a first-semester course, so its 2025-2026 edition has been past
   // since 2026-09-14 and a question searches it only once it is added.
@@ -88,7 +96,8 @@ test("the secretariat uploads a PDF to a past edition, and a student who adds th
   await expect(
     student.getByRole("button", { name: it.scope.added.replace("{{count}}", "1") }),
   ).toBeVisible();
-  await ask(student, `Che cos'è il test di Turing? ${randomUUID().slice(0, 8)}`);
+  const question = `Che cos'è il test di Turing? ${randomUUID().slice(0, 8)}`;
+  await ask(student, question);
   await student.getByRole("button", { name: new RegExp(`^${it.sources.title} \\(`) }).click();
   const source = student
     .getByRole("dialog")
@@ -100,4 +109,22 @@ test("the secretariat uploads a PDF to a past edition, and a student who adds th
   expect(served.status()).toBe(200);
   expect(await served.body()).toEqual(bytes);
   await own.close();
+
+  // The parallel journeys' tasks are listed too: each row is found by its words.
+  const steps = system.getByRole("region", { name: it.staff.system.steps });
+  const uploaded = it.staff.system.upload.replace("{{file}}", name);
+  await expect(system.getByRole("row").filter({ hasText: uploaded })).toContainText(
+    it.staff.system.outcome.ready,
+  );
+  await system.getByRole("button", { name: uploaded }).click();
+  for (const done of [it.steps.done.parsing, it.steps.done.indexing]) {
+    await expect(steps.getByText(done)).toBeVisible();
+  }
+  const asked = system.getByRole("row").filter({ hasText: question });
+  await expect(asked).toContainText(it.staff.system.outcome.answered);
+  await asked.getByRole("button").click();
+  for (const done of [it.steps.done.route, it.steps.done.generate]) {
+    await expect(steps.getByText(done)).toBeVisible();
+  }
+  await watching.close();
 });

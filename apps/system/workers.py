@@ -23,9 +23,10 @@ from config.celery import app
 
 logger = logging.getLogger(__name__)
 
-# How long each broadcast waits for replies. A worker answers within
-# milliseconds over the broker; the feed waits this long twice per refresh.
-INSPECT_SECONDS = 0.5
+# How long each broadcast waits for replies; the feed waits this long twice
+# per refresh. An idle solo worker on a Windows laptop missed one 0.5 s wait
+# in two, and none of 1 s (measured 1 November 2026).
+INSPECT_SECONDS = 1.0
 
 
 def online(timeout: float = INSPECT_SECONDS) -> list[Worker]:

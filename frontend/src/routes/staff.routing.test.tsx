@@ -509,6 +509,7 @@ describe("the Gestione group and /staff", () => {
         ["Corsi di laurea", "2", "/staff/programmes"],
         ["Account", undefined, "/staff/users"],
         ["Valutazioni", undefined, "/staff/feedback"],
+        ["Sistema", undefined, "/staff/system"],
       ],
       "/staff/programmes",
     ],

@@ -22,6 +22,7 @@ import RouteError from "@/routes/RouteError";
 import ShellLayout from "@/routes/ShellLayout";
 import StaffLanding, { StaffNotFound } from "@/routes/StaffLanding";
 import StyleguidePage from "@/routes/StyleguidePage";
+import SystemPage from "@/routes/SystemPage";
 import UsersPage from "@/routes/UsersPage";
 import VisitorLayout from "@/routes/VisitorLayout";
 
@@ -63,7 +64,8 @@ import VisitorLayout from "@/routes/VisitorLayout";
  * `/chat/:conversationId` stay one route tree. `/staff/*` is open to an account
  * holding a role or the superuser (`RequireStaff`); `/staff` lands on the
  * account's first Gestione item, and the pages are objects — programmes,
- * courses, editions, and the superuser's accounts and ratings — not roles.
+ * courses, editions, and the superuser's accounts, ratings and system — not
+ * roles.
  */
 export const routes: RouteObject[] = [
   {
@@ -109,6 +111,7 @@ export const routes: RouteObject[] = [
                   { path: "users", element: <UsersPage /> },
                   { path: "feedback", element: <FeedbackPage /> },
                   { path: "feedback/:id", element: <FeedbackDetailPage /> },
+                  { path: "system", element: <SystemPage /> },
                   { path: "*", element: <StaffNotFound /> },
                 ],
               },
