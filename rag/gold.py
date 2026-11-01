@@ -82,18 +82,26 @@ def missing_answer_refs(questions: Sequence[GoldQuestion], root: Path) -> list[s
     return [q.id for q in questions if not (root / q.answer_ref).is_file()]
 
 
-def is_hit(question: GoldQuestion, hits: Sequence[Hit]) -> bool:
-    """Slides questions score by (source_file, page); campus questions carry
-    `urls` and score by URL match on web chunks."""
+def first_hit_rank(question: GoldQuestion, hits: Sequence[Hit]) -> int | None:
+    """The 1-based rank of the first hit that answers the question, None when
+    none does. Slides questions score by (source_file, page); campus questions
+    carry `urls` and score by URL match on web chunks. hit@k and MRR are both
+    read from this rank, so the two share one success criterion."""
     if question.urls:
         wanted = {url.rstrip("/") for url in question.urls}
-        return any(
+        matches = (
             hit.chunk.url is not None and hit.chunk.url.rstrip("/") in wanted for hit in hits
         )
-    return any(
-        hit.chunk.source_file == question.source_file and question.page in hit.chunk.pages
-        for hit in hits
-    )
+    else:
+        matches = (
+            hit.chunk.source_file == question.source_file and question.page in hit.chunk.pages
+            for hit in hits
+        )
+    return next((rank for rank, match in enumerate(matches, start=1) if match), None)
+
+
+def is_hit(question: GoldQuestion, hits: Sequence[Hit]) -> bool:
+    return first_hit_rank(question, hits) is not None
 
 
 class RoutingRow(BaseModel):
