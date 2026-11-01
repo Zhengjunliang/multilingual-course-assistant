@@ -354,15 +354,20 @@ def test_a_newer_version_waiting_in_the_queue_is_not_replaced(
 def test_a_material_gone_or_ready_is_not_ingested_again(
     edition: CourseEdition, worker: Worker, state: str
 ) -> None:
-    material = upload(edition, FIRST)
+    # The id, not the instance's: Django clears `pk` on the instance it deletes.
+    pk = upload(edition, FIRST).pk
     if state == "deleted":
-        material.delete()
+        CourseMaterial.objects.filter(pk=pk).delete()
     else:
-        CourseMaterial.objects.filter(pk=material.pk).update(status=MaterialStatus.READY)
+        CourseMaterial.objects.filter(pk=pk).update(status=MaterialStatus.READY)
 
-    ingest_material(material.pk)
+    ingest_material(pk)
 
     assert worker.converter.calls == 0
+    # A row deleted in the queue ends its upload on the system page; a ready one is over.
+    told = [(e.task, e.event, e.code) for e in activity.read("0", block=0.01)]
+    gone = [(str(pk), "failed", MaterialFailure.INTERRUPTED)]
+    assert told == (gone if state == "deleted" else [])
 
 
 def test_a_material_deleted_while_it_was_indexed_leaves_no_point(
@@ -381,6 +386,8 @@ def test_a_material_deleted_while_it_was_indexed_leaves_no_point(
     ingest_material(material.pk)
 
     assert worker.points(material) == []
+    *_, last = activity.read("0", block=0.01)
+    assert (last.event, last.code) == ("failed", MaterialFailure.INTERRUPTED)
 
 
 def test_the_sweep_fails_what_lost_its_worker_and_nothing_else(edition: CourseEdition) -> None:
