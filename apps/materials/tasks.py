@@ -87,7 +87,11 @@ def ingest_material(material_id: int) -> None:
     material = (
         CourseMaterial.objects.select_related("edition__course").filter(pk=material_id).first()
     )
-    if material is None or material.status == MaterialStatus.READY:
+    if material is None:
+        # Deleted in the queue: the activity stream had it queued.
+        activity.record_upload(material_id, MaterialStatus.FAILED, code=MaterialFailure.INTERRUPTED)
+        return
+    if material.status == MaterialStatus.READY:
         return
     edition = EditionKey(material.edition.course.code, material.edition.academic_year)
     pipeline: Pipeline | None = None
@@ -132,7 +136,7 @@ def ingest_material(material_id: int) -> None:
 def fail_stalled() -> int:
     """Mark `interrupted` the rows whose worker died under them; how many.
 
-    One row at a time, each still running when it is marked, so that the
+    One row at a time, each still lost when it is marked, so that the
     activity stream is told of exactly the rows marked; there are none on
     most runs.
     """
@@ -140,7 +144,8 @@ def fail_stalled() -> int:
     lost = CourseMaterial.objects.filter(status__in=RUNNING, started_at__lt=now - STALLED_AFTER)
     stalled = 0
     for pk in list(lost.values_list("pk", flat=True)):
-        if CourseMaterial.objects.filter(pk=pk, status__in=RUNNING).update(
+        # Still lost when marked: a delivery that started it again since is not.
+        if lost.filter(pk=pk).update(
             status=MaterialStatus.FAILED, failure=MaterialFailure.INTERRUPTED, finished_at=now
         ):
             activity.record_upload(pk, MaterialStatus.FAILED, code=MaterialFailure.INTERRUPTED)
@@ -155,10 +160,13 @@ def _move(
 ) -> bool:
     """Write the step the ingest has reached into the row, and onto the
     activity stream with `chunks`, the passages the material was cut into;
-    False when the row is gone."""
+    False when the row is gone, which the stream hears as the ingest
+    interrupted, since no later step will end it there."""
     moved = CourseMaterial.objects.filter(pk=material.pk).update(status=status, **fields) == 1
     if moved:
         activity.record_upload(material.pk, status, chunks=chunks)
+    else:
+        activity.record_upload(material.pk, MaterialStatus.FAILED, code=MaterialFailure.INTERRUPTED)
     return moved
 
 
@@ -208,10 +216,11 @@ def _fail(
             delete_material(pipeline.client, material.sha256, edition)
         except Exception:
             logger.exception("material %d: its points could not be deleted", material.pk)
-    if CourseMaterial.objects.filter(pk=material.pk).update(
+    # Told the stream whether or not the row is still there to mark.
+    CourseMaterial.objects.filter(pk=material.pk).update(
         status=MaterialStatus.FAILED, failure=failure, finished_at=timezone.now()
-    ):
-        activity.record_upload(material.pk, MaterialStatus.FAILED, code=failure)
+    )
+    activity.record_upload(material.pk, MaterialStatus.FAILED, code=failure)
 
 
 def _failure_of(exc: Exception) -> MaterialFailure:
