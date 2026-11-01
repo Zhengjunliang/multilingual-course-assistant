@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from scripts.check import STEPS
 from scripts.guards import MARKER_RULE, Guard, commits, git, history, markers, run
 from scripts.guards.__main__ import main
 from scripts.guards.registry import GUARDS
@@ -167,15 +168,17 @@ def test_every_guard_has_a_hook_and_every_guard_hook_a_guard() -> None:
 
 
 def test_the_rule_table_of_claude_md_names_real_hooks_and_every_local_one() -> None:
-    """CLAUDE.md, section 5: a guard it names exists, and every rule of this
-    repository's own hooks is in it, so the table cannot promise a check nobody runs."""
+    """CLAUDE.md, section 5: a guard it names exists, a hook or a step of the
+    chain, and every rule of this repository's own hooks is in it, so the table
+    cannot promise a check nobody runs."""
     claude_md = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
     guards = re.findall(r"^\| [^|]+ \| [^|]+ \| ([^|]+) \|$", claude_md, re.MULTILINE)
     named = {name for cell in guards for name in re.findall(r"`([a-z-]+)`", cell)} - {"review"}
     hooks = set(re.findall(r"- id: (\S+)", CONFIG))
     local = set(re.findall(r"- id: (\S+)", CONFIG.split("- repo: local", 1)[1]))
+    steps = {step.name for step in STEPS}
 
-    assert named - hooks == set()
+    assert named - hooks - steps == set()
     assert local - named == set()
 
 
