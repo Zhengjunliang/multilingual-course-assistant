@@ -284,8 +284,7 @@ function placed(
       next[at] = null;
     }
   }
-  while (next.length > cap && next.at(-1) === null) next.pop();
-  return next;
+  return [...next.slice(0, cap), ...next.slice(cap).filter((cell) => cell !== null)];
 }
 
 function seatsOf(cells: readonly (Seat | null)[]): Seat[] {
