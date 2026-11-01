@@ -52,4 +52,4 @@ The site answers once it has an index, a model and a worker, which answers the q
 
 ## Thesis
 
-Bachelor's thesis in Information Engineering at the University of Florence, by Junliang Zheng, supervised by Prof. Marco Bertini. The design, the decisions and the measurements are in [docs/](docs/). MIT licence.
+Bachelor's thesis in Information Engineering at the University of Florence, by Junliang Zheng, supervised by Prof. Marco Bertini. The design, the decisions and the measurements are in `docs/`, whose [README](docs/README.md) lists every document by its reader. MIT licence.
