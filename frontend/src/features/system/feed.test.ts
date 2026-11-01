@@ -170,7 +170,7 @@ describe("a question nobody finished", () => {
     expect(ended.tasks[0]?.outcome).toBe("answered");
   });
 
-  it("gives its place back at the next refresh, the cap drawn again after one taken past it", () => {
+  it("gives its place back at the next refresh to the one taken past the cap, the rest unmoved", () => {
     const held = (answer_id: string, taken: boolean) => ({ answer_id, taken });
     const full = run({
       type: "snapshot",
@@ -182,8 +182,8 @@ describe("a question nobody finished", () => {
 
     const refresh = { seats: [held("b", true), held("d", false)], workers: [SOLO] };
     expect(reduce(crowded, { type: "refresh", refresh }).cells).toEqual([
-      held("b", true),
       held("d", false),
+      held("b", true),
     ]);
   });
 });

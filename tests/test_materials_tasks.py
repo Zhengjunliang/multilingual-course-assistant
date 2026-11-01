@@ -390,6 +390,29 @@ def test_a_material_deleted_while_it_was_indexed_leaves_no_point(
     assert (last.event, last.code) == ("failed", MaterialFailure.INTERRUPTED)
 
 
+def test_a_material_deleted_while_it_was_indexed_ends_interrupted_once_if_its_points_stay(
+    edition: CourseEdition, worker: Worker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    material = upload(edition, FIRST)
+    upsert = tasks.upsert_chunks
+
+    def upsert_then_delete(*args: Any, **kwargs: Any) -> list[str]:
+        written = upsert(*args, **kwargs)
+        CourseMaterial.objects.filter(pk=material.pk).delete()
+        return written
+
+    def unreachable(*_args: object) -> None:
+        raise ConnectionError("qdrant down")
+
+    monkeypatch.setattr(tasks, "upsert_chunks", upsert_then_delete)
+    monkeypatch.setattr(tasks, "delete_material", unreachable)
+
+    ingest_material(material.pk)
+
+    failed = [e.code for e in activity.read("0", block=0.01) if e.event == "failed"]
+    assert failed == [MaterialFailure.INTERRUPTED]
+
+
 def test_the_sweep_fails_what_lost_its_worker_and_nothing_else(edition: CourseEdition) -> None:
     """Called directly, as tests/test_account_sessions.py calls the session purge; the
     schedule is the one beat reads, and the name it sends one the app registered."""

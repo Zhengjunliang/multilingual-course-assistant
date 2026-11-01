@@ -275,10 +275,16 @@ function placed(
     if (free === -1) next.push(seat);
     else next[free] = seat;
   }
-  // Past the cap, a cell given up goes rather than stays empty.
-  for (let at = next.length - 1; next.length > cap && at >= 0; at -= 1) {
-    if (next[at] === null) next.splice(at, 1);
+  // Past the cap, a place moves into a cell given up under it, and the cells
+  // left empty there go; a place under the cap keeps its cell.
+  for (let at = cap; at < next.length; at += 1) {
+    const free = next.indexOf(null);
+    if (next[at] !== null && free !== -1 && free < cap) {
+      next[free] = next[at] ?? null;
+      next[at] = null;
+    }
   }
+  while (next.length > cap && next.at(-1) === null) next.pop();
   return next;
 }
 

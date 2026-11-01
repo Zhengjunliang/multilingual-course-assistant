@@ -123,8 +123,13 @@ def ingest_material(material_id: int) -> None:
             return
         written = upsert_chunks(pipeline.client, chunks, pipeline.dense, pipeline.sparse)
         if not _move(material, MaterialStatus.READY, finished_at=timezone.now()):
-            # Deleted while it was indexed: what was written goes with it.
-            delete_material(pipeline.client, material.sha256, edition)
+            # Deleted while it was indexed: what was written goes with it, and
+            # a failure to delete it is not the ingest's, which the stream has
+            # already heard as interrupted.
+            try:
+                delete_material(pipeline.client, material.sha256, edition)
+            except Exception:
+                logger.exception("material %d: its points could not be deleted", material.pk)
             return
     except Exception as exc:
         _fail(material, edition, pipeline, exc)
