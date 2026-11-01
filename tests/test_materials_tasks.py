@@ -30,6 +30,7 @@ from apps.materials import tasks
 from apps.materials.ingest import Pipeline
 from apps.materials.models import CourseMaterial, MaterialFailure, MaterialStatus
 from apps.materials.tasks import STALLED_AFTER, fail_stalled, ingest_material
+from apps.system import activity
 from config.celery import app
 from rag.chunk import Chunk
 from rag.index import COLLECTION, ensure_collection
@@ -145,6 +146,13 @@ def test_an_ingest_says_each_step_and_ends_ready_with_its_points(
     assert {(p.course, p.academic_year, p.source_file) for p in points} == {
         ("B028451", "2025-2026", NAME)
     }
+    # Each step on the activity stream too, with the passages it cut.
+    assert [(e.task, e.event, e.chunks) for e in activity.read("0", block=0.01)] == [
+        (str(material.pk), "parsing", None),
+        (str(material.pk), "chunking", None),
+        (str(material.pk), "indexing", len(points)),
+        (str(material.pk), "ready", None),
+    ]
 
 
 @pytest.mark.parametrize(
@@ -186,6 +194,8 @@ def test_a_failed_ingest_says_why_and_leaves_no_point(
     assert (material.status, material.failure) == (MaterialStatus.FAILED, failure)
     assert material.finished_at is not None
     assert worker.points(material) == []
+    *_, last = activity.read("0", block=0.01)
+    assert (last.event, last.code) == ("failed", failure)
 
 
 def test_timeout_marks_failed_and_indexes_nothing(edition: CourseEdition, worker: Worker) -> None:
@@ -405,6 +415,9 @@ def test_the_sweep_fails_what_lost_its_worker_and_nothing_else(edition: CourseEd
     assert {key: row.status for key, row in after.items() if key != "lost"} == {
         key: status for key, (status, _started) in rows.items() if key != "lost"
     }
+    assert [(e.task, e.event, e.code) for e in activity.read("0", block=0.01)] == [
+        (str(materials["lost"].pk), "failed", MaterialFailure.INTERRUPTED)
+    ]
     assert app.conf.beat_schedule["fail-stalled-materials"]["task"] in app.tasks
 
 

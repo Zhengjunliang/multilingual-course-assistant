@@ -58,3 +58,4 @@ GET qa:scope                                allow      allow    allow       allo
 GET qa:source                               allow      allow    allow       hide              allow hide    allow deny     deny
 GET review:feedback                         deny       deny     deny        deny              deny  deny    allow deny     deny
 GET review:feedback-item                    deny       deny     deny        deny              deny  deny    allow deny     deny
+GET system:activity                         deny       deny     deny        deny              deny  deny    allow deny     deny

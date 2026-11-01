@@ -77,7 +77,7 @@ from config.errors import ErrorCode, error_body, fail
 from config.request_id import current
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Mapping
+    from collections.abc import Generator, Iterator, Mapping
     from uuid import UUID
 
     from rest_framework.request import Request
@@ -241,9 +241,11 @@ class _Relay:
                 logger.exception("could not stop answer %s", self._answer_id)
 
 
-def _streaming(relay: _Relay) -> StreamingHttpResponse:
+def streaming(body: Iterator[str]) -> StreamingHttpResponse:
+    """`body`, served as a stream of server-sent events; the superuser's
+    activity feed is served by it too (apps/system/views.py)."""
     return StreamingHttpResponse(
-        relay,
+        body,
         content_type="text/event-stream",
         headers={
             # An answer is not reusable, and anything that buffers this
@@ -354,7 +356,7 @@ class AskView(APIView):
             # gives its place back and leaves no stream for anyone to wait on.
             inflight.abandon(answer_id, conversation_id=conversation_id)
             raise
-        return _streaming(_Relay(answer_id, "0", stops_on_leave=owner is None))
+        return streaming(_Relay(answer_id, "0", stops_on_leave=owner is None))
 
 
 class AnswerEventsView(APIView):
@@ -379,7 +381,7 @@ class AnswerEventsView(APIView):
         after = request.headers.get("Last-Event-ID")
         if after is not None and not EVENT_ID.fullmatch(after):
             fail(ErrorCode.MALFORMED_REQUEST)
-        return _streaming(_Relay(pk, after or "0", stops_on_leave=False))
+        return streaming(_Relay(pk, after or "0", stops_on_leave=False))
 
 
 class StopAnswerView(APIView):

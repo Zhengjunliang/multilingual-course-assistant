@@ -16,18 +16,33 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from apps.qa import inflight
-from apps.qa.contract import EndEvent, TokenEvent
+from apps.qa.contract import EndEvent, ErrorEvent, QueuedEvent, StepEvent, TokenEvent
+from apps.system import activity
+from config.errors import ErrorCode, error_body
 
 if TYPE_CHECKING:
     from pytest_django import Settings
 
-QUEUED = TokenEvent(text="queued")
+    from apps.system.contract import ActivityEntry
+
+
+def queued(answer_id: uuid.UUID, conversation: uuid.UUID | None = None) -> QueuedEvent:
+    return QueuedEvent(
+        answer_id=answer_id, conversation_id=conversation, question="What is an ORM?"
+    )
 
 
 def admit(*, owner: int | None = None, conversation: uuid.UUID | None = None) -> uuid.UUID:
     answer_id = uuid.uuid4()
-    assert inflight.admit(answer_id, QUEUED, owner=owner, conversation_id=conversation)
+    assert inflight.admit(
+        answer_id, queued(answer_id, conversation), owner=owner, conversation_id=conversation
+    )
     return answer_id
+
+
+def logged() -> list[ActivityEntry]:
+    """Everything on the activity stream (apps/system/activity.py)."""
+    return activity.read("0", block=0.01)
 
 
 def expire(answer_id: uuid.UUID) -> None:
@@ -39,14 +54,19 @@ def admitted() -> set[str]:
     return set(cast("list[str]", inflight.connection().client.zrange(inflight._admitted(), 0, -1)))
 
 
-def test_the_cap_refuses_past_its_limit_and_writes_nothing(settings: Settings) -> None:
+def test_the_cap_refuses_past_its_limit_and_writes_only_the_refusal(settings: Settings) -> None:
     settings.QA_MAX_IN_FLIGHT = 2
     first, second = admit(), admit()
     refused = uuid.uuid4()
 
-    assert not inflight.admit(refused, QUEUED, owner=None, conversation_id=None)
+    assert not inflight.admit(refused, queued(refused), owner=None, conversation_id=None)
     assert admitted() == {str(first), str(second)}
     assert inflight.read(refused, "0", block=0.01) == []
+    assert [(entry.task, entry.event) for entry in logged()] == [
+        (str(first), "queued"),
+        (str(second), "queued"),
+        (str(refused), "refused"),
+    ]
 
 
 def test_an_expired_lease_gives_its_place_to_the_next_question(settings: Settings) -> None:
@@ -71,7 +91,8 @@ def test_a_renewed_lease_goes_on_until_someone_asks_it_to_stop() -> None:
 def test_a_lost_lease_is_not_taken_back() -> None:
     answer_id = admit()
     expire(answer_id)
-    inflight.admit(uuid.uuid4(), QUEUED, owner=None, conversation_id=None)
+    later = uuid.uuid4()
+    inflight.admit(later, queued(later), owner=None, conversation_id=None)
 
     assert inflight.renew(answer_id) == "lost"
     assert str(answer_id) not in admitted()
@@ -85,7 +106,7 @@ def test_events_are_read_in_order_and_from_where_a_reader_left_off() -> None:
     everything = inflight.read(answer_id, "0", block=0.01)
     rest = inflight.read(answer_id, everything[1].id, block=0.01)
 
-    assert [entry.name for entry in everything] == ["token", "token", "token"]
+    assert [entry.name for entry in everything] == ["queued", "token", "token"]
     assert [entry.data for entry in rest] == [TokenEvent(text="ORM").model_dump_json()]
 
 
@@ -208,3 +229,52 @@ def test_a_third_reader_pushes_the_first_out() -> None:
     with pytest.raises(inflight.PushedOutError):
         inflight.read(answer_id, queued.id, block=5, reader=first)
     assert inflight.read(answer_id, queued.id, block=0.01, reader=second) == []
+
+
+def test_an_admission_names_a_signed_in_question_cut_short_and_no_visitors() -> None:
+    """The activity stream names no asker (apps/system/activity.py): a
+    student's question is its opening words, a visitor's is not there."""
+    student, visitor = uuid.uuid4(), uuid.uuid4()
+    long = QueuedEvent(answer_id=student, conversation_id=uuid.uuid4(), question="Why? " * 100)
+    inflight.admit(student, long, owner=42, conversation_id=None)
+    inflight.admit(visitor, queued(visitor), owner=None, conversation_id=None)
+
+    asked, anonymous = logged()
+
+    assert asked.question == long.question[: activity.QUESTION_CHARS]
+    assert anonymous.question is None
+    assert (asked.worker, anonymous.worker) == (None, None)
+
+
+def test_a_worker_and_the_answers_end_are_on_the_activity_stream_but_its_tokens() -> None:
+    answer_id = admit()
+    inflight.take(answer_id)
+    inflight.emit(answer_id, StepEvent(name="route", ms=None))
+    inflight.emit(answer_id, TokenEvent(text="An "))
+    inflight.emit(answer_id, StepEvent(name="route", ms=1200))
+    failure = ErrorEvent.model_validate(error_body(ErrorCode.ENGINE_DOWN))
+    inflight.finish(answer_id, failure, conversation_id=None)
+
+    assert [(entry.event, entry.step, entry.ms, entry.code) for entry in logged()] == [
+        ("queued", None, None, None),
+        ("taken", None, None, None),
+        ("step", "route", None, None),
+        ("step", "route", 1200, None),
+        ("error", None, None, ErrorCode.ENGINE_DOWN),
+    ]
+
+
+def test_an_answer_ended_without_a_last_event_writes_no_entry() -> None:
+    answer_id = admit()
+
+    inflight.finish(answer_id, None, conversation_id=None)
+
+    assert [entry.event for entry in logged()] == ["queued"]
+
+
+def test_the_seats_say_which_questions_a_worker_took() -> None:
+    waiting, answering, crashed = admit(), admit(), admit()
+    inflight.take(answering)
+    expire(crashed)
+
+    assert dict(inflight.seats()) == {waiting: False, answering: True}

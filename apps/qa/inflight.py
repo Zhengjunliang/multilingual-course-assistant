@@ -21,6 +21,11 @@ The two meet here, in seven kinds of key under `QA_KEY_PREFIX`
 - `<prefix>:joins:<id>`, a stream with one entry per reader that joined,
   which wakes the readers already waiting so that the one pushed out ends.
 
+Every event but the tokens is also copied onto the site's activity stream,
+which apps/system/activity.py owns, in the same step that writes it, and so
+are a question refused at the cap and one taken by a worker: the superuser's
+page of background work reads it (apps/system/views.py).
+
 **One clock.** Every decision about a lease runs as a Lua script on Redis's
 own `TIME`, so the web host's clock and the worker's never have to agree on
 when a lease ends. A lease is what makes a crashed worker's place come back by
@@ -47,11 +52,15 @@ from uuid import UUID
 from django.conf import settings
 from redis import Redis
 
+from apps.system import activity
+
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from redis.commands.core import Script
     from redis.typing import KeyT, StreamIdT
 
-    from apps.qa.contract import Event
+    from apps.qa.contract import Event, QueuedEvent
 
 # How long an admitted question may wait for a worker to take it. Past it the
 # question is dead to its reader and its place is counted no more; a worker
@@ -93,30 +102,34 @@ local t = redis.call('TIME')
 local now = tonumber(t[1]) + tonumber(t[2]) / 1000000
 """
 
-# KEYS: admitted, stream[, conversation]. ARGV: cap, lease, id, event, data,
-# owner, ttl. Expired members go first, so a crashed worker's place is free
-# before the count is taken.
+# KEYS: admitted, stream, activity[, conversation]. ARGV: cap, lease, id,
+# event, data, owner, ttl, the activity's length, then the fields of its entry
+# but the event's name. Expired members go first, so a crashed worker's place
+# is free before the count is taken. A refusal writes its entry alone.
 _ADMIT = (
     _NOW
     + """
 redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now)
 if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[1]) then
+  redis.call('XADD', KEYS[3], 'MAXLEN', '~', ARGV[8], '*', 'event', 'refused', unpack(ARGV, 9))
   return 0
 end
 redis.call('ZADD', KEYS[1], now + tonumber(ARGV[2]), ARGV[3])
 redis.call('XADD', KEYS[2], '*', 'event', ARGV[4], 'data', ARGV[5], 'owner', ARGV[6])
 redis.call('EXPIRE', KEYS[2], ARGV[7])
-if KEYS[3] then
-  redis.call('SET', KEYS[3], ARGV[3], 'EX', ARGV[7])
+redis.call('XADD', KEYS[3], 'MAXLEN', '~', ARGV[8], '*', 'event', ARGV[4], unpack(ARGV, 9))
+if KEYS[4] then
+  redis.call('SET', KEYS[4], ARGV[3], 'EX', ARGV[7])
 end
 return 1
 """
 )
 
-# KEYS: admitted, stop[, taken]. ARGV: id, lease[, ttl]. `XX`, because a
-# member the cap has already reclaimed must stay out: added back, it would
-# overfill the cap while its reader has already been told the answer died.
-# With `taken`, the worker's first renewal marks the question as taken.
+# KEYS: admitted, stop[, taken, activity]. ARGV: id, lease[, ttl, the
+# activity's length, the fields of its entry]. `XX`, because a member the cap
+# has already reclaimed must stay out: added back, it would overfill the cap
+# while its reader has already been told the answer died. With `taken`, the
+# worker's first renewal marks the question as taken, and says so.
 _RENEW = (
     _NOW
     + """
@@ -127,6 +140,7 @@ end
 redis.call('ZADD', KEYS[1], 'XX', now + tonumber(ARGV[2]), ARGV[1])
 if KEYS[3] then
   redis.call('SET', KEYS[3], 1, 'EX', ARGV[3])
+  redis.call('XADD', KEYS[4], 'MAXLEN', '~', ARGV[4], '*', unpack(ARGV, 5))
 end
 if redis.call('EXISTS', KEYS[2]) == 1 then
   return 'stopped'
@@ -135,20 +149,24 @@ return 'ok'
 """
 )
 
-# KEYS: admitted, stream, stop[, conversation]. ARGV: id, event, data, kept.
-# The last event and the end of the lease in one step: a reader who finds the
-# lease gone has therefore either read the last event already or will read it
-# next, never neither (`_PROBE`). An empty event name writes none, for an
+# KEYS: admitted, stream, stop, activity[, conversation]. ARGV: id, event,
+# data, kept, the activity's length[, the fields of its entry]. The last event
+# and the end of the lease in one step: a reader who finds the lease gone has
+# therefore either read the last event already or will read it next, never
+# neither (`_PROBE`). An empty event name writes none, nor any entry, for an
 # answer whose reader was already told it died.
 _FINISH = """
 if ARGV[2] ~= '' then
   redis.call('XADD', KEYS[2], '*', 'event', ARGV[2], 'data', ARGV[3])
   redis.call('EXPIRE', KEYS[2], ARGV[4])
 end
+if ARGV[6] then
+  redis.call('XADD', KEYS[4], 'MAXLEN', '~', ARGV[5], '*', unpack(ARGV, 6))
+end
 redis.call('ZREM', KEYS[1], ARGV[1])
 redis.call('DEL', KEYS[3])
-if KEYS[4] and redis.call('GET', KEYS[4]) == ARGV[1] then
-  redis.call('DEL', KEYS[4])
+if KEYS[5] and redis.call('GET', KEYS[5]) == ARGV[1] then
+  redis.call('DEL', KEYS[5])
 end
 return 1
 """
@@ -285,16 +303,22 @@ def _joins(answer_id: UUID) -> str:
     return _key("joins", answer_id)
 
 
+def _flat(fields: Mapping[str, str]) -> list[str]:
+    """An activity entry's fields as a script's arguments: name, value, name, value."""
+    return [part for pair in fields.items() for part in pair]
+
+
 def admit(
-    answer_id: UUID, first: Event, *, owner: int | None, conversation_id: UUID | None
+    answer_id: UUID, first: QueuedEvent, *, owner: int | None, conversation_id: UUID | None
 ) -> bool:
     """Take a place under the cap and open the answer's stream with `first`.
 
-    False when the cap is full, and then nothing is written. The stream lives
-    as long as the question may wait plus `KEPT_SECONDS`, so one no worker
-    ever takes still goes away.
+    False when the cap is full, and then nothing of the answer is written,
+    only its refusal on the activity stream. The stream lives as long as the
+    question may wait plus `KEPT_SECONDS`, so one no worker ever takes still
+    goes away.
     """
-    keys = [_admitted(), _stream(answer_id)]
+    keys = [_admitted(), _stream(answer_id), activity.key()]
     if conversation_id is not None:
         keys.append(_waiting(conversation_id))
     admitted = connection().admit(
@@ -307,6 +331,8 @@ def admit(
             first.model_dump_json(),
             "" if owner is None else str(owner),
             QUEUED_LEASE_SECONDS + KEPT_SECONDS,
+            activity.MAX_ENTRIES,
+            *_flat(activity.asked(answer_id, first)),
         ],
     )
     return bool(admitted)
@@ -335,25 +361,38 @@ def take(answer_id: UUID) -> Renewal:
     return cast(
         "Renewal",
         connection().renew(
-            keys=[_admitted(), _stop(answer_id), _taken(answer_id)],
-            args=[str(answer_id), RUNNING_LEASE_SECONDS, QUEUED_LEASE_SECONDS + KEPT_SECONDS],
+            keys=[_admitted(), _stop(answer_id), _taken(answer_id), activity.key()],
+            args=[
+                str(answer_id),
+                RUNNING_LEASE_SECONDS,
+                QUEUED_LEASE_SECONDS + KEPT_SECONDS,
+                activity.MAX_ENTRIES,
+                *_flat(activity.taken(answer_id)),
+            ],
         ),
     )
 
 
 def emit(answer_id: UUID, event: Event) -> None:
-    """Append one event; the stream is kept `KEPT_SECONDS` past it."""
-    pipe = connection().client.pipeline(transaction=False)
+    """Append one event, and its copy on the activity stream in the same
+    step; the answer's stream is kept `KEPT_SECONDS` past it."""
+    pipe = connection().client.pipeline(transaction=True)
     pipe.xadd(_stream(answer_id), {"event": type(event).NAME, "data": event.model_dump_json()})
     pipe.expire(_stream(answer_id), KEPT_SECONDS)
+    copy = activity.mirrored(answer_id, event)
+    if copy is not None:
+        # redis-py wants a dict of its own unions, and a dict is invariant.
+        pipe.xadd(activity.key(), copy, maxlen=activity.MAX_ENTRIES)  # pyright: ignore[reportArgumentType]
     pipe.execute()
 
 
 def finish(answer_id: UUID, last: Event | None, *, conversation_id: UUID | None) -> None:
-    """Write the last event, if any, and give the place back."""
-    keys = [_admitted(), _stream(answer_id), _stop(answer_id)]
+    """Write the last event, if any, with its copy on the activity stream,
+    and give the place back."""
+    keys = [_admitted(), _stream(answer_id), _stop(answer_id), activity.key()]
     if conversation_id is not None:
         keys.append(_waiting(conversation_id))
+    copy = None if last is None else activity.mirrored(answer_id, last)
     connection().finish(
         keys=keys,
         args=[
@@ -361,6 +400,8 @@ def finish(answer_id: UUID, last: Event | None, *, conversation_id: UUID | None)
             "" if last is None else type(last).NAME,
             "" if last is None else last.model_dump_json(),
             KEPT_SECONDS,
+            activity.MAX_ENTRIES,
+            *_flat(copy or {}),
         ],
     )
 
@@ -452,6 +493,22 @@ def owner(answer_id: UUID) -> str | None:
         return None
     _entry_id, fields = first[0]
     return fields.get("owner")
+
+
+def seats() -> list[tuple[UUID, bool]]:
+    """The places taken under the cap, each with whether a worker has taken
+    its question; a lease run out holds none, by Redis's clock."""
+    client = connection().client
+    seconds, micros = cast("tuple[int, int]", client.time())
+    members = cast(
+        "list[str]", client.zrangebyscore(_admitted(), f"({seconds + micros / 1e6}", "+inf")
+    )
+    pipe = client.pipeline(transaction=False)
+    for member in members:
+        pipe.exists(_taken(UUID(member)))
+    return [
+        (UUID(member), bool(taken)) for member, taken in zip(members, pipe.execute(), strict=True)
+    ]
 
 
 def answering(conversation_id: UUID) -> UUID | None:

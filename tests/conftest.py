@@ -3,7 +3,8 @@
 Three things in this project outlive a single request on purpose: the engine
 slot (apps/qa/engine.py, one set of models per process), the throttle counters
 (the Redis cache of config/settings.py) and the answers in flight with their
-global cap (apps/qa/inflight.py), the last two shared by every process of the site.
+global cap (apps/qa/inflight.py) and the activity stream they are copied onto
+(apps/system/activity.py), the last two shared by every process of the site.
 All three are correct in production and contamination in a test suite.
 
 The counters and the answers stay in Redis here too, the backend production
@@ -50,6 +51,7 @@ from pwned_passwords_django import api
 
 from apps.qa import engine as engine_module
 from apps.qa import inflight
+from apps.system import activity
 from config.env import env
 
 if TYPE_CHECKING:
@@ -135,13 +137,17 @@ def _fresh_process_state() -> Iterator[None]:
     # or the answers in flight, so a test of rag/ never connects to Redis and
     # runs without Docker. The signal, because a request served on a thread of
     # the test's own holds a connection of that thread, which this one cannot
-    # see. One FLUSHDB clears both: the cache and the answers share a database.
-    if served or caches.all(initialized_only=True) or inflight.connected():
+    # see. One FLUSHDB clears all three: the cache, the answers and the
+    # activity stream share a database.
+    if served or caches.all(initialized_only=True) or inflight.connected() or activity.connected():
         cache.clear()
     # Closed after each test, so that `connected()` says whether this one used it.
     if inflight.connected():
         inflight.connection().client.close()
         inflight._connect.cache_clear()
+    if activity.connected():
+        activity._client().close()
+        activity._connect.cache_clear()
 
 
 @pytest.fixture(autouse=True)
