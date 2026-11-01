@@ -1,10 +1,11 @@
 # Background tasks
 
-This file owns what runs beside the web process: Redis and what each of its databases holds, the Celery worker with its queues, pools and time limits, beat and its schedule, how a question is answered and a course material ingested on a worker, and which work of the project goes to one. The values themselves are the sections "Cache", "Question answering", "Course material" and "Background tasks" of [config/settings.py](../config/settings.py), each with its reason beside it; the commands that start the worker and beat are in [development.md](development.md), section "Daily loop". The wire shape of an answer's events is [api.md](api.md), section "Question-answering API".
+This file owns what runs beside the web process: Redis and what each of its databases holds, the Celery worker with its queues, pools and time limits, beat and its schedule, how a question is answered and a course material ingested on a worker, the activity stream a superuser watches them on, and which work of the project goes to one. The values themselves are the sections "Cache", "Question answering", "Course material" and "Background tasks" of [config/settings.py](../config/settings.py), each with its reason beside it; the commands that start the worker and beat are in [development.md](development.md), section "Daily loop". The wire shape of an answer's events is [api.md](api.md), section "Question-answering API".
 
 - ✅ Redis is a compose service (`docker-compose.yml`) and holds the throttle counters (`config/settings.py`, section "Cache"). A worker runs the tasks queued on `default` (`config/celery.py`), and beat queues the nightly purge of expired sessions (`apps/accounts/tasks.py`).
 - ✅ Questions are answered on a worker consuming `qa` (`apps/qa/tasks.py`), under a global cap counted in Redis, and their events travel through a Redis stream per answer, which a reload reads again and a stop endpoint ends (`apps/qa/inflight.py`, `apps/qa/views.py`).
 - ✅ Course material is ingested on a worker consuming `ingest`, one material at a time, and beat fails every ten minutes the ingests whose worker died (`apps/materials/tasks.py`).
+- ✅ What each question and upload goes through is written onto one Redis stream as it happens, which a superuser's page draws beside the places under the cap and the workers online (`apps/system/activity.py`, `apps/system/views.py`).
 
 ## Topology
 
@@ -18,7 +19,7 @@ flowchart TB
     subgraph RD["Redis"]
       BK[["broker (db 0)<br/>the queues"]]
       CA[["site data (db 1)<br/>throttle counters, global cap, stop flags"]]
-      ST[["streams (db 1)<br/>answer events"]]
+      ST[["streams (db 1)<br/>answer events, the activity"]]
     end
     WK["Celery worker<br/>engine: encoders + reranker (GPU)<br/>ingest: Docling + encoders (GPU)"]
     BT["Celery beat<br/>the schedule"]
@@ -47,7 +48,7 @@ One server, `redis:8` in `docker-compose.yml`, listening on the host's loopback 
 | Database | Holds | Named by |
 | -------- | ----- | -------- |
 | 0 | Celery's broker: one list per queue | `CELERY_BROKER_URL` |
-| 1 | The site's own data: the throttle counters, through Django's cache; under `QA_KEY_PREFIX`, the answers in flight, their streams, their stop flags and the answer each conversation waits for (`apps/qa/inflight.py`) | `REDIS_URL` |
+| 1 | The site's own data: the throttle counters, through Django's cache; under `QA_KEY_PREFIX`, the answers in flight, their streams, their stop flags and the answer each conversation waits for (`apps/qa/inflight.py`), and the activity stream (`apps/system/activity.py`) | `REDIS_URL` |
 | 2, and 3 + N | pytest's: one for a run without pytest-xdist, one for each worker `gwN` | `tests/conftest.py` |
 
 The broker and the site's data are kept in two databases because `cache.clear()` empties the whole database it is pointed at (`FLUSHDB`), and in the broker's it would drop every queued task. The tests get databases of their own for the same reason, and because every test worker numbers its users from 1, which would put two workers' throttle counters in one bucket.
@@ -96,6 +97,7 @@ sequenceDiagram
 - **The web process answers nothing.** It admits the question under the cap, queues it, and relays the stream as the worker writes it, each event under the id it has in the stream. The relay reads with a blocking `XREAD` of 10 s; a read that comes back empty sends a keepalive comment and asks Redis whether the writer holds its lease, and one that lost it, or a stream gone, ends the response with `ENGINE_DOWN`. A lease that ran out before any worker took the question ends it with `UNAVAILABLE` and the same retry hint as a full cap instead: most often the question waited for a worker longer than its lease, which a busy site does and a broken one need not. A site with no worker consuming `qa` gives the same, and the warning it logs names both causes. The relay touches no database.
 - **Retrieval takes turns; generation does not.** The encoders and the reranker share one GPU, so the threads of a worker retrieve one at a time, under a lock held for retrieval alone; generation runs outside it, and several answers are written at once while the model server batches them (`apps/qa/engine.py`).
 - **The rows are the worker's.** It writes the question and an empty answer once `start` exists, and settles the answer before it writes the last event, so a reader who receives `end` and reopens the conversation at once finds the answer whole (`apps/qa/conversations.py`). A question that fails or is stopped before `start` leaves nothing behind.
+- **Where the time goes.** The worker writes a `step` event as each step of the answer begins and ends: `queue` ends as it takes the question, timed from the moment the web process admitted it; `route`, then `retrieve`, which counts the wait for the GPU lock, begin and end before `start`; `generate` ends just before the last event. The steps that ended are kept on the answer's row, `Message.steps`, with their milliseconds, so a reopened conversation shows them again; their wire shape is [api.md](api.md)'s, section "Question-answering API".
 - **A lease, on one clock.** A question admitted holds its place for 2 minutes while it waits for a worker; the worker, from a heartbeat thread, renews it to 30 s every second while it answers. A worker that dies gives its places back within half a minute, with nothing to clean up, and its readers are told `ENGINE_DOWN`. A stop does not end the renewals: the answer stops at its next event, which the router's reply may hold back for half a minute, and its place stays taken until then. The answer's time limit does, so an answer stuck before its first event, where the task's own check never runs, gives its place back half a minute after it. Every decision about a lease is a Lua script that reads Redis's own `TIME`, so the web host's clock and the worker's never have to agree.
 - **Answered once.** The task is acknowledged as it starts (`acks_late=False`), against the late acknowledgement every other task has: a question whose worker died is not worth answering an hour later, when the broker would deliver it again, since its reader was told it failed long before. A worker that takes a question after its lease ran out drops it.
 
@@ -119,6 +121,17 @@ The stop button calls `POST /api/answers/<id>/stop`, which sets the answer's sto
 - **A failure leaves no point.** The points are written once every chunk is embedded, and on any failure those of the material's digest in its edition are deleted (`rag.index.delete_material`), so an older version under the same name goes on answering.
 - **A new version replaces the old once ready.** Its points are written beside the old ones; once its row is `ready`, the points of the same name in the edition that it did not write are deleted, then the older rows of that name, with their files unless another edition holds the same bytes. A delete the index refuses, or a worker lost before it, leaves both versions answering until the next version replaces them. Versions are taken in upload order because the `ingest` worker takes one material at a time, first in first out; a second process on `ingest` would break that order.
 - **Twice is harmless.** A redelivered task starts over and writes the same points under the same ids, a `ready` material is left alone, and a row deleted meanwhile stops the ingest at its next step, taking what was indexed with it.
+
+## Watching the work
+
+✅ A superuser's page, `/staff/system`, draws the questions and the uploads going through Redis and the workers as it happens, and lists the last 20 tasks with their steps (`frontend/src/routes/SystemPage.tsx`). It reads `GET /api/admin/activity` ([api.md](api.md), section "Background work"); why a page of the site, and not Flower or Redis's `MONITOR`, is [decisions.md](decisions.md), 2026-11-01, *A superuser watches the background work on a page of the site, and a student watches their answer's steps*.
+
+- **One stream, written where each thing happens.** `<QA_KEY_PREFIX>:activity`, in database 1, takes an entry for each thing that happens to a question or an upload (`apps/system/activity.py`). A question's are copies of its answer stream's events, written in the same Redis step as each: `queued`, or `refused` at the cap, in the script that admits it, `taken` in the one that marks it taken, each event as it is appended, and the last in the script that gives its place back (`apps/qa/inflight.py`), so the page never shows an event the answer did not have, nor misses one it had. An upload's go beside each status its row records: `queued` once the row is committed, then each step and the end, the sweep's `failed` included (`apps/materials/services.py`, `apps/materials/tasks.py`); each is written on its own, and a Redis that refuses one costs the entry, not the ingest. An entry written on a worker names it by its hostname.
+- **What it leaves out.** An answer's tokens, which are the answer itself, and anything that names the asker: a signed-in student's question is cut at 200 characters, and a visitor's is not written at all, since it is stored nowhere else. The tasks on `default`, the purges and Langfuse's upkeep, write nothing, so the page draws questions and uploads only.
+- **How much.** The last 2000 entries or so, trimmed `MAXLEN ~`, as Redis trims cheaply; a question writes about ten, so the stream holds the last couple of hundred tasks, and nothing else expires it.
+- **The places and the workers are asked, not written.** The places are the cap's sorted set, each one marked waiting or taken; the workers answer Celery's remote control, `inspect`'s `active_queues` and `stats`, two broadcasts that wait a second each for the replies (`apps/system/workers.py`), since an idle solo worker on the laptop missed one wait of half a second in two. A lease that runs out and a worker that goes away write no entry, so the page is sent both again every 15 s. A solo worker reads its remote control only between two tasks and does not reply while it works: the page keeps drawing it from its task's entries, which name it.
+- **An end nobody wrote.** A question whose lease ran out before a worker took it, or whose worker died, writes no last entry: the page ends it as interrupted once a refresh no longer holds its place. An upload holds no place, and the one whose worker died ends with the sweep's `failed` (section *Beat*).
+- **Watching holds a web thread.** Under WSGI an open page holds one, as an answer's stream does, and gives it back at the first event written after it closes; a quiet feed sends a keepalive every 5 s.
 
 ## Beat
 
@@ -146,6 +159,7 @@ Beat is one process that queues each scheduled task when it falls due; it runs n
 | Deleting a deleted conversation's traces, sending a rating's score | a worker on `default`, queued once the transaction commits | ✅ `apps/qa/traces.py` |
 | Bringing Langfuse back to the database | beat, then a worker on `default` | ✅ `apps/qa/traces.py` |
 | Bounding a document's parse time and pages | the upload for its pages, the ingest task for its parse time | ✅ `apps/materials/services.py`, `apps/materials/ingest.py` |
+| Showing a superuser the questions and uploads going through the workers | one Redis stream the site and the workers write, relayed by the web process | ✅ `apps/system/activity.py` |
 | Snapshotting the Qdrant index | beat, then a worker on `default` | 🔜 M5 #122 |
 | The deepening agent on the web (`rag/agent.py`) | a worker, over the answer streams | 🔜 M7, no issue |
 | The load test | the whole stack on MICC | 🔜 M6 #41 |
