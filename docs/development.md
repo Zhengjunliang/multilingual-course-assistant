@@ -72,10 +72,12 @@ uv run python scripts/check.py hooks types   # only these two
 | Step | Runs |
 | ---- | ---- |
 | `hooks` | every hook of `.pre-commit-config.yaml` except `uv-lock` and `biome` (the `frontend` step runs Biome), over every tracked file: file hygiene, `detect-private-key`, ruff lint and format, typos, zizmor and actionlint over the workflows, and the repository's own guards, each named with its rule in `CLAUDE.md`, section 5 |
-| `frontend` | biome, `tsc`, catalogue keys, colour contrast, `DESIGN.md`'s tokens and linter, vitest, production build |
+| `frontend` | biome, `tsc`, catalogue keys, colour contrast, `DESIGN.md`'s tokens and linter, Tailwind CSS IntelliSense's lints, vitest, production build |
 | `types` | `pyright` |
 | `deploy` | `manage.py check --deploy --fail-level WARNING`, which runs the ordinary system checks too |
 | `tests` | `pytest --cov`, with the coverage gate; migration drift is one of the tests |
+
+What the editor flags, the chain flags, over every file and not only the ones open in it. Each VS Code extension that reports problems on this repository has its command-line run in a step: TypeScript's is `tsc`, Pylance's is `pyright`, reading the same `[tool.pyright]` of [pyproject.toml](../pyproject.toml), and Tailwind CSS IntelliSense's is `npm run check:tailwind`, which runs the extension's own language server ([frontend/scripts/check-tailwind.mjs](../frontend/scripts/check-tailwind.mjs) says why it runs in the chain and not at commit time). An extension adopted later comes with its command in the same change.
 
 A hook that rewrites a file (ruff, trailing whitespace) fails the run that rewrote it: review the diff, `git add`, run again. The chain runs with `DJANGO_DEBUG=false` whatever `.env` says, because that is how CI tests. Why each step is where it is — `frontend` first, the TLS flag only on `deploy` — is written next to the step in the script. Interrupting the `frontend` step on Windows makes `cmd` ask `Terminate batch job (Y/N)?`: answer `Y`.
 

@@ -49,13 +49,13 @@ export function LineField({ id, label, trailing, className, ...input }: LineFiel
       />
       <label
         htmlFor={id}
-        className="pointer-events-none absolute bottom-tight left-0 origin-bottom-left text-muted text-reading transition-[transform,color] duration-base ease-emphasized peer-autofill:-translate-y-room peer-autofill:scale-80 peer-focus:-translate-y-room peer-focus:scale-80 peer-focus:text-accent peer-[:not(:placeholder-shown)]:-translate-y-room peer-[:not(:placeholder-shown)]:scale-80 motion-reduce:transition-none"
+        className="pointer-events-none absolute bottom-tight left-0 origin-bottom-left text-muted text-reading transition-[transform,color] duration-base ease-emphasized peer-autofill:-translate-y-room peer-autofill:scale-80 peer-focus:-translate-y-room peer-focus:scale-80 peer-focus:text-accent peer-not-placeholder-shown:-translate-y-room peer-not-placeholder-shown:scale-80 motion-reduce:transition-none"
       >
         {label}
       </label>
       <span
         aria-hidden
-        className="absolute inset-x-0 bottom-0 h-0.5 origin-left scale-x-0 bg-accent transition-transform duration-slow ease-emphasized group-focus-within:scale-x-100 group-has-[[aria-invalid=true]]:scale-x-100 group-has-[[aria-invalid=true]]:bg-warn-ink motion-reduce:transition-none"
+        className="absolute inset-x-0 bottom-0 h-0.5 origin-left scale-x-0 bg-accent transition-transform duration-slow ease-emphasized group-focus-within:scale-x-100 group-has-aria-invalid:scale-x-100 group-has-aria-invalid:bg-warn-ink motion-reduce:transition-none"
       />
       {trailing}
     </div>
