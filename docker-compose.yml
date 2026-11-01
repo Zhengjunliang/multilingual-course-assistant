@@ -22,12 +22,14 @@ name: multilingual-course-assistant
 
 # What Langfuse's web and worker containers share, from the official compose
 # file (langfuse/langfuse, docker-compose.yml, outside the repository). The
-# passwords written here open services that publish no port, so only the other
-# containers of this file reach them; the secrets a process on this host could
-# use come from .env. Every value from .env defaults to empty rather than
-# using `:?`, which compose checks even with the profile off: an empty
-# LANGFUSE_NEXTAUTH_SECRET stops langfuse-web from starting, so the profile
-# fails closed.
+# passwords written here open services that publish no port, so no other
+# machine reaches them, nor, under Docker Desktop, any process of this host; on
+# a Linux host every local process reaches a container's address, so a shared
+# one needs passwords of its own (#41). Langfuse's own secrets and the
+# developer's account come from .env. Every value from .env defaults to empty
+# rather than using `:?`, which compose checks even with the profile off: an
+# empty LANGFUSE_NEXTAUTH_SECRET stops langfuse-web from starting, so the
+# profile fails closed.
 x-langfuse-env: &langfuse-env
   NEXTAUTH_URL: http://localhost:3000
   DATABASE_URL: postgresql://postgres:postgres@langfuse-postgres:5432/postgres
