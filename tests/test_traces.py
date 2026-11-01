@@ -200,16 +200,17 @@ def paged(rows: list[Any], cursor: str | None) -> SimpleNamespace:
 
 @dataclasses.dataclass
 class FakeLangfuse:
-    """The client calls the tasks make, served from two lists: the roots of
-    the traces it holds and its scores. `sent` records every write."""
+    """The client calls the tasks make, served from two lists: the
+    observations of the traces it holds and its scores. `sent` records every
+    write."""
 
-    roots: list[SimpleNamespace] = dataclasses.field(default_factory=list)
+    observations: list[SimpleNamespace] = dataclasses.field(default_factory=list)
     scores: list[SimpleNamespace] = dataclasses.field(default_factory=list)
     sent: list[tuple[str, Any]] = dataclasses.field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.api = SimpleNamespace(
-            observations=SimpleNamespace(get_many=self.observations),
+            observations=SimpleNamespace(get_many=self.list_observations),
             scores=SimpleNamespace(
                 get_many=self.list_scores,
                 delete=lambda score_id: self.sent.append(("delete_score", score_id)),
@@ -219,18 +220,21 @@ class FakeLangfuse:
             ),
         )
 
-    def observations(
+    def list_observations(
         self,
         *,
-        name: str,
-        is_root_observation: bool,
         cursor: str | None = None,
+        name: str | None = None,
+        is_root_observation: bool | None = None,
         trace_id: str | None = None,
         **_query: object,
     ) -> SimpleNamespace:
-        assert is_root_observation
         rows = [
-            root for root in self.roots if root.name == name and trace_id in (None, root.trace_id)
+            observation
+            for observation in self.observations
+            if name in (None, observation.name)
+            and is_root_observation in (None, observation.is_root)
+            and trace_id in (None, observation.trace_id)
         ]
         return paged(rows, cursor)
 
@@ -246,7 +250,12 @@ class FakeLangfuse:
 
 
 def root(trace_id: str, session: str, name: str = traces.SITE_TRACE) -> SimpleNamespace:
-    return SimpleNamespace(trace_id=trace_id, session_id=session, name=name)
+    return SimpleNamespace(trace_id=trace_id, session_id=session, name=name, is_root=True)
+
+
+def step(trace_id: str, session: str, name: str = "RouteDecision") -> SimpleNamespace:
+    """An observation under a trace's root, which carries its session too."""
+    return SimpleNamespace(trace_id=trace_id, session_id=session, name=name, is_root=False)
 
 
 def score(answer: Message, value: bool, comment: str | None = None) -> SimpleNamespace:
@@ -272,7 +281,7 @@ def test_a_rating_is_a_score_on_its_answers_trace_named_and_dated_by_the_answer(
     rating withdrawn and given again is a row of another date, and Langfuse
     keeps a score under its id and its date."""
     rated = answered(started(0), "a" * 32)
-    langfuse.roots = [root("a" * 32, str(rated.conversation_id))]
+    langfuse.observations = [root("a" * 32, str(rated.conversation_id))]
     Feedback.objects.create(
         answer=rated, rating="down", reason="other", comment="Off.", locale="en"
     )
@@ -311,23 +320,28 @@ def test_a_rating_withdrawn_or_of_an_answer_with_no_trace_sends_no_score(
 
 
 def test_the_reconciliation_corrects_langfuse_to_the_database(langfuse: FakeLangfuse) -> None:
-    """The traces of a conversation that is gone are deleted, and its
-    session's alone: a CLI run's trace, `routing`, and a trace with no
-    session are not the site's. Then the scores: one whose rating was
-    withdrawn goes, one that disagrees is sent again, a missing one is sent,
-    one that agrees is left alone, and an answer with no trace gets none.
-    Every list is read past its first page."""
+    """The traces of a conversation that is gone are deleted, once each, and
+    its session's alone: a trace with no session, as a CLI run's are, is
+    not the site's. One whose root never reached Langfuse goes too, by its
+    steps. Then the scores: one whose rating was withdrawn goes, one that
+    disagrees is sent again, a missing one is sent, one that agrees is left
+    alone, and an answer with no trace gets none. Every list is read past its
+    first page."""
     kept, unchanged, missing = (answered(started(n), f"{n}" * 32) for n in range(3))
     untraced = answered(started(3), "3" * 32)
     withdrawn = answered(started(4), "4" * 32)
     gone = uuid.uuid4()
-    langfuse.roots = [
+    langfuse.observations = [
         *(root(m.request_id, str(m.conversation_id)) for m in (kept, unchanged, missing)),
         root("5" * 32, str(gone)),
+        step("5" * 32, str(gone)),
         root("6" * 32, str(gone)),
         root("7" * 32, "not-a-conversation"),
+        # Its worker died after the route, before the root was exported.
+        step("a" * 32, str(gone)),
         root("8" * 32, ""),
-        root("9" * 32, str(gone), name="routing"),
+        root("9" * 32, "", name="routing"),
+        step("9" * 32, ""),
     ]
     for rated in (kept, unchanged, missing, untraced):
         Feedback.objects.create(answer=rated, rating="up")
@@ -335,7 +349,7 @@ def test_the_reconciliation_corrects_langfuse_to_the_database(langfuse: FakeLang
 
     traces.reconcile_traces()
 
-    assert langfuse.sent[0] == ("delete_traces", ["5" * 32, "6" * 32, "7" * 32])
+    assert langfuse.sent[0] == ("delete_traces", ["5" * 32, "6" * 32, "7" * 32, "a" * 32])
     assert ("delete_score", traces.score_id(withdrawn.pk)) in langfuse.sent
     assert set(created(langfuse)) == {traces.score_id(kept.pk), traces.score_id(missing.pk)}
     assert langfuse.sent[-1] == ("flush", None)

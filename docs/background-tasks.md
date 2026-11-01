@@ -127,7 +127,7 @@ Beat is one process that queues each scheduled task when it falls due; it runs n
 | Task | When | Why |
 | ---- | ---- | --- |
 | `apps.accounts.tasks.clear_expired_sessions` | 04:00 every night | Django keeps an expired session's row until something deletes it, and asks for `clearsessions` to be run regularly |
-| `apps.qa.traces.reconcile_traces` | every 10 minutes | Langfuse is a copy of the database: the traces of conversations deleted while tracing was off or Langfuse was down, or exported after their conversation was deleted, are deleted, and the `user-feedback` scores are made to match the ratings ([decisions.md](decisions.md), 2026-10-31, *A signed-in student's answer is a trace in Langfuse that names nobody and goes with its conversation*, point 3); with tracing off it returns at once |
+| `apps.qa.traces.reconcile_traces` | every 10 minutes | Langfuse is a copy of the database: the traces of conversations deleted while tracing was off or Langfuse was down, or exported after their conversation was deleted, or left without their root by a worker that died, are deleted, and the `user-feedback` scores are made to match the ratings ([decisions.md](decisions.md), 2026-10-31, *A signed-in student's answer is a trace in Langfuse that names nobody and goes with its conversation*, point 3); with tracing off it returns at once |
 | `apps.materials.tasks.fail_stalled` | every 10 minutes | A worker that dies under a material leaves its row in a running state; past the ingest's hard limit and 5 minutes more, the row is marked failed, `interrupted` |
 
 ## What goes to a worker

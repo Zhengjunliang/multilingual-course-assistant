@@ -525,3 +525,6 @@ def test_a_routing_run_traces_each_question_under_its_run_id(
     assert sorted(span.parent.span_id for span in decisions if span.parent) == sorted(
         root.context.span_id for root in roots if root.context
     )
+    # No session: that is how the reconciliation tells a site answer's trace,
+    # which it deletes once its conversation is gone (apps/qa/traces.py).
+    assert not any("session.id" in dict(span.attributes or {}) for span in spans)

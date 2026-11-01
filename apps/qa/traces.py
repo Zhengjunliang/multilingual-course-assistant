@@ -13,9 +13,10 @@ Neither is what the projection rests on: a task runs while Langfuse is down,
 and none is queued while tracing is off. `reconcile_traces`, every ten
 minutes from beat, compares the two sides whole and corrects Langfuse: the
 traces of conversations that are gone, the one exported late, after its
-conversation was deleted mid-answer, and every score. It lists everything
-each time, which the thesis's few thousand traces afford; past that, it
-would list what changed since its last run.
+conversation was deleted mid-answer, the steps of one whose worker died
+before its root was exported, and every score. It lists everything each
+time, every step of every trace, which the thesis's few thousand traces
+afford; past that, it would list what changed since its last run.
 
 A score is named after its answer and dated by it, so writing it again
 replaces it rather than adding a second: Langfuse keeps a score under its
@@ -52,9 +53,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# The name of a site answer's trace (apps/qa/tasks.py), which tells it from a
-# CLI run's, `routing` or `agent` (rag/gold.py, rag/agent.py): a run belongs
-# to no conversation, and this module never touches one.
+# The name of a site answer's trace (apps/qa/tasks.py), as a CLI run's is
+# `routing` or `agent` (rag/gold.py, rag/agent.py). A run belongs to no
+# conversation, so its trace carries no session, and this module never
+# touches one.
 SITE_TRACE = "question"
 
 # A rating's score, by the name Langfuse's own guide gives user feedback
@@ -170,17 +172,14 @@ def _sync_score(client: Langfuse, answer_id: UUID) -> None:
 
 
 def _reconcile(client: Langfuse) -> None:
+    # Every observation rather than the roots: each carries its trace's
+    # session, and a step exported before its worker died is a trace whose
+    # root never comes, holding the question all the same.
     sessions = {
-        root.trace_id: root.session_id
-        for root in _every(
-            client.api.observations.get_many,
-            name=SITE_TRACE,
-            is_root_observation=True,
-            fields="basic",
-            limit=1000,
-        )
-        # A trace with no session is no site answer's, whatever its name.
-        if root.trace_id and root.session_id
+        observation.trace_id: observation.session_id
+        for observation in _every(client.api.observations.get_many, fields="basic", limit=1000)
+        # A trace with no session is no site answer's: a CLI run's has none.
+        if observation.trace_id and observation.session_id
     }
     ids: set[UUID] = set()
     for session in set(sessions.values()):
