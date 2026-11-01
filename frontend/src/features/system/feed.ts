@@ -55,6 +55,11 @@ export interface Task {
   place: Place;
   /** Its answer is being written, so the stream back to the browser is busy. */
   writing: boolean;
+  /**
+   * A worker began answering it: what a signed-in question's trace records
+   * (apps/qa/tasks.py). One refused, lost, or stopped as it was taken has none.
+   */
+  answering: boolean;
   outcome: Outcome | null;
   code: string | null;
 }
@@ -139,6 +144,7 @@ function blank(entry: ActivityEntry, received: number | null): Task {
     chunks: null,
     place: "browser",
     writing: false,
+    answering: false,
     outcome: null,
     code: null,
   };
@@ -170,14 +176,16 @@ function question(task: Task, entry: ActivityEntry, at: number, received: number
       if (entry.ms === null) {
         const place =
           entry.step === "route" ? "llm" : entry.step === "retrieve" ? "qdrant" : task.place;
-        return { ...task, steps: begun(task.steps, entry.step, at), place };
+        return { ...task, steps: begun(task.steps, entry.step, at), place, answering: true };
       }
       const writing = entry.step === "generate" ? false : task.writing;
-      return { ...task, steps: ended(task.steps, entry.step, entry.ms), place: "worker", writing };
+      const steps = ended(task.steps, entry.step, entry.ms);
+      return { ...task, steps, place: "worker", writing, answering: true };
     }
     case "start":
       return {
         ...task,
+        answering: true,
         found: entry.found,
         steps: begun(task.steps, "generate", at),
         place: "llm",
@@ -262,9 +270,14 @@ function placed(
   for (const seat of seats) {
     if (next.some((cell) => cell?.answer_id === seat.answer_id)) continue;
     const free = next.indexOf(null);
-    // More places than the cap: a cap lowered under leases still held.
+    // More places than the cap: a cap lowered under leases still held, or a
+    // place taken before a refresh told of the lease that freed it.
     if (free === -1) next.push(seat);
     else next[free] = seat;
+  }
+  // Past the cap, a cell given up goes rather than stays empty.
+  for (let at = next.length - 1; next.length > cap && at >= 0; at -= 1) {
+    if (next[at] === null) next.splice(at, 1);
   }
   return next;
 }

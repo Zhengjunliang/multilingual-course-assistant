@@ -12,6 +12,12 @@ worker that goes away write no entry. apps/system/contract.py owns the shapes.
 **For the superuser alone**, as the ratings page is (apps/qa/feedback_views.py):
 the entries name no asker, and a question is its opening words.
 
+**Its reader is read again at each refresh.** A feed has no end of its own,
+so a permission checked once would outlive a superuser demoted, deactivated or
+signed out by another while the page stays open: at each refresh the account
+and its session are read again, and once either no longer stands the feed
+ends, for the page to open it again and be refused.
+
 **Nothing to resume.** A reader who lost the connection opens the feed again
 and reads a new snapshot, which already holds what it missed; `Last-Event-ID`
 is not read. A Redis that fails mid-feed ends it, for the page to open it again.
@@ -30,12 +36,15 @@ import time
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.utils import timezone
 from redis.exceptions import RedisError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import APIView
 
+from apps.accounts.models import User
 from apps.accounts.permissions import IsSuperuser
+from apps.accounts.sessions import SessionStore
 from apps.qa import inflight
 from apps.qa.contract import KEEPALIVE, sse
 from apps.qa.views import RETRY_AFTER_SECONDS, ServerSentEventRenderer, streaming
@@ -75,7 +84,9 @@ class _Feed:
     lines name the request: the reason the answer's relay gives
     (apps/qa/views.py, `_Relay`)."""
 
-    def __init__(self) -> None:
+    def __init__(self, reader: int | None, session_key: str | None) -> None:
+        self._reader = reader
+        self._session_key = session_key
         self._context = contextvars.copy_context()
         self._frames = self._framed()
 
@@ -87,6 +98,17 @@ class _Feed:
 
     def close(self) -> None:
         self._context.run(self._frames.close)
+
+    def _still_read(self) -> bool:
+        """Whether its reader is still an active superuser, on a session
+        neither ended nor run out since the feed opened."""
+        sessions = SessionStore.get_model_class().objects
+        return (
+            User.objects.filter(pk=self._reader, is_active=True, is_superuser=True).exists()
+            and sessions.filter(
+                session_key=self._session_key, expire_date__gt=timezone.now()
+            ).exists()
+        )
 
     def _framed(self) -> Generator[str, None, None]:
         try:
@@ -107,6 +129,8 @@ class _Feed:
                     after = entry.id
                     yield sse(ActivityEntry.NAME, entry.model_dump_json(), entry.id)
                 if time.monotonic() - refreshed >= REFRESH_SECONDS:
+                    if not self._still_read():
+                        return
                     refreshed = time.monotonic()
                     yield sse(
                         Refresh.NAME, Refresh(seats=_seats(), workers=online()).model_dump_json()
@@ -119,7 +143,8 @@ class _Feed:
 
 class ActivityView(APIView):
     """GET the background work as it happens: `text/event-stream`, one
-    `snapshot`, then `activity` and `refresh` events, never an end of its own."""
+    `snapshot`, then `activity` and `refresh` events, with no end of its own
+    but its reader's."""
 
     # As apps/qa/views.py's: JSON first for the error bodies, the SSE framing
     # for a client that asks for the stream.
@@ -127,4 +152,4 @@ class ActivityView(APIView):
     permission_classes = (IsAuthenticated, IsSuperuser)
 
     def get(self, request: Request) -> StreamingHttpResponse:
-        return streaming(_Feed())
+        return streaming(_Feed(request.user.pk, request.session.session_key))

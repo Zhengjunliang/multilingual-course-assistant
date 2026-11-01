@@ -12,6 +12,7 @@ Who may open the feed is tests/access_matrix.txt's: the superuser, nobody else.
 
 from __future__ import annotations
 
+import itertools
 import json
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -23,6 +24,7 @@ from test_catalog_api import as_user
 from test_inflight import admit, queued
 
 from apps.accounts.models import User
+from apps.accounts.sessions import end_sessions
 from apps.materials.models import MaterialStatus
 from apps.qa import inflight
 from apps.system import activity, views, workers
@@ -125,6 +127,26 @@ def test_a_quiet_feed_keeps_its_connection_and_sends_the_places_again(
         "seats": [{"answer_id": str(answer_id), "taken": False}],
         "workers": [LAPTOP.model_dump()],
     }
+
+
+@pytest.mark.parametrize("change", ["demoted", "deactivated", "signed out"])
+def test_a_feed_ends_at_its_next_refresh_once_its_reader_may_no_longer_read_it(
+    monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    monkeypatch.setattr(activity, "READ_BLOCK_SECONDS", 0.01)
+    frames = feed()
+    next(frames)
+    root = User.objects.get(username="root")
+    if change == "signed out":
+        end_sessions(root)
+    else:
+        field = "is_superuser" if change == "demoted" else "is_active"
+        User.objects.filter(pk=root.pk).update(**{field: False})
+
+    monkeypatch.setattr(views, "REFRESH_SECONDS", 0)
+
+    # A few frames at most: a feed that does not end would never give `list` back.
+    assert list(itertools.islice(frames, 3)) == []
 
 
 def test_with_tracing_on_the_feed_says_where_a_trace_opens(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -169,6 +169,23 @@ describe("a question nobody finished", () => {
     const ended = live(refreshed, [entry({ id: "2000-0", task: "c", event: "end" })]);
     expect(ended.tasks[0]?.outcome).toBe("answered");
   });
+
+  it("gives its place back at the next refresh, the cap drawn again after one taken past it", () => {
+    const held = (answer_id: string, taken: boolean) => ({ answer_id, taken });
+    const full = run({
+      type: "snapshot",
+      snapshot: snapshot({ cap: 2, seats: [held("a", true), held("b", true)] }),
+    });
+    // a's lease runs out, which writes no entry, and d takes the place it freed.
+    const crowded = live(full, [entry({ id: "1000-0", task: "d", event: "queued" })]);
+    expect(crowded.cells).toHaveLength(3);
+
+    const refresh = { seats: [held("b", true), held("d", false)], workers: [SOLO] };
+    expect(reduce(crowded, { type: "refresh", refresh }).cells).toEqual([
+      held("b", true),
+      held("d", false),
+    ]);
+  });
 });
 
 describe("the workers", () => {

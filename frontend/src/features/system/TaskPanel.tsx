@@ -5,8 +5,10 @@
  *
  * Under them, the worker that ran it and, for a signed-in student's question,
  * the request's id, to copy, and the way to its trace in Langfuse once the
- * answer is over: Langfuse receives a trace only after its spans end. A
- * visitor's question has neither, since only a signed-in student's answer is
+ * answer is over: Langfuse receives a trace only after its spans end, and
+ * only of a question a worker began answering, so one refused at the cap,
+ * lost, or stopped as it was taken has no way there. A visitor's question
+ * has neither, since only a signed-in student's answer is
  * traced (docs/decisions.md, 2026-10-31, *A signed-in student's answer is a
  * trace in Langfuse that names nobody and goes with its conversation*,
  * point 1).
@@ -81,7 +83,7 @@ export function TaskPanel({ task, traceUrl }: TaskPanelProps) {
                   </p>
                   <code className="break-all font-mono text-ink">{task.requestId}</code>
                 </div>
-                {traceUrl !== null && task.outcome !== null && (
+                {traceUrl !== null && task.outcome !== null && task.answering && (
                   <a
                     href={`${traceUrl}${encodeURIComponent(task.requestId)}`}
                     target="_blank"

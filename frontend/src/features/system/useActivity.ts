@@ -2,18 +2,19 @@
  * The superuser's feed of background work, read for as long as the system
  * page is open (api/system.ts) and folded into a `Feed` (feed.ts).
  *
- * The feed never ends of its own. One that ends or breaks once a snapshot was
- * read is opened again after `REOPEN_MS`, whatever broke it, a server
- * restarted mid-demo included; its new snapshot holds what the gap missed,
- * and until then the page keeps what it drew, marked as not live. A failure
- * before the first snapshot is the page's to show, with a button that tries
- * again. A lost session signs the reader out, as on every staff page
- * (features/staff/context.tsx).
+ * The feed ends only when its reader may no longer read it. One that ends or
+ * breaks once a snapshot was read is opened again after `REOPEN_MS`, whatever
+ * broke it, a server restarted mid-demo included; its new snapshot holds what
+ * the gap missed, and until then the page keeps what it drew, marked as not
+ * live. A failure before the first snapshot, and a refusal at any time, since
+ * the account is no longer a superuser, is the page's to show, with a button
+ * that tries again. A lost session signs the reader out, as on every staff
+ * page (features/staff/context.tsx).
  */
 
 import { useCallback, useEffect, useReducer, useState } from "react";
 
-import { isSessionLost } from "@/api/http";
+import { ApiError, isSessionLost } from "@/api/http";
 import { openActivity, readActivity } from "@/api/system";
 import { useSession } from "@/auth/useSession";
 import { EMPTY, type Feed, reduce } from "./feed";
@@ -74,7 +75,7 @@ export function useActivity(): Activity {
             forget();
             return;
           }
-          if (!opened) {
+          if (!opened || (caught instanceof ApiError && caught.code === "PERMISSION_DENIED")) {
             setError(caught);
             return;
           }
