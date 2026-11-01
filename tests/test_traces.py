@@ -149,6 +149,7 @@ def test_every_deletion_of_a_conversation_forgets_its_traces_once_committed(
 
     with django_capture_on_commit_callbacks(execute=True):
         deletion(mine)
+        assert queued == []
 
     assert queued == [("apps.qa.traces.forget_traces", (["a" * 32],))]
     assert Conversation.objects.filter(pk=other.pk).exists()
@@ -178,6 +179,7 @@ def test_a_rating_put_or_withdrawn_queues_its_score(
         client().put(url, {"rating": "down"}, format="json")
         client().delete(url)
         client().delete(url)
+        assert queued == []
 
     assert queued == [("apps.qa.traces.sync_feedback_score", (str(rated.pk),))] * 2
 
