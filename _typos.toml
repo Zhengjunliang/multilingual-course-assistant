@@ -29,3 +29,7 @@ extend-ignore-identifiers-re = [
   # plus a hash (`qa_message_convers_561460_idx`), not words anyone wrote.
   "^\\w+_[0-9a-f]{6}_idx$",
 ]
+
+[default.extend-identifiers]
+# An evaluation library's name, which typos splits into "Tru" and "Lens".
+TruLens = "TruLens"
