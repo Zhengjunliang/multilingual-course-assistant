@@ -1396,14 +1396,16 @@ def test_a_stop_outlasts_a_router_slower_than_the_lease(
     the heartbeat goes on renewing the lease until then. It ends as `stopped`,
     not as an outage, and its place is not handed out while it runs. The lease
     and the heartbeat are shortened, and the router outlasts the lease."""
-    monkeypatch.setattr(inflight, "RUNNING_LEASE_SECONDS", 0.2)
-    monkeypatch.setattr(tasks, "HEARTBEAT_SECONDS", 0.01)
+    # A lease of 0.2 s ran out between two beats under four pytest workers:
+    # a second leaves room for a stalled beat and still ends before the router.
+    monkeypatch.setattr(inflight, "RUNNING_LEASE_SECONDS", 1.0)
+    monkeypatch.setattr(tasks, "HEARTBEAT_SECONDS", 0.05)
 
     class SlowRouter:
         def complete(self, messages: Sequence[ChatMessage]) -> str:
             stop = client_for().post(answer_url(held[0].answer_id, "stop"))
             assert stop.status_code == 204
-            time.sleep(0.5)
+            time.sleep(1.5)
             return SLIDES_ROUTE
 
     engine = install_engine(index, SLIDES_ROUTE)
