@@ -66,7 +66,7 @@ class Pipeline:
 def build_pipeline() -> Pipeline:
     """The Qdrant service with its slides collection, the encoders, the chunker and the parser.
 
-    The parser decodes formulas on every file, as docs/docling-pipeline.md
+    The parser decodes formulas on every file, as docs/rag-pipeline.md
     decides for a resident process, stops one at `PARSE_TIMEOUT_SECONDS`, and
     builds a converter for each variant as it first comes up: two at most,
     with OCR and without.

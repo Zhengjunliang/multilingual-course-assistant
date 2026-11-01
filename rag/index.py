@@ -306,7 +306,7 @@ def delete_web_versions(
     page's content, so upsert alone would leave the previous version alive;
     and an unscoped delete-by-url would let a live fetch destroy the crawl
     snapshot version — crawl and live never overwrite each other
-    (docs/docling-pipeline.md 3.6)."""
+    (docs/rag-pipeline.md 3.6)."""
     from qdrant_client import models
 
     for url, source in pairs:

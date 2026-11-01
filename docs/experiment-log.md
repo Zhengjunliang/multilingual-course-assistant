@@ -593,7 +593,7 @@ Index rebuilt from scratch in the collection `slides` (embedded Qdrant, `data/qd
 
 ### 1. Routing over the 31 documents
 
-`rag/probe.py` reads four signals from the PDF structure without loading a model or rendering a page — text per page, share of empty pages, image objects, font table — and routes each file: `classic + ocr` **1** document (`3.5-HTML5-Part-2`, **16 of 32** pages nearly empty), `classic + formula` **4** (the image and video compression decks), `classic` **26**. No false positive; **27/31** documents skip the formula model and **30/31** skip OCR. The thresholds are this corpus's measured values (`EMPTY_PAGE_CHARS = 50`, `NEEDS_VISION_RATIO = 0.3`); the rules are in [docling-pipeline.md](docling-pipeline.md).
+`rag/probe.py` reads four signals from the PDF structure without loading a model or rendering a page — text per page, share of empty pages, image objects, font table — and routes each file: `classic + ocr` **1** document (`3.5-HTML5-Part-2`, **16 of 32** pages nearly empty), `classic + formula` **4** (the image and video compression decks), `classic` **26**. No false positive; **27/31** documents skip the formula model and **30/31** skip OCR. The thresholds are this corpus's measured values (`EMPTY_PAGE_CHARS = 50`, `NEEDS_VISION_RATIO = 0.3`); the rules are in [rag-pipeline.md](rag-pipeline.md).
 
 ### 2. OCR against a VLM on the image-based deck
 

@@ -1062,7 +1062,7 @@ def test_a_two_hop_pdf_answer_is_reached_through_the_link_graph(
 
     # Provenance survives both hops: the ledger and the chunk payload name the
     # page each fetch was linked from, which is the payload contract for web
-    # chunks (docs/docling-pipeline.md 3.6) and the only record of the path
+    # chunks (docs/rag-pipeline.md 3.6) and the only record of the path
     # the loop actually walked.
     ledger = {row.url: row for row in read_registry(registry)}
     assert ledger[HUB].referrer_url == SEED

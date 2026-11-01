@@ -104,7 +104,7 @@ class Outlink(BaseModel):
 
 class RegistryEntry(BaseModel):
     """One append-only ledger row; field semantics shared with the chunk
-    payload contract (docs/docling-pipeline.md 3.6)."""
+    payload contract (docs/rag-pipeline.md 3.6)."""
 
     model_config = ConfigDict(frozen=True)
 

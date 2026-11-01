@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from scripts.guards import Files
 
-DECISIONS, LOG, PIPELINE = "docs/decisions.md", "docs/experiment-log.md", "docs/docling-pipeline.md"
+DECISIONS, LOG, PIPELINE = "docs/decisions.md", "docs/experiment-log.md", "docs/rag-pipeline.md"
 MENTION = re.compile(r"(?<![\w-])([a-z0-9-]+)\.md")
 DATE = r"\d{4}-\d{2}-\d{2}"
 DATES = rf"((?:{DATE}(?:,? and |, )?)+)"
@@ -156,7 +156,7 @@ DECISION_RULE = Rule(
         {**_DOCS, "docs/a.md": "decisions.md, 2026-09-25, *PPM read from Moodle*, point 1.\n"},
         {**_DOCS, "docs/a.md": "decisions.md, the two entries of 2026-09-25 and 2026-09-24.\n"},
         {**_DOCS, "rag/a.py": "# experiment-log.md, entry of 2026-08-21\n"},
-        {**_DOCS, "docs/a.md": "[docling-pipeline.md](docling-pipeline.md), section 4.1.\n"},
+        {**_DOCS, "docs/a.md": "[rag-pipeline.md](rag-pipeline.md), section 4.1.\n"},
         {**_DOCS, "docs/a.md": "[architecture.md](architecture.md), section on compute strategy\n"},
         {**_DOCS, "docs/a.md": "architecture.md, section on compute strategy (and why it holds)\n"},
         {
@@ -171,7 +171,7 @@ DECISION_RULE = Rule(
         {**_DOCS, "docs/a.md": "decisions.md, 2026-09-25, *Roles are built first*.\n"},
         {**_DOCS, "docs/a.md": "decisions.md, 2026-09-24, *One chain*, point 4.\n"},
         {**_DOCS, "docs/a.md": "experiment-log.md, entry of 2026-08-22\n"},
-        {**_DOCS, "docs/a.md": "docling-pipeline.md, section 3.6\n"},
+        {**_DOCS, "docs/a.md": "rag-pipeline.md, section 3.6\n"},
         {**_DOCS, "docs/a.md": "architecture.md, section on deployment\n"},
         {**_DOCS, "docs/a.md": "architecture.md, section on computers\n"},
     ),

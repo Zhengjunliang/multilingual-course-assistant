@@ -2,7 +2,7 @@
 
 ## Purpose and owner
 
-This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisions.md](decisions.md), the two entries of 2026-09-25, the role scopes by [decisions.md](decisions.md), 2026-09-29, *Staff permissions are a registry in code, answered by one backend; the admin is the superuser's*, and the code and year formats and the rule that an AD code names one course by [decisions.md](decisions.md), 2026-09-28, *An AD code belongs to one course, and codes and years are written in ASCII*; the chunk field table by [docling-pipeline.md](docling-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
+This file owns the website's relational schema: its entities and relationships, the scope invariants, the contract between `apps/` and `rag/`, and the concrete migration order. The decisions and their reasons are owned by [decisions.md](decisions.md), the two entries of 2026-09-25, the role scopes by [decisions.md](decisions.md), 2026-09-29, *Staff permissions are a registry in code, answered by one backend; the admin is the superuser's*, and the code and year formats and the rule that an AD code names one course by [decisions.md](decisions.md), 2026-09-28, *An AD code belongs to one course, and codes and years are written in ASCII*; the chunk field table by [rag-pipeline.md](rag-pipeline.md), section 3.6 (the chunk payload contract). Progress lives in GitHub issues: the epic `#94`, and `#35` `#36` `#93` for the parts they implement.
 
 ## Entities and relationships
 
@@ -51,8 +51,8 @@ erDiagram
 - The search functions take `scope: Sequence[EditionKey] | None` in place of the single `course` string, keyword-only and with no default; the command line takes `--scope CODE:YEAR`, once per edition.
 - `scope=None` means unrestricted, and only the command line uses it: passed when `--scope` is absent, and by `rag.answer` and `rag.agent` always; nothing under `apps/` passes it. The gold runs pin PPM's own pair (`rag/gold.py`), never the current edition, and stop when the index holds none of it.
 - `scope=[]` means the slides collection is skipped: no query runs, because Qdrant reads an empty `should` as no condition and would match every edition. `apps/qa/views.py` passes it for an anonymous request, and `search_scope` returns it for an account whose boundary holds no edition.
-- The scope applies to the slides branches only, as a filter on each branch's own query ([docling-pipeline.md](docling-pipeline.md), section 4.1, the fusion on the client).
-- In the web collection, `course` is a site-section slug such as `ingegneria` (values listed in [docling-pipeline.md](docling-pipeline.md), section 3.6), not a course key; a scope never matches it.
+- The scope applies to the slides branches only, as a filter on each branch's own query ([rag-pipeline.md](rag-pipeline.md), section 4.1, the fusion on the client).
+- In the web collection, `course` is a site-section slug such as `ingegneria` (values listed in [rag-pipeline.md](rag-pipeline.md), section 3.6), not a course key; a scope never matches it.
 - Re-indexing a slides file writes its new points, then deletes the others under (`source_file`, `course`, `academic_year`) (`rag/index.py`): the source file within its edition is the identity, and `source_sha256` only says whether the content changed, so another edition of the same PDF is never touched ([decisions.md](decisions.md), 2026-09-28, *Slides points carry their edition, and a re-index replaces a source file within it*, point 2).
 - One uploaded material's points are those of its digest in its edition, (`source_sha256`, `course`, `academic_year`), the key `CourseMaterial` holds as (`edition`, `sha256`); `delete_material` deletes them alone, leaving an older version under the same name and the same PDF in another edition (`rag/index.py`).
 - Indexing a directory also deletes, for each edition the directory holds, the points of files that left it, and skips that when any file failed; a single file never deletes another (`rag/index.py`; [decisions.md](decisions.md), 2026-09-28, *Slides points carry their edition, and a re-index replaces a source file within it*, point 3).
@@ -63,7 +63,7 @@ erDiagram
 
 ## Chunk payload mapping
 
-✅ The field table and the web-side values are owned by [docling-pipeline.md](docling-pipeline.md), section 3.6, with the model in `rag/chunk.py`. In the slides collection, `course` holds a UniFi course code (`B028451` for PPM) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default; a slides `chunk_id` carries both, so one PDF in two editions yields two identities. The stored points moved to these fields without re-embedding (step ④ below).
+✅ The field table and the web-side values are owned by [rag-pipeline.md](rag-pipeline.md), section 3.6, with the model in `rag/chunk.py`. In the slides collection, `course` holds a UniFi course code (`B028451` for PPM) instead of `"PPM"`, and an optional `academic_year` joins it, `None` by default; a slides `chunk_id` carries both, so one PDF in two editions yields two identities. The stored points moved to these fields without re-embedding (step ④ below).
 
 ## Migration order
 
