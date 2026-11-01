@@ -90,6 +90,15 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("unused")
     llm_model: str = "qwen3:4b-instruct-2507-q4_K_M"
 
+    # The judge `rag.eval judge` scores frozen answers with: an OpenAI-compatible
+    # endpoint like the one above, and its defaults, so the evaluation runs end
+    # to end on the laptop with the generator standing in for the judge. The M3
+    # runs point it at the judge model on MICC (docs/architecture.md, row
+    # "Evaluation").
+    judge_base_url: str = "http://localhost:11434/v1"
+    judge_api_key: SecretStr = SecretStr("unused")
+    judge_model: str = "qwen3:4b-instruct-2507-q4_K_M"
+
     # Langfuse, served by docker-compose.yml's tracing profile: where the CLIs
     # and the worker send the record of their LLM calls (rag/llm.py). Off by
     # default, so a fresh checkout, the tests and CI never reach for a server
