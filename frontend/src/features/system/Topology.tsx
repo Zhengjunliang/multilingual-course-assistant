@@ -215,7 +215,7 @@ export function Topology({ feed, selected, onSelect }: TopologyProps) {
         viewBox="0 0 1000 340"
         role="img"
         aria-label={t("staff.system.diagram", { taken, cap: feed.cap })}
-        className="block h-auto w-full min-w-[45rem]"
+        className="block h-auto w-full min-w-reading"
       >
         {EDGES.map((edge) => (
           <path

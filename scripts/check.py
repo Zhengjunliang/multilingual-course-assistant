@@ -98,6 +98,7 @@ STEPS: tuple[Step, ...] = (
                 "check:i18n",
                 "check:contrast",
                 "check:design",
+                "check:tailwind",
                 "test",
                 "build",
             )

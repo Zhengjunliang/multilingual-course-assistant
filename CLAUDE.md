@@ -40,7 +40,7 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 
 **Documents are in English.** The repository's markdown and its GitHub issues are written in English and maintained in place, **with no parallel translations** — two languages would mean keeping the same content twice. The thesis body and its delivery attachments are written in Italian outside the repository. Talk to the user in Chinese (agent rule 5). One language per repository is a rule a machine can check; several languages each owning a slice of the prose is not.
 
-**Every rule has a guard or says it has none.** A guard is a hook of `.pre-commit-config.yaml`, run at commit time and by `scripts/check.py`; `review` marks what only a reader can check. String literals, the UI catalogues and the gold set are data, in whatever language the data is.
+**Every rule has a guard or says it has none.** A guard is a hook of `.pre-commit-config.yaml`, run at commit time and by `scripts/check.py`, or a command only the chain runs, named with its step; `review` marks what only a reader can check. String literals, the UI catalogues and the gold set are data, in whatever language the data is.
 
 | Layer | Rule | Guard |
 | ----- | ---- | ----- |
@@ -51,6 +51,7 @@ The business rules whose violation is a bug are the scope invariants of `docs/da
 | Markdown prose | English | `language` |
 | Every tracked file | no known misspelling | `typos` |
 | Frontend sources (TypeScript, CSS, JSON) | Biome's rules and format, and no JSX `title` attribute (`DESIGN.md`) | `biome` |
+| What VS Code flags (TypeScript, Pylance, Tailwind CSS IntelliSense) | the chain flags too (`docs/development.md`, section "The check chain") | `frontend` step (`tsc`, `check:tailwind`), `types` step (`pyright`) |
 | `/api/` refusals (Python) | `fail()` or `field_error()` of `config/errors.py`, never DRF's or Django's exceptions (`docs/api.md`, section "Errors") | `ruff-check` (TID251) |
 | Status markers, temporal wording, links between files | the conventions below | `doc-conventions` |
 | Links, document paths, decision references, paths a status marker cites | they resolve | `doc-references` |
