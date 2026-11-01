@@ -186,6 +186,16 @@ describe("a question nobody finished", () => {
       held("b", true),
     ]);
   });
+
+  it("keeps no empty cell past the cap when a place there is given up", () => {
+    const held = (answer_id: string) => ({ answer_id, taken: true });
+    const lowered = run({
+      type: "snapshot",
+      snapshot: snapshot({ cap: 2, seats: ["a", "b", "c", "d"].map(held) }),
+    });
+    const ended = live(lowered, [entry({ id: "1000-0", task: "c", event: "end" })]);
+    expect(ended.cells).toEqual(["a", "b", "d"].map(held));
+  });
 });
 
 describe("the workers", () => {
