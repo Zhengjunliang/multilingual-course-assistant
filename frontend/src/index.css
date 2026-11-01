@@ -720,10 +720,10 @@
 }
 
 /*
- * The process line while the search runs (features/chat/ProcessLine.tsx): a
- * band sweeping across muted words, as Perplexity's "Ricerca in corso" and
- * ChatGPT's "Thinking" do (read 11 October 2026), so the line says it is
- * working without a spinner. The band is `ink`, darker than the words in the
+ * The step under way above an answer (features/chat/StepList.tsx): a band
+ * sweeping across muted words, as Perplexity's "Ricerca in corso" and
+ * ChatGPT's "Thinking" do (read 11 October 2026), so the words themselves say
+ * they are not final. The band is `ink`, darker than the words in the
  * light theme and brighter in the dark one, so the text never dips below its
  * resting contrast. Under reduced motion the words are plain muted text.
  */

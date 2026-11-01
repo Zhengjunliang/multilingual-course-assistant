@@ -159,7 +159,6 @@
     "both": "两个来源"
   },
   "process": {
-    "running": "正在检索 · {{seconds}} 秒",
     "done": "检索完成 · {{seconds}} 秒",
     "doneUntimed": "检索完成",
     "searchedIn": "检索了<where>{{where}}</where>",
@@ -169,6 +168,22 @@
     "cited_other": "引用了 {{count}} 个来源",
     "asked": "提问语言：{{language}}",
     "languages": "提问语言：{{language}}；来源语言：{{sources}}"
+  },
+  "steps": {
+    "running": {
+      "queue": "排队中",
+      "route": "正在理解问题",
+      "retrieve": "正在检索资料",
+      "generate": "正在写回答"
+    },
+    "done": {
+      "queue": "排到了",
+      "route": "理解了问题",
+      "retrieve_one": "找到 {{count}} 个片段",
+      "retrieve_other": "找到 {{count}} 个片段",
+      "generate": "回答写好了"
+    },
+    "seconds": "{{seconds}} 秒"
   },
   "sources": {
     "slide": "幻灯片第 {{page}} 页",

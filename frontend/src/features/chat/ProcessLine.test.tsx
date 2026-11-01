@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
 /**
- * The process line: counting while the search runs, folded into the server's
- * seconds once `start` has said where it looked, and opening onto the steps:
- * where, how much it read and cited, and in which languages.
+ * The process line: the steps as they happen while the search runs, folded
+ * into the server's seconds once `start` has said where it looked, and opening
+ * onto where, how much it read and cited, in which languages, and how long
+ * each step took.
  */
 
 import { act } from "react";
@@ -48,25 +49,110 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+/** The text of each step's row, its words and then its seconds. */
+function stepRows(container: HTMLElement, selector: string): string[] {
+  return [...container.querySelectorAll(selector)].map((row) =>
+    [...row.children].map((part) => part.textContent).join("|"),
+  );
+}
+
 describe("the process line", () => {
-  it("counts a second at a time while the search runs", () => {
+  it("is in the queue, counting, until the server says a worker took the question", () => {
     vi.useFakeTimers();
     const { container, unmount } = mount(
       <ProcessLine
         running
         route={null}
+        steps={[]}
         searchMs={null}
         citations={[]}
         cited={null}
         locale={null}
       />,
     );
-    const first = container.textContent;
-    act(() => vi.advanceTimersByTime(2000));
-    const later = container.textContent;
+    const first = stepRows(container, "li");
+    act(() => vi.advanceTimersByTime(1200));
+    const later = stepRows(container, "li");
     unmount();
 
-    expect([first, later]).toEqual(["Ricerca in corso · 1 s", "Ricerca in corso · 3 s"]);
+    expect([first, later]).toEqual([["|In coda|0,0 s"], ["|In coda|1,2 s"]]);
+  });
+
+  it("ticks each finished step with the server's seconds, the one under way counting from zero", () => {
+    vi.useFakeTimers();
+    const { container, unmount } = mount(
+      <ProcessLine
+        running
+        route={null}
+        steps={[
+          { name: "queue", ms: 2400 },
+          { name: "route", ms: null },
+        ]}
+        searchMs={null}
+        citations={[]}
+        cited={null}
+        locale={null}
+      />,
+    );
+    act(() => vi.advanceTimersByTime(300));
+    const rows = stepRows(container, "li");
+    unmount();
+
+    expect(rows).toEqual(["|Atteso il turno|2,4 s", "|Capisce la domanda|0,3 s"]);
+  });
+
+  it("leaves out a wait in the queue under a second, and claims no count before `start` brings it", () => {
+    const { container, unmount } = mount(
+      <ProcessLine
+        running
+        route={null}
+        steps={[
+          { name: "queue", ms: 300 },
+          { name: "route", ms: 1200 },
+          { name: "retrieve", ms: 800 },
+        ]}
+        searchMs={null}
+        citations={[]}
+        cited={null}
+        locale={null}
+      />,
+    );
+    const rows = stepRows(container, "li");
+    unmount();
+
+    expect(rows).toEqual(["|Domanda capita|1,2 s", "|Cerca nel materiale|0,8 s"]);
+  });
+
+  it("opens, once folded, onto how long each step took, what the search read said on its step alone", () => {
+    const { container, unmount } = mount(
+      <ProcessLine
+        running={false}
+        route={ROUTE}
+        steps={[
+          { name: "queue", ms: 2400 },
+          { name: "route", ms: 1200 },
+          { name: "retrieve", ms: 800 },
+          { name: "generate", ms: 5230 },
+        ]}
+        searchMs={4400}
+        citations={CITATIONS}
+        cited={new Set([CITATIONS[0]?.marker ?? ""])}
+        locale="it"
+      />,
+    );
+    const rows = stepRows(container, "details li li");
+    const read = container.querySelector("details")?.textContent?.match(/Letti/g) ?? [];
+    const shimmering = container.querySelectorAll(".shimmer").length;
+    unmount();
+
+    expect(rows).toEqual([
+      "|Atteso il turno|2,4 s",
+      "|Domanda capita|1,2 s",
+      "|Trovati 3 estratti · 1 fonte citata|0,8 s",
+      "|Risposta scritta|5,2 s",
+    ]);
+    expect(read).toEqual([]);
+    expect(shimmering).toBe(0);
   });
 
   it("folds into the server's seconds, rounded up as the count is, once it knows where it looked", () => {
@@ -74,6 +160,7 @@ describe("the process line", () => {
       <ProcessLine
         running
         route={ROUTE}
+        steps={[]}
         searchMs={2100}
         citations={CITATIONS}
         cited={null}
@@ -92,6 +179,7 @@ describe("the process line", () => {
       <ProcessLine
         running={false}
         route={ROUTE}
+        steps={[]}
         searchMs={null}
         citations={[]}
         cited={null}
@@ -104,6 +192,7 @@ describe("the process line", () => {
       <ProcessLine
         running={false}
         route={ROUTE}
+        steps={[]}
         searchMs={300}
         citations={[]}
         cited={null}
@@ -118,12 +207,14 @@ describe("the process line", () => {
 
   it("opens onto where it searched, how much it read and the answer cited, and the languages", () => {
     // The two excerpts of unifi.it are one source, cited; the English page is
-    // the other, not cited.
+    // the other, not cited. An answer stored before its steps were has no row
+    // for them.
     const english = { ...CITATIONS[2], locale: "en" } as Citation;
     const { container, unmount } = mount(
       <ProcessLine
         running={false}
         route={ROUTE}
+        steps={[]}
         searchMs={2600}
         citations={[CITATIONS[0], CITATIONS[1], english] as Citation[]}
         cited={new Set([CITATIONS[0]?.marker ?? ""])}
@@ -150,6 +241,7 @@ describe("the process line", () => {
       <ProcessLine
         running={false}
         route={ROUTE}
+        steps={[]}
         searchMs={900}
         citations={[]}
         cited={new Set()}
@@ -173,6 +265,7 @@ describe("the process line", () => {
       <ProcessLine
         running={false}
         route={null}
+        steps={[]}
         searchMs={null}
         citations={[]}
         cited={null}

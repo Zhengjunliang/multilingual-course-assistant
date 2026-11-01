@@ -1,9 +1,11 @@
 /**
  * The one line above an answer that says how it was looked for (#180).
  *
- * While the search runs it counts the seconds, its words shimmering; once
- * `start` arrives it folds into "Ricerca completata · N s", which opens onto
- * the steps. One line, folded, as Perplexity's "Ricerca completata · 3s" and
+ * While the search runs it lists the steps as they happen (`StepList`): the
+ * queue, understanding the question, searching the material. Once `start`
+ * arrives it folds into "Ricerca completata · N s", which opens onto what was
+ * found and how long each step took. One line, folded, as Perplexity's
+ * "Ricerca completata · 3s" and
  * Open WebUI's "Retrieved N sources" are (read 11 October 2026): the reader
  * came for the answer, and the line is there for whoever wants to know how it
  * was found. It is a bordered pill, raised like the buttons under the answer,
@@ -16,23 +18,22 @@
  * (`StartEvent.locale`), which is the question's: that the answer kept to it
  * is the model's to get right, and is not claimed here.
  *
- * The seconds once done are the server's (`StartEvent.search_ms`), stored with
- * the answer, so a conversation reopened later shows the same number; a turn
- * without them shows none. The running count is this
- * line's own, from when the turn appeared, since the server says nothing until
- * the search is over.
+ * The seconds once done are the server's (`StartEvent.search_ms`, and each
+ * step's `ms`), stored with the answer, so a conversation reopened later shows
+ * the same numbers; a turn stored without them shows none.
  *
  * A native `<details>`: the keyboard, the expanded state a screen reader
  * announces, and find-in-page opening it all come with the element.
  */
 
-import { Check, ChevronRight, Search } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { Check, ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
-import type { Citation, RouteDecision } from "@/api/contract";
+import type { Citation, RouteDecision, StepEvent } from "@/api/contract";
 import { Chip } from "@/components/ui/chip";
 import { languageList, languageName } from "@/i18n";
+import { StepList, shownSteps } from "./StepList";
 import { sourcesOf } from "./sourceLabel";
 
 interface ProcessLineProps {
@@ -40,6 +41,8 @@ interface ProcessLineProps {
   running: boolean;
   route: RouteDecision | null;
   searchMs: number | null;
+  /** The steps so far, as `Turn.steps` holds them. */
+  steps: readonly StepEvent[];
   citations: readonly Citation[];
   /** The markers the finished answer used; `null` until it has finished. */
   cited: ReadonlySet<string> | null;
@@ -56,19 +59,7 @@ export function searchSeconds(searchMs: number): number {
   return Math.max(1, Math.ceil(searchMs / 1000));
 }
 
-/** Whole seconds since `counting` became true, from 1, ticking once a second. */
-function useSeconds(counting: boolean): number {
-  const [seconds, setSeconds] = useState(1);
-  useEffect(() => {
-    if (!counting) return;
-    setSeconds(1);
-    const timer = setInterval(() => setSeconds((count) => count + 1), 1000);
-    return () => clearInterval(timer);
-  }, [counting]);
-  return seconds;
-}
-
-/** The pill both states of the line wear. */
+/** The pill the folded line wears. */
 const PILL =
   "inline-flex w-fit items-center gap-tight rounded-full border border-line bg-surface py-hair pr-snug pl-hair text-body text-muted shadow-raised";
 
@@ -89,29 +80,40 @@ export function ProcessLine({
   running,
   route,
   searchMs,
+  steps,
   citations,
   cited,
   locale,
 }: ProcessLineProps) {
   const { t, i18n } = useTranslation();
-  const seconds = useSeconds(running && route === null);
 
   if (route === null) {
     // Failed before `start` — a 503 from a server full of questions, an
     // `error` event from a worker that could not search — says so under the
     // answer; there was no search to report.
     if (!running) return null;
+    // The question is in the queue from when it was sent until a worker
+    // takes it, which is when the server says how long the wait was: the
+    // stream has no event for the wait beginning.
+    const queued: StepEvent = { name: "queue", ms: null };
+    const live = steps.some((step) => step.name === "queue") ? steps : [queued, ...steps];
     return (
-      <p className={PILL}>
-        <Search aria-hidden className="size-icon shrink-0" />
-        <span className="shimmer">{t("process.running", { seconds })}</span>
-      </p>
+      <div className="w-fit rounded-card border border-line bg-surface px-snug py-tight text-body text-ink shadow-raised">
+        <StepList steps={live} found={null} cited={null} live />
+      </div>
     );
   }
 
   const sources = sourcesOf(citations);
-  const citedCount = sources.filter((source) => cited?.has(source.marker)).length;
+  // Counted once the answer is whole, and only when there was something to cite.
+  const citedCount =
+    cited !== null && sources.length > 0
+      ? sources.filter((source) => cited.has(source.marker)).length
+      : null;
   const languages = [...new Set(sources.map((source) => source.locale))];
+  // What the search read is said once: on its step, with its time, when the
+  // answer was stored with its steps, and on a line of its own otherwise.
+  const searched = steps.some((step) => step.name === "retrieve" && step.ms !== null);
   return (
     <details className="group">
       <summary
@@ -138,12 +140,14 @@ export function ProcessLine({
             components={{ where: <Chip tone="accent" /> }}
           />
         </Step>
-        <Step>
-          <span>{t("process.read", { count: citations.length })}</span>
-          {cited !== null && sources.length > 0 && (
-            <span className="text-muted">· {t("process.cited", { count: citedCount })}</span>
-          )}
-        </Step>
+        {!searched && (
+          <Step>
+            <span>{t("process.read", { count: citations.length })}</span>
+            {citedCount !== null && (
+              <span className="text-muted">· {t("process.cited", { count: citedCount })}</span>
+            )}
+          </Step>
+        )}
         {locale !== null && (
           <Step>
             {languages.length === 0
@@ -153,6 +157,14 @@ export function ProcessLine({
                   sources: languageList(languages, i18n.language),
                 })}
           </Step>
+        )}
+        {/* How long each step took: the summary's seconds are those before
+            `start`, the queue's included. No dot of its own, since each step
+            has its tick. */}
+        {shownSteps(steps, false).length > 0 && (
+          <li>
+            <StepList steps={steps} found={citations.length} cited={citedCount} live={false} />
+          </li>
         )}
       </ol>
     </details>
