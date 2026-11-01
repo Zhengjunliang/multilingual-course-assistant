@@ -174,14 +174,21 @@
       "queue": "排队中",
       "route": "正在理解问题",
       "retrieve": "正在检索资料",
-      "generate": "正在写回答"
+      "generate": "正在写回答",
+      "parsing": "正在读取 PDF",
+      "chunking": "正在切成段落",
+      "indexing": "正在建立索引"
     },
     "done": {
       "queue": "排到了",
       "route": "理解了问题",
       "retrieve_one": "找到 {{count}} 个片段",
       "retrieve_other": "找到 {{count}} 个片段",
-      "generate": "回答写好了"
+      "generate": "回答写好了",
+      "parsing": "PDF 读完了",
+      "chunking_one": "切成 {{count}} 段",
+      "chunking_other": "切成 {{count}} 段",
+      "indexing": "可以检索了"
     },
     "seconds": "{{seconds}} 秒"
   },
@@ -316,7 +323,8 @@
       "programme": "学位专业",
       "mine": "我的课程",
       "users": "账号",
-      "feedback": "评分"
+      "feedback": "评分",
+      "system": "系统"
     },
     "programmes": {
       "title": "专业",
@@ -663,6 +671,73 @@
     "failure": {
       "title": "无法打开此页面",
       "part": "页面的这一部分没有加载出来。"
+    },
+    "system": {
+      "title": "系统",
+      "sub": "问题和上传经过网站、Redis 和 worker 的过程。",
+      "live": "实时",
+      "opening": "正在连接…",
+      "reopening": "正在重新连接…",
+      "diagram": "系统示意图：浏览器、网站、Redis、Celery worker、模型与数据。已占名额 {{taken}}/{{cap}}。",
+      "node": {
+        "browserSub": "提问的人",
+        "site": "网站 · Django",
+        "siteSub": "排队并转发",
+        "queues": "队列 · qa {{qa}} · ingest {{ingest}}",
+        "seats": "名额 {{taken}}/{{cap}}",
+        "seatsFull": "名额 {{taken}}/{{cap}} · 已满",
+        "streams": "回答流",
+        "workers": "Celery worker",
+        "noWorker": "没有在线的 worker",
+        "models": "模型与数据"
+      },
+      "load": {
+        "busy": "忙",
+        "idle": "空闲",
+        "some": "{{busy}}/{{concurrency}} 工作中",
+        "unknown": "工作中"
+      },
+      "legend": {
+        "question": "问题",
+        "upload": "上传的资料",
+        "refused": "被拒：名额已满",
+        "waiting": "名额：排队中",
+        "answering": "名额：回答中"
+      },
+      "retry": "503 · {{seconds}} 秒",
+      "recent": "最近活动",
+      "recentSub": "进行中的，以及最近 {{count}} 个已结束的；点一行看它的步骤。",
+      "none": "还没有活动。",
+      "column": {
+        "what": "内容",
+        "outcome": "结果",
+        "duration": "用时",
+        "worker": "Worker"
+      },
+      "visitor": "访客的问题",
+      "upload": "PDF · {{file}}",
+      "outcome": {
+        "going": "进行中",
+        "answered": "已回答",
+        "stopped": "已停止",
+        "error": "出错",
+        "refused": "被拒：名额已满",
+        "lost": "中断",
+        "ready": "就绪",
+        "failed": "失败"
+      },
+      "steps": "步骤",
+      "pick": "在示意图或列表里选一项活动。",
+      "worker": "Worker: {{name}}",
+      "request": "请求 ID",
+      "copy": "复制请求 ID",
+      "copied": "已复制",
+      "langfuse": "在 Langfuse 中打开",
+      "code": "代码：{{code}}",
+      "duration": {
+        "seconds": "{{seconds}} 秒",
+        "minutes": "{{minutes}} 分 {{seconds}} 秒"
+      }
     }
   },
   "shortcuts": {

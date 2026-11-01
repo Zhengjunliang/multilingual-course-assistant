@@ -85,6 +85,8 @@ export const SCREENS: Screen[] = [
     as: "admin",
     mark: heading(it.staff.feedback.answer),
   },
+  // Its list is drawn once the feed's snapshot arrives.
+  { path: "/staff/system", as: "admin", mark: heading(it.staff.system.recent) },
   { path: "/staff/nowhere", as: "staff", mark: heading(it.staff.refusal.notFound) },
   { path: "/nowhere", as: "visitor", mark: heading(it.notFound.title) },
 ];
@@ -115,6 +117,7 @@ export async function visit(page: Page, api: Api, screen: Screen): Promise<void>
     api.catalog();
     api.users();
     api.feedback();
+    api.activity();
   }
   await page.goto(screen.path + (screen.hash ?? ""));
   const { role, name } = screen.mark;

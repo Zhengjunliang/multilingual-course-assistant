@@ -67,6 +67,7 @@ describe("a staff page's breadcrumb", () => {
     ["a teacher's own courses", { kind: "mine" }, "mine", [{ label: "I miei insegnamenti" }]],
     ["the accounts", { kind: "users" }, "programmes", [{ label: "Account" }]],
     ["the ratings", { kind: "feedback" }, "programmes", [{ label: "Valutazioni" }]],
+    ["the system", { kind: "system" }, "programmes", [{ label: "Sistema" }]],
     [
       "a rating, named by its question",
       { kind: "rating", question: "Che cos'è un ORM?" },
@@ -109,6 +110,7 @@ describe("the area whose icon leads the breadcrumb", () => {
     ["a teacher's own courses", { kind: "mine" }, "mine", "mine"],
     ["the accounts, under no programme", { kind: "users" }, "programmes", "users"],
     ["a rating, under no programme", { kind: "rating", question: "?" }, "programmes", "feedback"],
+    ["the system, under no programme", { kind: "system" }, "programmes", "system"],
     ["a page not there, for a teacher", { kind: "notFound" }, "mine", "mine"],
     ["a page not there, for secretariat staff", { kind: "notFound" }, "programme", "programme"],
   ])("of %s", (_, page, root, expected) => {

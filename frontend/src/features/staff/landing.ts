@@ -11,8 +11,8 @@
  * staff of several programmes (docs/decisions.md, 2026-10-05, *The staff
  * pages live in the chat shell*, point 1). A teacher also gets their own courses, after
  * any programme item, so an account that runs a programme lands on it; the
- * superuser gets the accounts and then the students' ratings of the answers
- * last, the two items no programme leads to.
+ * superuser gets the accounts, the students' ratings of the answers and the
+ * system's background work last, the three items no programme leads to.
  * An edition's page counts as inside the programme item when there is one,
  * and inside the teacher's own courses otherwise.
  *
@@ -24,7 +24,7 @@ import type { Account } from "@/api/account";
 import type { Programme } from "@/api/catalog";
 import { teaches } from "@/auth/staff";
 
-export type ManagementKey = "programmes" | "programme" | "mine" | "users" | "feedback";
+export type ManagementKey = "programmes" | "programme" | "mine" | "users" | "feedback" | "system";
 
 export interface ManagementItem {
   key: ManagementKey;
@@ -34,8 +34,8 @@ export interface ManagementItem {
   /**
    * What the item's page lists, as its `Count` shows it: the programmes, the
    * one programme's courses, or the editions the account teaches. `null` while
-   * the superuser's list has not arrived, and for the accounts and the
-   * ratings, which only their own pages count.
+   * the superuser's list has not arrived, and for the accounts, the ratings
+   * and the system, which only their own pages count.
    */
   count: number | null;
 }
@@ -44,6 +44,7 @@ const LIST = "/staff/programmes";
 const MINE = "/staff/mine";
 const USERS = "/staff/users";
 const FEEDBACK = "/staff/feedback";
+const SYSTEM = "/staff/system";
 
 export function managementItems(
   account: Account,
@@ -78,6 +79,7 @@ export function managementItems(
   if (account.is_superuser) {
     items.push({ key: "users", to: USERS, within: [USERS], count: null });
     items.push({ key: "feedback", to: FEEDBACK, within: [FEEDBACK], count: null });
+    items.push({ key: "system", to: SYSTEM, within: [SYSTEM], count: null });
   }
   return items;
 }

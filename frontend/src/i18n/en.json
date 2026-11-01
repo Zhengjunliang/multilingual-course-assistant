@@ -174,14 +174,21 @@
       "queue": "In the queue",
       "route": "Understanding the question",
       "retrieve": "Searching the material",
-      "generate": "Writing the answer"
+      "generate": "Writing the answer",
+      "parsing": "Reading the PDF",
+      "chunking": "Cutting it into passages",
+      "indexing": "Making it searchable"
     },
     "done": {
       "queue": "Waited for its turn",
       "route": "Question understood",
       "retrieve_one": "Found {{count}} excerpt",
       "retrieve_other": "Found {{count}} excerpts",
-      "generate": "Answer written"
+      "generate": "Answer written",
+      "parsing": "PDF read",
+      "chunking_one": "Cut into {{count}} passage",
+      "chunking_other": "Cut into {{count}} passages",
+      "indexing": "Made searchable"
     },
     "seconds": "{{seconds}} s"
   },
@@ -316,7 +323,8 @@
       "programme": "Degree programme",
       "mine": "My courses",
       "users": "Accounts",
-      "feedback": "Ratings"
+      "feedback": "Ratings",
+      "system": "System"
     },
     "programmes": {
       "title": "Degree programmes",
@@ -663,6 +671,73 @@
     "failure": {
       "title": "This page could not be opened",
       "part": "This part of the page did not load."
+    },
+    "system": {
+      "title": "System",
+      "sub": "Questions and uploads as they go through the site, Redis and the workers.",
+      "live": "Live",
+      "opening": "Connecting…",
+      "reopening": "Reconnecting…",
+      "diagram": "System diagram: browser, site, Redis, Celery workers, models and data. Places taken: {{taken}} of {{cap}}.",
+      "node": {
+        "browserSub": "who asks",
+        "site": "Site · Django",
+        "siteSub": "queues and relays",
+        "queues": "Queues · qa {{qa}} · ingest {{ingest}}",
+        "seats": "Places {{taken}}/{{cap}}",
+        "seatsFull": "Places {{taken}}/{{cap}} · full",
+        "streams": "Answer streams",
+        "workers": "Celery workers",
+        "noWorker": "No worker online",
+        "models": "Models and data"
+      },
+      "load": {
+        "busy": "busy",
+        "idle": "idle",
+        "some": "{{busy}}/{{concurrency}} working",
+        "unknown": "working"
+      },
+      "legend": {
+        "question": "Question",
+        "upload": "Uploaded material",
+        "refused": "Refused: places full",
+        "waiting": "Place: queued",
+        "answering": "Place: answering"
+      },
+      "retry": "503 · {{seconds}} s",
+      "recent": "Latest activity",
+      "recentSub": "What is under way and the last {{count}} finished; a row shows its steps.",
+      "none": "No activity yet.",
+      "column": {
+        "what": "What",
+        "outcome": "Outcome",
+        "duration": "Duration",
+        "worker": "Worker"
+      },
+      "visitor": "A visitor's question",
+      "upload": "PDF · {{file}}",
+      "outcome": {
+        "going": "Under way",
+        "answered": "Answered",
+        "stopped": "Stopped",
+        "error": "Error",
+        "refused": "Refused: places full",
+        "lost": "Interrupted",
+        "ready": "Ready",
+        "failed": "Failed"
+      },
+      "steps": "Steps",
+      "pick": "Pick an activity in the diagram or in the list.",
+      "worker": "Worker: {{name}}",
+      "request": "Request ID",
+      "copy": "Copy the request ID",
+      "copied": "Copied",
+      "langfuse": "Open in Langfuse",
+      "code": "Code: {{code}}",
+      "duration": {
+        "seconds": "{{seconds}} s",
+        "minutes": "{{minutes}} min {{seconds}} s"
+      }
     }
   },
   "shortcuts": {
