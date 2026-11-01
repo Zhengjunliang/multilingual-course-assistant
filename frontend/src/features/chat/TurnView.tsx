@@ -41,16 +41,17 @@ interface TurnViewProps {
   /** True only for a turn whose tokens are arriving right now. */
   live: boolean;
   /**
-   * True while the server is working and nothing is on screen yet. That gap is
-   * real work, not latency: routing asks the model where to look and retrieval
-   * runs before a single event is sent (apps/qa/engine.py).
+   * True while the server is working and no word of the answer is on screen
+   * yet. That gap is real work, not latency: the question waits for a worker,
+   * routing asks the model where to look and retrieval runs before `start` is
+   * sent (apps/qa/engine.py), and the process line names each step.
    */
   thinking: boolean;
   /**
    * The server refused the question as busy and it will be asked again, in
    * `seconds`, for the `attempt`th time; `null` otherwise. The cat keeps
    * thinking, but nothing is being searched: the process line waits, and
-   * counts afresh from the next request, as the server's seconds do. A banner
+   * starts afresh with the next request, as the server's seconds do. A banner
    * says what is happening instead; the page says it to a screen reader
    * (notice.ts).
    */
@@ -118,13 +119,14 @@ export const TurnView = memo(function TurnView({
             running={working && retry === null}
             route={turn.route}
             searchMs={turn.searchMs}
+            steps={turn.steps}
             citations={turn.citations}
             cited={cited}
             locale={turn.locale}
           />
 
           {/* Nothing under the process line until the search is over: the
-              cat's thinking pose and the line's count say the turn is
+              cat's thinking pose and the line's steps say the turn is
               working. Then the caret, alone until the first word. */}
           {(turn.answer !== "" || (live && turn.route !== null)) && (
             <HighlightContext value={highlighted}>

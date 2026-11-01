@@ -159,7 +159,6 @@
     "both": "entrambe le fonti"
   },
   "process": {
-    "running": "Ricerca in corso · {{seconds}} s",
     "done": "Ricerca completata · {{seconds}} s",
     "doneUntimed": "Ricerca completata",
     "searchedIn": "Cercato in <where>{{where}}</where>",
@@ -169,6 +168,22 @@
     "cited_other": "{{count}} fonti citate",
     "asked": "Domanda in {{language}}",
     "languages": "Domanda in {{language}}, fonti in {{sources}}"
+  },
+  "steps": {
+    "running": {
+      "queue": "In coda",
+      "route": "Capisce la domanda",
+      "retrieve": "Cerca nel materiale",
+      "generate": "Scrive la risposta"
+    },
+    "done": {
+      "queue": "Atteso il turno",
+      "route": "Domanda capita",
+      "retrieve_one": "Trovato {{count}} estratto",
+      "retrieve_other": "Trovati {{count}} estratti",
+      "generate": "Risposta scritta"
+    },
+    "seconds": "{{seconds}} s"
   },
   "sources": {
     "slide": "Slide p. {{page}}",

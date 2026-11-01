@@ -159,7 +159,6 @@
     "both": "both sources"
   },
   "process": {
-    "running": "Searching · {{seconds}} s",
     "done": "Search complete · {{seconds}} s",
     "doneUntimed": "Search complete",
     "searchedIn": "Searched <where>{{where}}</where>",
@@ -169,6 +168,22 @@
     "cited_other": "{{count}} sources cited",
     "asked": "Asked in {{language}}",
     "languages": "Asked in {{language}}, sources in {{sources}}"
+  },
+  "steps": {
+    "running": {
+      "queue": "In the queue",
+      "route": "Understanding the question",
+      "retrieve": "Searching the material",
+      "generate": "Writing the answer"
+    },
+    "done": {
+      "queue": "Waited for its turn",
+      "route": "Question understood",
+      "retrieve_one": "Found {{count}} excerpt",
+      "retrieve_other": "Found {{count}} excerpts",
+      "generate": "Answer written"
+    },
+    "seconds": "{{seconds}} s"
   },
   "sources": {
     "slide": "Slide p. {{page}}",

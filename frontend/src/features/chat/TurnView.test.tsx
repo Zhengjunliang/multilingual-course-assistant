@@ -110,14 +110,21 @@ describe("the process line", () => {
     expect(view(turn())).not.toContain(ROUTE.reason);
   });
 
-  it("counts the seconds while the server has not said where it looked", () => {
+  it("lists the steps while the server has not said where it looked", () => {
     const html = view(
-      turn({ route: null, searchMs: null, citations: [], answer: "", complete: false }),
+      turn({
+        route: null,
+        searchMs: null,
+        steps: [{ name: "queue", ms: 2400 }],
+        citations: [],
+        answer: "",
+        complete: false,
+      }),
       false,
       true,
     );
 
-    expect(html).toContain("Ricerca in corso · 1 s");
+    expect(html).toContain("Atteso il turno");
   });
 
   it("is not set in the smallest type on the page", () => {
@@ -736,8 +743,8 @@ describe("a turn that did not get all the way", () => {
     expect(html).toContain("C&#x27;è un&#x27;altra domanda in corso.");
     expect(html).toContain("Riprovo tra 5 secondi (1 di 2).");
     expect(html).not.toContain('role="status"');
-    // No search is counted while it waits.
-    expect(html).not.toContain("Ricerca in corso");
+    // No step is under way while it waits.
+    expect(html).not.toContain("In coda");
   });
 });
 

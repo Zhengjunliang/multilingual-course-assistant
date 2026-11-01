@@ -24,12 +24,20 @@ test.describe("a signed-in student", () => {
     await ask(page, question);
     await expect(page.locator("a[data-pill]")).toHaveAttribute("href", CITED);
     await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
+    // The steps the worker sent, the last of them once the answer was written.
+    await page.getByRole("article").locator("summary").click();
+    await expect(page.getByText("Domanda capita")).toBeVisible();
+    await expect(page.getByText("Risposta scritta")).toBeVisible();
 
     const reopened = await context.newPage();
     await reopened.goto(page.url());
     // In the thread, not only in the sidebar's list.
     await expect(reopened.getByRole("article").getByText(question)).toBeVisible();
     await expect(reopened.locator("a[data-pill]")).toHaveAttribute("href", CITED);
+    // The same steps, stored with the answer.
+    await reopened.getByRole("article").locator("summary").click();
+    await expect(reopened.getByText("Domanda capita")).toBeVisible();
+    await expect(reopened.getByText("Risposta scritta")).toBeVisible();
   });
 });
 
