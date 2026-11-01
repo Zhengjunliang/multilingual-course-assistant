@@ -233,7 +233,7 @@ class Candidate:
 
     The referrer travels with the link rather than beside it because it is part
     of the payload contract, not bookkeeping: a web chunk names the page an
-    attachment hung on (docs/docling-pipeline.md 3.6), and only slides chunks
+    attachment hung on (docs/rag-pipeline.md 3.6), and only slides chunks
     may leave it empty. A candidate that lost its source page would produce a
     stored PDF nobody can trace back to where it was linked from.
     """

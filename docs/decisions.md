@@ -311,7 +311,7 @@ This file holds the decisions taken without the supervisor that the thesis argue
 
 ## 2026-08-04 — Parsed documents are kept as lossless JSON, not Markdown
 
-1. **`rag/parse.py` writes two files per document: the `save_as_json` output, the only input of chunking, and a `.meta.json` provenance sidecar.** The chunker needs the object tree with its heading hierarchy and page provenance, which Markdown cannot express; how the chunk step uses the two files is [docling-pipeline.md](docling-pipeline.md), section 3.5. Markdown output is rejected: it serves only a human reader, and the JSON is readable.
+1. **`rag/parse.py` writes two files per document: the `save_as_json` output, the only input of chunking, and a `.meta.json` provenance sidecar.** The chunker needs the object tree with its heading hierarchy and page provenance, which Markdown cannot express; how the chunk step uses the two files is [rag-pipeline.md](rag-pipeline.md), section 3.5. Markdown output is rejected: it serves only a human reader, and the JSON is readable.
    **Status:** ✅ `rag/parse.py`.
 
 ## 2026-08-04 — Sparse retrieval is fastembed BM25 with an IDF modifier; SPLADE is not pursued

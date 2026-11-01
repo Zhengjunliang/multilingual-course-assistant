@@ -144,7 +144,7 @@ ANCHOR_RULE = Rule(
     bad=(
         {"docs/a.md": "[setup](README.md#setup)\n"},
         {"docs/a.md": "[x](../docs/a.md#b)\n"},
-        {"README.md": "| see [the pipeline](docs/docling-pipeline.md#chunking) |\n"},
+        {"README.md": "| see [the pipeline](docs/rag-pipeline.md#chunking) |\n"},
     ),
 )
 

@@ -70,7 +70,7 @@ class ParsedMeta(BaseModel):
     # Web-source provenance, threaded through to the chunk payload.
     # All optional with defaults so every sidecar already on disk stays valid;
     # the PDF path never sets them (a legal terminal state, not missing data).
-    # Field semantics are owned by docs/docling-pipeline.md.
+    # Field semantics are owned by docs/rag-pipeline.md.
     kind: Literal["slides", "web"] = "slides"
     lang: str | None = None
     url: str | None = None

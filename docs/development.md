@@ -120,7 +120,7 @@ Course PDFs go in `data/corpus/<course>/` (gitignored). These commands are the e
 | `live` | fetch one URL, gate it, grow the shared index; `--rollback <run_id>` undoes a run, `--measure-gate` scores the gate | `<url>` |
 | `snapshot` | copy `slides` and `unifi_web` out of the Qdrant server into `data\snapshots\<UTC time>\`, one snapshot file each and a `manifest.json` with their points per `url` and `ingest_source`; `--restore` uploads such a directory to a server that holds neither collection, then prints its counts as source / restored and fails if any differs | none · `--restore data\snapshots\<time> --qdrant http://127.0.0.1:6340` |
 
-Parsing writes two files per PDF, `<name>.<variant>.json` (the lossless DoclingDocument) and `<name>.<variant>.meta.json` (provenance); routing rules, measurements and the chunk payload contract are in [docs/docling-pipeline.md](docling-pipeline.md).
+Parsing writes two files per PDF, `<name>.<variant>.json` (the lossless DoclingDocument) and `<name>.<variant>.meta.json` (provenance); routing rules, measurements and the chunk payload contract are in [docs/rag-pipeline.md](rag-pipeline.md).
 
 Embedding and reranking (0.6B each) run on the local GPU, fully offline. Generation calls an OpenAI-compatible endpoint, by default a local Ollama:
 

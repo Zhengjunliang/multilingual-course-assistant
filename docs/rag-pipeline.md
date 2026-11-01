@@ -1,15 +1,38 @@
-# Docling and the RAG pipeline
+# The RAG pipeline
 
-How the ingest and query pipelines work: what each step does, why it is needed and how this project does it. This file owns the parsing routing rules, the chunk payload contract (section 3.6) and the retrieval and generation rules (section 4.1). Decisions and their reasons are [decisions.md](decisions.md), the route comparison is [rag-analysis.md](rag-analysis.md), and every count and timing is [experiment-log.md](experiment-log.md).
+How the ingest and query pipelines work: what each step does, why it is needed and how this project does it. This file owns the parsing routing rules, the chunk payload contract (section 3.6) and the retrieval and generation rules (section 4.1). Decisions and their reasons are [decisions.md](decisions.md), the route comparison and why no framework is used are [rag-analysis.md](rag-analysis.md), and every count and timing is [experiment-log.md](experiment-log.md).
 
 ## 1. The big picture: RAG is two pipelines, not one
 
-"The RAG pipeline" names two different things, which run at different times, fail in different ways and are evaluated differently. The diagram of both, as the web API runs them, is in [README.md](../README.md), section "How it works"; the deepening loop below is not in it, since only the command-line agent runs it.
+"The RAG pipeline" names two different things, which run at different times, fail in different ways and are evaluated differently. The diagram draws both as the web API runs them; the deepening loop is not in it, since only the command-line agent runs it.
+
+```mermaid
+flowchart LR
+    accTitle: How UniGuide AI answers a question
+    accDescr: Two pipelines. Offline, course slides, each probed for its parse settings, and crawled university web pages are parsed with Docling, split into passages that keep their heading chain, and indexed in Qdrant by dense vectors and keywords. Online, a question in any language is routed to the course material, the campus pages or both, searched in that index by meaning and keywords, reranked so that irrelevant passages drop out, and answered by a Qwen3 model in the question's language with a citation for each claim.
+    subgraph Offline["Offline · once per document"]
+        direction TB
+        S["Course slides, PDF"] --> PR["Probe: pick each file's parse settings"]
+        PR --> PA["Parse with Docling"]
+        W["University web pages, crawled"] --> PA
+        PA --> C["Split into passages, each with its heading chain"]
+        C --> I[("Qdrant index: dense vectors + keywords")]
+    end
+    subgraph Online["Online · every question"]
+        direction TB
+        Q["Question, in any language"] --> RT["Route: course, campus or both"]
+        RT --> R["Hybrid search in the index: meaning + keywords"]
+        R --> RR["Rerank, drop the irrelevant"]
+        RR --> G["Qwen3 writes the answer in the question's language"]
+        G --> A["Answer with a citation per claim"]
+    end
+    Offline -. the index is searched .-> Online
+```
 
 Three principles:
 
 - **Ingest errors become permanent.** A parse that reads two columns as one or garbles `perché` cannot be rescued by any LLM later — the index itself is wrong. Parsing quality is checked first; the order cannot be reversed.
-- **The query side is small, explicit control flow**: a router, retrieval and generation; for the campus source the command-line agent adds a deepening loop of at most three fetches (`route()` and `deepen()` in `rag/agent.py`; the state machine is [unifi-web-source.md](unifi-web-source.md)). The web API does not run the loop (`apps/qa/engine.py`); its web path is 🔜 M7, no issue. Why no framework: [rag-analysis.md](rag-analysis.md).
+- **The query side is small, explicit control flow**: a router, retrieval and generation; for the campus source the command-line agent adds a deepening loop of at most three fetches (`route()` and `deepen()` in `rag/agent.py`; the state machine is [unifi-web-source.md](unifi-web-source.md)). The web API does not run the loop (`apps/qa/engine.py`); its web path is 🔜 M7, no issue.
 - **The LLM is the last and least important step.** If retrieval misses the right excerpt, generation can only invent. RAGAS measures *context precision/recall* (retrieval) and *faithfulness* (generation) separately so that the blame lands in the right place (🔜 M3 `#20`).
 
 ## 2. Steps 0–1 · probe and parse
@@ -218,7 +241,3 @@ Implemented in `rag/index.py`, `rag/search.py`, `rag/passages.py` and `rag/answe
 - **Refusal** ✅ `rag/answer.py`: with no candidate the LLM is not called, and the answer says the material has nothing — in Italian for an Italian question, in English otherwise; the prompt also asks the model to say so when the excerpts do not support an answer. Whether a refusal was right is a bucket of the error taxonomy (🔜 M3 `#23`).
 - **RRF parameters and dense/sparse weights**: Qdrant's RRF constant (`RRF_K`), no weights, and 20 candidates per branch (`PREFETCH_LIMIT`); choosing them and the cut-off by measurement is 🔜 M3 `#31`.
 - **Heading-chain pollution**: section 3.7.
-
-## 5. LangChain / LangGraph / LlamaIndex
-
-Why the pipeline uses none of them, with the mapping from their terms to this project: [rag-analysis.md](rag-analysis.md).

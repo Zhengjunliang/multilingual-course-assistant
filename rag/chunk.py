@@ -118,7 +118,7 @@ def chunk_id_of(
     with the edition for a slides chunk that has one — so one PDF taught under
     two editions gets disjoint id sets instead of colliding on `chunk_id`. A
     web chunk (`edition=None`) keeps its unprefixed form unchanged
-    (docs/docling-pipeline.md, section 3.6)."""
+    (docs/rag-pipeline.md, section 3.6)."""
     content = f"{source_sha256[:16]}:{parse_variant}:{index:04d}"
     return content if edition is None else f"{edition.course}:{edition.academic_year}:{content}"
 
@@ -229,7 +229,7 @@ def document_locale(document: DoclingDocument, meta: ParsedMeta) -> Locale:
 
 
 class Chunk(BaseModel):
-    """The index payload contract (docs/docling-pipeline.md owns the field table).
+    """The index payload contract (docs/rag-pipeline.md owns the field table).
 
     `text` is the raw chunk body — the BM25/sparse side and what the user is shown.
     `embed_text` is the heading-contextualized version — the dense side only, so a

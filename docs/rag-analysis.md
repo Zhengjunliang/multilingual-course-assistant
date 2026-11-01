@@ -43,7 +43,7 @@ The direction changed on 2026-08-21: the agent and live fetching entered the pro
 - `docling` also has a classic, non-VLM pipeline, which is reliable on born-digital PDFs; the VLM targets scans and complex layouts.
 - For the thesis: the material is mostly slide PDFs, so parsing quality decides everything downstream.
 
-This file analyses the route and does not repeat how the pipelines work: that is [docling-pipeline.md](docling-pipeline.md), and the measured comparison of the two parsing routes is [experiment-log.md](experiment-log.md), entry of 2026-08-02.
+This file analyses the route and does not repeat how the pipelines work: that is [rag-pipeline.md](rag-pipeline.md), and the measured comparison of the two parsing routes is [experiment-log.md](experiment-log.md), entry of 2026-08-02.
 
 ## What the analysis implies
 

@@ -29,32 +29,7 @@ Ask about a university course or about the campus in any language, and the answe
 
 ## How it works
 
-Retrieval-augmented generation is two pipelines that run at different times. **Offline**, once per document, the material is parsed, split into passages and indexed. **Online**, for every question, the passages closest to it are retrieved and a Qwen model writes the answer from them alone, citing each one it uses. A parse that garbles the text cannot be rescued later, and an answer is only as good as the passages retrieved for it: the model is the last step, not the first.
-
-```mermaid
-flowchart LR
-    accTitle: How UniGuide AI answers a question
-    accDescr: Two pipelines. Offline, course slides, each probed for its parse settings, and crawled university web pages are parsed with Docling, split into passages that keep their heading chain, and indexed in Qdrant by dense vectors and keywords. Online, a question in any language is routed to the course material, the campus pages or both, searched in that index by meaning and keywords, reranked so that irrelevant passages drop out, and answered by a Qwen3 model in the question's language with a citation for each claim.
-    subgraph Offline["Offline · once per document"]
-        direction TB
-        S["Course slides, PDF"] --> PR["Probe: pick each file's parse settings"]
-        PR --> PA["Parse with Docling"]
-        W["University web pages, crawled"] --> PA
-        PA --> C["Split into passages, each with its heading chain"]
-        C --> I[("Qdrant index: dense vectors + keywords")]
-    end
-    subgraph Online["Online · every question"]
-        direction TB
-        Q["Question, in any language"] --> RT["Route: course, campus or both"]
-        RT --> R["Hybrid search in the index: meaning + keywords"]
-        R --> RR["Rerank, drop the irrelevant"]
-        RR --> G["Qwen3 writes the answer in the question's language"]
-        G --> A["Answer with a citation per claim"]
-    end
-    Offline -. the index is searched .-> Online
-```
-
-Docling parses; Qwen3-Embedding and BM25 index into Qdrant; Qwen3-Reranker reorders; a Qwen3 model behind any OpenAI-compatible server writes. Django serves the API and the React interface.
+Retrieval-augmented generation, in two pipelines. **Offline**, once per document, Docling parses the material, which is split into passages and indexed in Qdrant by Qwen3-Embedding vectors and BM25 keywords. **Online**, for every question, the passages closest to it are retrieved, Qwen3-Reranker drops the irrelevant ones, and a Qwen3 model behind any OpenAI-compatible server writes the answer from them alone, citing each one it uses. Django serves the API and the React interface. The pipeline, with its diagram, is [docs/rag-pipeline.md](docs/rag-pipeline.md).
 
 ## Run it locally
 
