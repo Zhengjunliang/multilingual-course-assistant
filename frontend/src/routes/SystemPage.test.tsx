@@ -239,6 +239,32 @@ describe("the system page", () => {
     expect(panel(container).querySelector("a")).toBeNull();
   });
 
+  it("shows no trace for a question no worker answered: refused, or stopped as it was taken", async () => {
+    const { container } = await open();
+    const asked = (task: string, question: string) =>
+      entry({
+        id: `2${task === "r" ? 0 : 1}000-0`,
+        task,
+        question,
+        request_id: REQUEST,
+        event: "queued",
+      });
+    act(() => {
+      feeds[0]?.write(
+        frame("activity", { ...asked("r", "Piena?"), event: "refused" }) +
+          frame("activity", asked("s", "Fermata?")) +
+          frame("activity", entry({ id: "21100-0", task: "s", event: "taken", worker: WORKER })) +
+          frame("activity", entry({ id: "21101-0", task: "s", event: "stopped", worker: WORKER })),
+      );
+    });
+    await settle();
+    for (const question of ["Piena?", "Fermata?"]) {
+      pick(container, question);
+      expect(panel(container).querySelector("code")?.textContent).toBe(REQUEST);
+      expect(panel(container).querySelector("a")).toBeNull();
+    }
+  });
+
   it("shows an upload's step under way, and the passages once it is cut", async () => {
     const { container } = await open();
     pick(container, "PDF · Lezione 08.pdf");
@@ -299,6 +325,21 @@ describe("the system page", () => {
     await settle();
     expect(fetched).toHaveLength(2);
     expect(container.textContent).toContain("In diretta");
+  });
+
+  it("says why once the feed it opens again is refused, rather than opening it on and on", async () => {
+    const { container } = await open();
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    // The reader is no longer a superuser: the server ended the feed, and refuses the next.
+    answer = () => codedRefusal("PERMISSION_DENIED");
+    act(() => feeds[0]?.end());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(REOPEN_MS * 3);
+    });
+    vi.useRealTimers();
+    await settle();
+    expect(fetched).toHaveLength(2);
+    expect(container.querySelector("h1")?.textContent).not.toBe("Sistema");
   });
 
   it("says why a feed that never opened failed, and opens it on Riprova", async () => {
