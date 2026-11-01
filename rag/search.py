@@ -58,6 +58,11 @@ PREFETCH_LIMIT = 20
 # scores are ranks, not judgements, so nothing cuts a list without a reranker.
 RELEVANCE_CUTOFF = 0.5
 
+# The most sources an answer is given: `search()` keeps fewer when the reranker
+# calls the rest irrelevant (`RELEVANCE_CUTOFF`). The site answers with it, and
+# the evaluation answers as the site does; the CLIs default their --top-k to it.
+TOP_K = 5
+
 # Qdrant's own RRF constant (`DEFAULT_RRF_K` in reciprocal_rank_fusion.rs, and
 # qdrant-client's `hybrid/fusion.py`): a point at rank r, counted from 0,
 # scores 1 / (r + RRF_K) in each branch that holds it.
@@ -378,7 +383,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--dense-model", default=DEFAULT_DENSE_MODEL)
     parser.add_argument("--rerank-model", default=DEFAULT_RERANK_MODEL)
     parser.add_argument("--no-rerank", action="store_true", help="fusion order only (M3 baseline)")
-    parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--top-k", type=int, default=TOP_K)
     parser.add_argument("--locale", type=locale_arg, default=None)
     parser.add_argument(
         "--scope",

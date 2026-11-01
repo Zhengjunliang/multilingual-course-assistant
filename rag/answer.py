@@ -32,6 +32,7 @@ from rag.probe import configure_cli_logging
 from rag.search import (
     DEFAULT_RERANK_MODEL,
     RELEVANCE_CUTOFF,
+    TOP_K,
     Hit,
     build_reranker,
     search,
@@ -226,7 +227,7 @@ def main(argv: list[str] | None = None) -> None:
         help="answer language (BCP-47 primary subtag, e.g. en/it/zh); "
         "default: detected from the question",
     )
-    parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--top-k", type=int, default=TOP_K)
     parser.add_argument("--no-rerank", action="store_true")
     add_qdrant_argument(parser)
     parser.add_argument(
