@@ -1,6 +1,6 @@
 # HTTP API
 
-This file owns the HTTP API the site serves: accounts, question answering, conversations, the catalogue, and the one body every error answers. The shapes' single sources are [apps/qa/contract.py](../apps/qa/contract.py) and [apps/catalog/serializers.py](../apps/catalog/serializers.py); how to run the server is [development.md](development.md).
+This file owns the HTTP API the site serves: accounts, question answering, conversations, the ratings, the background work, the catalogue, and the one body every error answers. The shapes' single sources are [apps/qa/contract.py](../apps/qa/contract.py), [apps/system/contract.py](../apps/system/contract.py) and [apps/catalog/serializers.py](../apps/catalog/serializers.py); how to run the server is [development.md](development.md).
 
 ## Accounts
 
@@ -125,6 +125,16 @@ A signed-in student rates the complete answers of their own conversations, up or
 - Only a complete answer of the caller's own conversation is rated: anyone else's answer, a question, an answer being written or stopped halfway, and an unknown id are all a 404 `NOT_FOUND`, to a `PUT` and a `DELETE` alike, and before the body is read. A conversation's deletion takes its ratings with it.
 - A reopened conversation (`GET /api/conversations/<id>`) carries each message's `feedback`, `{"rating", "reason", "comment"}` or `null`, always `null` on a question.
 - The two `/api/admin/feedback` paths answer a superuser only: anyone else is a 403 `PERMISSION_DENIED`, and anyone not signed in a 401. Neither returns an account or a conversation.
+
+## Background work
+
+`GET /api/admin/activity` is what the superuser's system page draws: the questions and the uploads going through Redis and the workers, as it happens ([background-tasks.md](background-tasks.md), section "Watching the work"). It answers a superuser only, as the ratings do, and with a server-sent event stream that has no end of its own:
+
+- `snapshot`, once, first: `cap` (`QA_MAX_IN_FLIGHT`), `retry_after_seconds` (the wait a question refused at the cap is told), `trace_url` (with tracing on, the Langfuse address a trace opens at once its request id is appended; `null` with it off), `seats` (each place taken under the cap, `{"answer_id", "taken"}`, `taken` once a worker has the question), `workers` (each worker that answered, `{"hostname", "queues", "pool", "concurrency"}`, `pool` as `celery worker -P` names it) and `recent` (every entry of the last 20 tasks, oldest first).
+- `activity`, an entry as it is written, under its stream id as its `id:`, whose first part is the moment Redis wrote it, in milliseconds: `kind` (`question` or `upload`), `task` (the answer's id, or the material's), `event`, `worker` (the hostname of the worker that wrote it, `null` for the web process) and the fields of some events only, `null` on the rest. A question's events are `queued`, or `refused` at the cap, then `taken`, and the answer stream's own but the tokens, with `step` and `ms` on a `step`, `found` (the excerpts the answer is written from) on `start`, and `code` on `error`; its `queued` and `refused` carry `question`, a signed-in student's question cut at 200 characters and `null` for a visitor's, and `request_id`. An upload's are its row's statuses, `queued` with `file`, `indexing` with `chunks` (the passages the material was cut into) and `failed` with `code`, the material's failure.
+- `refresh`, every 15 s: `seats` and `workers` again, since a lease that runs out and a worker that goes away write no entry. A line that starts with a colon is a keepalive comment, sent every 5 s while nothing else is.
+
+Nothing is resumed: `Last-Event-ID` is not read, and a reader who lost the connection opens the feed again, whose new `snapshot` holds what it missed. Anyone but a superuser is a 403 `PERMISSION_DENIED`, and anyone not signed in a 401. The fields and their meaning are [apps/system/contract.py](../apps/system/contract.py)'s, the single source.
 
 ## Catalogue API
 
