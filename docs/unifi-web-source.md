@@ -74,7 +74,7 @@ The loop's hard caps and budgets are all code constants:
 | Rule | Value | Where | Why |
 | --- | --- | --- | --- |
 | steps per question | at most 3 fetches | `DEEPEN_MAX_STEPS` | bounds latency and writes into the shared index |
-| shortlist | 10 links and 5 PDFs, two separate quotas | `MAX_LINK_CANDIDATES`, `MAX_PDF_CANDIDATES`, `narrow_candidates()` | one page can link forty decree PDFs; one shared quota would let navigation push out the one attachment that answers |
+| shortlist | 10 links and 5 PDFs, two separate quotas | `MAX_LINK_CANDIDATES`, `MAX_PDF_CANDIDATES`, `narrow_candidates()` | a page offers a median of 79 links, and one links up to 408 PDFs ([experiment-log.md](experiment-log.md), entry of 2026-08-23); one shared quota would let navigation push out the one attachment that answers |
 | ranking | cosine between `RouteDecision.query` and the anchor text plus URL path (plus the file name for a PDF), on the shared CPU encoder; never DOM order | `ranking_text()`, `narrow_candidates()` | a page's first links are its navigation; the cosine is plain Python, no numpy |
 | candidate source | the outlinks of the hit rows and of the pages fetched this turn; a hit without outlinks (a PDF) falls back to its carrier page's row; pages this step retrieved and pages fetched this turn are excluded | `graph_outlinks()`, `_carrier_row()` | PDF rows record no outlinks; a carrier page lists its own attachments, which would hand the hits back as candidates |
 | refusing to pick | allowed: the model may reject the whole shortlist, and no fetch follows | `CandidateChoice.unsuitable`, `pick_candidate()` | a forced pick writes a page the model itself called irrelevant into the shared index |
