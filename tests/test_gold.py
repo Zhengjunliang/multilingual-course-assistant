@@ -19,6 +19,7 @@ from test_search import ORM_TEXT, TASSE_TEXT, TASSE_URL, KeywordReranker, make_w
 from rag.gold import (
     EVAL_SCOPE,
     GoldQuestion,
+    first_hit_rank,
     is_hit,
     load_gold,
     main,
@@ -45,6 +46,15 @@ def test_hit_requires_both_file_and_page_span() -> None:
     assert is_hit(make_question(page=1), hits)
     assert not is_hit(make_question(page=7), hits)
     assert not is_hit(make_question(page=1), [])
+
+
+def test_the_rank_is_the_first_hit_that_answers_counted_from_one() -> None:
+    # deck.pdf pages 1, 2, 3, 2: page 2 answers first at rank 2, not at rank 4.
+    hits = [Hit(chunk=make_chunk(index, ORM_TEXT), score=1.0) for index in (0, 1, 2, 1)]
+    assert first_hit_rank(make_question(page=1), hits) == 1
+    assert first_hit_rank(make_question(page=2), hits) == 2
+    assert first_hit_rank(make_question(page=3), hits) == 3
+    assert first_hit_rank(make_question(page=7), hits) is None
 
 
 def test_target_defaults_to_slides() -> None:
@@ -76,6 +86,8 @@ def test_campus_hit_scores_by_url_not_by_page() -> None:
     )
     assert is_hit(make_campus_question(), [Hit(chunk=web_chunk, score=1.0)])
     assert not is_hit(make_campus_question(), [Hit(chunk=make_chunk(0, ORM_TEXT), score=1.0)])
+    slides_first = [Hit(chunk=make_chunk(0, ORM_TEXT), score=1.0), Hit(chunk=web_chunk, score=0.5)]
+    assert first_hit_rank(make_campus_question(), slides_first) == 2
 
 
 def test_missing_answer_refs_lists_dangling_ids(tmp_path: Path) -> None:
