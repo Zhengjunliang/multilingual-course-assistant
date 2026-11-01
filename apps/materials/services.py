@@ -25,8 +25,15 @@ from django.db import IntegrityError, transaction
 from pypdf import PdfReader
 from pypdf.errors import DependencyError, FileNotDecryptedError
 
-from apps.materials.models import CourseMaterial, material_name, material_storage
+from apps.materials.models import (
+    CourseMaterial,
+    MaterialFailure,
+    MaterialStatus,
+    material_name,
+    material_storage,
+)
 from apps.materials.tasks import ingest_material
+from apps.system import activity
 
 if TYPE_CHECKING:
     from celery import Task
@@ -148,11 +155,16 @@ def _queue_ingest(material: CourseMaterial, name: str) -> None:
     bytes against a second upload. Outside a transaction, as the view and
     the import command call `create_material`, this runs before it returns,
     so the error reaches the caller.
+
+    The activity stream (apps/system/activity.py) is told before the task
+    is queued, so that its `queued` comes before anything the worker writes.
     """
+    activity.record_upload(material.pk, MaterialStatus.QUEUED, file=material.source_file)
     try:
         # Celery leaves `app.task` unannotated, so pyright sees the bare function.
         cast("Task", ingest_material).delay(material.pk)
     except Exception:
+        activity.record_upload(material.pk, MaterialStatus.FAILED, code=MaterialFailure.INTERNAL)
         material.delete()
         if not CourseMaterial.objects.filter(file=name).exists():
             material_storage.delete(name)

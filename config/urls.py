@@ -31,6 +31,7 @@ urlpatterns = [
     path("api/auth/", include("apps.accounts.urls")),
     path("api/admin/", include("apps.accounts.manage_urls")),
     path("api/admin/", include("apps.qa.review_urls")),
+    path("api/admin/", include("apps.system.urls")),
     path("api/catalog/", include("apps.catalog.urls")),
     path("api/", include("apps.qa.urls")),
     re_path(r"^api/", ApiNotFound.as_view(), name=UNMATCHED),

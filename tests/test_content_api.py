@@ -23,6 +23,7 @@ from apps.catalog.content_views import EditionReadingView
 from apps.catalog.models import ReadingItem, Syllabus
 from apps.materials.models import CourseMaterial, MaterialFailure, MaterialStatus, material_storage
 from apps.materials.tasks import ingest_material
+from apps.system import activity
 
 if TYPE_CHECKING:
     from django.http.response import HttpResponseBase
@@ -383,6 +384,12 @@ def test_an_upload_answers_before_its_ingest_is_queued(
     assert waiting == []
     assert CourseMaterial.objects.get().status == MaterialStatus.QUEUED
     assert queued == [response.json()["id"]]  # pyright: ignore[reportAttributeAccessIssue]
+    (entry,) = activity.read("0", block=0.01)
+    assert (entry.task, entry.event, entry.file) == (
+        str(queued[0]),
+        "queued",
+        CourseMaterial.objects.get().source_file,
+    )
 
 
 def test_an_upload_whose_ingest_cannot_be_queued_leaves_nothing_behind(
@@ -404,6 +411,10 @@ def test_an_upload_whose_ingest_cannot_be_queued_leaves_nothing_behind(
 
     assert not CourseMaterial.objects.exists()
     assert not material_storage.exists(f"{hashlib.sha256(DECK).hexdigest()}.pdf")
+    assert [(e.event, e.code) for e in activity.read("0", block=0.01)] == [
+        ("queued", None),
+        ("failed", MaterialFailure.INTERNAL),
+    ]
 
 
 def test_the_same_file_twice_on_an_edition_is_refused_with_the_material_it_is() -> None:

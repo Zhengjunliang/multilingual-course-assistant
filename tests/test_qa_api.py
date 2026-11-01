@@ -77,6 +77,7 @@ from apps.qa.engine import LLM_DOWN, Engine, EngineUnavailableError
 from apps.qa.models import HISTORY_WINDOW_TURNS, Conversation, Message
 from apps.qa.serializers import MAX_HISTORY_ANSWER_CHARS, MAX_QUESTION_CHARS
 from apps.qa.tasks import AnswerJob
+from apps.system import activity
 from config.celery import app
 from config.env import env
 from config.request_id import RequestIdFilter
@@ -490,6 +491,36 @@ def test_the_stream_names_its_events_in_order(index: QdrantClient) -> None:
         "step:generate",
         "end",
     ]
+
+
+def test_the_activity_stream_follows_the_answer_but_its_tokens(index: QdrantClient) -> None:
+    """What the superuser's page sees of it (apps/system/activity.py): every
+    event but the prose, and the worker taking it, with the request that asked
+    and how many excerpts the answer is written from."""
+    install_engine(index, SLIDES_ROUTE, ["An ORM ", "maps objects."])
+    response = ask()
+    stream = events(response)
+
+    logged = activity.read("0", block=0.01)
+
+    assert [f"step:{entry.step}" if entry.step else entry.event for entry in logged] == [
+        "queued",
+        "taken",
+        "step:queue",
+        "step:route",
+        "step:route",
+        "step:retrieve",
+        "step:retrieve",
+        "start",
+        "step:generate",
+        "end",
+    ]
+    assert {entry.task for entry in logged} == {queued_of(stream)["answer_id"]}
+    assert (logged[0].question, logged[0].request_id) == (
+        "What is an ORM?",
+        response["X-Request-ID"],
+    )
+    assert logged[7].found == len(start_of(stream)["citations"]) > 0
 
 
 def test_the_first_event_names_the_answer_and_its_conversation(index: QdrantClient) -> None:

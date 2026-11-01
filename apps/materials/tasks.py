@@ -4,7 +4,8 @@
 (docs/background-tasks.md), queued once the material's row is committed. It
 writes each step into the row as it reaches it — `parsing`, `chunking`,
 `indexing` — and ends at `ready` or at `failed` with a code
-(apps/materials/models.py). A failure leaves no point of the material behind:
+(apps/materials/models.py), each one onto the site's activity stream too
+(apps/system/activity.py). A failure leaves no point of the material behind:
 the points are written only once every chunk is embedded (`upsert_chunks`),
 and whatever was written goes again by the material's own key
 (`delete_material`), so an older version under the same name keeps answering.
@@ -49,6 +50,7 @@ from apps.materials.models import (
     MaterialStatus,
     material_storage,
 )
+from apps.system import activity
 from config.celery import app
 from rag.chunk import EditionKey, chunk_document, document_locale
 from rag.index import delete_material, replace_slides_sources, upsert_chunks
@@ -113,7 +115,7 @@ def ingest_material(material_id: int) -> None:
         if not chunks:
             # A scan with nothing recognised in it: nothing a question could find.
             raise UnreadablePdfError(f"{material.source_file}: no text")
-        if not _move(material, MaterialStatus.INDEXING):
+        if not _move(material, MaterialStatus.INDEXING, chunks=len(chunks)):
             return
         written = upsert_chunks(pipeline.client, chunks, pipeline.dense, pipeline.sparse)
         if not _move(material, MaterialStatus.READY, finished_at=timezone.now()):
@@ -128,19 +130,36 @@ def ingest_material(material_id: int) -> None:
 
 @app.task
 def fail_stalled() -> int:
-    """Mark `interrupted` the rows whose worker died under them; how many."""
+    """Mark `interrupted` the rows whose worker died under them; how many.
+
+    One row at a time, each still running when it is marked, so that the
+    activity stream is told of exactly the rows marked; there are none on
+    most runs.
+    """
     now = timezone.now()
-    stalled = CourseMaterial.objects.filter(
-        status__in=RUNNING, started_at__lt=now - STALLED_AFTER
-    ).update(status=MaterialStatus.FAILED, failure=MaterialFailure.INTERRUPTED, finished_at=now)
+    lost = CourseMaterial.objects.filter(status__in=RUNNING, started_at__lt=now - STALLED_AFTER)
+    stalled = 0
+    for pk in list(lost.values_list("pk", flat=True)):
+        if CourseMaterial.objects.filter(pk=pk, status__in=RUNNING).update(
+            status=MaterialStatus.FAILED, failure=MaterialFailure.INTERRUPTED, finished_at=now
+        ):
+            activity.record_upload(pk, MaterialStatus.FAILED, code=MaterialFailure.INTERRUPTED)
+            stalled += 1
     if stalled:
         logger.warning("%d material ingest(s) lost their worker, marked failed", stalled)
     return stalled
 
 
-def _move(material: CourseMaterial, status: MaterialStatus, **fields: Any) -> bool:
-    """Write the step the ingest has reached; False when the row is gone."""
-    return CourseMaterial.objects.filter(pk=material.pk).update(status=status, **fields) == 1
+def _move(
+    material: CourseMaterial, status: MaterialStatus, *, chunks: int | None = None, **fields: Any
+) -> bool:
+    """Write the step the ingest has reached into the row, and onto the
+    activity stream with `chunks`, the passages the material was cut into;
+    False when the row is gone."""
+    moved = CourseMaterial.objects.filter(pk=material.pk).update(status=status, **fields) == 1
+    if moved:
+        activity.record_upload(material.pk, status, chunks=chunks)
+    return moved
 
 
 def _replace_older(
@@ -189,9 +208,10 @@ def _fail(
             delete_material(pipeline.client, material.sha256, edition)
         except Exception:
             logger.exception("material %d: its points could not be deleted", material.pk)
-    CourseMaterial.objects.filter(pk=material.pk).update(
+    if CourseMaterial.objects.filter(pk=material.pk).update(
         status=MaterialStatus.FAILED, failure=failure, finished_at=timezone.now()
-    )
+    ):
+        activity.record_upload(material.pk, MaterialStatus.FAILED, code=failure)
 
 
 def _failure_of(exc: Exception) -> MaterialFailure:
