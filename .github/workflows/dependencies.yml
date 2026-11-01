@@ -92,13 +92,16 @@ jobs:
         # looks each pin up on PyPI, where a labelled version is a 404 that it
         # reports as a skip and exits 0 on.
         #
-        # No advisory is ignored. The one accepted risk, accelerate's, is one
-        # the advisory databases no longer name. Why it is out of reach, and
-        # when its flag returns: docs/security.md, the table of accepted risks.
+        # Two advisories are ignored, both with no fixed release: ragas's SSRF
+        # and diskcache's pickle, which ragas brings in. accelerate's, accepted
+        # as well, is one the advisory databases no longer name.
+        # Why each is out of reach, and when its flag goes: docs/security.md,
+        # the table of accepted risks.
         run: |
           uv export --locked --no-emit-project --no-hashes -o requirements.txt
           sed -E -i 's/(==[^ ;+]+)\+[^ ;]+/\1/' requirements.txt
-          uvx pip-audit --no-deps --disable-pip -r requirements.txt
+          uvx pip-audit --no-deps --disable-pip -r requirements.txt \
+            --ignore-vuln GHSA-95ww-475f-pr4f --ignore-vuln GHSA-w8v5-vhqr-4h9v
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

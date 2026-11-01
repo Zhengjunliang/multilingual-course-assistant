@@ -10,7 +10,7 @@
   },
   "packageRules": [
     {
-      "description": "The measured pipeline, pinned with == in pyproject.toml: the parser and its OCR engine, the dense encoder and the reranker, BM25, and the torch they run on. CI runs no ingest and loads no model, so a green build says nothing about what gold and campus measure. Its updates wait together in one draft pull request, majors included, since the pins depend on one another; it is marked ready and merged in the session that re-measures them.",
+      "description": "The measured pipeline, pinned with == in pyproject.toml: the parser and its OCR engine, the dense encoder and the reranker, BM25, the torch they run on, and ragas, whose prompts the judge reads. CI runs no ingest and loads no model, so a green build says nothing about what gold and campus measure or how the judge scores them. Its updates wait together in one draft pull request, majors included, since the pins depend on one another; it is marked ready and merged in the session that re-measures them.",
       "matchPackageNames": [
         "docling",
         "docling-*",
@@ -23,12 +23,18 @@
         "torchvision",
         "fastembed",
         "mmh3",
-        "py-rust-stemmers"
+        "py-rust-stemmers",
+        "ragas"
       ],
       "groupName": "measured pipeline",
       "groupSlug": "measured-pipeline",
       "separateMajorMinor": false,
       "draftPR": true
+    },
+    {
+      "description": "ragas 0.4.3 imports langchain_community.chat_models.vertexai when it loads, a module langchain-community 0.4.2 removed (vibrantlabsai/ragas#2745). langchain-community stays below it until a ragas release stops importing it; then this rule goes, with the comment beside its pin in pyproject.toml.",
+      "matchPackageNames": ["langchain-community"],
+      "allowedVersions": "<0.4.2"
     },
     {
       "description": "torch and torchvision come from the PyTorch indexes, whose versions carry a local label (2.13.0+cpu, 2.13.0+cu126). A pin must not take one: the label names a single platform's build, and == on the bare version already matches every label.",
