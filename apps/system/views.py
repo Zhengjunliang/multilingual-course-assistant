@@ -20,7 +20,8 @@ ends, for the page to open it again and be refused.
 
 **Nothing to resume.** A reader who lost the connection opens the feed again
 and reads a new snapshot, which already holds what it missed; `Last-Event-ID`
-is not read. A Redis that fails mid-feed ends it, for the page to open it again.
+is not read. A Redis or a database that fails mid-feed ends it, for the page
+to open it again.
 
 **Under WSGI an open feed holds a thread**, as an answer's stream does
 (apps/qa/views.py): one per page open, and the page is a superuser's. A
@@ -36,6 +37,7 @@ import time
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.db import DatabaseError
 from django.utils import timezone
 from redis.exceptions import RedisError
 from rest_framework.permissions import IsAuthenticated
@@ -137,7 +139,7 @@ class _Feed:
                     )
                 elif not entries:
                     yield KEEPALIVE
-        except RedisError:
+        except (RedisError, DatabaseError):
             logger.exception("the activity feed could not be read")
 
 
