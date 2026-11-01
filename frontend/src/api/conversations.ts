@@ -2,7 +2,8 @@
  * `/api/conversations` — the sidebar, and reopening a thread.
  *
  * A stored message carries the same `citations`, `route` and `search_ms` the
- * `start` event delivered (apps/qa/models.py says why they are columns). That
+ * `start` event delivered, and the `step` events that ended (apps/qa/models.py
+ * says why they are columns). That
  * is what lets a reopened conversation render through the very same components
  * as a live one: the pills, the sources and the process line with its seconds
  * all come back, and there is no second rendering path for history to drift
@@ -10,7 +11,7 @@
  */
 
 import { answerPath } from "./client";
-import type { Citation, RouteDecision } from "./contract";
+import type { Citation, RouteDecision, StepEvent } from "./contract";
 import { request } from "./http";
 
 /** A course an answer drew on, as the catalogue names it. */
@@ -90,6 +91,8 @@ export interface StoredMessage {
   route: RouteDecision | null;
   /** `StartEvent.search_ms`; `null` on a question. */
   search_ms: number | null;
+  /** The steps the answer finished, each with its `ms`; `[]` on a question. */
+  steps: StepEvent[];
   created_at: string;
   /** The owner's rating of an answer; `null` when there is none, and on a question. */
   feedback: StoredFeedback | null;

@@ -29,6 +29,7 @@ from test_index import StubDense, StubSparse, make_chunk
 from test_qa_api import ORM_TEXT, PPM, PPM_YEAR, SLIDES_ROUTE, ScriptedStreamer
 
 from apps.qa import engine as engine_module
+from apps.qa.contract import StartEvent, StepEvent
 from apps.qa.engine import Engine, EngineUnavailableError
 from rag.agent import RouteDecision
 from rag.answer import Turn
@@ -37,8 +38,6 @@ from rag.index import ensure_collection, index_chunks, open_client
 
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
-
-    from apps.qa.contract import StartEvent
 
 CONVERSATION_ID = UUID("3f1c9a52-6b0e-4d7a-9c1e-2a5b8d4f0e17")
 # The edition of the one chunk `stub_engine` indexes.
@@ -80,8 +79,9 @@ def test_the_engine_answers_without_touching_the_database(tmp_path: Path) -> Non
     )
     engine.client.close()
 
-    assert [type(event).NAME for event in events] == ["start", "token", "end"]
-    assert cast("StartEvent", events[0]).conversation_id == CONVERSATION_ID
+    starts = [event for event in events if isinstance(event, StartEvent)]
+    assert len(starts) == 1
+    assert starts[0].conversation_id == CONVERSATION_ID
 
 
 @pytest.mark.parametrize(
@@ -107,17 +107,49 @@ def test_the_search_time_counts_from_when_the_question_was_asked(
     when the call began if there is none. The clock is the engine module's
     own, so the stub moves no other code's time."""
     clock = iter(readings)
-    monkeypatch.setattr(engine_module, "time", SimpleNamespace(time=lambda: next(clock)))
+    monkeypatch.setattr(
+        engine_module, "time", SimpleNamespace(time=lambda: next(clock), monotonic=time.monotonic)
+    )
     engine = stub_engine(tmp_path)
 
     events = engine.stream("What is an ORM?", CONVERSATION_ID, scope=SCOPE, asked_at=asked_at)
     try:
-        start = next(events)
+        start = next(event for event in events if isinstance(event, StartEvent))
     finally:
         events.close()
         engine.client.close()
 
-    assert cast("StartEvent", start).search_ms == expected_ms
+    assert start.search_ms == expected_ms
+
+
+def test_the_wait_for_the_gpu_is_part_of_retrieval(tmp_path: Path) -> None:
+    """The steps in their order, and `retrieve` begun before the lock is
+    asked for: a student waits through another answer's retrieval, so the
+    step they see counts it. The lock is held here until a tenth of a second
+    after `retrieve` began."""
+    engine = stub_engine(tmp_path)
+    engine.gpu.acquire()
+    steps: list[StepEvent] = []
+    try:
+        for event in engine.stream("What is an ORM?", CONVERSATION_ID, scope=SCOPE):
+            if not isinstance(event, StepEvent):
+                continue
+            steps.append(event)
+            if event == StepEvent(name="retrieve", ms=None):
+                threading.Timer(0.1, engine.gpu.release).start()
+    finally:
+        engine.client.close()
+
+    assert [(step.name, step.ms is None) for step in steps] == [
+        ("route", True),
+        ("route", False),
+        ("retrieve", True),
+        ("retrieve", False),
+        ("generate", False),
+    ]
+    waited = steps[3].ms
+    assert waited is not None
+    assert waited >= 100
 
 
 def test_retrieval_takes_turns_and_generation_does_not(monkeypatch: pytest.MonkeyPatch) -> None:

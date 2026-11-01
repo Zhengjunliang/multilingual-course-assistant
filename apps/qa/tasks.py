@@ -40,7 +40,14 @@ from pydantic import BaseModel, ConfigDict
 from redis.exceptions import RedisError
 
 from apps.qa import inflight
-from apps.qa.contract import EndEvent, ErrorEvent, StartEvent, StoppedEvent, TokenEvent
+from apps.qa.contract import (
+    EndEvent,
+    ErrorEvent,
+    StartEvent,
+    StepEvent,
+    StoppedEvent,
+    TokenEvent,
+)
 from apps.qa.conversations import ConversationGoneError, record_exchange, settle
 from apps.qa.engine import EngineUnavailableError, loaded_engine
 from apps.qa.traces import SITE_TRACE
@@ -217,13 +224,21 @@ def _generate(job: AnswerJob, heartbeat: _Heartbeat, root: Observation | None) -
     meanwhile: asked once more rather than read off the heartbeat, whose
     verdict may be a second old. So a question that fails, or is stopped,
     before its answer began leaves nothing behind (apps/qa/conversations.py).
+    The steps it finished go with them: the first is the wait for this
+    worker, which ends here, and the engine times the rest.
     Closing the engine's generator, on every way out, is what stops pulling
     tokens from a model nobody is listening to any more.
     """
     parts: list[str] = []
+    steps: list[StepEvent] = []
     stored = False
     complete = False
     try:
+        # Never below zero: `asked_at` is the web host's clock, and this
+        # worker's may be behind it.
+        queue = StepEvent(name="queue", ms=max(0, round((time.time() - job.asked_at) * 1000)))
+        steps.append(queue)
+        inflight.emit(job.answer_id, queue)
         events = loaded_engine().stream(
             job.question,
             job.conversation_id,
@@ -233,36 +248,34 @@ def _generate(job: AnswerJob, heartbeat: _Heartbeat, root: Observation | None) -
             asked_at=job.asked_at,
         )
         with closing(events):
-            start = cast("StartEvent", next(events))
-            # Before the renewal, which would hold on to a lease the
-            # heartbeat let go, and before any row is written.
-            if time.monotonic() > heartbeat.deadline:
-                logger.error("answer %s passed its time limit", job.answer_id)
-                return _failure(ErrorCode.ENGINE_DOWN)
-            verdict = inflight.renew(job.answer_id)
-            if verdict != "ok":
-                return _halted(job, verdict)
-            if job.conversation_id is not None:
-                record_exchange(
-                    job.conversation_id,
-                    start,
-                    job.answer_id,
-                    request_id=job.request_id,
-                    history=job.history,
-                    added_editions=job.added_editions,
-                )
-                stored = True
-            inflight.emit(job.answer_id, start)
             for event in events:
-                if heartbeat.verdict != "ok":
-                    return _halted(job, heartbeat.verdict)
-                if time.monotonic() > heartbeat.deadline:
-                    logger.error("answer %s passed its time limit", job.answer_id)
-                    return _failure(ErrorCode.ENGINE_DOWN)
-                if isinstance(event, EndEvent):
+                # Before anything else, a renewal included, which would hold
+                # on to a lease the heartbeat let go.
+                ending = _ended(job, heartbeat)
+                if ending is not None:
+                    return ending
+                if isinstance(event, StartEvent):
+                    verdict = inflight.renew(job.answer_id)
+                    if verdict != "ok":
+                        return _halted(job, verdict)
+                    if job.conversation_id is not None:
+                        record_exchange(
+                            job.conversation_id,
+                            event,
+                            job.answer_id,
+                            request_id=job.request_id,
+                            history=job.history,
+                            steps=steps,
+                            added_editions=job.added_editions,
+                        )
+                        stored = True
+                elif isinstance(event, EndEvent):
                     complete = True
                     return event
-                parts.append(cast("TokenEvent", event).text)
+                elif isinstance(event, TokenEvent):
+                    parts.append(event.text)
+                elif isinstance(event, StepEvent) and event.ms is not None:
+                    steps.append(event)
                 inflight.emit(job.answer_id, event)
         # The engine ends every answer with `end`.
         logger.error("answer %s ended without its end event", job.answer_id)
@@ -283,9 +296,20 @@ def _generate(job: AnswerJob, heartbeat: _Heartbeat, root: Observation | None) -
             root.update(output="".join(parts))
         if stored:
             try:
-                settle(job.answer_id, "".join(parts), complete=complete)
+                settle(job.answer_id, "".join(parts), complete=complete, steps=steps)
             except Exception:
                 logger.exception("could not settle answer %s", job.answer_id)
+
+
+def _ended(job: AnswerJob, heartbeat: _Heartbeat) -> Event | None:
+    """The event that ends the answer before its next one, if something ended
+    it meanwhile: a stop, its lease running out, or its time limit."""
+    if heartbeat.verdict != "ok":
+        return _halted(job, heartbeat.verdict)
+    if time.monotonic() > heartbeat.deadline:
+        logger.error("answer %s passed its time limit", job.answer_id)
+        return _failure(ErrorCode.ENGINE_DOWN)
+    return None
 
 
 def _halted(job: AnswerJob, verdict: inflight.Renewal) -> Event:

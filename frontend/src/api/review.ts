@@ -9,7 +9,7 @@
 
 import type { ListPage } from "./admin";
 import type { HistoryTurn } from "./client";
-import type { Citation, RouteDecision } from "./contract";
+import type { Citation, RouteDecision, StepEvent } from "./contract";
 import type { FeedbackReason } from "./conversations";
 import { request } from "./http";
 
@@ -41,6 +41,8 @@ export interface RatedAnswer {
   citations: Citation[];
   route: RouteDecision | null;
   search_ms: number | null;
+  /** The steps the answer finished, each with its `ms`. */
+  steps: StepEvent[];
   /** The id of the request that produced it, which files its log lines; `""` before it was kept. */
   request_id: string;
   created_at: string;

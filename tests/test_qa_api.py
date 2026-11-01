@@ -427,7 +427,13 @@ def finish(response: Any) -> None:
 
 
 def names(stream: list[tuple[str, Any]]) -> list[str]:
-    return [name for name, _ in stream]
+    """The events' names but the steps', which tests of their own follow."""
+    return [name for name, _ in stream if name != "step"]
+
+
+def ended_steps(stream: list[tuple[str, Any]]) -> list[dict[str, Any]]:
+    """The `step` events that end a step, in the order they came."""
+    return [data for name, data in stream if name == "step" and data["ms"] is not None]
 
 
 def queued_of(stream: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -465,10 +471,25 @@ def test_a_question_is_answered_from_the_index(index: QdrantClient) -> None:
 
 
 def test_the_stream_names_its_events_in_order(index: QdrantClient) -> None:
-    """The shape the frontend is written against: the answer's name, its
-    context, then prose, then a terminator that says the answer is whole."""
+    """The shape the frontend is written against: the answer's name, the
+    steps to its context, its context, then prose, then a terminator that says
+    the answer is whole. A step begins and ends, but for the wait for a worker
+    and the writing, which `queued` and `start` begin."""
     install_engine(index, SLIDES_ROUTE, ["An ORM ", "maps objects."])
-    assert names(events(ask())) == ["queued", "start", "token", "token", "end"]
+    stream = events(ask())
+    assert [f"step:{data['name']}" if name == "step" else name for name, data in stream] == [
+        "queued",
+        "step:queue",
+        "step:route",
+        "step:route",
+        "step:retrieve",
+        "step:retrieve",
+        "start",
+        "token",
+        "token",
+        "step:generate",
+        "end",
+    ]
 
 
 def test_the_first_event_names_the_answer_and_its_conversation(index: QdrantClient) -> None:
@@ -490,7 +511,8 @@ def test_every_event_carries_an_id_to_resume_after(index: QdrantClient) -> None:
     ids = [event_id for event_id, _, _ in frames(ask())]
 
     assert all(event_id is not None for event_id in ids)
-    assert len(set(ids)) == len(ids) == 5
+    # `queued`, six steps, `start`, two tokens and `end`.
+    assert len(set(ids)) == len(ids) == 11
 
 
 def test_the_answer_arrives_as_separate_token_events(index: QdrantClient) -> None:
@@ -1052,13 +1074,15 @@ def test_a_student_who_leaves_mid_answer_still_finds_it_whole(
 
     monkeypatch.setattr(views_module, "enqueue", on_a_thread)
     response = ask_the_view()
-    read = [read_one(response) for _ in range(3)]
+    # Up to the first token: `queued`, the five steps before `start`, `start`.
+    read = [read_one(response) for _ in range(8)]
     finish(response)
     left.set()
     jobs[0].join(10)
 
     assert [frame.split("\n")[1] for frame in read] == [
         "event: queued",
+        *["event: step"] * 5,
         "event: start",
         "event: token",
     ]
@@ -1305,9 +1329,14 @@ def test_a_stopped_answer_keeps_what_was_written(
     response = ask()
     answer(held[0])
 
-    assert names(events(response)) == ["queued", "start", "token", "stopped"]
+    stream = events(response)
+    assert names(stream) == ["queued", "start", "token", "stopped"]
     assert turns_of(only_conversation())[1] == ("assistant", "An ORM ", False)
     assert admitted() == set()
+    # The writing never ended, so neither the stream nor the row says it did.
+    stored = Message.objects.get(pk=held[0].answer_id).steps
+    assert [step["name"] for step in stored] == ["queue", "route", "retrieve"]
+    assert stored == ended_steps(stream)
 
 
 def test_an_answer_stopped_before_it_began_leaves_nothing_behind(
@@ -1658,8 +1687,16 @@ def test_reopening_a_conversation_returns_what_the_stream_delivered(
     assert answer_message["citations"] == start_of(stream)["citations"]
     assert answer_message["route"] == start_of(stream)["route"]
     assert answer_message["search_ms"] == start_of(stream)["search_ms"]
-    # The student's half has no search of its own: the column is empty there.
+    assert answer_message["steps"] == ended_steps(stream)
+    assert [step["name"] for step in answer_message["steps"]] == [
+        "queue",
+        "route",
+        "retrieve",
+        "generate",
+    ]
+    # The student's half has no search of its own: the columns are empty there.
     assert body["messages"][0]["search_ms"] is None
+    assert body["messages"][0]["steps"] == []
 
 
 def test_a_conversation_reopened_while_answered_names_the_answer(

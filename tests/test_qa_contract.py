@@ -38,6 +38,8 @@ from apps.qa.contract import (
     ErrorEvent,
     QueuedEvent,
     StartEvent,
+    StepEvent,
+    StepName,
     StoppedEvent,
     TokenEvent,
 )
@@ -81,6 +83,7 @@ MIRRORED: tuple[type[BaseModel], ...] = (
     RouteDecision,
     Citation,
     QueuedEvent,
+    StepEvent,
     StartEvent,
     TokenEvent,
     EndEvent,
@@ -147,6 +150,15 @@ def test_the_mirror_declares_every_field(mirror: str, model_name: str, field: st
     assert line is not None, f"{model_name}.{field} is missing from {MIRROR.name}"
     nullable = (model_name, field) in NULLABLE
     assert ("| null" in line) == nullable, f"{model_name}.{field} nullable is {nullable} in Python"
+
+
+def test_the_mirror_names_the_steps_in_their_order(mirror: str) -> None:
+    """The one set of values checked here: a client labels each step by its
+    name, and a step renamed on one side only compiles on both."""
+    declared = re.search(r"^export type StepName = (.*);$", mirror, re.MULTILINE)
+
+    assert declared is not None
+    assert tuple(re.findall(r'"(\w+)"', declared[1])) == get_args(StepName)
 
 
 def test_the_request_mirror_declares_exactly_the_serializers_fields() -> None:

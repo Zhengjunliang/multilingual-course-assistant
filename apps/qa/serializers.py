@@ -204,7 +204,8 @@ class MessageSerializer(serializers.ModelSerializer[Message]):
     """One stored turn, in the shape the interface already knows how to draw.
 
     `citations`, `route` and `search_ms` come back as they were stored, which is
-    the shape the `start` event delivered them in (apps/qa/contract.py). That is
+    the shape the `start` event delivered them in (apps/qa/contract.py), and
+    `steps` as the `step` events that ended delivered them. That is
     the whole point of storing them: a reopened conversation renders through
     exactly the same code as a live one, pills, sources and process line
     included, instead of a second rendering path for history that would drift
@@ -228,6 +229,7 @@ class MessageSerializer(serializers.ModelSerializer[Message]):
             "citations",
             "route",
             "search_ms",
+            "steps",
             "created_at",
             "feedback",
         )

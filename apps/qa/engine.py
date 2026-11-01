@@ -46,7 +46,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from apps.qa.contract import Citation, EndEvent, Event, StartEvent, TokenEvent
+from apps.qa.contract import Citation, EndEvent, Event, StartEvent, StepEvent, TokenEvent
 from rag.agent import collections_for, route
 from rag.answer import answer
 from rag.chunk import detect_locale
@@ -80,6 +80,11 @@ LLM_DOWN = (
 
 # The index is the compose service every process shares (docker-compose.yml).
 INDEX_DOWN = "The search index did not respond. Check that the Qdrant service is running."
+
+
+def _ms_since(began: float) -> int:
+    """Milliseconds from the `time.monotonic()` reading `began` to now."""
+    return round((time.monotonic() - began) * 1000)
 
 
 @contextmanager
@@ -155,9 +160,12 @@ class Engine:
         process; a direct caller, which has no queue, leaves it to this call.
 
         Everything up to `StartEvent` fails before anything is stored, which is
-        why routing and retrieval happen before the first `yield` rather than
-        lazily alongside the tokens: the task writes the conversation's rows
-        only once `start` exists (apps/qa/tasks.py).
+        why routing and retrieval happen before it rather than lazily alongside
+        the tokens: the task writes the conversation's rows only once `start`
+        exists (apps/qa/tasks.py). What comes before it is `step` events, each
+        step's beginning and end, which the task relays and stores nothing of
+        until then; `generate` ends just before `EndEvent`. The steps are timed
+        on this process's monotonic clock, since each begins and ends here.
         """
         # Lazy on purpose: `rag/` imports the OpenAI SDK and qdrant-client inside
         # the functions that need them, and Django's startup should not pay for
@@ -170,6 +178,8 @@ class Engine:
         answer_locale = locale or detect_locale(question)
         started = time.time() if asked_at is None else asked_at
 
+        yield StepEvent(name="route", ms=None)
+        routing = time.monotonic()
         try:
             # An unusable router *reply* is already a routing decision — `route`
             # degrades to `target="both"` and says so in `reason`, a frozen
@@ -183,7 +193,12 @@ class Engine:
             decision = route(question, self.completer, history)
         except APIError as exc:
             raise EngineUnavailableError(LLM_DOWN) from exc
+        yield StepEvent(name="route", ms=_ms_since(routing))
 
+        # Begun before the lock is asked for, so that the wait for it is part
+        # of the step, as a student waits through it.
+        yield StepEvent(name="retrieve", ms=None)
+        retrieving = time.monotonic()
         try:
             # `both` is also what the router falls back to, so a question can be
             # aimed at a collection this index never built: a fresh checkout
@@ -234,7 +249,11 @@ class Engine:
             if isinstance(exc.source, ValidationError):
                 raise
             raise EngineUnavailableError(INDEX_DOWN) from exc
+        # After the lock is let go: a generator suspended inside it would hold
+        # the GPU for as long as its caller took to come back.
+        yield StepEvent(name="retrieve", ms=_ms_since(retrieving))
 
+        generating = time.monotonic()
         yield StartEvent(
             question=question,
             conversation_id=conversation_id,
@@ -258,6 +277,7 @@ class Engine:
             # model server that drops the connection mid-answer is httpx's own.
             raise EngineUnavailableError(LLM_DOWN) from exc
 
+        yield StepEvent(name="generate", ms=_ms_since(generating))
         yield EndEvent()
 
 

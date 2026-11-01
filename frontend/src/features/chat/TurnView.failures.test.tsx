@@ -96,6 +96,7 @@ function failed(error: ApiError): Turn {
     citations: [],
     route: null,
     searchMs: null,
+    steps: [],
     locale: "it",
     complete: false,
     failure: { kind: "failed", error },

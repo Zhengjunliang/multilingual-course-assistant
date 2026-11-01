@@ -44,6 +44,7 @@ function turnOf(rating: FeedbackDetail): Turn {
     citations: answer.citations,
     route: answer.route,
     searchMs: answer.search_ms,
+    steps: answer.steps,
     locale: answer.locale,
     complete: answer.complete,
     failure: answer.complete ? null : { kind: "interrupted" },
