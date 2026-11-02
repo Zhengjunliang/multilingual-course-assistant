@@ -2,6 +2,86 @@
 
 What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; each entry's *Reproducibility* section says how its numbers were produced, and what of that was not kept. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
+## 2026-11-02 — The first M3 run: two runs a server restart apart agree to the last digit, retrieval repeats the gates, and campus answers lose most on relevancy in Italian
+
+`#20`. `rag.eval generate` and `rag.eval judge` on both gold sets, twice, on ultron, under the protocol of [decisions.md](decisions.md), 2026-11-01, *Retrieval and generation are measured apart and per language, and a larger Qwen3 judges answers frozen before it reads them*, and of [architecture.md](architecture.md), row "Evaluation" and section "Experiment reproducibility". Every number below is the artefact `eval/<run_id>.json` of its run; the two runs of a set are equal, so a value cites either.
+
+### 1. The setup
+
+| Item | Value |
+| --- | --- |
+| Machine | ultron, GPU 0, Titan RTX 24 GB; the other card busy with another user's job |
+| Code | `eb0da48`, the tree clean in all four artefacts |
+| Index | the snapshot `data/snapshots/20261101-200800/` restored on ultron's Qdrant server: `slides` 1248 points; `unifi_web` 29114, of which the two crawl runs `crawl-20260822-143647` (26047) and `crawl-20260822-164843` (3051) are read and `live-20261031-231043` (16) is not |
+| Retrieval | `Qwen/Qwen3-Embedding-0.6B` and `Qwen/Qwen3-Reranker-0.6B` on GPU 0 beside the system's server; the top 10 for the retrieval metrics, the product's top 5 and cut-off 0.5 for the answer |
+| System | `Qwen/Qwen3-4B-Instruct-2507` at `cdbee75f17c01a7cc42f958dc650907174af0554`, fp16, vLLM 0.32.0 with `--max-model-len 16384 --gpu-memory-utilization 0.55 --seed 0 --generation-config vllm --max-num-seqs 1 --no-enable-prefix-caching`; temperature 0, seed 0 |
+| Judge | `Qwen/Qwen3-32B-AWQ` at `0499c3ac83fdef8810b907a23894ba91e95eddd8`, AWQ, the same vLLM with `--max-model-len 8192 --gpu-memory-utilization 0.95 --enforce-eager --max-num-seqs 1 --no-enable-prefix-caching`; non-thinking, temperature 0, top-p 1, seed 0, `max_tokens` 2048; ragas 0.4.3, answer relevancy's encoder on the CPU |
+| Runs | `m3-smoke-run1` and `m3-campus-run1`, then each server stopped and started again, then `m3-smoke-run2` and `m3-campus-run2` |
+
+### 2. Two runs
+
+The two artefacts of each set are equal once the run id, the times and the answers' path are left out: the answers' sha256 (smoke `1220e6f1…`, campus `b03674e3…`), the rank of every question on both arms, and all 288 judgements, 72 questions by four metrics. Between the runs the 4B server and the 32B server each restarted. `m3-campus-run2` was generated after an out-of-memory stop (section 6) with `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`, which changes how memory is allocated and not what is computed, and its answers are run 1's byte for byte. The protocol's third run, for two runs that differ, was not needed.
+
+### 3. Retrieval
+
+| Set | Arm | hit@1 | hit@3 | hit@5 | hit@10 | MRR@10 |
+| --- | --- | --- | --- | --- | --- | --- |
+| smoke (40, en) | rerank | 30 | 37 | **38** | 40 | 0.845 |
+| smoke | no rerank | 29 | 34 | 37 | 39 | 0.808 |
+| campus (32) | rerank | 19 | 27 | **28** | 29 | 0.715 |
+| campus | no rerank | 10 | 22 | 23 | 25 | 0.496 |
+
+| Campus | en (12) | it (13) | zh (7) |
+| --- | --- | --- | --- |
+| rerank, hit@5 · MRR@10 | 11 · 0.660 | 11 · 0.780 | 6 · 0.690 |
+| no rerank, hit@5 · MRR@10 | 5 · 0.323 | 12 · 0.615 | 6 · 0.571 |
+
+The reranked arm, the product's path, repeats the gates question by question: smoke 38/40 missing `q018` and `q028`, campus 28/32 missing `c003`, `c011`, `c012` and `c034`, en 11/12, it 11/13, zh 6/7 (entry of 2026-09-29, section 4). Smoke without the reranker repeats its 37/40 and its misses `q015`, `q035` and `q036`.
+
+Campus without the reranker reads 23/32 on ultron against 21/32 on the laptop: `rag.gold gold/campus.jsonl --no-rerank`, run on the laptop's service holding the same snapshot with the same code, scores `c010` and `c034` a MISS (en 4/12), where ultron ranks them first and third. `c034` is the tie inside one branch of the entry of 2026-09-29, section 4. Which of the two machines' arithmetic or the restored index moves `c010` was not measured. The no-rerank arm therefore depends on the machine as well as on restarts, and `#25`'s arms are compared on one machine.
+
+### 4. Generation
+
+| Metric | smoke (40, en) | campus (32) | en (12) | it (13) | zh (7) |
+| --- | --- | --- | --- | --- | --- |
+| Faithfulness | 0.966, 1 failed | 0.922 | 1.000 | 0.858 | 0.905 |
+| Answer relevancy | 0.848 | 0.755 | 0.882 | **0.631** | 0.770 |
+| Context precision | 0.962 | 0.733 | 0.673 | 0.806 | 0.701 |
+| Context recall | 0.980 | 0.671 | 0.636 | 0.718 | 0.643 |
+
+No metric returned NaN, no question reached the refusal path, and every answer is in its question's language by `detect_locale` (40/40, 32/32). One judgement failed, on both runs: faithfulness on `q035`, whose answer of 1597 characters made the judge's list of statements outrun `max_tokens` 2048 (`IncompleteOutputException`); it is counted as failed and left out of the mean of 39.
+
+The flag *faithful but irrelevant* holds `q028`, `q040`, `c004`, `c012` and `c029`. Four of them answer that the excerpts do not hold what was asked, which is faithful to the excerpts and which answer relevancy scores 0 as a noncommittal answer: `q028`, a retrieval miss of the gate, and `c004`, `c012` and `c029`. They had context, so by the protocol they are not refusals, and their 0 is in the means. `c012` cites `[None]`, a marker that names no excerpt. `q040` answers its question and scores 0.470.
+
+The question of the entry of 2026-08-25, section 1, «学费什么时候交？», which degenerated into `[febbraio]`, is in no gold set, so this run says nothing about it; the seven Chinese campus questions were all answered in Chinese. It belongs to the gold set of `#19`.
+
+### 5. Time
+
+| Step | Run 1 | Run 2 |
+| --- | --- | --- |
+| 4B server ready | 2542 s, the first start reading the weights from `/oblivion` and compiling | 116 s |
+| `generate` smoke | 959 s | 206 s |
+| `generate` campus | 246 s | 216 s, on a third start of the server (137 s) |
+| 32B server ready | 121 s with `--enforce-eager` at 0.95, after a start at 0.92 had stopped | 127 s, the same way |
+| `judge` smoke | 6547 s, 2.7 min a question | 6752 s |
+| `judge` campus | 6332 s, 3.3 min a question | 6599 s |
+
+The 32B weights, 18 GB downloaded in 494 s, took 22787 MiB of GPU 0 with the server. At 0.92 the first start stopped: holding 8192 tokens needed 2.0 GiB of KV cache and 1.79 GiB was left, enough for 7312. With `--enforce-eager` at 0.95 the KV cache held 15,376 tokens, and the judge decoded about 9.4 tokens a second.
+
+### 6. What the server needed
+
+The first `m3-campus-run2` stopped with CUDA out of memory: the reranker asked 3.27 GiB at once beside the 4B server's 13.28 GiB, and 3.63 GiB its own process held were free only in pieces. It is the tensor of the entry of 2026-10-26, section 7. `expandable_segments` let the free blocks join, and the stopped run started again from where it stopped, its finished artefacts kept.
+
+### Reproducibility
+
+```bash
+uv run python -m rag.eval generate gold/smoke.jsonl --run-id m3-smoke-run1 --index-snapshot data/snapshots/20261101-200800 --revision cdbee75f17c01a7cc42f958dc650907174af0554 --quantisation fp16
+uv run python -m rag.eval judge --run-id m3-smoke-run1 --revision 0499c3ac83fdef8810b907a23894ba91e95eddd8 --quantisation awq
+uv run python -m rag.gold gold/campus.jsonl --no-rerank    # the laptop's arm of section 3
+```
+
+and the same for `gold/campus.jsonl` and the `run2` ids, with `.env` pointing `LLM_*` at the 4B server and `JUDGE_*` at the 32B one ([development.md](development.md), section "Working on the MICC servers"). On ultron the four runs ran from one script started under `nohup`, which started and stopped both servers and Qdrant between the runs; the script and its log were kept outside the repository. The artefacts are `eval/m3-smoke-run1.json`, `eval/m3-smoke-run2.json`, `eval/m3-campus-run1.json` and `eval/m3-campus-run2.json`; the frozen answers, text included, are `data/eval/<run_id>/answers.jsonl`, outside git, on the laptop and on `/oblivion`. The equality of section 2 is a recursive comparison of each pair of artefacts that skips `run_id`, `generated_at`, `judged_at` and `path`; the script was not kept.
+
 ## 2026-11-01 — Tracing a routing run in Langfuse costs less than the run-to-run spread, and a deleted conversation leaves Langfuse in under two minutes
 
 `#26`. The campus set's routing report run with tracing on and off, then the site's traces followed through a rating, its withdrawal and two deletions, one made while tracing was off. The laptop, RTX 4070 Laptop 8 GB, Ollama serving `qwen3:4b-instruct-2507-q4_K_M`; Langfuse v4.72.0 under the compose profile `tracing`, the SDK `langfuse` 5.1.0.
