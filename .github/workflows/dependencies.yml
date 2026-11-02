@@ -60,6 +60,10 @@ jobs:
           # leaves to Dependabot's alerts.
           fail-on-severity: low
           fail-on-scopes: runtime
+          # The audit job's two accepted advisories, which this pull request
+          # brings in with ragas; no release fixes either. docs/security.md,
+          # the table of accepted risks, says when each goes.
+          allow-ghsas: GHSA-95ww-475f-pr4f, GHSA-w8v5-vhqr-4h9v
           # On by default; licences are not the question this check answers.
           license-check: false
 
