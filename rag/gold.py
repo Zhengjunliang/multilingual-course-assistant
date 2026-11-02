@@ -31,7 +31,7 @@ from rag.agent import FALLBACK_REASON, collections_for, route
 from rag.chunk import EditionKey
 from rag.llm import trace
 from rag.probe import configure_cli_logging
-from rag.search import DEFAULT_RERANK_MODEL, build_reranker, payload_filter, search
+from rag.search import DEFAULT_RERANK_MODEL, TOP_K, build_reranker, payload_filter, search
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -182,7 +182,7 @@ def main(argv: list[str] | None = None) -> None:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("gold_file", type=Path)
-    parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--top-k", type=int, default=TOP_K)
     parser.add_argument(
         "--min-score",
         type=float,

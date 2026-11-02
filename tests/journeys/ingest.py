@@ -7,7 +7,7 @@ tests/test_parse.py with the parse plan given, so nothing probes the file;
 its digest is still the file's, which is how `/api/sources/<sha256>` finds
 it. One chunk, by the word-counting chunker of tests/test_chunk.py: with the
 two excerpts already indexed, fewer than an answer's five sources
-(apps/qa/engine.py, `TOP_K`), so an uploaded file is among them whatever
+(rag/search.py, `TOP_K`), so an uploaded file is among them whatever
 the stub encoders make of the question.
 """
 
