@@ -149,7 +149,10 @@ def test_the_wait_for_the_gpu_is_part_of_retrieval(tmp_path: Path) -> None:
     ]
     waited = steps[3].ms
     assert waited is not None
-    assert waited >= 100
+    # `ms` reads `time.monotonic()`, which on Windows ticks every 15.6 ms: a
+    # wait of 100 ms can read as 6 ticks, 94 ms.
+    tick = time.get_clock_info("monotonic").resolution * 1000
+    assert waited >= 100 - tick
 
 
 def test_retrieval_takes_turns_and_generation_does_not(monkeypatch: pytest.MonkeyPatch) -> None:
