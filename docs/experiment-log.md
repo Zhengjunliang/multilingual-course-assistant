@@ -11,9 +11,9 @@ What was measured, on which data and with which command, and the problems met al
 | Item | Value |
 | --- | --- |
 | Machine | ultron, GPU 0, Titan RTX 24 GB; the other card busy with another user's job |
-| Code | `eb0da48`, the tree clean in all four artefacts |
+| Code | `eb0da48`, the tree clean in all four artefacts; they record the code `generate` ran on, and the `judge` step ran on the same checkout, which the script's log names at its start |
 | Index | the snapshot `data/snapshots/20261101-200800/` restored on ultron's Qdrant server: `slides` 1248 points; `unifi_web` 29114, of which the two crawl runs `crawl-20260822-143647` (26047) and `crawl-20260822-164843` (3051) are read and `live-20261031-231043` (16) is not |
-| Retrieval | `Qwen/Qwen3-Embedding-0.6B` and `Qwen/Qwen3-Reranker-0.6B` on GPU 0 beside the system's server; the top 10 for the retrieval metrics, the product's top 5 and cut-off 0.5 for the answer |
+| Retrieval | `Qwen/Qwen3-Embedding-0.6B` and `Qwen/Qwen3-Reranker-0.6B` on GPU 0 beside the system's server; each question searched in its gold target collection, as the gates search it, so the router and its rewritten query are outside these numbers; the top 10 for the retrieval metrics, the product's top 5 and cut-off 0.5 for the answer |
 | System | `Qwen/Qwen3-4B-Instruct-2507` at `cdbee75f17c01a7cc42f958dc650907174af0554`, fp16, vLLM 0.32.0 with `--max-model-len 16384 --gpu-memory-utilization 0.55 --seed 0 --generation-config vllm --max-num-seqs 1 --no-enable-prefix-caching`; temperature 0, seed 0 |
 | Judge | `Qwen/Qwen3-32B-AWQ` at `0499c3ac83fdef8810b907a23894ba91e95eddd8`, AWQ, the same vLLM with `--max-model-len 8192 --gpu-memory-utilization 0.95 --enforce-eager --max-num-seqs 1 --no-enable-prefix-caching`; non-thinking, temperature 0, top-p 1, seed 0, `max_tokens` 2048; ragas 0.4.3, answer relevancy's encoder on the CPU |
 | Runs | `m3-smoke-run1` and `m3-campus-run1`, then each server stopped and started again, then `m3-smoke-run2` and `m3-campus-run2` |
