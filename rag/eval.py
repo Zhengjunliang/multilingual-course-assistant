@@ -270,6 +270,9 @@ def generate(args: argparse.Namespace) -> None:
     from rag.index import build_dense_encoder, build_sparse_encoder, open_client
     from rag.llm import build_streamer
 
+    # Read as the step starts: a commit or a checkout during a run of hours
+    # would otherwise name code that did not run.
+    code = code_identity()
     questions = load_gold(args.gold_file)
     # The reference answers live outside git (gold/README.md), and the judge
     # needs them: stop before a GPU is spent on a run that cannot be judged.
@@ -358,7 +361,7 @@ def generate(args: argparse.Namespace) -> None:
     artefact: dict[str, Any] = {
         "run_id": run_id,
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "code": code_identity(),
+        "code": code,
         "gold": {"path": args.gold_file.as_posix(), "sha256": sha256_of(args.gold_file)},
         "index": {
             "points": points,
@@ -392,6 +395,7 @@ def judge(args: argparse.Namespace) -> None:
     from rag.index import build_dense_encoder
     from rag.judge import JUDGE_SAMPLING, Judge
 
+    code = code_identity()
     path = ARTEFACT_DIR / f"{args.run_id}.json"
     artefact: dict[str, Any] = json.loads(path.read_bytes())
     answers_path = Path(artefact["answers"]["path"])
@@ -426,6 +430,7 @@ def judge(args: argparse.Namespace) -> None:
     asyncio.run(score_all())
     artefact["judged_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     artefact["judge"] = {
+        "code": code,
         "model": env.judge_model,
         "revision": args.revision,
         "quantisation": args.quantisation,

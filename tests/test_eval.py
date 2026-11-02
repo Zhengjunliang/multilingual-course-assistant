@@ -242,6 +242,38 @@ def test_judge_scores_the_frozen_answers_and_refuses_changed_ones(
         main(["judge", "--run-id", RUN_ID])
 
 
+def test_each_step_records_the_code_it_started_on(
+    run_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A commit or a checkout during a run of hours does not rename the code
+    that ran: each step reads the code as it starts, and the judge's code is
+    recorded beside the generator's."""
+    code = {"commit": "generate-start", "dirty": False}
+    monkeypatch.setattr("rag.eval.code_identity", lambda: dict(code))
+
+    class CommittingStreamer(StubStreamer):
+        def stream(self, messages: Any) -> Any:
+            code["commit"] = "during-generate"
+            return super().stream(messages)
+
+    class CommittingJudge(StubJudge):
+        async def score(
+            self, question: str, answer: str, contexts: list[str], reference: str
+        ) -> dict[str, float | str]:
+            code["commit"] = "during-judge"
+            return await super().score(question, answer, contexts, reference)
+
+    monkeypatch.setattr("rag.llm.build_streamer", lambda *args, **kwargs: CommittingStreamer())
+    generate()
+    code["commit"] = "judge-start"
+    monkeypatch.setattr("rag.judge.Judge", CommittingJudge)
+    main(["judge", "--run-id", RUN_ID])
+
+    artefact = json.loads(ARTEFACT.read_bytes())
+    assert artefact["code"] == {"commit": "generate-start", "dirty": False}
+    assert artefact["judge"]["code"] == {"commit": "judge-start", "dirty": False}
+
+
 def row(locale: str, rank: tuple[int | None, int | None], scores: Any, **extra: Any) -> Any:
     return {
         "locale": locale,
