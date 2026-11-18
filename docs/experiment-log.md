@@ -11,7 +11,7 @@ What was measured, on which data and with which command, and the problems met al
 | Item | Value |
 | --- | --- |
 | Machine | ultron, GPU 0, Titan RTX 24 GB; the other card busy with another user's job |
-| Code | `eb0da48`, the tree clean in all four artefacts; they record the code `generate` ran on, and the `judge` step ran on the same checkout, which the script's log names at its start |
+| Code | `b6c8699` on main; the artefacts record `eb0da48`, its commit before the rebase merge of PR #247, the same tree, clean in all four artefacts; they record the code `generate` ran on, and the `judge` step ran on the same checkout, which the script's log names at its start |
 | Index | the snapshot `data/snapshots/20261101-200800/` restored on ultron's Qdrant server: `slides` 1248 points; `unifi_web` 29114, of which the two crawl runs `crawl-20260822-143647` (26047) and `crawl-20260822-164843` (3051) are read and `live-20261031-231043` (16) is not |
 | Retrieval | `Qwen/Qwen3-Embedding-0.6B` and `Qwen/Qwen3-Reranker-0.6B` on GPU 0 beside the system's server; each question searched in its gold target collection, as the gates search it, so the router and its rewritten query are outside these numbers; the top 10 for the retrieval metrics, the product's top 5 and cut-off 0.5 for the answer |
 | System | `Qwen/Qwen3-4B-Instruct-2507` at `cdbee75f17c01a7cc42f958dc650907174af0554`, fp16, vLLM 0.32.0 with `--max-model-len 16384 --gpu-memory-utilization 0.55 --seed 0 --generation-config vllm --max-num-seqs 1 --no-enable-prefix-caching`; temperature 0, seed 0 |
@@ -477,7 +477,7 @@ On the second turn the model wrote no answer: it **copied the retrieved excerpt*
 
 The defect is **distinct** from the one recorded on 2026-08-21 and 2026-08-25 under citation-marker conformance, although it shares the surface symptom `[Excerpt N]`. There the model wrote an answer and got the marker wrong; here it writes no answer at all. It is recorded as a bucket of its own in the error taxonomy (`#23`): **transcription instead of an answer**, with the hypothesis to verify that the trigger is a very short follow-up turn (a statement, not a question) combined with a densely structured tabular context.
 
-The source cards were unaffected, since they are rendered from retrieval metadata, not from the model's text ([decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*, point 6); the turn that does not answer stays visible to the student and belongs to generation.
+The source cards were unaffected, since they are rendered from retrieval metadata, not from the model's text ([decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*, point 5); the turn that does not answer stays visible to the student and belongs to generation.
 
 ### Reproducibility
 
@@ -524,7 +524,7 @@ With the 1470 s batch of 2026-08-24, these times are this machine's normal regim
 
 No write reached the knowledge base: `unifi_web` stayed at 29098 points and the points with `ingest_run_id='live-retest-main'` are **0** (g001 fetched nothing; of g002's two fetches, one was unchanged from the crawl and the other was rejected by the gate). No rollback was needed.
 
-**Operational consequence**: measurements that involve the LLM move to the MICC server; the local machine is for development and functional checks. The split is possible because `rag/` does not import Django and runs outside the web. The decision is [decisions.md](decisions.md), 2026-08-25, *Where measurements run*.
+**Operational consequence**: measurements that involve the LLM move to the MICC server; the local machine is for development and functional checks. The split is possible because `rag/` does not import Django and runs outside the web. The decision in force is [decisions.md](decisions.md), 2026-11-18, *Where measurements run: every model run is on MICC, and the laptop keeps the code and the site*.
 
 ### Reproducibility
 
@@ -662,7 +662,7 @@ The first end-to-end check of the retrieval → generation chain running entirel
 - **Groundedness**: the 8 trial answers were correct and faithful to the retrieved excerpts; no hallucinated content observed.
 - **Language adherence**: a question in Italian → an answer in Italian (the "same language as the question" requirement).
 - **Out-of-domain refusal**: to a question foreign to the course (Kubernetes ingress) the model answers correctly that the excerpts do not contain the information, without inventing.
-- **Citation-marker fidelity — a problem found**: the quantised 4B model does not reliably copy the `[file p.N]` markers into the answer body: it shortens them, writes `[Excerpt N]`, or copies a file name the system prompt gave as an example. The web interface therefore renders sources from retrieval metadata, not from the model's text ([decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*, point 6), and numbered citations replaced the markers (entry of 2026-10-12, section 6). Citation fidelity becomes a variable of the 0.6B/4B/8B size comparison (`#27`).
+- **Citation-marker fidelity — a problem found**: the quantised 4B model does not reliably copy the `[file p.N]` markers into the answer body: it shortens them, writes `[Excerpt N]`, or copies a file name the system prompt gave as an example. The web interface therefore renders sources from retrieval metadata, not from the model's text ([decisions.md](decisions.md), 2026-08-21, *The campus source and the agent*, point 5), and numbered citations replaced the markers (entry of 2026-10-12, section 6). Citation fidelity becomes a variable of the 0.6B/4B/8B size comparison (`#27`).
 - **GPU memory**: measured peak **7761 / 8188 MiB** during an answer (dense encoder Qwen3-Embedding-0.6B in **bfloat16** ≈ 1.2 GB + reranker fp16 ≈ 1.2 GB + LLM q4 ≈ 2.6 GB + activations). The three models fit on 8 GB, at the limit: between questions the Ollama model has to be unloaded (`ollama stop …` or `OLLAMA_KEEP_ALIVE=0` on the server side), otherwise the default residency (5 min) causes an OOM on the next question.
 
 ### Reproducibility

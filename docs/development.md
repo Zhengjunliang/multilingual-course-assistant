@@ -125,14 +125,14 @@ Course PDFs go in `data/corpus/<course>/` (gitignored). These commands are the e
 
 Parsing writes two files per PDF, `<name>.<variant>.json` (the lossless DoclingDocument) and `<name>.<variant>.meta.json` (provenance); routing rules, measurements and the chunk payload contract are in [docs/rag-pipeline.md](rag-pipeline.md).
 
-Embedding and reranking (0.6B each) run on the local GPU, fully offline. Generation calls an OpenAI-compatible endpoint, by default a local Ollama:
+Embedding and reranking (0.6B each) run on the local GPU, fully offline. Generation calls an OpenAI-compatible endpoint: vLLM on MICC (section "Working on the MICC servers"), and a local Ollama, the default of `config/env.py`, only when MICC is unreachable:
 
 ```powershell
 winget install Ollama.Ollama
 ollama pull qwen3:4b-instruct-2507-q4_K_M
 ```
 
-The endpoint and model are `LLM_BASE_URL` and `LLM_MODEL` in `.env`; the M3 experiments point them at vLLM on MICC through an SSH tunnel (the commented lines in `.env.example`). `rag.eval judge` asks its own endpoint, `JUDGE_BASE_URL` and `JUDGE_MODEL`, which default to the same local Ollama. The reasons for this split are in [docs/architecture.md](architecture.md), section on compute strategy.
+The endpoint and model are `LLM_BASE_URL` and `LLM_MODEL` in `.env`; the commented lines in `.env.example` point them at vLLM on MICC through an SSH tunnel. `rag.eval judge` asks its own endpoint, `JUDGE_BASE_URL` and `JUDGE_MODEL`, which default to the same local Ollama. The reasons for this split are in [docs/architecture.md](architecture.md), section on compute strategy.
 
 ## Code layout
 
@@ -178,7 +178,7 @@ export UV_NO_SYNC=1                      # uv run keeps the CUDA torch (Serving 
 export PATH=/oblivion/users/jzheng/bin:$PATH   # uv, installed with UV_INSTALL_DIR there
 ```
 
-On ultron the system `gcc` (gcc-11) stops with "internal compiler error: Illegal instruction" on any input, and Triton compiles its kernel launchers with the compiler `CC` names, so ultron's `~/.bashrc` also exports `CC=gcc-12`. Shared datasets are under `/<volume>/DATASETS`, `/<volume>/datasets` or `/home/DATASETS` (naming differs per machine); datasets in a personal directory get cleaned up by the NAS rules.
+The Dream Machines mount the same `/oblivion` as ultron and theflash runs the same driver, 535 (2026-11-18), so the caches and the virtual environment below serve them too; a machine's first login needs the lines above in its own `~/.bashrc`. On ultron the system `gcc` (gcc-11) stops with "internal compiler error: Illegal instruction" on any input, and Triton compiles its kernel launchers with the compiler `CC` names, so ultron's `~/.bashrc` also exports `CC=gcc-12`. Shared datasets are under `/<volume>/DATASETS`, `/<volume>/datasets` or `/home/DATASETS` (naming differs per machine); datasets in a personal directory get cleaned up by the NAS rules.
 
 **Serving the LLM.** vLLM pins its own torch, so it gets a virtual environment of its own, and the project reaches it over HTTP only. PyPI's `vllm` 0.32.0 is built for CUDA 13, which needs driver 580 or later; ultron's driver is 535, so the wheel is the release page's `+cu129` build:
 
@@ -192,7 +192,7 @@ VLLM_API_KEY=$(cat ~/.vllm_key) CUDA_VISIBLE_DEVICES=0 nohup /oblivion/users/jzh
   --max-model-len 16384 --gpu-memory-utilization 0.55 --seed 0 > ~/vllm.log 2>&1 &
 ```
 
-The server listens on loopback because the MICC servers answer from the internet, and checks a key because every user of the server reaches its loopback port. The key travels in `VLLM_API_KEY`, not `--api-key`: `ps` shows any process's command line to every user. A first start compiles kernels for about three minutes into the caches above, and a restart takes about 80 s ([experiment-log.md](experiment-log.md), entry of 2026-10-26). On the laptop, a tunnel and three lines of `.env` (`.env.example` names them) point the project at it, with no change to the code:
+The memory share above is ultron's: on a Dream Machine's 11 GB card the 4B's 8 GB of fp16 weights need a larger share and a shorter `--max-model-len`. The server listens on loopback because the MICC servers answer from the internet, and checks a key because every user of the server reaches its loopback port. The key travels in `VLLM_API_KEY`, not `--api-key`: `ps` shows any process's command line to every user. A first start compiles kernels for about three minutes into the caches above, and a restart takes about 80 s ([experiment-log.md](experiment-log.md), entry of 2026-10-26). On the laptop, a tunnel and three lines of `.env` (`.env.example` names them) point the project at it, with no change to the code:
 
 ```bash
 ssh -o ServerAliveInterval=30 -N -L 8100:127.0.0.1:8417 ultron
