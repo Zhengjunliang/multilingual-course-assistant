@@ -15,6 +15,7 @@ from test_answer import StubStreamer
 from test_index import StubDense, StubSparse, make_chunk
 from test_search import ORM_TEXT, TASSE_TEXT, TASSE_URL, KeywordReranker, make_web_chunk
 
+from config.env import env
 from rag.eval import METRICS, code_identity, main, summarise
 from rag.gold import GoldQuestion
 from rag.index import WEB_COLLECTION, DenseEncoder, ensure_collection, index_chunks, open_client
@@ -122,7 +123,8 @@ def test_run_artifact_records_snapshot_identity(run_dir: Path) -> None:
     }
     assert artefact["index"]["ingest_source"] == "crawl"
     assert artefact["system"] == {
-        "model": "qwen3:4b-instruct-2507-q4_K_M",
+        # The model `.env` names, which is MICC's vLLM one on a developer's laptop.
+        "model": env.llm_model,
         "revision": "abc123",
         "quantisation": "fp16",
         "server": {"version": "stub"},
