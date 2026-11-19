@@ -2,6 +2,52 @@
 
 What was measured, on which data and with which command, and the problems met along the way. One entry per date, newest first; each entry's *Reproducibility* section says how its numbers were produced, and what of that was not kept. Decisions are owned by [decisions.md](decisions.md); the thesis chapter on experiments is written from this log (`#42`).
 
+## 2026-11-19 — FISICA II enters through the upload chain: 352 pages in 66 minutes on the laptop, display formulas decoded, inline ones left as OCR noise
+
+`#47`. The Elettromagnetismo part of FISICA II's textbook and the question sheets of its written exams from 2022 to 2025, added to (`B024251`, `2025-2026`) by `manage.py import_materials` and ingested by the laptop's worker as an upload is: Docling with formula decoding on every file, on the RTX 4070 Laptop GPU. What enters and why: [decisions.md](decisions.md), 2026-11-19, *A course without slides enters through the part of its textbook its exams cover, past exams are split by year, and the evaluation searches every course with material*.
+
+### 1. What went in
+
+| Material | Files | Pages | Chunks | Parse and index time |
+| --- | --- | --- | --- | --- |
+| Textbook, chapters 1 to 10 | 10 | 278 | 953 | 2521 s |
+| Textbook, guide to the problems with numerical results | 1 | 34 | 135 | 1273 s |
+| Exam question sheets, 2022 to 2025 | 27 | 40 | 92 | 165 s |
+
+Every file reached `ready`. A chapter took from 94 s (chapter 3, 14 pages) to 401 s (chapter 4, 36 pages), 5 to 11 s a page; a question sheet took from 1 to 15 s, and the first one 36 s, which include loading the models.
+
+### 2. What the parse kept
+
+- **Exam sheets**: a clean text layer; the constants line decodes to LaTeX; exponents flatten (`10-7C`).
+- **Display formulas of the textbook**: 1446, decoded to LaTeX. 18 keep only their equation number, such as `$$( 3 . 4 )$$`, all in chapters 1 to 6; in chapter 3 they are Gauss's law itself, equations 3.3 to 3.6, while its 63 other display formulas read as correct LaTeX on a check of every ninth.
+- **Inline formulas** come from the scan's OCR text layer and read as noise: `4 n e 0 r` for 4πε₀r.
+- **Soft hyphens**: 2751 of them, each followed by a space, split words at the scan's line ends (`attra­ verso`), in chapters 1 to 10; the guide has none.
+- **Captions**: 14 of chapter 3's 48 chunks hold a figure caption alone.
+
+These are the parsing comparison's to measure (`#29`); the chain is unchanged for this course.
+
+### 3. The guide to the problems outlasts the task's soft limit
+
+Its 34 pages hold 360 display formulas and took 1273 s, past the ingest task's 20-minute soft limit (`apps/materials/tasks.py`), which a Windows worker's solo pool does not enforce: a Linux worker would stop this file. Formula decoding runs outside the 300 s budget of the page conversion (`#237`).
+
+### 4. Two answers on the site
+
+The demo student (`B047`, year 2), default scope, generation from the local Ollama while MICC was unreachable ([decisions.md](decisions.md), 2026-11-18, point 1):
+
+- *Come si usa la legge di Gauss per calcolare il campo elettrico dentro e fuori una sfera uniformemente carica?*: the field inside and outside is right, cited from `mazzoldi-03-legge-di-gauss-p056.pdf`, page 8, which is book page 63, section 3.3. The worker took 84 s.
+- Exercise 1 of 2026-04-03, a held-out sheet, pasted whole: cited from the same page and from `Compito12012022.pdf`, page 1, the same template in 2022. The fields are right; the potential difference between the centre and the shell is wrong, since it drops the part inside the sphere. 91 s.
+
+### 5. The index after the entry
+
+The snapshot `data/snapshots/20261119-133451/` holds 2669 slides points: PPM 1253, FISICA II 1180, and 236 of `B003725` in 2026-2027, five papers uploaded through the site on 2026-11-02 to an edition whose teaching has not started, outside the evaluation scope. PPM's 1253 points against the 1248 of M3's snapshot `20261101-200800` are one more PDF uploaded through the site on 2026-11-02, five points, which is not in `data/corpus/PPM/`. No FISICA II source file is from 2026. The before-and-after measurement therefore runs on this one snapshot, PPM's scope against both courses', so that FISICA II's passages are the only difference.
+
+### Reproducibility
+
+- The split: book page p is PDF page p + 10, checked at every chapter's first and last page; the one-off `pypdfium2` script was not kept.
+- `uv run python manage.py import_materials data/corpus/FISICA2 --course B024251 --academic-year 2025-2026`, with the worker as [development.md](development.md) runs it; a time is the material's `finished_at` minus its `started_at`.
+- The counts come from a Qdrant scroll over `course` = `B024251`; the script was not kept.
+- The PDFs stay in `data/`, outside git.
+
 ## 2026-11-02 — The first M3 run: two runs a server restart apart agree to the last digit, retrieval repeats the gates, and campus answers lose most on relevancy in Italian
 
 `#20`. `rag.eval generate` and `rag.eval judge` on both gold sets, twice, on ultron, under the protocol of [decisions.md](decisions.md), 2026-11-01, *Retrieval and generation are measured apart and per language, and a larger Qwen3 judges answers frozen before it reads them*, and of [architecture.md](architecture.md), row "Evaluation" and section "Experiment reproducibility". Every number below is the artefact `eval/<run_id>.json` of its run; the two runs of a set are equal, so a value cites either.

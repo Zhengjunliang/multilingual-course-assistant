@@ -41,9 +41,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# The evaluation scope is pinned, never the current edition: a switch must not
-# move an M3 number (`#96`).
-EVAL_SCOPE = (EditionKey("B028451", "2025-2026"),)
+# The evaluation scope is every edition that holds course material within a
+# student's default scope, searched together as that scope searches every
+# course of a programme (docs/decisions.md, 2026-11-19). It is pinned, never
+# the current edition: a switch must not move an M3 number (`#96`).
+EVAL_SCOPE = (EditionKey("B028451", "2025-2026"), EditionKey("B024251", "2025-2026"))
 
 
 class GoldQuestion(BaseModel):
